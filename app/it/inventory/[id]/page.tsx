@@ -1,17 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowLeft, Edit, Trash2, Calendar, MapPin, User, Package, Zap, Monitor, Cpu, HardDrive, Wifi, Camera, Printer, Smartphone, Tablet, Headphones, Mouse, Keyboard, ExternalLink, Download, Share2, Loader2, AlertCircle, DollarSign, Building, Globe } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, HardDrive, Monitor, Loader2, AlertCircle, Calendar, DollarSign, User, Building, Package, Shield, Clock } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore"
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   AlertDialog,
@@ -34,21 +33,14 @@ interface InventoryItem {
   assignedTo: string
   condition: "excellent" | "good" | "fair" | "poor" | "damaged"
   status: "active" | "inactive" | "maintenance" | "retired"
-  vendorType: "physical" | "online"
-  storeName: string
-  storeLocation: string
-  websiteName: string
-  websiteUrl: string
-  purchaseDate: string
-  warrantyExpiry: string
   cost: number
   currency: string
-  description: string
+  purchaseDate: string
+  warrantyExpiry: string
   serialNumber?: string
-  specifications?: string
   licenseKey?: string
   version?: string
-  categorySpecs?: Record<string, any>
+  description: string
   created_at: any
   updated_at: any
   created_by: string
@@ -62,45 +54,6 @@ interface User {
   last_name: string
   email: string
   company_id?: string
-}
-
-const categoryIcons = {
-  "Desktop Computer": Monitor,
-  "Laptop": Monitor,
-  "Server": Cpu,
-  "Printer": Printer,
-  "Network Switch": Wifi,
-  "Router": Wifi,
-  "Firewall": Wifi,
-  "Monitor": Monitor,
-  "Smartphone": Smartphone,
-  "Tablet": Tablet,
-  "Storage Device": HardDrive,
-  "Keyboard": Keyboard,
-  "Mouse": Mouse,
-  "Webcam": Camera,
-  "Headset": Headphones,
-  "Projector": Monitor,
-  "Scanner": Camera,
-  "UPS": Zap,
-  "Cable": Zap,
-  "Docking Station": Monitor,
-  "Operating System": Monitor,
-  "Productivity Suite": Monitor,
-  "Design Software": Monitor,
-  "Security Software": Monitor,
-  "Database Software": Monitor,
-  "Development Tools": Monitor,
-  "Antivirus": Monitor,
-  "Backup Software": Monitor,
-  "Communication Software": Monitor,
-  "Project Management": Monitor,
-  "Accounting Software": Monitor,
-  "CRM Software": Monitor,
-  "ERP Software": Monitor,
-  "Media Software": Monitor,
-  "Browser": Monitor,
-  "Utility Software": Monitor,
 }
 
 const statusColors = {
@@ -118,9 +71,9 @@ const conditionColors = {
   damaged: "bg-red-100 text-red-800 border-red-200",
 }
 
-export default function InventoryItemDetails() {
-  const params = useParams()
+export default function InventoryItemDetailPage() {
   const router = useRouter()
+  const params = useParams()
   const { userData } = useAuth()
   const [item, setItem] = useState<InventoryItem | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -128,59 +81,84 @@ export default function InventoryItemDetails() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Fetch item details and users
+  const itemId = params.id as string
+
+  // Fetch item details
   useEffect(() => {
-    const fetchData = async () => {
-      if (!params.id || typeof params.id !== 'string' || !userData?.company_id) return
+    const fetchItem = async () => {
+      if (!itemId || !userData?.company_id) return
 
       try {
-        // Fetch item details
-        const itemRef = doc(db, "itInventory", params.id)
-        const itemSnap = await getDoc(itemRef)
-
-        if (itemSnap.exists()) {
-          const itemData = itemSnap.data()
-          setItem({
-            id: itemSnap.id,
-            name: itemData.name || "",
-            type: itemData.type || "hardware",
-            category: itemData.category || "",
-            brand: itemData.brand || "",
-            department: itemData.department || "",
-            assignedTo: itemData.assignedTo || "unassigned",
-            condition: itemData.condition || "excellent",
-            status: itemData.status || "active",
-            vendorType: itemData.vendorType || "physical",
-            storeName: itemData.storeName || "",
-            storeLocation: itemData.storeLocation || "",
-            websiteName: itemData.websiteName || "",
-            websiteUrl: itemData.websiteUrl || "",
-            purchaseDate: itemData.purchaseDate || "",
-            warrantyExpiry: itemData.warrantyExpiry || "",
-            cost: itemData.cost || 0,
-            currency: itemData.currency || "USD",
-            description: itemData.description || "",
-            serialNumber: itemData.serialNumber || "",
-            specifications: itemData.specifications || "",
-            licenseKey: itemData.licenseKey || "",
-            version: itemData.version || "",
-            categorySpecs: itemData.categorySpecs || {},
-            created_at: itemData.created_at,
-            updated_at: itemData.updated_at,
-            created_by: itemData.created_by || "",
-            company_id: itemData.company_id || "",
-          })
-        } else {
+        const itemDoc = await getDoc(doc(db, "itInventory", itemId))
+        
+        if (!itemDoc.exists()) {
           toast({
-            title: "Error",
-            description: "Item not found",
+            title: "Item Not Found",
+            description: "The requested inventory item could not be found.",
             variant: "destructive",
           })
           router.push("/it/inventory")
           return
         }
 
-        // Fetch users for display names
+        const data = itemDoc.data()
+        
+        // Check if item belongs to user's company
+        if (data.company_id !== userData.company_id) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to view this item.",
+            variant: "destructive",
+          })
+          router.push("/it/inventory")
+          return
+        }
+
+        setItem({
+          id: itemDoc.id,
+          name: data.name || "",
+          type: data.type || "hardware",
+          category: data.category || "",
+          brand: data.brand || "",
+          department: data.department || "",
+          assignedTo: data.assignedTo || "unassigned",
+          condition: data.condition || "excellent",
+          status: data.status || "active",
+          cost: data.cost || 0,
+          currency: data.currency || "USD",
+          purchaseDate: data.purchaseDate || "",
+          warrantyExpiry: data.warrantyExpiry || "",
+          serialNumber: data.serialNumber || "",
+          licenseKey: data.licenseKey || "",
+          version: data.version || "",
+          description: data.description || "",
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          created_by: data.created_by || "",
+          company_id: data.company_id || "",
+        })
+      } catch (error) {
+        console.error("Error fetching item:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load item details",
+          variant: "destructive",
+        })
+        router.push("/it/inventory")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchItem()
+  }, [itemId, userData?.company_id, router])
+
+  // Fetch users for display names
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData?.company_id) return
+
+      try {
         const usersRef = collection(db, "iboard_users")
         const q = query(usersRef, where("company_id", "==", userData.company_id))
         const querySnapshot = await getDocs(q)
@@ -200,19 +178,12 @@ export default function InventoryItemDetails() {
 
         setUsers(fetchedUsers)
       } catch (error) {
-        console.error("Error fetching data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load item details",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
+        console.error("Error fetching users:", error)
       }
     }
 
-    fetchData()
-  }, [params.id, userData?.company_id, router])
+    fetchUsers()
+  }, [userData?.company_id])
 
   // Helper function to get user display name
   const getUserDisplayName = (uid: string) => {
@@ -222,11 +193,25 @@ export default function InventoryItemDetails() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  const handleEdit = () => {
-    router.push(`/it/inventory/edit/${params.id}`)
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "Not specified"
+    try {
+      return new Date(dateString).toLocaleDateString()
+    } catch {
+      return dateString
+    }
   }
 
-  const handleDelete = async () => {
+  const handleEdit = () => {
+    router.push(`/it/inventory/edit/${itemId}`)
+  }
+
+  const handleDelete = () => {
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
     if (!item) return
 
     setIsDeleting(true)
@@ -250,53 +235,14 @@ export default function InventoryItemDetails() {
     }
   }
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    toast({
-      title: "Link Copied",
-      description: "Item link copied to clipboard",
-    })
-  }
-
-  const formatSpecificationKey = (key: string) => {
-    return key
-      .replace(/([A-Z])/g, " $1")
-      .replace(/^./, (str) => str.toUpperCase())
-      .trim()
-  }
-
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Not specified"
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-  }
-
-  const formatTimestamp = (timestamp: any) => {
-    if (!timestamp) return "Not available"
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  const handleBack = () => {
+    router.push("/it/inventory")
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-7xl">
+        <div className="container mx-auto p-6">
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -311,62 +257,46 @@ export default function InventoryItemDetails() {
   if (!item) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-7xl">
-          <div className="text-center py-12">
-            <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Item Not Found</h2>
-            <p className="text-gray-600 mb-6">The requested inventory item could not be found.</p>
-            <Button onClick={() => router.push("/it/inventory")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
-            </Button>
+        <div className="container mx-auto p-6">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="flex flex-col items-center space-y-4">
+              <AlertCircle className="h-16 w-16 text-muted-foreground" />
+              <div className="text-center">
+                <h3 className="text-lg font-semibold">Item Not Found</h3>
+                <p className="text-muted-foreground">The requested inventory item could not be found.</p>
+              </div>
+              <Button onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Inventory
+              </Button>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  const CategoryIcon = categoryIcons[item.category as keyof typeof categoryIcons] || Package
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="container mx-auto p-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
           <div className="flex items-center space-x-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/it/inventory")}
-              className="shadow-sm bg-white"
-            >
+            <Button variant="outline" onClick={handleBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
+              Back
             </Button>
-            <Separator orientation="vertical" className="h-6" />
             <div>
               <h1 className="text-3xl font-bold text-slate-900">{item.name}</h1>
-              <p className="text-slate-600">
-                {item.brand} • {item.category}
-              </p>
+              <p className="text-slate-600">{item.brand} • {item.category}</p>
             </div>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={handleShare} className="shadow-sm bg-white">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleEdit} className="shadow-sm bg-white">
+          <div className="flex space-x-2">
+            <Button onClick={handleEdit} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-              className="shadow-sm bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
+            <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -374,219 +304,139 @@ export default function InventoryItemDetails() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
+          {/* Main Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Basic Information Card */}
-            <Card className="shadow-sm">
+            {/* Basic Information */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CategoryIcon className="h-5 w-5 mr-2" />
-                  Item Overview
+                <CardTitle className="flex items-center space-x-2">
+                  {item.type === "hardware" ? (
+                    <HardDrive className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <Monitor className="h-5 w-5 text-green-600" />
+                  )}
+                  <span>Basic Information</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Type</label>
-                      <div className="flex items-center mt-1">
-                        {item.type === "hardware" ? (
-                          <HardDrive className="h-4 w-4 mr-2 text-blue-600" />
-                        ) : (
-                          <Monitor className="h-4 w-4 mr-2 text-green-600" />
-                        )}
-                        <span className="text-sm font-medium capitalize">{item.type}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Department</label>
-                      <div className="flex items-center mt-1">
-                        <Building className="h-4 w-4 mr-2 text-gray-400" />
-                        <span className="text-sm">{item.department}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Status</label>
-                      <div className="mt-1">
-                        <Badge variant="outline" className={cn(statusColors[item.status])}>
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                        </Badge>
-                      </div>
-                    </div>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Name</label>
+                    <p className="text-sm font-semibold">{item.name}</p>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Condition</label>
-                      <div className="mt-1">
-                        <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                          {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Assigned To</label>
-                      <div className="flex items-center mt-1">
-                        <User className="h-4 w-4 mr-2 text-gray-400" />
-                        <span className="text-sm">{getUserDisplayName(item.assignedTo)}</span>
-                      </div>
-                    </div>
-                    {item.serialNumber && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Serial Number</label>
-                        <div className="mt-1">
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
-                            {item.serialNumber}
-                          </code>
-                        </div>
-                      </div>
-                    )}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Type</label>
+                    <p className="text-sm font-semibold capitalize">{item.type}</p>
                   </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Brand</label>
+                    <p className="text-sm font-semibold">{item.brand}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Category</label>
+                    <p className="text-sm font-semibold">{item.category}</p>
+                  </div>
+                  {item.serialNumber && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Serial Number</label>
+                      <p className="text-sm font-mono">{item.serialNumber}</p>
+                    </div>
+                  )}
+                  {item.version && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Version</label>
+                      <p className="text-sm font-semibold">{item.version}</p>
+                    </div>
+                  )}
                 </div>
+                
+                {item.licenseKey && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">License Key</label>
+                    <p className="text-sm font-mono bg-muted p-2 rounded">{item.licenseKey}</p>
+                  </div>
+                )}
+
                 {item.description && (
-                  <div className="mt-6 pt-6 border-t">
-                    <label className="text-sm font-medium text-gray-600">Description</label>
-                    <p className="text-sm text-gray-700 mt-2 leading-relaxed">{item.description}</p>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Description</label>
+                    <p className="text-sm">{item.description}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Technical Specifications */}
-            {((item.type === "hardware" && (item.specifications || item.categorySpecs)) ||
-              (item.type === "software" && (item.licenseKey || item.version || item.categorySpecs))) && (
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Cpu className="h-5 w-5 mr-2" />
-                    Technical Specifications
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Basic specs */}
-                    {item.type === "hardware" && item.specifications && (
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">General Specifications</h4>
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                          <p className="text-sm font-mono">{item.specifications}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {item.type === "software" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {item.licenseKey && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-600">License Key</label>
-                            <div className="mt-1">
-                              <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono block">
-                                {item.licenseKey}
-                              </code>
-                            </div>
-                          </div>
-                        )}
-                        {item.version && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-600">Version</label>
-                            <div className="mt-1">
-                              <span className="text-sm font-medium">{item.version}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Category-specific specs */}
-                    {item.categorySpecs && Object.keys(item.categorySpecs).length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                          {item.category} Specifications
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {Object.entries(item.categorySpecs).map(([key, value]) => {
-                            if (!value) return null
-                            return (
-                              <div key={key}>
-                                <label className="text-sm font-medium text-gray-600">
-                                  {formatSpecificationKey(key)}
-                                </label>
-                                <div className="mt-1">
-                                  <span className="text-sm bg-gray-50 px-2 py-1 rounded block">
-                                    {value}
-                                  </span>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
+            {/* Assignment & Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="h-5 w-5 text-purple-600" />
+                  <span>Assignment & Status</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Department</label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">{item.department}</p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Assigned To</label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">{getUserDisplayName(item.assignedTo)}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
+                    <div className="mt-1">
+                      <Badge variant="outline" className={cn(statusColors[item.status])}>
+                        {item.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Condition</label>
+                    <div className="mt-1">
+                      <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                        {item.condition}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Vendor Information */}
-            {(item.storeName || item.storeLocation || item.websiteName) && (
-              <Card className="shadow-sm">
+            {/* Financial Information */}
+            {item.cost > 0 && (
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    {item.vendorType === "physical" ? (
-                      <MapPin className="h-5 w-5 mr-2" />
-                    ) : (
-                      <Globe className="h-5 w-5 mr-2" />
-                    )}
-                    Vendor Information
+                  <CardTitle className="flex items-center space-x-2">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                    <span>Financial Information</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Store Type</label>
-                      <div className="mt-1">
-                        <Badge variant="secondary" className="capitalize">
-                          {item.vendorType === "physical" ? "Physical Store" : "Online Store"}
-                        </Badge>
+                      <label className="text-sm font-medium text-muted-foreground">Purchase Cost</label>
+                      <p className="text-lg font-bold text-green-600">
+                        {item.currency} {item.cost.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Purchase Date</label>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-semibold">{formatDate(item.purchaseDate)}</p>
                       </div>
                     </div>
-                    {item.storeName && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Store Name</label>
-                        <p className="text-sm mt-1">{item.storeName}</p>
-                      </div>
-                    )}
-                    {item.vendorType === "physical" && item.storeLocation && (
-                      <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-gray-600">Store Location</label>
-                        <p className="text-sm mt-1">{item.storeLocation}</p>
-                      </div>
-                    )}
-                    {item.vendorType === "online" && (
-                      <>
-                        {item.websiteName && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-600">Website Name</label>
-                            <p className="text-sm mt-1">{item.websiteName}</p>
-                          </div>
-                        )}
-                        {item.websiteUrl && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-600">Website URL</label>
-                            <div className="mt-1">
-                              <a
-                                href={item.websiteUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 underline flex items-center"
-                              >
-                                {item.websiteUrl}
-                                <ExternalLink className="h-3 w-3 ml-1" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -595,84 +445,90 @@ export default function InventoryItemDetails() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Financial Information */}
-            <Card className="shadow-sm">
+            {/* Quick Stats */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2" />
-                  Financial Information
+                <CardTitle className="flex items-center space-x-2">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <span>Quick Overview</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-center mb-4">
-                  <p className="text-sm text-gray-600 mb-1">Purchase Cost</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {item.cost > 0 ? formatCurrency(item.cost, item.currency) : "Not specified"}
+              <CardContent className="space-y-4">
+                <div className="text-center">
+                  {item.type === "hardware" ? (
+                    <HardDrive className="h-12 w-12 text-blue-600 mx-auto mb-2" />
+                  ) : (
+                    <Monitor className="h-12 w-12 text-green-600 mx-auto mb-2" />
+                  )}
+                  <p className="font-semibold">{item.type === "hardware" ? "Hardware Asset" : "Software License"}</p>
+                  <p className="text-sm text-muted-foreground">{item.category}</p>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Status:</span>
+                    <Badge variant="outline" className={cn(statusColors[item.status], "text-xs")}>
+                      {item.status}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Condition:</span>
+                    <Badge variant="outline" className={cn(conditionColors[item.condition], "text-xs")}>
+                      {item.condition}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Warranty Information */}
+            {item.warrantyExpiry && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield className="h-5 w-5 text-orange-600" />
+                    <span>Warranty</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Expires on</p>
+                    <p className="text-lg font-semibold">{formatDate(item.warrantyExpiry)}</p>
+                    {new Date(item.warrantyExpiry) < new Date() && (
+                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 mt-2">
+                        Expired
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Timestamps */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-gray-600" />
+                  <span>Record Information</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Created</label>
+                  <p className="text-sm">
+                    {item.created_at ? new Date(item.created_at.toDate()).toLocaleString() : "Unknown"}
                   </p>
                 </div>
-                <Separator className="my-4" />
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium">Purchase Date</p>
-                      <p className="text-sm text-gray-600">{formatDate(item.purchaseDate)}</p>
-                    </div>
+                {item.updated_at && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
+                    <p className="text-sm">
+                      {new Date(item.updated_at.toDate()).toLocaleString()}
+                    </p>
                   </div>
-                  {item.warrantyExpiry && (
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium">Warranty Expiry</p>
-                        <p className="text-sm text-gray-600">{formatDate(item.warrantyExpiry)}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* System Information */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>System Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Created</p>
-                  <p className="text-sm text-gray-600">{formatTimestamp(item.created_at)}</p>
-                  {item.created_by && (
-                    <p className="text-xs text-gray-500">by {item.created_by}</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Last Updated</p>
-                  <p className="text-sm text-gray-600">{formatTimestamp(item.updated_at)}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" onClick={handleEdit}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Item
-                </Button>
-                <Button variant="outline" className="w-full justify-start" onClick={handleShare}>
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share Item
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Details
-                </Button>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -687,13 +543,13 @@ export default function InventoryItemDetails() {
                 <span>Delete Inventory Item</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{item?.name}"? This action cannot be undone.
+                Are you sure you want to delete "{item.name}"? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDelete}
+                onClick={confirmDelete}
                 disabled={isDeleting}
                 className="bg-red-600 hover:bg-red-700"
               >

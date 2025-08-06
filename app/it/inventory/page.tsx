@@ -11,7 +11,7 @@ import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardD
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, orderBy, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, deleteDoc, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   DropdownMenu,
@@ -109,8 +109,6 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "!=", true),
-          orderBy("deleted", "asc"),
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -118,32 +116,29 @@ export default function ITInventoryPage() {
         const fetchedItems: InventoryItem[] = []
         querySnapshot.forEach((doc) => {
           const data = doc.data()
-          // Additional client-side filter as backup
-          if (data.deleted !== true) {
-            fetchedItems.push({
-              id: doc.id,
-              name: data.name || "",
-              type: data.type || "hardware",
-              category: data.category || "",
-              brand: data.brand || "",
-              department: data.department || "",
-              assignedTo: data.assignedTo || "unassigned",
-              condition: data.condition || "excellent",
-              status: data.status || "active",
-              cost: data.cost || 0,
-              currency: data.currency || "USD",
-              purchaseDate: data.purchaseDate || "",
-              warrantyExpiry: data.warrantyExpiry || "",
-              serialNumber: data.serialNumber || "",
-              licenseKey: data.licenseKey || "",
-              version: data.version || "",
-              description: data.description || "",
-              created_at: data.created_at,
-              updated_at: data.updated_at,
-              created_by: data.created_by || "",
-              company_id: data.company_id || "",
-            })
-          }
+          fetchedItems.push({
+            id: doc.id,
+            name: data.name || "",
+            type: data.type || "hardware",
+            category: data.category || "",
+            brand: data.brand || "",
+            department: data.department || "",
+            assignedTo: data.assignedTo || "unassigned",
+            condition: data.condition || "excellent",
+            status: data.status || "active",
+            cost: data.cost || 0,
+            currency: data.currency || "USD",
+            purchaseDate: data.purchaseDate || "",
+            warrantyExpiry: data.warrantyExpiry || "",
+            serialNumber: data.serialNumber || "",
+            licenseKey: data.licenseKey || "",
+            version: data.version || "",
+            description: data.description || "",
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            created_by: data.created_by || "",
+            company_id: data.company_id || "",
+          })
         })
 
         setItems(fetchedItems)
@@ -235,13 +230,7 @@ export default function ITInventoryPage() {
 
     setIsDeleting(true)
     try {
-      // Soft delete by setting deleted field to true
-      await updateDoc(doc(db, "itInventory", itemToDelete.id), {
-        deleted: true,
-        deleted_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      })
-      
+      await deleteDoc(doc(db, "itInventory", itemToDelete.id))
       setItems(items.filter(item => item.id !== itemToDelete.id))
       toast({
         title: "Item Deleted",
