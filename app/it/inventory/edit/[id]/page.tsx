@@ -10,15 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2, Upload, X, Image } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
+
+// Initialize Firebase Storage
+const storage = getStorage()
 
 interface FormData {
+  productNumber: string
   name: string
   type: "hardware" | "software"
   category: string
@@ -35,6 +40,7 @@ interface FormData {
   warrantyExpiry: string
   cost: string
   currency?: string
+  stock: string
   description: string
   serialNumber?: string
   specifications?: string
@@ -42,6 +48,10 @@ interface FormData {
   version?: string
   status: "active" | "inactive" | "maintenance" | "retired"
   categorySpecs?: Record<string, any>
+  // Media fields
+  images: File[]
+  imageUrls: string[]
+  existingImageUrls: string[]
 }
 
 interface User {
@@ -126,6 +136,13 @@ const getAllSteps = () => [
   },
   {
     id: 4,
+    title: "Media",
+    description: "Images",
+    icon: Image,
+    color: "bg-pink-500",
+  },
+  {
+    id: 5,
     title: "Technical",
     description: "Specifications",
     icon: Settings,
@@ -133,7 +150,7 @@ const getAllSteps = () => [
     showFor: "hardware", // Only show for hardware
   },
   {
-    id: 5,
+    id: 6,
     title: "Review",
     description: "Final check",
     icon: Eye,
@@ -156,7 +173,9 @@ export default function EditInventoryItemPage() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingItem, setLoadingItem] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadingImages, setUploadingImages] = useState(false)
   const [formData, setFormData] = useState<FormData>({
+    productNumber: "",
     name: "",
     type: "hardware",
     category: "",
@@ -173,6 +192,7 @@ export default function EditInventoryItemPage() {
     warrantyExpiry: "",
     cost: "",
     currency: "USD",
+    stock: "",
     description: "",
     serialNumber: "",
     specifications: "",
@@ -180,6 +200,9 @@ export default function EditInventoryItemPage() {
     version: "",
     status: "active",
     categorySpecs: {},
+    images: [],
+    imageUrls: [],
+    existingImageUrls: [],
   })
 
   const visibleSteps = getVisibleSteps(formData.type)
@@ -208,6 +231,7 @@ export default function EditInventoryItemPage() {
           }
 
           setFormData({
+            productNumber: data.productNumber || "",
             name: data.name || "",
             type: data.type || "hardware",
             category: data.category || "",
@@ -224,6 +248,7 @@ export default function EditInventoryItemPage() {
             warrantyExpiry: data.warrantyExpiry || "",
             cost: data.cost ? data.cost.toString() : "",
             currency: data.currency || "USD",
+            stock: data.stock ? data.stock.toString() : "",
             description: data.description || "",
             serialNumber: data.serialNumber || "",
             specifications: data.specifications || "",
@@ -231,6 +256,9 @@ export default function EditInventoryItemPage() {
             version: data.version || "",
             status: data.status || "active",
             categorySpecs: data.categorySpecs || {},
+            images: [],
+            imageUrls: [],
+            existingImageUrls: data.imageUrls || [],
           })
         } else {
           toast({
@@ -316,6 +344,65 @@ export default function EditInventoryItemPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
+  // Handle image upload
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+    
+    if (imageFiles.length !== files.length) {
+      toast({
+        title: "Invalid Files",
+        description: "Only image files are allowed",
+        variant: "destructive",
+      })
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, ...imageFiles]
+    }))
+  }
+
+  // Remove new image
+  const removeImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Remove existing image
+  const removeExistingImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      existingImageUrls: prev.existingImageUrls.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Upload new images to Firebase Storage
+  const uploadImages = async (): Promise<string[]> => {
+    if (formData.images.length === 0) return []
+
+    setUploadingImages(true)
+    const uploadPromises = formData.images.map(async (file) => {
+      const fileName = `${Date.now()}-${file.name}`
+      const storageRef = ref(storage, `inventory-images/${fileName}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      return await getDownloadURL(snapshot.ref)
+    })
+
+    try {
+      const urls = await Promise.all(uploadPromises)
+      setUploadingImages(false)
+      return urls
+    } catch (error) {
+      setUploadingImages(false)
+      throw error
+    }
+  }
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -325,6 +412,8 @@ export default function EditInventoryItemPage() {
       case 3:
         return true // Optional fields
       case 4:
+        return true // Optional fields
+      case 5:
         return true // Optional fields
       default:
         return true
@@ -374,8 +463,15 @@ export default function EditInventoryItemPage() {
     setIsSubmitting(true)
 
     try {
+      // Upload new images first
+      const newImageUrls = await uploadImages()
+
+      // Combine existing and new image URLs
+      const allImageUrls = [...formData.existingImageUrls, ...newImageUrls]
+
       // Prepare the data to be updated
       const itemData = {
+        productNumber: formData.productNumber,
         name: formData.name,
         type: formData.type,
         category: formData.category,
@@ -392,6 +488,7 @@ export default function EditInventoryItemPage() {
         warrantyExpiry: formData.warrantyExpiry || "",
         cost: formData.cost ? Number.parseFloat(formData.cost) : 0,
         currency: formData.currency || "USD",
+        stock: formData.stock ? Number.parseInt(formData.stock) : 0,
         description: formData.description || "",
         serialNumber: formData.serialNumber || "",
         specifications: formData.specifications || "",
@@ -399,6 +496,7 @@ export default function EditInventoryItemPage() {
         version: formData.version || "",
         status: formData.status,
         categorySpecs: formData.categorySpecs || {},
+        imageUrls: allImageUrls,
         updated_at: serverTimestamp(),
       }
 
@@ -468,6 +566,18 @@ export default function EditInventoryItemPage() {
               <CardContent className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
+                    <Label htmlFor="productNumber" className="text-base font-medium">
+                      Product Number *
+                    </Label>
+                    <Input
+                      id="productNumber"
+                      value={formData.productNumber}
+                      readOnly
+                      className="h-12 text-base bg-gray-50 font-mono"
+                    />
+                    <p className="text-sm text-muted-foreground">Auto-generated product number</p>
+                  </div>
+                  <div className="space-y-3">
                     <Label htmlFor="name" className="text-base font-medium">
                       Item Name *
                     </Label>
@@ -480,6 +590,9 @@ export default function EditInventoryItemPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="type" className="text-base font-medium">
                       Item Type *
@@ -509,9 +622,6 @@ export default function EditInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="category" className="text-base font-medium">
                       Category *
@@ -533,6 +643,9 @@ export default function EditInventoryItemPage() {
                     </Select>
                     <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="brand" className="text-base font-medium">
                       Brand *
@@ -546,9 +659,6 @@ export default function EditInventoryItemPage() {
                       required
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="department" className="text-base font-medium">
                       Department *
@@ -571,6 +681,9 @@ export default function EditInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="assignedTo" className="text-base font-medium">
                       Assigned To
@@ -598,9 +711,6 @@ export default function EditInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="condition" className="text-base font-medium">
                       Condition
@@ -643,6 +753,9 @@ export default function EditInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="status" className="text-base font-medium">
                       Status
@@ -840,7 +953,7 @@ export default function EditInventoryItemPage() {
 
             <Card className="border-2 border-dashed border-yellow-200 bg-yellow-50/30">
               <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="cost" className="text-base font-medium">
                       Purchase Cost
@@ -897,6 +1010,21 @@ export default function EditInventoryItemPage() {
                     </div>
                   </div>
                   <div className="space-y-3">
+                    <Label htmlFor="stock" className="text-base font-medium">
+                      Stock Quantity
+                    </Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      placeholder="0"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-sm text-muted-foreground">Number of items in stock</p>
+                  </div>
+                  <div className="space-y-3">
                     <Label htmlFor="purchaseDate" className="text-base font-medium">
                       Purchase Date
                     </Label>
@@ -920,6 +1048,109 @@ export default function EditInventoryItemPage() {
                       className="h-12 text-base"
                     />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+
+      case "Media":
+        return (
+          <div className="space-y-8">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-pink-100 mb-4">
+                <Image className="h-8 w-8 text-pink-600" />
+              </div>
+              <h2 className="text-2xl font-bold">Media Upload</h2>
+              <p className="text-muted-foreground">Update images of your inventory item</p>
+            </div>
+
+            <Card className="border-2 border-dashed border-pink-200 bg-pink-50/30">
+              <CardContent className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Item Images</Label>
+                  
+                  {/* Upload Area */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-pink-400 transition-colors">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-lg font-medium text-gray-700 mb-2">
+                        Click to upload new images
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        PNG, JPG, JPEG up to 10MB each
+                      </p>
+                    </label>
+                  </div>
+
+                  {/* Existing Images */}
+                  {formData.existingImageUrls.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Current Images ({formData.existingImageUrls.length})</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.existingImageUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={url || "/placeholder.svg"}
+                                alt={`Existing ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeExistingImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* New Images Preview */}
+                  {formData.images.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">New Images ({formData.images.length})</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.images.map((file, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                alt={`New ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1 truncate">
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-muted-foreground">
+                    You can upload multiple images. Only image files (PNG, JPG, JPEG) are allowed.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -973,7 +1204,7 @@ export default function EditInventoryItemPage() {
                 </div>
               </div>
 
-              {/* Category-specific specifications */}
+              {/* Category-specific specifications - same as new page but with existing data */}
               {formData.category === "Desktop Computer" && (
                 <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
                   <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -1657,6 +1888,10 @@ export default function EditInventoryItemPage() {
                       </h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Product Number:</span>
+                          <span className="text-sm text-muted-foreground font-mono">{formData.productNumber}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Type:</span>
                           <Badge variant="secondary" className="capitalize">
                             {formData.type}
@@ -1783,6 +2018,12 @@ export default function EditInventoryItemPage() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Stock:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {formData.stock ? `${formData.stock} units` : "Not specified"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Purchase Date:</span>
                           <span className="text-sm text-muted-foreground">
                             {formData.purchaseDate || "Not specified"}
@@ -1796,6 +2037,42 @@ export default function EditInventoryItemPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Media Preview */}
+                    {(formData.existingImageUrls.length > 0 || formData.images.length > 0) && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Media ({formData.existingImageUrls.length + formData.images.length} images)
+                        </h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          {/* Show existing images first */}
+                          {formData.existingImageUrls.slice(0, 4).map((url, index) => (
+                            <div key={`existing-${index}`} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={url || "/placeholder.svg"}
+                                alt={`Existing ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {/* Show new images */}
+                          {formData.images.slice(0, 4 - formData.existingImageUrls.length).map((file, index) => (
+                            <div key={`new-${index}`} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                alt={`New ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {(formData.existingImageUrls.length + formData.images.length) > 4 && (
+                            <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
+                              <span className="text-sm text-gray-500">+{(formData.existingImageUrls.length + formData.images.length) - 4} more</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
@@ -1835,6 +2112,7 @@ export default function EditInventoryItemPage() {
                         )}
                       </div>
                     </div>
+
                     {/* Category-specific specs preview */}
                     {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
                       <div>
@@ -1979,11 +2257,11 @@ export default function EditInventoryItemPage() {
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || uploadingImages}
                 className="shadow-sm bg-blue-600 hover:bg-blue-700"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSubmitting ? "Updating..." : "Update Item"}
+                {isSubmitting ? "Updating..." : uploadingImages ? "Uploading..." : "Update Item"}
               </Button>
             )}
           </div>

@@ -10,15 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Upload, X, Image } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+
+// Initialize Firebase Storage
+const storage = getStorage()
 
 interface FormData {
+  productNumber: string
   name: string
   type: "hardware" | "software"
   category: string
@@ -35,6 +40,7 @@ interface FormData {
   warrantyExpiry: string
   cost: string
   currency?: string
+  stock: string
   description: string
   serialNumber?: string
   specifications?: string
@@ -42,6 +48,9 @@ interface FormData {
   version?: string
   // Category-specific fields
   categorySpecs?: Record<string, any>
+  // Media fields
+  images: File[]
+  imageUrls: string[]
 }
 
 interface User {
@@ -101,6 +110,13 @@ const getCategoriesForType = (type: "hardware" | "software") => {
   return type === "hardware" ? hardwareCategories : softwareCategories
 }
 
+// Generate product number
+const generateProductNumber = () => {
+  const timestamp = Date.now().toString()
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  return `IT-${timestamp.slice(-6)}-${random}`
+}
+
 // Replace the static steps array with this dynamic one
 const getAllSteps = () => [
   {
@@ -126,6 +142,13 @@ const getAllSteps = () => [
   },
   {
     id: 4,
+    title: "Media",
+    description: "Images",
+    icon: Image,
+    color: "bg-pink-500",
+  },
+  {
+    id: 5,
     title: "Technical",
     description: "Specifications",
     icon: Settings,
@@ -133,7 +156,7 @@ const getAllSteps = () => [
     showFor: "hardware", // Only show for hardware
   },
   {
-    id: 5,
+    id: 6,
     title: "Review",
     description: "Final check",
     icon: Eye,
@@ -161,7 +184,9 @@ export default function NewInventoryItemPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadingImages, setUploadingImages] = useState(false)
   const [formData, setFormData] = useState<FormData>({
+    productNumber: generateProductNumber(),
     name: "",
     type: "hardware",
     category: "",
@@ -178,12 +203,15 @@ export default function NewInventoryItemPage() {
     warrantyExpiry: "",
     cost: "",
     currency: "USD",
+    stock: "",
     description: "",
     serialNumber: "",
     specifications: "",
     licenseKey: "",
     version: "",
     categorySpecs: {},
+    images: [],
+    imageUrls: [],
   })
 
   const visibleSteps = getVisibleSteps(formData.type)
@@ -259,6 +287,57 @@ export default function NewInventoryItemPage() {
     }))
   }
 
+  // Handle image upload
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+    
+    if (imageFiles.length !== files.length) {
+      toast({
+        title: "Invalid Files",
+        description: "Only image files are allowed",
+        variant: "destructive",
+      })
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, ...imageFiles]
+    }))
+  }
+
+  // Remove image
+  const removeImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Upload images to Firebase Storage
+  const uploadImages = async (): Promise<string[]> => {
+    if (formData.images.length === 0) return []
+
+    setUploadingImages(true)
+    const uploadPromises = formData.images.map(async (file) => {
+      const fileName = `${Date.now()}-${file.name}`
+      const storageRef = ref(storage, `inventory-images/${fileName}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      return await getDownloadURL(snapshot.ref)
+    })
+
+    try {
+      const urls = await Promise.all(uploadPromises)
+      setUploadingImages(false)
+      return urls
+    } catch (error) {
+      setUploadingImages(false)
+      throw error
+    }
+  }
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -268,6 +347,8 @@ export default function NewInventoryItemPage() {
       case 3:
         return true // Optional fields
       case 4:
+        return true // Optional fields
+      case 5:
         return true // Optional fields
       default:
         return true
@@ -317,8 +398,12 @@ export default function NewInventoryItemPage() {
     setIsSubmitting(true)
 
     try {
+      // Upload images first
+      const imageUrls = await uploadImages()
+
       // Prepare the data to be saved
       const itemData = {
+        productNumber: formData.productNumber,
         name: formData.name,
         type: formData.type,
         category: formData.category,
@@ -335,12 +420,14 @@ export default function NewInventoryItemPage() {
         warrantyExpiry: formData.warrantyExpiry || "",
         cost: formData.cost ? Number.parseFloat(formData.cost) : 0,
         currency: formData.currency || "USD",
+        stock: formData.stock ? Number.parseInt(formData.stock) : 0,
         description: formData.description || "",
         serialNumber: formData.serialNumber || "",
         specifications: formData.specifications || "",
         licenseKey: formData.licenseKey || "",
         version: formData.version || "",
         categorySpecs: formData.categorySpecs || {},
+        imageUrls: imageUrls,
         status: "active", // Default status
         company_id: userData.company_id,
         created_by: userData.uid,
@@ -399,6 +486,18 @@ export default function NewInventoryItemPage() {
               <CardContent className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
+                    <Label htmlFor="productNumber" className="text-base font-medium">
+                      Product Number *
+                    </Label>
+                    <Input
+                      id="productNumber"
+                      value={formData.productNumber}
+                      readOnly
+                      className="h-12 text-base bg-gray-50 font-mono"
+                    />
+                    <p className="text-sm text-muted-foreground">Auto-generated product number</p>
+                  </div>
+                  <div className="space-y-3">
                     <Label htmlFor="name" className="text-base font-medium">
                       Item Name *
                     </Label>
@@ -411,6 +510,9 @@ export default function NewInventoryItemPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="type" className="text-base font-medium">
                       Item Type *
@@ -440,9 +542,6 @@ export default function NewInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="category" className="text-base font-medium">
                       Category *
@@ -464,6 +563,9 @@ export default function NewInventoryItemPage() {
                     </Select>
                     <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="brand" className="text-base font-medium">
                       Brand *
@@ -477,9 +579,6 @@ export default function NewInventoryItemPage() {
                       required
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="department" className="text-base font-medium">
                       Department *
@@ -502,6 +601,9 @@ export default function NewInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="assignedTo" className="text-base font-medium">
                       Assigned To
@@ -529,49 +631,48 @@ export default function NewInventoryItemPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="condition" className="text-base font-medium">
-                    Condition
-                  </Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
-                      setFormData({ ...formData, condition: value })
-                    }
-                  >
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="excellent">
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          Excellent
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="good">
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                          Good
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="fair">
-                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                          Fair
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="poor">
-                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                          Poor
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="damaged">
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                          Damaged
-                        </Badge>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-3">
+                    <Label htmlFor="condition" className="text-base font-medium">
+                      Condition
+                    </Label>
+                    <Select
+                      value={formData.condition}
+                      onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
+                        setFormData({ ...formData, condition: value })
+                      }
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="excellent">
+                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                            Excellent
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="good">
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                            Good
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="fair">
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            Fair
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="poor">
+                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                            Poor
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="damaged">
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            Damaged
+                          </Badge>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -732,7 +833,7 @@ export default function NewInventoryItemPage() {
 
             <Card className="border-2 border-dashed border-yellow-200 bg-yellow-50/30">
               <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="cost" className="text-base font-medium">
                       Purchase Cost
@@ -789,6 +890,21 @@ export default function NewInventoryItemPage() {
                     </div>
                   </div>
                   <div className="space-y-3">
+                    <Label htmlFor="stock" className="text-base font-medium">
+                      Stock Quantity
+                    </Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      placeholder="0"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-sm text-muted-foreground">Number of items in stock</p>
+                  </div>
+                  <div className="space-y-3">
                     <Label htmlFor="purchaseDate" className="text-base font-medium">
                       Purchase Date
                     </Label>
@@ -812,6 +928,82 @@ export default function NewInventoryItemPage() {
                       className="h-12 text-base"
                     />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+
+      case "Media":
+        return (
+          <div className="space-y-8">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-pink-100 mb-4">
+                <Image className="h-8 w-8 text-pink-600" />
+              </div>
+              <h2 className="text-2xl font-bold">Media Upload</h2>
+              <p className="text-muted-foreground">Upload images of your inventory item</p>
+            </div>
+
+            <Card className="border-2 border-dashed border-pink-200 bg-pink-50/30">
+              <CardContent className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Item Images</Label>
+                  
+                  {/* Upload Area */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-pink-400 transition-colors">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-lg font-medium text-gray-700 mb-2">
+                        Click to upload images
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        PNG, JPG, JPEG up to 10MB each
+                      </p>
+                    </label>
+                  </div>
+
+                  {/* Image Preview */}
+                  {formData.images.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Uploaded Images ({formData.images.length})</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.images.map((file, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                alt={`Upload ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1 truncate">
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-muted-foreground">
+                    You can upload multiple images. Only image files (PNG, JPG, JPEG) are allowed.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -1261,6 +1453,8 @@ export default function NewInventoryItemPage() {
                             <Label className="text-base font-medium">Port Count</Label>
                             <Input 
                               placeholder="e.g., 24 ports, 48 ports" 
+                              className="h-12 text-base"
+                              value={formData.categorySp
                               className="h-12 text-base"
                               value={formData.categorySpecs?.portCount || ""}
                               onChange={(e) => updateCategorySpec("portCount", e.target.value)}
@@ -1807,6 +2001,10 @@ export default function NewInventoryItemPage() {
                       </h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Product Number:</span>
+                          <span className="text-sm text-muted-foreground font-mono">{formData.productNumber}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Type:</span>
                           <Badge variant="secondary" className="capitalize">
                             {formData.type}
@@ -1919,6 +2117,12 @@ export default function NewInventoryItemPage() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Stock:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {formData.stock ? `${formData.stock} units` : "Not specified"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Purchase Date:</span>
                           <span className="text-sm text-muted-foreground">
                             {formData.purchaseDate || "Not specified"}
@@ -1932,6 +2136,31 @@ export default function NewInventoryItemPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Media Preview */}
+                    {formData.images.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Media ({formData.images.length} images)
+                        </h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          {formData.images.slice(0, 6).map((file, index) => (
+                            <div key={index} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {formData.images.length > 6 && (
+                            <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
+                              <span className="text-sm text-gray-500">+{formData.images.length - 6} more</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
@@ -2116,11 +2345,11 @@ export default function NewInventoryItemPage() {
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || uploadingImages}
                 className="shadow-sm bg-green-600 hover:bg-green-700"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSubmitting ? "Creating..." : "Create Item"}
+                {isSubmitting ? "Creating..." : uploadingImages ? "Uploading..." : "Create Item"}
               </Button>
             )}
           </div>
