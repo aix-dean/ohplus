@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink, Image } from 'lucide-react'
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink, Image, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -91,6 +92,8 @@ export default function InventoryDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   // Fetch item details
   useEffect(() => {
@@ -205,12 +208,57 @@ export default function InventoryDetailsPage() {
     fetchUsers()
   }, [userData?.company_id])
 
+  // Keyboard navigation for fullscreen images
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!fullscreenImage || !item?.imageUrls) return
+
+      switch (event.key) {
+        case 'Escape':
+          setFullscreenImage(null)
+          break
+        case 'ArrowLeft':
+          event.preventDefault()
+          navigateImage('prev')
+          break
+        case 'ArrowRight':
+          event.preventDefault()
+          navigateImage('next')
+          break
+      }
+    }
+
+    if (fullscreenImage) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [fullscreenImage, item?.imageUrls, currentImageIndex])
+
   // Helper function to get user display name
   const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
+  }
+
+  const handleImageClick = (imageUrl: string, index: number) => {
+    setCurrentImageIndex(index)
+    setFullscreenImage(imageUrl)
+  }
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (!item?.imageUrls) return
+
+    let newIndex = currentImageIndex
+    if (direction === 'prev') {
+      newIndex = currentImageIndex > 0 ? currentImageIndex - 1 : item.imageUrls.length - 1
+    } else {
+      newIndex = currentImageIndex < item.imageUrls.length - 1 ? currentImageIndex + 1 : 0
+    }
+
+    setCurrentImageIndex(newIndex)
+    setFullscreenImage(item.imageUrls[newIndex])
   }
 
   const handleEdit = useCallback(() => {
@@ -614,26 +662,38 @@ export default function InventoryDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Image className="h-5 w-5 text-pink-600" />
-                    <span>Media</span>
+                    <span>Media ({item.imageUrls.length})</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-3 gap-2">
                     {item.imageUrls.slice(0, 6).map((url, index) => (
-                      <div key={index} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                      <div 
+                        key={index} 
+                        className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleImageClick(url, index)}
+                      >
                         <img
                           src={url || "/placeholder.svg"}
-                          alt={`Image ${index + 1}`}
+                          alt={`${item.name} - Image ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
                       </div>
                     ))}
                     {item.imageUrls.length > 6 && (
-                      <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
+                      <div 
+                        className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
+                        onClick={() => handleImageClick(item.imageUrls[6], 6)}
+                      >
                         <span className="text-sm text-gray-500">+{item.imageUrls.length - 6} more</span>
                       </div>
                     )}
                   </div>
+                  {item.imageUrls.length > 1 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Click any image to view in fullscreen
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -685,6 +745,67 @@ export default function InventoryDetailsPage() {
             </Card>
           </div>
         </div>
+
+        {/* Fullscreen Image Preview Dialog */}
+        <Dialog open={!!fullscreenImage} onOpenChange={() => setFullscreenImage(null)}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/90 border-0">
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
+                onClick={() => setFullscreenImage(null)}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+
+              {/* Navigation Buttons */}
+              {item?.imageUrls && item.imageUrls.length > 1 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-50 text-white hover:bg-white/20"
+                    onClick={() => navigateImage('prev')}
+                  >
+                    <ChevronLeft className="h-8 w-8" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-white hover:bg-white/20"
+                    onClick={() => navigateImage('next')}
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </Button>
+                </>
+              )}
+
+              {/* Image Counter */}
+              {item?.imageUrls && item.imageUrls.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                  {currentImageIndex + 1} of {item.imageUrls.length}
+                </div>
+              )}
+
+              {/* Main Image */}
+              {fullscreenImage && (
+                <img
+                  src={fullscreenImage || "/placeholder.svg"}
+                  alt={`${item?.name} - Fullscreen view`}
+                  className="max-w-full max-h-full object-contain"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+
+              {/* Instructions */}
+              <div className="absolute bottom-4 right-4 z-50 text-white/70 text-xs">
+                <p>ESC to close • Arrow keys to navigate</p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
