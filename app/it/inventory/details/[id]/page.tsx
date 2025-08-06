@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink, Image } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 interface InventoryItem {
+  productNumber: string
   id: string
   name: string
   type: "hardware" | "software"
@@ -35,6 +36,7 @@ interface InventoryItem {
   status: "active" | "inactive" | "maintenance" | "retired"
   cost: number
   currency: string
+  stock: number
   purchaseDate: string
   warrantyExpiry: string
   serialNumber?: string
@@ -48,6 +50,7 @@ interface InventoryItem {
   websiteUrl: string
   specifications?: string
   categorySpecs?: Record<string, any>
+  imageUrls: string[]
   created_at: any
   updated_at: any
   created_by: string
@@ -113,6 +116,7 @@ export default function InventoryDetailsPage() {
           }
 
           setItem({
+            productNumber: data.productNumber || "",
             id: itemSnap.id,
             name: data.name || "",
             type: data.type || "hardware",
@@ -124,6 +128,7 @@ export default function InventoryDetailsPage() {
             status: data.status || "active",
             cost: data.cost || 0,
             currency: data.currency || "USD",
+            stock: data.stock || 0,
             purchaseDate: data.purchaseDate || "",
             warrantyExpiry: data.warrantyExpiry || "",
             serialNumber: data.serialNumber || "",
@@ -137,6 +142,7 @@ export default function InventoryDetailsPage() {
             websiteUrl: data.websiteUrl || "",
             specifications: data.specifications || "",
             categorySpecs: data.categorySpecs || {},
+            imageUrls: data.imageUrls || [],
             created_at: data.created_at,
             updated_at: data.updated_at,
             created_by: data.created_by || "",
@@ -355,6 +361,10 @@ export default function InventoryDetailsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Product Number</p>
+                    <p className="text-sm font-mono">{item.productNumber}</p>
+                  </div>
+                  <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Item Type</p>
                     <Badge variant="secondary" className="capitalize">
                       {item.type}
@@ -564,6 +574,14 @@ export default function InventoryDetailsPage() {
                     </p>
                   </div>
                 )}
+                {item.stock > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Stock Quantity</p>
+                    <p className="text-lg font-semibold">
+                      {item.stock} units
+                    </p>
+                  </div>
+                )}
                 {item.purchaseDate && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Purchase Date</p>
@@ -589,6 +607,36 @@ export default function InventoryDetailsPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Media Preview */}
+            {item.imageUrls && item.imageUrls.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Image className="h-5 w-5 text-pink-600" />
+                    <span>Media</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {item.imageUrls.slice(0, 6).map((url, index) => (
+                      <div key={index} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={url || "/placeholder.svg"}
+                          alt={`Image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {item.imageUrls.length > 6 && (
+                      <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
+                        <span className="text-sm text-gray-500">+{item.imageUrls.length - 6} more</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Quick Actions */}
             <Card>
