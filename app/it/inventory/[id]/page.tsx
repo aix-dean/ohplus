@@ -11,7 +11,7 @@ import { ArrowLeft, Edit, Trash2, Calendar, MapPin, User, Package, Zap, Monitor,
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   AlertDialog,
@@ -140,79 +140,91 @@ export default function InventoryItemDetails() {
 
         if (itemSnap.exists()) {
           const itemData = itemSnap.data()
-          setItem({
-            id: itemSnap.id,
-            name: itemData.name || "",
-            type: itemData.type || "hardware",
-            category: itemData.category || "",
-            brand: itemData.brand || "",
-            department: itemData.department || "",
-            assignedTo: itemData.assignedTo || "unassigned",
-            condition: itemData.condition || "excellent",
-            status: itemData.status || "active",
-            vendorType: itemData.vendorType || "physical",
-            storeName: itemData.storeName || "",
-            storeLocation: itemData.storeLocation || "",
-            websiteName: itemData.websiteName || "",
-            websiteUrl: itemData.websiteUrl || "",
-            purchaseDate: itemData.purchaseDate || "",
-            warrantyExpiry: itemData.warrantyExpiry || "",
-            cost: itemData.cost || 0,
-            currency: itemData.currency || "USD",
-            description: itemData.description || "",
-            serialNumber: itemData.serialNumber || "",
-            specifications: itemData.specifications || "",
-            licenseKey: itemData.licenseKey || "",
-            version: itemData.version || "",
-            categorySpecs: itemData.categorySpecs || {},
-            created_at: itemData.created_at,
-            updated_at: itemData.updated_at,
-            created_by: itemData.created_by || "",
-            company_id: itemData.company_id || "",
-          })
-        } else {
+        
+        // Check if item is deleted
+        if (itemData.deleted === true) {
           toast({
             title: "Error",
-            description: "Item not found",
+            description: "This item has been deleted",
             variant: "destructive",
           })
           router.push("/it/inventory")
           return
         }
 
-        // Fetch users for display names
-        const usersRef = collection(db, "iboard_users")
-        const q = query(usersRef, where("company_id", "==", userData.company_id))
-        const querySnapshot = await getDocs(q)
-
-        const fetchedUsers: User[] = []
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          fetchedUsers.push({
-            id: doc.id,
-            uid: data.uid,
-            first_name: data.first_name || "",
-            last_name: data.last_name || "",
-            email: data.email || "",
-            company_id: data.company_id,
-          })
+        setItem({
+          id: itemSnap.id,
+          name: itemData.name || "",
+          type: itemData.type || "hardware",
+          category: itemData.category || "",
+          brand: itemData.brand || "",
+          department: itemData.department || "",
+          assignedTo: itemData.assignedTo || "unassigned",
+          condition: itemData.condition || "excellent",
+          status: itemData.status || "active",
+          vendorType: itemData.vendorType || "physical",
+          storeName: itemData.storeName || "",
+          storeLocation: itemData.storeLocation || "",
+          websiteName: itemData.websiteName || "",
+          websiteUrl: itemData.websiteUrl || "",
+          purchaseDate: itemData.purchaseDate || "",
+          warrantyExpiry: itemData.warrantyExpiry || "",
+          cost: itemData.cost || 0,
+          currency: itemData.currency || "USD",
+          description: itemData.description || "",
+          serialNumber: itemData.serialNumber || "",
+          specifications: itemData.specifications || "",
+          licenseKey: itemData.licenseKey || "",
+          version: itemData.version || "",
+          categorySpecs: itemData.categorySpecs || {},
+          created_at: itemData.created_at,
+          updated_at: itemData.updated_at,
+          created_by: itemData.created_by || "",
+          company_id: itemData.company_id || "",
         })
-
-        setUsers(fetchedUsers)
-      } catch (error) {
-        console.error("Error fetching data:", error)
+      } else {
         toast({
           title: "Error",
-          description: "Failed to load item details",
+          description: "Item not found",
           variant: "destructive",
         })
-      } finally {
-        setLoading(false)
+        router.push("/it/inventory")
+        return
       }
-    }
 
-    fetchData()
-  }, [params.id, userData?.company_id, router])
+      // Fetch users for display names
+      const usersRef = collection(db, "iboard_users")
+      const q = query(usersRef, where("company_id", "==", userData.company_id))
+      const querySnapshot = await getDocs(q)
+
+      const fetchedUsers: User[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        fetchedUsers.push({
+          id: doc.id,
+          uid: data.uid,
+          first_name: data.first_name || "",
+          last_name: data.last_name || "",
+          email: data.email || "",
+          company_id: data.company_id,
+        })
+      })
+
+      setUsers(fetchedUsers)
+    } catch (error) {
+      console.error("Error fetching data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load item details",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  fetchData()
+}, [params.id, userData?.company_id, router])
 
   // Helper function to get user display name
   const getUserDisplayName = (uid: string) => {
@@ -229,32 +241,32 @@ export default function InventoryItemDetails() {
   const handleDelete = async () => {
     if (!item) return
 
-    setIsDeleting(true)
-    try {
-      // Soft delete: update the deleted field to true instead of removing the document
-      await updateDoc(doc(db, "itInventory", item.id), {
-        deleted: true,
-        deleted_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      })
-      
-      toast({
-        title: "Item Deleted",
-        description: `${item.name} has been deleted from inventory`,
-      })
-      router.push("/it/inventory")
-    } catch (error) {
-      console.error("Error deleting item:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete item. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDeleting(false)
-      setDeleteDialogOpen(false)
-    }
+  setIsDeleting(true)
+  try {
+    // Soft delete: update the document with deleted: true instead of deleting it
+    await updateDoc(doc(db, "itInventory", item.id), {
+      deleted: true,
+      deleted_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    })
+    
+    toast({
+      title: "Item Deleted",
+      description: `${item.name} has been deleted from inventory`,
+    })
+    router.push("/it/inventory")
+  } catch (error) {
+    console.error("Error deleting item:", error)
+    toast({
+      title: "Error",
+      description: "Failed to delete item. Please try again.",
+      variant: "destructive",
+    })
+  } finally {
+    setIsDeleting(false)
+    setDeleteDialogOpen(false)
   }
+}
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href)
