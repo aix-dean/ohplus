@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from 'lucide-react'
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -59,6 +59,9 @@ export function TopNavigation() {
 
     // Add this new check for business section
     if (pathname.startsWith("/business")) return "Business Developer"
+
+    // Add this new check for finance section
+    if (pathname.startsWith("/finance")) return "Finance"
 
     if (segments[0]) {
       const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
@@ -130,6 +133,7 @@ export function TopNavigation() {
   const isCmsSection = pathname.startsWith("/cms")
   const isAdminSection = pathname.startsWith("/admin")
   const isAccountPage = pathname === "/account" // New check for account page
+  const isFinanceSection = pathname.startsWith("/finance")
 
   const navBgColor = isSalesSection
     ? "bg-[#ff3333]"
@@ -137,7 +141,9 @@ export function TopNavigation() {
       ? "bg-[#6b46c1]"
       : isCmsSection
         ? "bg-[#f97316]"
-        : "bg-[#0a1433]"
+        : isFinanceSection
+          ? "bg-[#10b981]"
+          : "bg-[#0a1433]"
 
   const diagonalBgColor = isSalesSection
     ? "bg-[#ffcccc]"
@@ -145,7 +151,9 @@ export function TopNavigation() {
       ? "bg-[#c4b5fd]"
       : isCmsSection
         ? "bg-[#fed7aa]"
-        : "bg-[#38b6ff]"
+        : isFinanceSection
+          ? "bg-[#a7f3d0]"
+          : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
