@@ -8,11 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X, MoreHorizontal, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
@@ -37,12 +37,10 @@ const currencies = [
 ];
 
 const statusOptions = [
-  { value: 'Pending', label: 'Pending', variant: 'secondary' as const },
-  { value: 'Approved', label: 'Approved', variant: 'default' as const },
-  { value: 'Rejected', label: 'Rejected', variant: 'destructive' as const },
-  { value: 'Processing', label: 'Processing', variant: 'outline' as const },
-  { value: 'Completed', label: 'Completed', variant: 'default' as const },
-  { value: 'On Hold', label: 'On Hold', variant: 'secondary' as const },
+  { value: 'Pending', label: 'Pending', icon: Clock, color: 'text-yellow-600' },
+  { value: 'Approved', label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
+  { value: 'Rejected', label: 'Rejected', icon: XCircle, color: 'text-red-600' },
+  { value: 'Processing', label: 'Processing', icon: AlertCircle, color: 'text-blue-600' },
 ];
 
 export default function RequestsView() {
@@ -168,7 +166,7 @@ export default function RequestsView() {
     return () => unsubscribe();
   }, [user, userData, toast]);
 
-  const handleStatusUpdate = async (requestId: string, newStatus: string) => {
+  const handleUpdateStatus = async (requestId: string, newStatus: string) => {
     setUpdatingStatusId(requestId);
     try {
       await updateDoc(doc(db, 'request', requestId), {
@@ -219,8 +217,18 @@ export default function RequestsView() {
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    const statusOption = statusOptions.find(option => option.value.toLowerCase() === status.toLowerCase());
-    return statusOption?.variant || 'secondary';
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'rejected':
+        return 'destructive';
+      case 'processing':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
   };
 
   const getRequestTypeBadgeVariant = (type: string) => {
@@ -390,30 +398,9 @@ export default function RequestsView() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={request.Actions}
-                          onValueChange={(value) => handleStatusUpdate(request.id, value)}
-                          disabled={updatingStatusId === request.id}
-                        >
-                          <SelectTrigger className="w-32">
-                            <div className="flex items-center gap-2">
-                              <Badge variant={getStatusBadgeVariant(request.Actions)} className="text-xs">
-                                {request.Actions}
-                              </Badge>
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map((status) => (
-                              <SelectItem key={status.value} value={status.value}>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={status.variant} className="text-xs">
-                                    {status.label}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Badge variant={getStatusBadgeVariant(request.Actions)}>
+                          {request.Actions}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -422,42 +409,78 @@ export default function RequestsView() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                disabled={deletingId === request.id}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Request</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this request? This will move the request to trash and it can be recovered later if needed.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteRequest(request.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              className="h-8 w-8 p-0"
+                              disabled={updatingStatusId === request.id || deletingId === request.id}
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Request
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                            {statusOptions.map((status) => {
+                              const IconComponent = status.icon;
+                              const isCurrentStatus = request.Actions === status.value;
+                              return (
+                                <DropdownMenuItem
+                                  key={status.value}
+                                  onClick={() => handleUpdateStatus(request.id, status.value)}
+                                  disabled={isCurrentStatus || updatingStatusId === request.id}
+                                  className={isCurrentStatus ? 'bg-muted' : ''}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                                  <IconComponent className={`mr-2 h-4 w-4 ${status.color}`} />
+                                  {status.label}
+                                  {isCurrentStatus && (
+                                    <span className="ml-auto text-xs text-muted-foreground">Current</span>
+                                  )}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                            <DropdownMenuSeparator />
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Request
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Request</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this request? This will move the request to trash and it can be recovered later if needed.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteRequest(request.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
