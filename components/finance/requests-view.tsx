@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -44,6 +45,7 @@ const statusOptions = [
 ];
 
 export default function RequestsView() {
+  const router = useRouter();
   const { user, userData } = useAuth();
   const { toast } = useToast();
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
@@ -165,6 +167,10 @@ export default function RequestsView() {
 
     return () => unsubscribe();
   }, [user, userData, toast]);
+
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/finance/requests/details/${requestId}`);
+  };
 
   const handleUpdateStatus = async (requestId: string, newStatus: string) => {
     setUpdatingStatusId(requestId);
@@ -422,7 +428,7 @@ export default function RequestsView() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
