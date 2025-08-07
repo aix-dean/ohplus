@@ -222,7 +222,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-finance-green",
       contentBgColor: "bg-card-content-finance",
       members: [],
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       id: "media",
