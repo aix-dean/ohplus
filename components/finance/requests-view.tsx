@@ -1,20 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Filter, MoreHorizontal, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, AlertCircle, DollarSign, Calendar, User } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Eye, Trash2, Plus, FileText, DollarSign, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
 const currencies = [
@@ -36,19 +36,14 @@ const currencies = [
   { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
 ];
 
-const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'approved':
-      return <CheckCircle className="h-4 w-4 text-green-600" />;
-    case 'pending':
-      return <Clock className="h-4 w-4 text-yellow-600" />;
-    case 'rejected':
-      return <XCircle className="h-4 w-4 text-red-600" />;
-    case 'processing':
-      return <AlertCircle className="h-4 w-4 text-blue-600" />;
-    default:
-      return <Clock className="h-4 w-4 text-gray-600" />;
-  }
+const getCurrencySymbol = (currencyCode: string) => {
+  const currency = currencies.find(c => c.code === currencyCode);
+  return currency?.symbol || currencyCode;
+};
+
+const formatAmount = (amount: number, currencyCode: string) => {
+  const symbol = getCurrencySymbol(currencyCode);
+  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const getStatusBadgeVariant = (status: string) => {
@@ -66,26 +61,15 @@ const getStatusBadgeVariant = (status: string) => {
   }
 };
 
-const getCurrencySymbol = (currencyCode: string) => {
-  const currency = currencies.find(c => c.code === currencyCode);
-  return currency?.symbol || currencyCode;
-};
-
-const formatAmount = (amount: number, currencyCode: string) => {
-  const symbol = getCurrencySymbol(currencyCode);
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
 export default function RequestsView() {
+  const router = useRouter();
   const { user, userData } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -122,27 +106,9 @@ export default function RequestsView() {
     return () => unsubscribe();
   }, [user, userData, toast]);
 
-  const handleViewDetails = (requestId: string) => {
-    router.push(`/finance/requests/details/${requestId}`);
-  };
-
-  const handleEdit = (requestId: string) => {
-    // TODO: Implement edit functionality
-    toast({
-      title: "Coming Soon",
-      description: "Edit functionality will be available soon.",
-    });
-  };
-
-  const handleDelete = async (requestId: string) => {
+  const handleDeleteRequest = async (requestId: string) => {
     try {
-      setDeletingId(requestId);
-      const requestRef = doc(db, 'request', requestId);
-      await updateDoc(requestRef, {
-        deleted: true,
-        deleted_at: new Date(),
-      });
-      
+      await deleteDoc(doc(db, 'request', requestId));
       toast({
         title: "Success",
         description: "Request deleted successfully.",
@@ -154,9 +120,11 @@ export default function RequestsView() {
         description: "Failed to delete request. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setDeletingId(null);
     }
+  };
+
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/finance/requests/details/${requestId}`);
   };
 
   const filteredRequests = requests.filter(request => {
@@ -171,203 +139,240 @@ export default function RequestsView() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const stats = {
+    total: requests.length,
+    pending: requests.filter(r => r.Actions?.toLowerCase() === 'pending').length,
+    approved: requests.filter(r => r.Actions?.toLowerCase() === 'approved').length,
+    rejected: requests.filter(r => r.Actions?.toLowerCase() === 'rejected').length,
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="h-10 bg-muted rounded animate-pulse flex-1" />
-          <div className="h-10 bg-muted rounded w-32 animate-pulse" />
-          <div className="h-10 bg-muted rounded w-32 animate-pulse" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
             <Card key={i}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="h-5 bg-muted rounded w-24 animate-pulse mb-2" />
-                    <div className="h-4 bg-muted rounded w-32 animate-pulse" />
-                  </div>
-                  <div className="h-6 bg-muted rounded w-16 animate-pulse" />
-                </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+                <div className="h-4 w-4 bg-muted rounded animate-pulse" />
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="h-4 bg-muted rounded w-full animate-pulse" />
-                <div className="h-4 bg-muted rounded w-3/4 animate-pulse" />
-                <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
-                <div className="h-8 bg-muted rounded w-full animate-pulse" />
+              <CardContent>
+                <div className="h-8 bg-muted rounded w-12 animate-pulse mb-1" />
+                <div className="h-3 bg-muted rounded w-24 animate-pulse" />
               </CardContent>
             </Card>
           ))}
         </div>
+        <Card>
+          <CardHeader>
+            <div className="h-6 bg-muted rounded w-32 animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <div className="h-4 bg-muted rounded flex-1 animate-pulse" />
+                  <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+                  <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+                  <div className="h-4 bg-muted rounded w-16 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search requests..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-32">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-32">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="reimbursement">Reimbursement</SelectItem>
-            <SelectItem value="requisition">Requisition</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredRequests.length} of {requests.length} requests
-      </div>
-
-      {/* Requests Grid */}
-      {filteredRequests.length === 0 ? (
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Search className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No requests found</h3>
-            <p className="text-muted-foreground text-center">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
-                ? "Try adjusting your search criteria or filters."
-                : "No finance requests have been created yet."}
-            </p>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">All time requests</p>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredRequests.map((request) => (
-            <Card key={request.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">
-                      #{request['Request No.']}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-1">
-                      <Badge variant={request.request_type === 'reimbursement' ? 'outline' : 'secondary'}>
-                        {request.request_type}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(request.Actions)}
-                    <Badge variant={getStatusBadgeVariant(request.Actions)}>
-                      {request.Actions}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{request.Requestor}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {formatAmount(request.Amount, request.Currency || 'PHP')}
-                  </span>
-                </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.pending}</div>
+            <p className="text-xs text-muted-foreground">Awaiting approval</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.approved}</div>
+            <p className="text-xs text-muted-foreground">Successfully approved</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.rejected}</div>
+            <p className="text-xs text-muted-foreground">Declined requests</p>
+          </CardContent>
+        </Card>
+      </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>{format(request.created.toDate(), 'MMM dd, yyyy')}</span>
-                </div>
-
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {request['Requested Item']}
-                </p>
-
-                <div className="flex items-center justify-between pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewDetails(request.id)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEdit(request.id)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem 
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-destructive focus:text-destructive"
+      {/* Requests Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Finance Requests</CardTitle>
+              <CardDescription>
+                Manage and track all finance requests
+              </CardDescription>
+            </div>
+            <Button onClick={() => router.push('/finance/requests/create')}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Request
+            </Button>
+          </div>
+          
+          {/* Filters */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search requests..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="reimbursement">Reimbursement</SelectItem>
+                <SelectItem value="requisition">Requisition</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Request No.</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Requestor</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRequests.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">No requests found</p>
+                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' ? (
+                          <p className="text-sm text-muted-foreground">
+                            Try adjusting your search or filters
+                          </p>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            onClick={() => router.push('/finance/requests/create')}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Request</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete request #{request['Request No.']}? 
-                              This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(request.id)}
-                              disabled={deletingId === request.id}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create your first request
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="font-medium">
+                        #{request['Request No.']}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={request.request_type === 'reimbursement' ? 'outline' : 'secondary'}>
+                          {request.request_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{request.Requestor}</TableCell>
+                      <TableCell className="font-medium">
+                        {formatAmount(request.Amount, request.Currency || 'PHP')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(request.Actions)}>
+                          {request.Actions}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(request.created.toDate(), 'MMM dd, yyyy')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteRequest(request.id)}
+                              className="text-red-600"
                             >
-                              {deletingId === request.id ? 'Deleting...' : 'Delete'}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

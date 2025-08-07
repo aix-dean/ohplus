@@ -9,9 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Calendar, User, FileText, DollarSign, Building, Clock, CheckCircle, XCircle, AlertCircle, Download, ExternalLink, ImageIcon, Video, File, Eye, Maximize2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User, FileText, DollarSign, Building, Clock, CheckCircle, XCircle, AlertCircle, Download, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
@@ -74,242 +73,6 @@ const formatAmount = (amount: number, currencyCode: string) => {
   return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const getFileType = (url: string) => {
-  if (!url) return 'unknown';
-  
-  const extension = url.split('.').pop()?.toLowerCase() || '';
-  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
-  const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'];
-  const documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
-  
-  if (imageExtensions.includes(extension)) return 'image';
-  if (videoExtensions.includes(extension)) return 'video';
-  if (documentExtensions.includes(extension)) return 'document';
-  if (extension === 'pdf') return 'pdf';
-  
-  return 'unknown';
-};
-
-const getFileIcon = (fileType: string) => {
-  switch (fileType) {
-    case 'image':
-      return <ImageIcon className="h-5 w-5" />;
-    case 'video':
-      return <Video className="h-5 w-5" />;
-    case 'document':
-    case 'pdf':
-      return <FileText className="h-5 w-5" />;
-    default:
-      return <File className="h-5 w-5" />;
-  }
-};
-
-const getFileName = (url: string) => {
-  if (!url) return 'Unknown file';
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname;
-    const fileName = pathname.split('/').pop() || 'Unknown file';
-    return decodeURIComponent(fileName);
-  } catch {
-    return 'Unknown file';
-  }
-};
-
-interface AttachmentViewerProps {
-  url: string;
-  fileName: string;
-  fileType: string;
-}
-
-const AttachmentViewer = ({ url, fileName, fileType }: AttachmentViewerProps) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const handleLoad = () => setLoading(false);
-  const handleError = () => {
-    setLoading(false);
-    setError(true);
-  };
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <File className="h-12 w-12 text-muted-foreground mb-4" />
-        <p className="text-sm text-muted-foreground mb-4">
-          Unable to preview this file
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => window.open(url, '_blank')}
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Open in new tab
-        </Button>
-      </div>
-    );
-  }
-
-  switch (fileType) {
-    case 'image':
-      return (
-        <div className="relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse">
-              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-            </div>
-          )}
-          <img
-            src={url || "/placeholder.svg"}
-            alt={fileName}
-            className="w-full h-auto max-h-96 object-contain rounded-lg"
-            onLoad={handleLoad}
-            onError={handleError}
-            crossOrigin="anonymous"
-          />
-        </div>
-      );
-
-    case 'video':
-      return (
-        <div className="relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse rounded-lg">
-              <Video className="h-8 w-8 text-muted-foreground" />
-            </div>
-          )}
-          <video
-            controls
-            className="w-full h-auto max-h-96 rounded-lg"
-            onLoadedData={handleLoad}
-            onError={handleError}
-            crossOrigin="anonymous"
-          >
-            <source src={url} />
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      );
-
-    case 'pdf':
-      return (
-        <div className="w-full h-96 border rounded-lg overflow-hidden">
-          {loading && (
-            <div className="flex items-center justify-center h-full bg-muted animate-pulse">
-              <FileText className="h-8 w-8 text-muted-foreground" />
-            </div>
-          )}
-          <iframe
-            src={`${url}#toolbar=1&navpanes=1&scrollbar=1`}
-            className="w-full h-full"
-            onLoad={handleLoad}
-            onError={handleError}
-            title={fileName}
-          />
-        </div>
-      );
-
-    case 'document':
-      return (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg">
-          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="font-medium mb-2">{fileName}</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Document preview not available
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => window.open(url, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Open document
-          </Button>
-        </div>
-      );
-
-    default:
-      return (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg">
-          <File className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="font-medium mb-2">{fileName}</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            File preview not available
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => window.open(url, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Open file
-          </Button>
-        </div>
-      );
-  }
-};
-
-interface AttachmentCardProps {
-  url: string;
-  title: string;
-  description: string;
-}
-
-const AttachmentCard = ({ url, title, description }: AttachmentCardProps) => {
-  const fileType = getFileType(url);
-  const fileName = getFileName(url);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between p-4 border rounded-lg">
-        <div className="flex items-center gap-3">
-          {getFileIcon(fileType)}
-          <div>
-            <p className="font-medium">{title}</p>
-            <p className="text-sm text-muted-foreground">{description}</p>
-            <p className="text-xs text-muted-foreground mt-1">{fileName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  {getFileIcon(fileType)}
-                  {title}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-4">
-                <AttachmentViewer url={url} fileName={fileName} fileType={fileType} />
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(url, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Open
-          </Button>
-        </div>
-      </div>
-      
-      {/* Inline preview for images */}
-      {fileType === 'image' && (
-        <div className="border rounded-lg p-4">
-          <AttachmentViewer url={url} fileName={fileName} fileType={fileType} />
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function RequestDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -318,6 +81,11 @@ export default function RequestDetailsPage() {
   const [request, setRequest] = useState<FinanceRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    url: string;
+    type: 'image' | 'video' | 'pdf' | 'document';
+    name: string;
+  } | null>(null);
 
   const requestId = params.id as string;
 
@@ -376,6 +144,38 @@ export default function RequestDetailsPage() {
 
   const handleBack = () => {
     router.push('/finance/requests');
+  };
+
+  const getFileType = (url: string): 'image' | 'video' | 'pdf' | 'document' => {
+    const extension = url.split('.').pop()?.toLowerCase() || '';
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
+      return 'image';
+    } else if (['mp4', 'webm', 'ogg', 'mov', 'avi'].includes(extension)) {
+      return 'video';
+    } else if (extension === 'pdf') {
+      return 'pdf';
+    } else {
+      return 'document';
+    }
+  };
+
+  const handleViewAttachment = (url: string, name: string) => {
+    if (url) {
+      const fileType = getFileType(url);
+      setAttachmentPreview({ url, type: fileType, name });
+    }
+  };
+
+  const handleDownloadAttachment = (url: string) => {
+    if (url) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = url.split('/').pop() || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   if (loading) {
@@ -610,25 +410,158 @@ export default function RequestDetailsPage() {
               Attachments
             </CardTitle>
             <CardDescription>
-              View, preview, or download attachments
+              View attachments inline or download them
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {request.Attachments && (
-              <AttachmentCard
-                url={request.Attachments}
-                title="Request Attachment"
-                description="Supporting document for this request"
-              />
-            )}
-            
-            {request.request_type === 'requisition' && request.Quotation && (
-              <AttachmentCard
-                url={request.Quotation}
-                title="Quotation"
-                description="Price quotation document"
-              />
-            )}
+          <CardContent>
+            <div className="space-y-6">
+              {/* Attachment Files */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {request.Attachments && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Request Attachment</p>
+                        <p className="text-sm text-muted-foreground">Supporting document</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewAttachment(request.Attachments, 'Request Attachment')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadAttachment(request.Attachments)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {request.request_type === 'requisition' && request.Quotation && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Quotation</p>
+                        <p className="text-sm text-muted-foreground">Price quotation document</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewAttachment(request.Quotation, 'Quotation')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadAttachment(request.Quotation)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Attachment Preview */}
+              {attachmentPreview && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Preview: {attachmentPreview.name}</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setAttachmentPreview(null)}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="border rounded-lg overflow-hidden">
+                    {attachmentPreview.type === 'image' && (
+                      <div className="relative">
+                        <img
+                          src={attachmentPreview.url || "/placeholder.svg"}
+                          alt={attachmentPreview.name}
+                          className="w-full max-h-96 object-contain bg-muted"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'flex items-center justify-center h-48 bg-muted text-muted-foreground';
+                            errorDiv.innerHTML = '<p>Unable to load image</p>';
+                            target.parentNode?.appendChild(errorDiv);
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    {attachmentPreview.type === 'video' && (
+                      <video
+                        controls
+                        className="w-full max-h-96"
+                        onError={() => {
+                          toast({
+                            title: "Error",
+                            description: "Unable to load video file.",
+                            variant: "destructive",
+                          });
+                        }}
+                      >
+                        <source src={attachmentPreview.url} />
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                    
+                    {attachmentPreview.type === 'pdf' && (
+                      <div className="h-96">
+                        <iframe
+                          src={`${attachmentPreview.url}#toolbar=1&navpanes=1&scrollbar=1`}
+                          className="w-full h-full border-0"
+                          title={attachmentPreview.name}
+                          onError={() => {
+                            toast({
+                              title: "Error",
+                              description: "Unable to load PDF file.",
+                              variant: "destructive",
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    {attachmentPreview.type === 'document' && (
+                      <div className="flex flex-col items-center justify-center h-48 bg-muted text-muted-foreground">
+                        <FileText className="h-12 w-12 mb-4" />
+                        <p className="text-center mb-4">
+                          Document preview not available for this file type.
+                        </p>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDownloadAttachment(attachmentPreview.url)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download to View
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
