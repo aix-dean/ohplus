@@ -1,12 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
-import { SideNavigation } from "@/components/side-navigation"
+import { ArrowLeft } from 'lucide-react'
 
 export default function BusinessProductDetailLoading() {
   return (
     <div className="flex min-h-screen">
-      <SideNavigation />
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-5xl mx-auto">
           <Button variant="ghost" className="mb-6">
