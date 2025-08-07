@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Calendar, BarChart3, Truck, AlertTriangle, FileText, Settings, ShieldCheck, BookOpen, Package, MessageCircle, FileCheck, Sparkles, ChevronLeft, ChevronRight, TrendingUp, ClipboardList, CloudRain, Cog, Monitor, Wifi, HardDrive, DollarSign, Receipt, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Users, Calendar, BarChart3, Truck, AlertTriangle, FileText, Settings, ShieldCheck, BookOpen, Package, MessageCircle, FileCheck, Sparkles, ChevronLeft, ChevronRight, TrendingUp, ClipboardList, CloudRain, Cog, Monitor, Wifi, HardDrive, DollarSign } from 'lucide-react'
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
@@ -76,10 +76,11 @@ const navigationItems = [
     icon: DollarSign,
     items: [
       { title: "Dashboard", href: "/finance/dashboard", icon: LayoutDashboard },
-      { title: "Invoices", href: "/finance/invoices", icon: FileText },
-      { title: "Expenses", href: "/finance/expenses", icon: Receipt },
-      { title: "Reports", href: "/finance/reports", icon: BarChart3 },
-      { title: "Budget Planning", href: "/finance/budget", icon: TrendingUp },
+      { title: "Accounts Receivable", href: "/finance/receivables", icon: FileText },
+      { title: "Accounts Payable", href: "/finance/payables", icon: FileText },
+      { title: "Budget Planning", href: "/finance/budget", icon: BarChart3 },
+      { title: "Financial Reports", href: "/finance/reports", icon: FileText },
+      { title: "Tax Management", href: "/finance/tax", icon: FileText },
     ],
   },
   {
@@ -133,11 +134,11 @@ export function SideNavigation() {
   if (pathname?.startsWith("/business")) {
     currentSection = "business"
   }
-  if (pathname?.startsWith("/it")) {
-    currentSection = "it"
-  }
   if (pathname?.startsWith("/finance")) {
     currentSection = "finance"
+  }
+  if (pathname?.startsWith("/it")) {
+    currentSection = "it"
   }
 
   // Find the navigation item for the current section
@@ -150,8 +151,8 @@ export function SideNavigation() {
     currentSection !== "logistics" &&
     currentSection !== "cms" &&
     currentSection !== "business" &&
-    currentSection !== "it" &&
-    currentSection !== "finance"
+    currentSection !== "finance" &&
+    currentSection !== "it"
   ) {
     return null
   }
@@ -526,6 +527,128 @@ export function SideNavigation() {
               </div>
             </div>
           </>
+        ) : currentSection === "finance" ? (
+          <>
+            {/* Notification Section */}
+            <div className="bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-lg p-3 text-white">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium">Notification</h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+              </div>
+            </div>
+
+            {/* To Go Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "Dashboard", href: "/finance/dashboard", icon: LayoutDashboard },
+                  { title: "Financial Reports", href: "/finance/reports", icon: FileText },
+                  { title: "Budget Planning", href: "/finance/budget", icon: BarChart3 },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* To Do Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "Accounts Receivable", href: "/finance/receivables", icon: FileText },
+                  { title: "Accounts Payable", href: "/finance/payables", icon: FileText },
+                  { title: "Tax Management", href: "/finance/tax", icon: FileText },
+                  { title: "Invoicing", href: "/finance/invoicing", icon: FileText },
+                  { title: "Expense Tracking", href: "/finance/expenses", icon: BarChart3 },
+                  { title: "Settings", href: "/finance/settings", icon: Cog },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Intelligence Section */}
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
+              <div className="flex items-center space-x-2 mb-3">
+                <h3 className="text-sm font-medium">Intelligence</h3>
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="relative">
+                <div className="flex items-center space-x-2">
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                  </div>
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+              </div>
+            </div>
+          </>
         ) : currentSection === "it" ? (
           <>
             {/* Notification Section */}
@@ -602,128 +725,6 @@ export function SideNavigation() {
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                   { title: "User Management", href: "/it/user-management", icon: Users },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : currentSection === "finance" ? (
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-
-            {/* To Go Section */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Dashboard", href: "/finance/dashboard", icon: LayoutDashboard },
-                  { title: "Quick Reports", href: "/finance/reports", icon: BarChart3 },
-                  { title: "Budget Overview", href: "/finance/budget", icon: TrendingUp },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* To Do Section */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Invoices", href: "/finance/invoices", icon: FileText },
-                  { title: "Expenses", href: "/finance/expenses", icon: Receipt },
-                  { title: "Accounts Receivable", href: "/finance/receivables", icon: DollarSign },
-                  { title: "Accounts Payable", href: "/finance/payables", icon: CreditCard },
-                  { title: "Tax Management", href: "/finance/taxes", icon: FileText },
-                  { title: "Financial Settings", href: "/finance/settings", icon: Cog },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
