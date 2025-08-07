@@ -1,332 +1,314 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Receipt, PieChart, BarChart3, FileText, Calendar, AlertCircle } from 'lucide-react'
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, ChevronDown, DollarSign, TrendingUp, TrendingDown, CreditCard, PieChart, BarChart3, FileText, Calendar, Users, AlertCircle } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { RouteProtection } from "@/components/route-protection"
+import { useAuth } from "@/contexts/auth-context"
+import { cn } from "@/lib/utils"
 
-export default function FinanceDashboard() {
+export default function FinanceDashboardPage() {
+  const { userData } = useAuth()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedPeriod, setSelectedPeriod] = useState("This Month")
+
+  // Sample financial data
+  const financialMetrics = [
+    {
+      title: "Total Revenue",
+      value: "₱2,450,000",
+      change: "+12.5%",
+      trend: "up",
+      icon: DollarSign,
+      color: "text-green-600"
+    },
+    {
+      title: "Total Expenses",
+      value: "₱1,850,000",
+      change: "+8.2%",
+      trend: "up",
+      icon: CreditCard,
+      color: "text-red-600"
+    },
+    {
+      title: "Net Profit",
+      value: "₱600,000",
+      change: "+18.7%",
+      trend: "up",
+      icon: TrendingUp,
+      color: "text-green-600"
+    },
+    {
+      title: "Cash Flow",
+      value: "₱320,000",
+      change: "-5.3%",
+      trend: "down",
+      icon: BarChart3,
+      color: "text-blue-600"
+    }
+  ]
+
+  const recentTransactions = [
+    {
+      id: "TXN-001",
+      description: "LED Billboard Installation - SM Mall",
+      amount: "₱450,000",
+      type: "income",
+      date: "2024-01-15",
+      status: "completed"
+    },
+    {
+      id: "TXN-002",
+      description: "Equipment Purchase - LED Panels",
+      amount: "₱280,000",
+      type: "expense",
+      date: "2024-01-14",
+      status: "completed"
+    },
+    {
+      id: "TXN-003",
+      description: "Monthly Rent - Office Space",
+      amount: "₱85,000",
+      type: "expense",
+      date: "2024-01-13",
+      status: "pending"
+    },
+    {
+      id: "TXN-004",
+      description: "Digital Advertising Campaign",
+      amount: "₱320,000",
+      type: "income",
+      date: "2024-01-12",
+      status: "completed"
+    }
+  ]
+
+  const upcomingPayments = [
+    {
+      id: "PAY-001",
+      description: "Supplier Payment - LED Components",
+      amount: "₱150,000",
+      dueDate: "2024-01-20",
+      priority: "high"
+    },
+    {
+      id: "PAY-002",
+      description: "Employee Salaries",
+      amount: "₱420,000",
+      dueDate: "2024-01-25",
+      priority: "high"
+    },
+    {
+      id: "PAY-003",
+      description: "Utility Bills",
+      amount: "₱35,000",
+      dueDate: "2024-01-28",
+      priority: "medium"
+    }
+  ]
+
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Finance Dashboard</h2>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Calendar className="mr-2 h-4 w-4" />
-            Last 30 days
-          </Button>
-          <Button size="sm">
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Report
-          </Button>
+    <RouteProtection requiredRoles="finance">
+      <div className="flex-1 p-4 md:p-6">
+        <div className="flex flex-col gap-6">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">
+              {userData?.first_name
+                ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Finance Dashboard`
+                : "Finance Dashboard"}
+            </h1>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search transactions..."
+                  className="w-full rounded-lg bg-background pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                    {selectedPeriod} <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Week")}>This Week</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Month")}>This Month</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Quarter")}>This Quarter</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Year")}>This Year</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Financial Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {financialMetrics.map((metric, index) => {
+              const Icon = metric.icon
+              return (
+                <Card key={index} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">
+                      {metric.title}
+                    </CardTitle>
+                    <Icon className={cn("h-4 w-4", metric.color)} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{metric.value}</div>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      {metric.trend === "up" ? (
+                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                      )}
+                      <span className={metric.trend === "up" ? "text-green-600" : "text-red-600"}>
+                        {metric.change}
+                      </span>
+                      <span className="ml-1">from last month</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Recent Transactions */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Recent Transactions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentTransactions.map((transaction) => (
+                      <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{transaction.description}</span>
+                            <Badge 
+                              variant={transaction.status === "completed" ? "default" : "secondary"}
+                              className="text-xs"
+                            >
+                              {transaction.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {transaction.id} • {transaction.date}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={cn(
+                            "font-semibold",
+                            transaction.type === "income" ? "text-green-600" : "text-red-600"
+                          )}>
+                            {transaction.type === "income" ? "+" : "-"}{transaction.amount}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full mt-4">
+                    View All Transactions
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Upcoming Payments */}
+            <div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Upcoming Payments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {upcomingPayments.map((payment) => (
+                      <div key={payment.id} className="p-3 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{payment.description}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Due: {payment.dueDate}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {payment.priority === "high" && (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                            <Badge 
+                              variant={payment.priority === "high" ? "destructive" : "secondary"}
+                              className="text-xs"
+                            >
+                              {payment.priority}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="font-semibold text-red-600 mt-2">
+                          {payment.amount}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full mt-4">
+                    View All Payments
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <PieChart className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                <h3 className="font-medium">Financial Reports</h3>
+                <p className="text-sm text-gray-500">Generate detailed reports</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                <h3 className="font-medium">Budget Planning</h3>
+                <p className="text-sm text-gray-500">Plan and track budgets</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <CreditCard className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                <h3 className="font-medium">Expense Management</h3>
+                <p className="text-sm text-gray-500">Track and categorize expenses</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <BarChart3 className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+                <h3 className="font-medium">Analytics</h3>
+                <p className="text-sm text-gray-500">View financial analytics</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₱2,450,000</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600 flex items-center">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +20.1% from last month
-                  </span>
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <CreditCard className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₱1,850,000</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-red-600 flex items-center">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +5.2% from last month
-                  </span>
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₱600,000</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600 flex items-center">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +15.3% from last month
-                  </span>
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Outstanding Invoices</CardTitle>
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₱320,000</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-orange-600 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    12 pending invoices
-                  </span>
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Revenue Overview</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-[200px] flex items-center justify-center bg-muted/50 rounded">
-                  <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Revenue Chart</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
-                <CardDescription>Latest financial activities</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">Payment Received</p>
-                      <p className="text-sm text-muted-foreground">ABC Corp - Invoice #1234</p>
-                    </div>
-                    <div className="ml-auto font-medium text-green-600">+₱125,000</div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">Equipment Purchase</p>
-                      <p className="text-sm text-muted-foreground">LED Display Units</p>
-                    </div>
-                    <div className="ml-auto font-medium text-red-600">-₱85,000</div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">Service Payment</p>
-                      <p className="text-sm text-muted-foreground">XYZ Marketing</p>
-                    </div>
-                    <div className="ml-auto font-medium text-green-600">+₱45,000</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="revenue" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Revenue</CardTitle>
-                <CardDescription>Revenue breakdown by month</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[200px] flex items-center justify-center bg-muted/50 rounded">
-                  <PieChart className="h-8 w-8 text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Monthly Revenue Chart</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue by Service</CardTitle>
-                <CardDescription>Service type breakdown</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">LED Advertising</span>
-                    <Badge variant="secondary">₱1,200,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Static Billboards</span>
-                    <Badge variant="secondary">₱800,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Digital Displays</span>
-                    <Badge variant="secondary">₱450,000</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Clients</CardTitle>
-                <CardDescription>Highest revenue contributors</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">ABC Corporation</span>
-                    <Badge variant="outline">₱350,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">XYZ Marketing</span>
-                    <Badge variant="outline">₱280,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Global Brands Inc</span>
-                    <Badge variant="outline">₱220,000</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="expenses" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Expense Categories</CardTitle>
-                <CardDescription>Breakdown of operational expenses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Equipment & Maintenance</span>
-                    <Badge variant="destructive">₱650,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Staff Salaries</span>
-                    <Badge variant="destructive">₱480,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Utilities</span>
-                    <Badge variant="destructive">₱320,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Marketing</span>
-                    <Badge variant="destructive">₱180,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Office Rent</span>
-                    <Badge variant="destructive">₱120,000</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Other</span>
-                    <Badge variant="destructive">₱100,000</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Expense Trend</CardTitle>
-                <CardDescription>Expense tracking over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] flex items-center justify-center bg-muted/50 rounded">
-                  <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Expense Trend Chart</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Financial Reports</CardTitle>
-                <CardDescription>Generate comprehensive financial reports</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Profit & Loss Statement
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Balance Sheet
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Cash Flow Statement
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax Reports</CardTitle>
-                <CardDescription>Tax-related documentation</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  VAT Returns
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Income Tax Report
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Withholding Tax
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom Reports</CardTitle>
-                <CardDescription>Create custom financial reports</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <PieChart className="mr-2 h-4 w-4" />
-                  Revenue Analysis
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Expense Analysis
-                </Button>
-                <Button className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Create Custom Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+    </RouteProtection>
   )
 }

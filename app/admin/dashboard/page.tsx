@@ -222,6 +222,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-finance-green",
       contentBgColor: "bg-card-content-finance",
       members: [],
+      href: "/finance/dashboard",
       isAvailable: true,
     },
     {
@@ -355,7 +356,7 @@ export default function AdminDashboardPage() {
 }
 
 // Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
-import { Search, ChevronDown, Plus } from "lucide-react"
+import { Search, ChevronDown, Plus } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
