@@ -1,379 +1,314 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, FileText, Calculator, PieChart, Calendar, Search, Plus, Download, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Receipt, PieChart, Calendar, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 
 export default function FinanceDashboard() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedPeriod, setSelectedPeriod] = useState('month')
-
-  // Mock data for financial metrics
-  const financialMetrics = [
-    {
-      title: 'Total Revenue',
-      value: '₱2,450,000',
-      change: '+12.5%',
-      trend: 'up',
-      icon: DollarSign,
-      color: 'text-green-600'
-    },
-    {
-      title: 'Total Expenses',
-      value: '₱1,850,000',
-      change: '+8.2%',
-      trend: 'up',
-      icon: TrendingDown,
-      color: 'text-red-600'
-    },
-    {
-      title: 'Net Profit',
-      value: '₱600,000',
-      change: '+18.7%',
-      trend: 'up',
-      icon: TrendingUp,
-      color: 'text-green-600'
-    },
-    {
-      title: 'Cash Flow',
-      value: '₱450,000',
-      change: '+5.3%',
-      trend: 'up',
-      icon: CreditCard,
-      color: 'text-blue-600'
-    }
-  ]
-
-  // Mock data for recent transactions
-  const recentTransactions = [
-    {
-      id: 1,
-      description: 'LED Billboard Installation - SM Mall',
-      amount: 150000,
-      type: 'income',
-      date: '2024-01-15',
-      status: 'completed',
-      category: 'Installation Services'
-    },
-    {
-      id: 2,
-      description: 'Equipment Purchase - LED Panels',
-      amount: -85000,
-      type: 'expense',
-      date: '2024-01-14',
-      status: 'completed',
-      category: 'Equipment'
-    },
-    {
-      id: 3,
-      description: 'Monthly Maintenance - Ayala Center',
-      amount: 25000,
-      type: 'income',
-      date: '2024-01-13',
-      status: 'pending',
-      category: 'Maintenance'
-    },
-    {
-      id: 4,
-      description: 'Office Rent Payment',
-      amount: -45000,
-      type: 'expense',
-      date: '2024-01-12',
-      status: 'completed',
-      category: 'Operating Expenses'
-    },
-    {
-      id: 5,
-      description: 'Digital Signage Project - BGC',
-      amount: 200000,
-      type: 'income',
-      date: '2024-01-11',
-      status: 'completed',
-      category: 'Project Revenue'
-    }
-  ]
-
-  // Mock data for upcoming payments
-  const upcomingPayments = [
-    {
-      id: 1,
-      description: 'Supplier Payment - LED Components',
-      amount: 120000,
-      dueDate: '2024-01-20',
-      priority: 'high',
-      vendor: 'TechSupply Corp'
-    },
-    {
-      id: 2,
-      description: 'Employee Salaries',
-      amount: 180000,
-      dueDate: '2024-01-25',
-      priority: 'high',
-      vendor: 'Payroll'
-    },
-    {
-      id: 3,
-      description: 'Utility Bills',
-      amount: 15000,
-      dueDate: '2024-01-22',
-      priority: 'medium',
-      vendor: 'Various Utilities'
-    },
-    {
-      id: 4,
-      description: 'Insurance Premium',
-      amount: 35000,
-      dueDate: '2024-01-28',
-      priority: 'medium',
-      vendor: 'Insurance Co.'
-    }
-  ]
-
-  const quickActions = [
-    {
-      title: 'Generate Report',
-      description: 'Create financial reports',
-      icon: FileText,
-      color: 'bg-blue-500',
-      action: () => console.log('Generate Report')
-    },
-    {
-      title: 'Budget Planning',
-      description: 'Plan and manage budgets',
-      icon: Calculator,
-      color: 'bg-green-500',
-      action: () => console.log('Budget Planning')
-    },
-    {
-      title: 'Expense Management',
-      description: 'Track and categorize expenses',
-      icon: CreditCard,
-      color: 'bg-orange-500',
-      action: () => console.log('Expense Management')
-    },
-    {
-      title: 'Financial Analytics',
-      description: 'View detailed analytics',
-      icon: PieChart,
-      color: 'bg-purple-500',
-      action: () => console.log('Financial Analytics')
-    }
-  ]
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP'
-    }).format(Math.abs(amount))
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-PH', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
   return (
-    <div className="flex-1 space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
-          <p className="text-muted-foreground">
-            Monitor your financial performance and manage transactions
-          </p>
-        </div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Finance Dashboard</h2>
         <div className="flex items-center space-x-2">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button>
-            <Download className="mr-2 h-4 w-4" />
-            Export
+          <Button variant="outline" size="sm">
+            <Calendar className="mr-2 h-4 w-4" />
+            Last 30 days
+          </Button>
+          <Button size="sm">
+            <FileText className="mr-2 h-4 w-4" />
+            Generate Report
           </Button>
         </div>
       </div>
 
-      {/* Financial Metrics Cards */}
+      {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {financialMetrics.map((metric, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {metric.title}
-              </CardTitle>
-              <metric.icon className={`h-4 w-4 ${metric.color}`} />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₱2,450,000</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600 flex items-center">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +12.5%
+              </span>
+              from last month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Outstanding Invoices</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₱485,000</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-orange-600 flex items-center">
+                <Clock className="h-3 w-3 mr-1" />
+                23 pending
+              </span>
+              invoices
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₱890,000</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-red-600 flex items-center">
+                <TrendingDown className="h-3 w-3 mr-1" />
+                +3.2%
+              </span>
+              from last month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <PieChart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₱1,560,000</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600 flex items-center">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +18.7%
+              </span>
+              profit margin
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Revenue Overview</CardTitle>
+                <CardDescription>Monthly revenue for the past 6 months</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                <div className="space-y-4">
+                  {[
+                    { month: "Jan", amount: 2100000, growth: 12 },
+                    { month: "Feb", amount: 2250000, growth: 15 },
+                    { month: "Mar", amount: 2180000, growth: -3 },
+                    { month: "Apr", amount: 2350000, growth: 8 },
+                    { month: "May", amount: 2420000, growth: 11 },
+                    { month: "Jun", amount: 2450000, growth: 12 }
+                  ].map((data, index) => (
+                    <div key={index} className="flex items-center space-x-4">
+                      <div className="w-12 text-sm font-medium">{data.month}</div>
+                      <div className="flex-1">
+                        <Progress value={(data.amount / 2500000) * 100} className="h-2" />
+                      </div>
+                      <div className="w-20 text-sm text-right">₱{(data.amount / 1000000).toFixed(1)}M</div>
+                      <div className={`w-16 text-xs text-right ${data.growth > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {data.growth > 0 ? '+' : ''}{data.growth}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>Latest financial activities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { type: "payment", client: "Summit Media", amount: 125000, status: "completed" },
+                    { type: "invoice", client: "GTS Holdings", amount: 89000, status: "pending" },
+                    { type: "expense", client: "Equipment Rental", amount: -45000, status: "completed" },
+                    { type: "payment", client: "HDI Admix", amount: 156000, status: "completed" },
+                    { type: "invoice", client: "Moving Walls", amount: 78000, status: "overdue" }
+                  ].map((transaction, index) => (
+                    <div key={index} className="flex items-center space-x-4">
+                      <div className={`w-2 h-2 rounded-full ${
+                        transaction.status === 'completed' ? 'bg-green-500' :
+                        transaction.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{transaction.client}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{transaction.type}</p>
+                      </div>
+                      <div className={`text-sm font-medium ${
+                        transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {transaction.amount > 0 ? '+' : ''}₱{Math.abs(transaction.amount).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="invoices" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Invoice Management</CardTitle>
+              <CardDescription>Track and manage all invoices</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{metric.value}</div>
-              <div className="flex items-center text-xs text-muted-foreground">
-                {metric.trend === 'up' ? (
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                ) : (
-                  <ArrowDownRight className="mr-1 h-3 w-3 text-red-500" />
-                )}
-                {metric.change} from last {selectedPeriod}
+              <div className="space-y-4">
+                {[
+                  { id: "INV-001", client: "Summit Media", amount: 125000, status: "paid", dueDate: "2024-01-15" },
+                  { id: "INV-002", client: "GTS Holdings", amount: 89000, status: "pending", dueDate: "2024-01-20" },
+                  { id: "INV-003", client: "HDI Admix", amount: 156000, status: "paid", dueDate: "2024-01-18" },
+                  { id: "INV-004", client: "Moving Walls", amount: 78000, status: "overdue", dueDate: "2024-01-10" },
+                  { id: "INV-005", client: "Vistar Media", amount: 92000, status: "pending", dueDate: "2024-01-25" }
+                ].map((invoice, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <div>
+                        <p className="font-medium">{invoice.id}</p>
+                        <p className="text-sm text-muted-foreground">{invoice.client}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="font-medium">₱{invoice.amount.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Due: {invoice.dueDate}</p>
+                      </div>
+                      <Badge variant={
+                        invoice.status === 'paid' ? 'default' :
+                        invoice.status === 'pending' ? 'secondary' : 'destructive'
+                      }>
+                        {invoice.status === 'paid' && <CheckCircle className="w-3 h-3 mr-1" />}
+                        {invoice.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                        {invoice.status === 'overdue' && <AlertCircle className="w-3 h-3 mr-1" />}
+                        {invoice.status}
+                      </Badge>
+                      <Button variant="outline" size="sm">View</Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Main Content */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Recent Transactions */}
-        <Card className="col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Recent Transactions</CardTitle>
-                <CardDescription>
-                  Latest financial transactions and activities
-                </CardDescription>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search transactions..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 w-64"
-                  />
-                </div>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filter
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-full ${
-                      transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {transaction.type === 'income' ? (
-                        <ArrowUpRight className={`h-4 w-4 ${
-                          transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
-                        }`} />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <span>{transaction.category}</span>
-                        <span>•</span>
-                        <span>{formatDate(transaction.date)}</span>
+        <TabsContent value="expenses" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Expense Tracking</CardTitle>
+              <CardDescription>Monitor operational expenses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { category: "Equipment Rental", amount: 245000, percentage: 28, trend: "up" },
+                  { category: "Staff Salaries", amount: 320000, percentage: 36, trend: "stable" },
+                  { category: "Utilities", amount: 85000, percentage: 10, trend: "down" },
+                  { category: "Maintenance", amount: 125000, percentage: 14, trend: "up" },
+                  { category: "Marketing", amount: 95000, percentage: 11, trend: "stable" },
+                  { category: "Other", amount: 20000, percentage: 2, trend: "down" }
+                ].map((expense, index) => (
+                  <div key={index} className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">{expense.category}</span>
+                        <span className="text-sm text-muted-foreground">₱{expense.amount.toLocaleString()}</span>
                       </div>
+                      <Progress value={expense.percentage} className="h-2" />
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${
-                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                    <div className={`text-xs ${
+                      expense.trend === 'up' ? 'text-red-600' :
+                      expense.trend === 'down' ? 'text-green-600' : 'text-gray-600'
                     }`}>
-                      {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                    </p>
-                    <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
-                      {transaction.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 text-center">
-              <Button variant="outline">View All Transactions</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Payments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming Payments</CardTitle>
-            <CardDescription>
-              Payments due in the next 30 days
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {upcomingPayments.map((payment) => (
-                <div key={payment.id} className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant={
-                      payment.priority === 'high' ? 'destructive' : 
-                      payment.priority === 'medium' ? 'default' : 'secondary'
-                    }>
-                      {payment.priority} priority
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      Due {formatDate(payment.dueDate)}
-                    </span>
-                  </div>
-                  <p className="font-medium text-sm">{payment.description}</p>
-                  <p className="text-xs text-muted-foreground mb-2">{payment.vendor}</p>
-                  <p className="font-semibold text-red-600">{formatCurrency(payment.amount)}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <Button className="w-full" variant="outline">
-                <Calendar className="mr-2 h-4 w-4" />
-                View Payment Schedule
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common financial tasks and operations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {quickActions.map((action, index) => (
-              <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow" onClick={action.action}>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${action.color}`}>
-                      <action.icon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{action.title}</p>
-                      <p className="text-sm text-muted-foreground">{action.description}</p>
+                      {expense.trend === 'up' && <TrendingUp className="w-3 h-3" />}
+                      {expense.trend === 'down' && <TrendingDown className="w-3 h-3" />}
+                      {expense.trend === 'stable' && <div className="w-3 h-3 bg-gray-400 rounded-full" />}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Financial Reports</CardTitle>
+                <CardDescription>Generate comprehensive financial reports</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Profit & Loss Statement
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Cash Flow Report
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Balance Sheet
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Tax Summary
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>Common financial tasks</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button className="w-full justify-start">
+                  <Receipt className="mr-2 h-4 w-4" />
+                  Create Invoice
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Record Payment
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Add Expense
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <PieChart className="mr-2 h-4 w-4" />
+                  Budget Planning
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

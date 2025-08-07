@@ -268,13 +268,3 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
     throw error
   }
 }
-
-export function generateJONumber(): string {
-  const now = new Date()
-  const year = now.getFullYear().toString().slice(-2)
-  const month = (now.getMonth() + 1).toString().padStart(2, '0')
-  const day = now.getDate().toString().padStart(2, '0')
-  const timestamp = now.getTime().toString().slice(-6)
-  
-  return `JO${year}${month}${day}-${timestamp}`
-}
