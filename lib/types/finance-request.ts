@@ -1,18 +1,18 @@
-import type { Timestamp } from "firebase/firestore";
+import { Timestamp } from 'firebase/firestore';
 
-interface BaseRequest {
+export interface BaseRequest {
   id: string;
   company_id: string;
-  created: Timestamp;
-  deleted: boolean; // Add deleted field
   request_type: 'reimbursement' | 'requisition';
   'Request No.': number;
   Requestor: string;
   'Requested Item': string;
   Amount: number;
   'Approved By': string;
-  Attachments: string; // URL
+  Attachments: string;
   Actions: string;
+  created: Timestamp;
+  deleted: boolean;
 }
 
 export interface ReimbursementRequest extends BaseRequest {
@@ -25,7 +25,7 @@ export interface RequisitionRequest extends BaseRequest {
   Cashback: number;
   'O.R No.': string;
   'Invoice No.': string;
-  Quotation: string; // URL
+  Quotation: string;
   'Date Requested': Timestamp;
 }
 

@@ -25,6 +25,7 @@ import { ResponsiveTable } from '@/components/responsive-table';
 
 interface FinanceRequest {
   id: string;
+  company_id: string;
   request_type: 'reimbursement' | 'requisition';
   'Request No.': number;
   Requestor: string;
@@ -52,23 +53,37 @@ export default function RequestsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     // Use project_id as company identifier if company_id is not available
     const companyIdentifier = user.company_id || userData?.project_id || user.uid;
 
+    if (!companyIdentifier) {
+      console.error('No company identifier found for user');
+      setLoading(false);
+      return;
+    }
+
+    console.log('Filtering requests for company_id:', companyIdentifier);
+
+    // Query with multiple filters: company_id and deleted status
     const q = query(
       collection(db, 'request'),
       where('company_id', '==', companyIdentifier),
-      where('deleted', '==', false) // Filter out deleted requests
+      where('deleted', '==', false)
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const requestsData: FinanceRequest[] = [];
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('Request data:', { id: doc.id, company_id: data.company_id, deleted: data.deleted });
         requestsData.push({
           id: doc.id,
-          ...doc.data(),
+          ...data,
         } as FinanceRequest);
       });
       
@@ -79,6 +94,7 @@ export default function RequestsView() {
         return bTime.getTime() - aTime.getTime();
       });
       
+      console.log('Filtered requests count:', requestsData.length);
       setRequests(requestsData);
       setLoading(false);
     }, (error) => {
