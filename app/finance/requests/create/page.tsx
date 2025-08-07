@@ -108,6 +108,7 @@ export default function CreateRequestPage() {
       const baseData = {
         company_id: companyIdentifier,
         created: serverTimestamp(),
+        deleted: false, // Add deleted field set to false for new requests
         request_type: formData.request_type,
         'Request No.': parseInt(formData['Request No.']) || generateRequestNumber(),
         Requestor: formData.Requestor,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ interface FinanceRequest {
   Attachments: string;
   Actions: string;
   created: any;
+  deleted: boolean;
   // Reimbursement specific
   'Date Released'?: any;
   // Requisition specific
@@ -58,7 +59,8 @@ export default function RequestsView() {
 
     const q = query(
       collection(db, 'request'),
-      where('company_id', '==', companyIdentifier)
+      where('company_id', '==', companyIdentifier),
+      where('deleted', '==', false) // Filter out deleted requests
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -94,7 +96,10 @@ export default function RequestsView() {
 
   const handleDeleteRequest = async (requestId: string) => {
     try {
-      await deleteDoc(doc(db, 'request', requestId));
+      // Soft delete: set deleted field to true instead of actually deleting the document
+      await updateDoc(doc(db, 'request', requestId), {
+        deleted: true
+      });
       toast({
         title: "Success",
         description: "Request deleted successfully.",
@@ -238,15 +243,15 @@ export default function RequestsView() {
       label: 'Actions',
       render: (request: FinanceRequest) => (
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" title="View Request">
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" title="Edit Request">
             <Edit className="h-4 w-4" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" title="Delete Request">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
@@ -254,7 +259,7 @@ export default function RequestsView() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Request</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete request #{request['Request No.']}? This action cannot be undone.
+                  Are you sure you want to delete request #{request['Request No.']}? This action will move the request to trash but can be recovered if needed.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -311,7 +316,7 @@ export default function RequestsView() {
           <CardHeader>
             <CardTitle>All Requests</CardTitle>
             <CardDescription>
-              {requests.length} request{requests.length !== 1 ? 's' : ''} found
+              {requests.length} active request{requests.length !== 1 ? 's' : ''} found
             </CardDescription>
           </CardHeader>
           <CardContent>

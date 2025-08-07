@@ -4,6 +4,7 @@ interface BaseRequest {
   id: string;
   company_id: string;
   created: Timestamp;
+  deleted: boolean; // Add deleted field
   request_type: 'reimbursement' | 'requisition';
   'Request No.': number;
   Requestor: string;
