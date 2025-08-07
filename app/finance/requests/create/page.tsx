@@ -21,6 +21,7 @@ interface CreateRequestFormData {
   Requestor: string;
   'Requested Item': string;
   Amount: string;
+  Currency: string;
   'Approved By': string;
   Attachments: File | null;
   Actions: string;
@@ -34,6 +35,25 @@ interface CreateRequestFormData {
   'Date Requested': string;
 }
 
+const currencies = [
+  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
+  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
+  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
+  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
+  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
+  { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
+];
+
 export default function CreateRequestPage() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
@@ -45,6 +65,7 @@ export default function CreateRequestPage() {
     Requestor: user?.displayName || '',
     'Requested Item': '',
     Amount: '',
+    Currency: 'PHP', // Default to Philippine Peso
     'Approved By': '',
     Attachments: null,
     Actions: 'Pending',
@@ -72,6 +93,10 @@ export default function CreateRequestPage() {
 
   const generateRequestNumber = (): number => {
     return Math.floor(Math.random() * 900000) + 100000;
+  };
+
+  const getSelectedCurrency = () => {
+    return currencies.find(currency => currency.code === formData.Currency);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,6 +139,7 @@ export default function CreateRequestPage() {
         Requestor: formData.Requestor,
         'Requested Item': formData['Requested Item'],
         Amount: parseFloat(formData.Amount) || 0,
+        Currency: formData.Currency, // Add currency field
         'Approved By': formData['Approved By'],
         Attachments: attachmentsUrl,
         Actions: formData.Actions,
@@ -235,15 +261,42 @@ export default function CreateRequestPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount *</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  value={formData.Amount}
-                  onChange={(e) => handleInputChange('Amount', e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      value={formData.Amount}
+                      onChange={(e) => handleInputChange('Amount', e.target.value)}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Select
+                      value={formData.Currency}
+                      onValueChange={(value) => handleInputChange('Currency', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.code} value={currency.code}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm">{currency.symbol}</span>
+                              <span>{currency.code}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {getSelectedCurrency()?.name} ({getSelectedCurrency()?.symbol})
+                </p>
               </div>
             </div>
 
@@ -347,13 +400,19 @@ export default function CreateRequestPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="cashback">Cashback</Label>
-                      <Input
-                        id="cashback"
-                        type="number"
-                        placeholder="0"
-                        value={formData.Cashback}
-                        onChange={(e) => handleInputChange('Cashback', e.target.value)}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="cashback"
+                          type="number"
+                          placeholder="0"
+                          value={formData.Cashback}
+                          onChange={(e) => handleInputChange('Cashback', e.target.value)}
+                          className="flex-1"
+                        />
+                        <div className="w-20 flex items-center justify-center bg-muted rounded-md px-3 text-sm text-muted-foreground">
+                          {getSelectedCurrency()?.symbol}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="space-y-2">

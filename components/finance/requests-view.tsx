@@ -1,75 +1,67 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, FileText, Calendar, DollarSign, User, Trash2, Eye, Edit } from 'lucide-react';
+import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, DollarSign } from 'lucide-react';
 import Link from 'next/link';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { ResponsiveTable } from '@/components/responsive-table';
+import { format } from 'date-fns';
+import type { FinanceRequest } from '@/lib/types/finance-request';
 
-interface FinanceRequest {
-  id: string;
-  company_id: string;
-  request_type: 'reimbursement' | 'requisition';
-  'Request No.': number;
-  Requestor: string;
-  'Requested Item': string;
-  Amount: number;
-  'Approved By': string;
-  Attachments: string;
-  Actions: string;
-  created: any;
-  deleted: boolean;
-  // Reimbursement specific
-  'Date Released'?: any;
-  // Requisition specific
-  Cashback?: number;
-  'O.R No.'?: string;
-  'Invoice No.'?: string;
-  Quotation?: string;
-  'Date Requested'?: any;
-}
+const currencies = [
+  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
+  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
+  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
+  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
+  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
+  { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
+];
 
 export default function RequestsView() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const getCurrencySymbol = (currencyCode: string) => {
+    const currency = currencies.find(c => c.code === currencyCode);
+    return currency?.symbol || currencyCode;
+  };
+
+  const formatAmount = (amount: number, currencyCode: string) => {
+    const symbol = getCurrencySymbol(currencyCode);
+    return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    // Use project_id as company identifier if company_id is not available
-    const companyIdentifier = user.company_id || userData?.project_id || user.uid;
-
+    const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+    
     if (!companyIdentifier) {
-      console.error('No company identifier found for user');
+      console.log('No company identifier found');
       setLoading(false);
       return;
     }
 
-    console.log('Filtering requests for company_id:', companyIdentifier);
+    console.log('Fetching requests for company:', companyIdentifier);
 
-    // Query with multiple filters: company_id and deleted status
     const q = query(
       collection(db, 'request'),
       where('company_id', '==', companyIdentifier),
@@ -87,21 +79,14 @@ export default function RequestsView() {
         } as FinanceRequest);
       });
       
-      // Sort by creation date (newest first)
-      requestsData.sort((a, b) => {
-        const aTime = a.created?.toDate?.() || new Date(0);
-        const bTime = b.created?.toDate?.() || new Date(0);
-        return bTime.getTime() - aTime.getTime();
-      });
-      
-      console.log('Filtered requests count:', requestsData.length);
+      console.log(`Found ${requestsData.length} requests`);
       setRequests(requestsData);
       setLoading(false);
     }, (error) => {
       console.error('Error fetching requests:', error);
       toast({
         title: "Error",
-        description: "Failed to load requests.",
+        description: "Failed to fetch requests. Please try again.",
         variant: "destructive",
       });
       setLoading(false);
@@ -111,22 +96,25 @@ export default function RequestsView() {
   }, [user, userData, toast]);
 
   const handleDeleteRequest = async (requestId: string) => {
+    setDeletingId(requestId);
     try {
-      // Soft delete: set deleted field to true instead of actually deleting the document
       await updateDoc(doc(db, 'request', requestId), {
         deleted: true
       });
+      
       toast({
         title: "Success",
-        description: "Request deleted successfully.",
+        description: "Request moved to trash successfully.",
       });
     } catch (error) {
       console.error('Error deleting request:', error);
       toast({
         title: "Error",
-        description: "Failed to delete request.",
+        description: "Failed to delete request. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -145,21 +133,8 @@ export default function RequestsView() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
-  };
-
-  const formatDate = (date: any) => {
-    if (!date) return 'N/A';
-    const dateObj = date.toDate ? date.toDate() : new Date(date);
-    return dateObj.toLocaleDateString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const getRequestTypeBadgeVariant = (type: string) => {
+    return type === 'reimbursement' ? 'outline' : 'secondary';
   };
 
   if (loading) {
@@ -167,132 +142,27 @@ export default function RequestsView() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
-            <p className="text-muted-foreground">Manage reimbursements and requisitions</p>
+            <div className="h-8 bg-muted rounded w-48 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-64 mt-2 animate-pulse" />
           </div>
-          <div className="h-10 w-32 bg-muted animate-pulse rounded-md" />
+          <div className="h-10 bg-muted rounded w-32 animate-pulse" />
         </div>
-        <div className="grid gap-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  <div className="h-4 bg-muted animate-pulse rounded w-1/4" />
-                  <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
-                  <div className="h-4 bg-muted animate-pulse rounded w-1/3" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <CardHeader>
+            <div className="h-6 bg-muted rounded w-32 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-48 animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 bg-muted rounded animate-pulse" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-
-  const tableColumns = [
-    {
-      key: 'Request No.',
-      label: 'Request No.',
-      render: (request: FinanceRequest) => (
-        <div className="font-medium">#{request['Request No.']}</div>
-      ),
-    },
-    {
-      key: 'request_type',
-      label: 'Type',
-      render: (request: FinanceRequest) => (
-        <Badge variant="outline" className="capitalize">
-          {request.request_type}
-        </Badge>
-      ),
-    },
-    {
-      key: 'Requestor',
-      label: 'Requestor',
-      render: (request: FinanceRequest) => (
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span>{request.Requestor}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'Requested Item',
-      label: 'Item',
-      render: (request: FinanceRequest) => (
-        <div className="max-w-xs truncate" title={request['Requested Item']}>
-          {request['Requested Item']}
-        </div>
-      ),
-    },
-    {
-      key: 'Amount',
-      label: 'Amount',
-      render: (request: FinanceRequest) => (
-        <div className="flex items-center gap-2 font-medium">
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-          {formatCurrency(request.Amount)}
-        </div>
-      ),
-    },
-    {
-      key: 'Actions',
-      label: 'Status',
-      render: (request: FinanceRequest) => (
-        <Badge variant={getStatusBadgeVariant(request.Actions)}>
-          {request.Actions}
-        </Badge>
-      ),
-    },
-    {
-      key: 'created',
-      label: 'Date Created',
-      render: (request: FinanceRequest) => (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
-          {formatDate(request.created)}
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (request: FinanceRequest) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" title="View Request">
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" title="Edit Request">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" title="Delete Request">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Request</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete request #{request['Request No.']}? This action will move the request to trash but can be recovered if needed.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleDeleteRequest(request.id)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      ),
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -300,7 +170,7 @@ export default function RequestsView() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
           <p className="text-muted-foreground">
-            Manage reimbursements and requisitions
+            Manage your reimbursement and requisition requests
           </p>
         </div>
         <Link href="/finance/requests/create">
@@ -311,40 +181,128 @@ export default function RequestsView() {
         </Link>
       </div>
 
-      {requests.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No requests found</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              You haven't created any finance requests yet. Create your first request to get started.
-            </p>
-            <Link href="/finance/requests/create">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Request
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>All Requests</CardTitle>
-            <CardDescription>
-              {requests.length} active request{requests.length !== 1 ? 's' : ''} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveTable
-              data={requests}
-              columns={tableColumns}
-              searchKey="Requested Item"
-              searchPlaceholder="Search requests..."
-            />
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>All Requests</CardTitle>
+          <CardDescription>
+            View and manage your finance requests
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {requests.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No requests found</h3>
+              <p className="mt-2 text-muted-foreground">
+                Get started by creating your first finance request.
+              </p>
+              <Link href="/finance/requests/create">
+                <Button className="mt-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Your First Request
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Request No.</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Requestor</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="font-medium">
+                        #{request['Request No.']}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getRequestTypeBadgeVariant(request.request_type)}>
+                          {request.request_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {request.Requestor}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {request['Requested Item']}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">
+                            {formatAmount(request.Amount, request.Currency || 'PHP')}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(request.Actions)}>
+                          {request.Actions}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {format(request.created.toDate(), 'MMM dd, yyyy')}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                disabled={deletingId === request.id}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Request</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this request? This will move the request to trash and it can be recovered later if needed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteRequest(request.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

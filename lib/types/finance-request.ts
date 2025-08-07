@@ -8,6 +8,7 @@ export interface BaseRequest {
   Requestor: string;
   'Requested Item': string;
   Amount: number;
+  Currency: string; // Add Currency field
   'Approved By': string;
   Attachments: string;
   Actions: string;
