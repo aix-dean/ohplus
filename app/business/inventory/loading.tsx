@@ -1,10 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { SideNavigation } from "@/components/side-navigation"
 
 export default function BusinessInventoryLoading() {
   return (
     <div className="flex min-h-screen">
-      <SideNavigation />
       <div className="flex-1 p-4 md:p-6">
         <div className="mb-6 flex items-center justify-between">
           <Skeleton className="h-8 w-32" />

@@ -1,13 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import { SideNavigation } from "@/components/side-navigation"
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function BusinessEditProductLoading() {
   return (
     <div className="flex min-h-screen">
-      <SideNavigation />
       <div className="flex-1 p-6">
         <div className="max-w-3xl mx-auto">
           <Button variant="ghost" className="mb-6">
