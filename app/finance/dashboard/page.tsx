@@ -1,314 +1,379 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Search, ChevronDown, DollarSign, TrendingUp, TrendingDown, CreditCard, PieChart, BarChart3, FileText, Calendar, Users, AlertCircle } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { RouteProtection } from "@/components/route-protection"
-import { useAuth } from "@/contexts/auth-context"
-import { cn } from "@/lib/utils"
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, FileText, Calculator, PieChart, Calendar, Search, Plus, Download, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
-export default function FinanceDashboardPage() {
-  const { userData } = useAuth()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPeriod, setSelectedPeriod] = useState("This Month")
+export default function FinanceDashboard() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedPeriod, setSelectedPeriod] = useState('month')
 
-  // Sample financial data
+  // Mock data for financial metrics
   const financialMetrics = [
     {
-      title: "Total Revenue",
-      value: "₱2,450,000",
-      change: "+12.5%",
-      trend: "up",
+      title: 'Total Revenue',
+      value: '₱2,450,000',
+      change: '+12.5%',
+      trend: 'up',
       icon: DollarSign,
-      color: "text-green-600"
+      color: 'text-green-600'
     },
     {
-      title: "Total Expenses",
-      value: "₱1,850,000",
-      change: "+8.2%",
-      trend: "up",
-      icon: CreditCard,
-      color: "text-red-600"
+      title: 'Total Expenses',
+      value: '₱1,850,000',
+      change: '+8.2%',
+      trend: 'up',
+      icon: TrendingDown,
+      color: 'text-red-600'
     },
     {
-      title: "Net Profit",
-      value: "₱600,000",
-      change: "+18.7%",
-      trend: "up",
+      title: 'Net Profit',
+      value: '₱600,000',
+      change: '+18.7%',
+      trend: 'up',
       icon: TrendingUp,
-      color: "text-green-600"
+      color: 'text-green-600'
     },
     {
-      title: "Cash Flow",
-      value: "₱320,000",
-      change: "-5.3%",
-      trend: "down",
-      icon: BarChart3,
-      color: "text-blue-600"
+      title: 'Cash Flow',
+      value: '₱450,000',
+      change: '+5.3%',
+      trend: 'up',
+      icon: CreditCard,
+      color: 'text-blue-600'
     }
   ]
 
+  // Mock data for recent transactions
   const recentTransactions = [
     {
-      id: "TXN-001",
-      description: "LED Billboard Installation - SM Mall",
-      amount: "₱450,000",
-      type: "income",
-      date: "2024-01-15",
-      status: "completed"
+      id: 1,
+      description: 'LED Billboard Installation - SM Mall',
+      amount: 150000,
+      type: 'income',
+      date: '2024-01-15',
+      status: 'completed',
+      category: 'Installation Services'
     },
     {
-      id: "TXN-002",
-      description: "Equipment Purchase - LED Panels",
-      amount: "₱280,000",
-      type: "expense",
-      date: "2024-01-14",
-      status: "completed"
+      id: 2,
+      description: 'Equipment Purchase - LED Panels',
+      amount: -85000,
+      type: 'expense',
+      date: '2024-01-14',
+      status: 'completed',
+      category: 'Equipment'
     },
     {
-      id: "TXN-003",
-      description: "Monthly Rent - Office Space",
-      amount: "₱85,000",
-      type: "expense",
-      date: "2024-01-13",
-      status: "pending"
+      id: 3,
+      description: 'Monthly Maintenance - Ayala Center',
+      amount: 25000,
+      type: 'income',
+      date: '2024-01-13',
+      status: 'pending',
+      category: 'Maintenance'
     },
     {
-      id: "TXN-004",
-      description: "Digital Advertising Campaign",
-      amount: "₱320,000",
-      type: "income",
-      date: "2024-01-12",
-      status: "completed"
+      id: 4,
+      description: 'Office Rent Payment',
+      amount: -45000,
+      type: 'expense',
+      date: '2024-01-12',
+      status: 'completed',
+      category: 'Operating Expenses'
+    },
+    {
+      id: 5,
+      description: 'Digital Signage Project - BGC',
+      amount: 200000,
+      type: 'income',
+      date: '2024-01-11',
+      status: 'completed',
+      category: 'Project Revenue'
     }
   ]
 
+  // Mock data for upcoming payments
   const upcomingPayments = [
     {
-      id: "PAY-001",
-      description: "Supplier Payment - LED Components",
-      amount: "₱150,000",
-      dueDate: "2024-01-20",
-      priority: "high"
+      id: 1,
+      description: 'Supplier Payment - LED Components',
+      amount: 120000,
+      dueDate: '2024-01-20',
+      priority: 'high',
+      vendor: 'TechSupply Corp'
     },
     {
-      id: "PAY-002",
-      description: "Employee Salaries",
-      amount: "₱420,000",
-      dueDate: "2024-01-25",
-      priority: "high"
+      id: 2,
+      description: 'Employee Salaries',
+      amount: 180000,
+      dueDate: '2024-01-25',
+      priority: 'high',
+      vendor: 'Payroll'
     },
     {
-      id: "PAY-003",
-      description: "Utility Bills",
-      amount: "₱35,000",
-      dueDate: "2024-01-28",
-      priority: "medium"
+      id: 3,
+      description: 'Utility Bills',
+      amount: 15000,
+      dueDate: '2024-01-22',
+      priority: 'medium',
+      vendor: 'Various Utilities'
+    },
+    {
+      id: 4,
+      description: 'Insurance Premium',
+      amount: 35000,
+      dueDate: '2024-01-28',
+      priority: 'medium',
+      vendor: 'Insurance Co.'
     }
   ]
 
+  const quickActions = [
+    {
+      title: 'Generate Report',
+      description: 'Create financial reports',
+      icon: FileText,
+      color: 'bg-blue-500',
+      action: () => console.log('Generate Report')
+    },
+    {
+      title: 'Budget Planning',
+      description: 'Plan and manage budgets',
+      icon: Calculator,
+      color: 'bg-green-500',
+      action: () => console.log('Budget Planning')
+    },
+    {
+      title: 'Expense Management',
+      description: 'Track and categorize expenses',
+      icon: CreditCard,
+      color: 'bg-orange-500',
+      action: () => console.log('Expense Management')
+    },
+    {
+      title: 'Financial Analytics',
+      description: 'View detailed analytics',
+      icon: PieChart,
+      color: 'bg-purple-500',
+      action: () => console.log('Financial Analytics')
+    }
+  ]
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    }).format(Math.abs(amount))
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-PH', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
   return (
-    <RouteProtection requiredRoles="finance">
-      <div className="flex-1 p-4 md:p-6">
-        <div className="flex flex-col gap-6">
-          {/* Header Section */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold">
-              {userData?.first_name
-                ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Finance Dashboard`
-                : "Finance Dashboard"}
-            </h1>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-grow">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search transactions..."
-                  className="w-full rounded-lg bg-background pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                    {selectedPeriod} <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Week")}>This Week</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Month")}>This Month</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Quarter")}>This Quarter</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedPeriod("This Year")}>This Year</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          {/* Financial Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {financialMetrics.map((metric, index) => {
-              const Icon = metric.icon
-              return (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">
-                      {metric.title}
-                    </CardTitle>
-                    <Icon className={cn("h-4 w-4", metric.color)} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{metric.value}</div>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      {metric.trend === "up" ? (
-                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                      )}
-                      <span className={metric.trend === "up" ? "text-green-600" : "text-red-600"}>
-                        {metric.change}
-                      </span>
-                      <span className="ml-1">from last month</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Recent Transactions */}
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Recent Transactions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {recentTransactions.map((transaction) => (
-                      <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{transaction.description}</span>
-                            <Badge 
-                              variant={transaction.status === "completed" ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {transaction.status}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {transaction.id} • {transaction.date}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className={cn(
-                            "font-semibold",
-                            transaction.type === "income" ? "text-green-600" : "text-red-600"
-                          )}>
-                            {transaction.type === "income" ? "+" : "-"}{transaction.amount}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Transactions
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Upcoming Payments */}
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Upcoming Payments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {upcomingPayments.map((payment) => (
-                      <div key={payment.id} className="p-3 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{payment.description}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Due: {payment.dueDate}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {payment.priority === "high" && (
-                              <AlertCircle className="h-4 w-4 text-red-500" />
-                            )}
-                            <Badge 
-                              variant={payment.priority === "high" ? "destructive" : "secondary"}
-                              className="text-xs"
-                            >
-                              {payment.priority}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="font-semibold text-red-600 mt-2">
-                          {payment.amount}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Payments
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 text-center">
-                <PieChart className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-                <h3 className="font-medium">Financial Reports</h3>
-                <p className="text-sm text-gray-500">Generate detailed reports</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 text-center">
-                <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
-                <h3 className="font-medium">Budget Planning</h3>
-                <p className="text-sm text-gray-500">Plan and track budgets</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 text-center">
-                <CreditCard className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-                <h3 className="font-medium">Expense Management</h3>
-                <p className="text-sm text-gray-500">Track and categorize expenses</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 text-center">
-                <BarChart3 className="h-8 w-8 mx-auto mb-2 text-orange-600" />
-                <h3 className="font-medium">Analytics</h3>
-                <p className="text-sm text-gray-500">View financial analytics</p>
-              </CardContent>
-            </Card>
-          </div>
+    <div className="flex-1 space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
+          <p className="text-muted-foreground">
+            Monitor your financial performance and manage transactions
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="quarter">This Quarter</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
       </div>
-    </RouteProtection>
+
+      {/* Financial Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {financialMetrics.map((metric, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {metric.title}
+              </CardTitle>
+              <metric.icon className={`h-4 w-4 ${metric.color}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metric.value}</div>
+              <div className="flex items-center text-xs text-muted-foreground">
+                {metric.trend === 'up' ? (
+                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
+                ) : (
+                  <ArrowDownRight className="mr-1 h-3 w-3 text-red-500" />
+                )}
+                {metric.change} from last {selectedPeriod}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Recent Transactions */}
+        <Card className="col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>
+                  Latest financial transactions and activities
+                </CardDescription>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search transactions..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-64"
+                  />
+                </div>
+                <Button variant="outline" size="sm">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filter
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentTransactions.map((transaction) => (
+                <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-full ${
+                      transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {transaction.type === 'income' ? (
+                        <ArrowUpRight className={`h-4 w-4 ${
+                          transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                        }`} />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{transaction.description}</p>
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <span>{transaction.category}</span>
+                        <span>•</span>
+                        <span>{formatDate(transaction.date)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-semibold ${
+                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                    </p>
+                    <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
+                      {transaction.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 text-center">
+              <Button variant="outline">View All Transactions</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Payments */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming Payments</CardTitle>
+            <CardDescription>
+              Payments due in the next 30 days
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {upcomingPayments.map((payment) => (
+                <div key={payment.id} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant={
+                      payment.priority === 'high' ? 'destructive' : 
+                      payment.priority === 'medium' ? 'default' : 'secondary'
+                    }>
+                      {payment.priority} priority
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      Due {formatDate(payment.dueDate)}
+                    </span>
+                  </div>
+                  <p className="font-medium text-sm">{payment.description}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{payment.vendor}</p>
+                  <p className="font-semibold text-red-600">{formatCurrency(payment.amount)}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4">
+              <Button className="w-full" variant="outline">
+                <Calendar className="mr-2 h-4 w-4" />
+                View Payment Schedule
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>
+            Common financial tasks and operations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {quickActions.map((action, index) => (
+              <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow" onClick={action.action}>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${action.color}`}>
+                      <action.icon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{action.title}</p>
+                      <p className="text-sm text-muted-foreground">{action.description}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
