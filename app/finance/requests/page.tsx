@@ -6,7 +6,7 @@ export default function FinanceRequestsPage() {
         <div>
             <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
             <p className="text-muted-foreground">
-                Manage and review reimbursement and requisition requests. Add new entries directly in the table below.
+                Manage and review reimbursement and requisition requests.
             </p>
         </div>
         <RequestsView />

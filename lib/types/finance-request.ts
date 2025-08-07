@@ -29,28 +29,3 @@ export interface RequisitionRequest extends BaseRequest {
 }
 
 export type FinanceRequest = ReimbursementRequest | RequisitionRequest;
-
-// Types for new entries being created
-export interface NewReimbursementRequest {
-  id: string;
-  'Request No.': string;
-  Requestor: string;
-  'Requested Item': string;
-  Amount: string;
-  'Date Released': string;
-  Actions: string;
-  isNew: boolean;
-}
-
-export interface NewRequisitionRequest {
-  id: string;
-  'Request No.': string;
-  Requestor: string;
-  'Requested Item': string;
-  Amount: string;
-  'O.R No.': string;
-  'Invoice No.': string;
-  'Date Requested': string;
-  Actions: string;
-  isNew: boolean;
-}
