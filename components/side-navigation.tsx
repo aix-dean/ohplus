@@ -2,31 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  BarChart3,
-  Truck,
-  AlertTriangle,
-  FileText,
-  Settings,
-  ShieldCheck,
-  BookOpen,
-  Package,
-  MessageCircle,
-  FileCheck,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  ClipboardList,
-  CloudRain,
-  Cog,
-  Monitor,
-  Wifi,
-  HardDrive,
-} from "lucide-react"
+import { LayoutDashboard, Users, Calendar, BarChart3, Truck, AlertTriangle, FileText, Settings, ShieldCheck, BookOpen, Package, MessageCircle, FileCheck, Sparkles, ChevronLeft, ChevronRight, TrendingUp, ClipboardList, CloudRain, Cog, Monitor, Wifi, HardDrive } from 'lucide-react'
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
@@ -101,10 +77,7 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/it", icon: LayoutDashboard },
       { title: "System Status", href: "/it/system-status", icon: Monitor },
-      { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
-      { title: "Network Management", href: "/it/network", icon: Wifi },
-      { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-      { title: "Device Management", href: "/it/devices", icon: Package },
+      { title: "Support Overview", href: "/it/support-overview", icon: AlertTriangle },
     ],
   },
   {
@@ -609,9 +582,10 @@ export function SideNavigation() {
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
                   { title: "Network Management", href: "/it/network", icon: Wifi },
                   { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-                  { title: "Device Management", href: "/it/inventory", icon: Package },
+                  { title: "Hardwares", href: "/it/inventory", icon: Package },
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
+                  { title: "User Management", href: "/it/user-management", icon: Users },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
