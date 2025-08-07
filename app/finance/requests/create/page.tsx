@@ -35,7 +35,7 @@ interface CreateRequestFormData {
 }
 
 export default function CreateRequestPage() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,10 +76,14 @@ export default function CreateRequestPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.company_id) {
+    
+    // Use project_id as company identifier if company_id is not available
+    const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+    
+    if (!companyIdentifier) {
       toast({
         title: "Error",
-        description: "User company information not found.",
+        description: "Unable to identify company information. Please try logging in again.",
         variant: "destructive",
       });
       return;
@@ -102,7 +106,7 @@ export default function CreateRequestPage() {
 
       // Prepare the document data
       const baseData = {
-        company_id: user.company_id,
+        company_id: companyIdentifier,
         created: serverTimestamp(),
         request_type: formData.request_type,
         'Request No.': parseInt(formData['Request No.']) || generateRequestNumber(),

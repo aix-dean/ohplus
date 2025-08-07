@@ -1,210 +1,329 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, FileText, Calendar, DollarSign, User, Trash2, Eye, Edit } from 'lucide-react';
 import Link from 'next/link';
-import type { ReimbursementRequest, RequisitionRequest } from '@/lib/types/finance-request';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { ResponsiveTable } from '@/components/responsive-table';
 
-const ReimbursementTable = ({ data, isLoading }: { data: ReimbursementRequest[], isLoading: boolean }) => {
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-md" />)}
-      </div>
-    );
-  }
-
-  if (data.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <p className="text-muted-foreground mb-4">No reimbursement requests found.</p>
-        <Link href="/finance/requests/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Your First Request
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full overflow-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Request No.</TableHead>
-            <TableHead>Requestor</TableHead>
-            <TableHead>Requested Item</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead>Date Released</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((request) => (
-            <TableRow key={request.id}>
-              <TableCell className="font-medium">{request['Request No.']}</TableCell>
-              <TableCell>{request.Requestor}</TableCell>
-              <TableCell className="max-w-xs truncate">{request['Requested Item']}</TableCell>
-              <TableCell className="text-right">{request.Amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-              <TableCell>{request['Date Released'].toDate().toLocaleDateString()}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{request.Actions}</Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
-
-const RequisitionTable = ({ data, isLoading }: { data: RequisitionRequest[], isLoading: boolean }) => {
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-md" />)}
-      </div>
-    );
-  }
-
-  if (data.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <p className="text-muted-foreground mb-4">No requisition requests found.</p>
-        <Link href="/finance/requests/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Your First Request
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full overflow-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Request No.</TableHead>
-            <TableHead>Requestor</TableHead>
-            <TableHead>Requested Item</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead>O.R No.</TableHead>
-            <TableHead>Invoice No.</TableHead>
-            <TableHead>Date Requested</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((request) => (
-            <TableRow key={request.id}>
-              <TableCell className="font-medium">{request['Request No.']}</TableCell>
-              <TableCell>{request.Requestor}</TableCell>
-              <TableCell className="max-w-xs truncate">{request['Requested Item']}</TableCell>
-              <TableCell className="text-right">{request.Amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-              <TableCell>{request['O.R No.']}</TableCell>
-              <TableCell>{request['Invoice No.']}</TableCell>
-              <TableCell>{request['Date Requested'].toDate().toLocaleDateString()}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{request.Actions}</Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
+interface FinanceRequest {
+  id: string;
+  request_type: 'reimbursement' | 'requisition';
+  'Request No.': number;
+  Requestor: string;
+  'Requested Item': string;
+  Amount: number;
+  'Approved By': string;
+  Attachments: string;
+  Actions: string;
+  created: any;
+  // Reimbursement specific
+  'Date Released'?: any;
+  // Requisition specific
+  Cashback?: number;
+  'O.R No.'?: string;
+  'Invoice No.'?: string;
+  Quotation?: string;
+  'Date Requested'?: any;
+}
 
 export default function RequestsView() {
-  const { user } = useAuth();
-  const [reimbursements, setReimbursements] = useState<ReimbursementRequest[]>([]);
-  const [requisitions, setRequisitions] = useState<RequisitionRequest[]>([]);
-  const [isReimbursementLoading, setIsReimbursementLoading] = useState(true);
-  const [isRequisitionLoading, setIsRequisitionLoading] = useState(true);
+  const { user, userData } = useAuth();
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<FinanceRequest[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.company_id) {
-      setIsReimbursementLoading(false);
-      setIsRequisitionLoading(false);
-      return;
+    if (!user) return;
+
+    // Use project_id as company identifier if company_id is not available
+    const companyIdentifier = user.company_id || userData?.project_id || user.uid;
+
+    const q = query(
+      collection(db, 'request'),
+      where('company_id', '==', companyIdentifier)
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const requestsData: FinanceRequest[] = [];
+      querySnapshot.forEach((doc) => {
+        requestsData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as FinanceRequest);
+      });
+      
+      // Sort by creation date (newest first)
+      requestsData.sort((a, b) => {
+        const aTime = a.created?.toDate?.() || new Date(0);
+        const bTime = b.created?.toDate?.() || new Date(0);
+        return bTime.getTime() - aTime.getTime();
+      });
+      
+      setRequests(requestsData);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load requests.",
+        variant: "destructive",
+      });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, userData, toast]);
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      await deleteDoc(doc(db, 'request', requestId));
+      toast({
+        title: "Success",
+        description: "Request deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete request.",
+        variant: "destructive",
+      });
     }
+  };
 
-    const requestsCollection = collection(db, 'request');
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'rejected':
+        return 'destructive';
+      case 'processing':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
 
-    const qReimbursement = query(
-      requestsCollection, 
-      where('request_type', '==', 'reimbursement'), 
-      where('company_id', '==', user.company_id)
-    );
-    const unsubscribeReimbursement = onSnapshot(qReimbursement, (querySnapshot) => {
-      const reimbursementData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as ReimbursementRequest[];
-      setReimbursements(reimbursementData);
-      setIsReimbursementLoading(false);
-    }, (error) => {
-      console.error("Error fetching reimbursements:", error);
-      setIsReimbursementLoading(false);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
+
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    const dateObj = date.toDate ? date.toDate() : new Date(date);
+    return dateObj.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
     });
+  };
 
-    const qRequisition = query(
-      requestsCollection, 
-      where('request_type', '==', 'requisition'), 
-      where('company_id', '==', user.company_id)
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
+            <p className="text-muted-foreground">Manage reimbursements and requisitions</p>
+          </div>
+          <div className="h-10 w-32 bg-muted animate-pulse rounded-md" />
+        </div>
+        <div className="grid gap-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  <div className="h-4 bg-muted animate-pulse rounded w-1/4" />
+                  <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
+                  <div className="h-4 bg-muted animate-pulse rounded w-1/3" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     );
-    const unsubscribeRequisition = onSnapshot(qRequisition, (querySnapshot) => {
-      const requisitionData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as RequisitionRequest[];
-      setRequisitions(requisitionData);
-      setIsRequisitionLoading(false);
-    }, (error) => {
-      console.error("Error fetching requisitions:", error);
-      setIsRequisitionLoading(false);
-    });
+  }
 
-    return () => {
-      unsubscribeReimbursement();
-      unsubscribeRequisition();
-    };
-  }, [user]);
+  const tableColumns = [
+    {
+      key: 'Request No.',
+      label: 'Request No.',
+      render: (request: FinanceRequest) => (
+        <div className="font-medium">#{request['Request No.']}</div>
+      ),
+    },
+    {
+      key: 'request_type',
+      label: 'Type',
+      render: (request: FinanceRequest) => (
+        <Badge variant="outline" className="capitalize">
+          {request.request_type}
+        </Badge>
+      ),
+    },
+    {
+      key: 'Requestor',
+      label: 'Requestor',
+      render: (request: FinanceRequest) => (
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" />
+          <span>{request.Requestor}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'Requested Item',
+      label: 'Item',
+      render: (request: FinanceRequest) => (
+        <div className="max-w-xs truncate" title={request['Requested Item']}>
+          {request['Requested Item']}
+        </div>
+      ),
+    },
+    {
+      key: 'Amount',
+      label: 'Amount',
+      render: (request: FinanceRequest) => (
+        <div className="flex items-center gap-2 font-medium">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          {formatCurrency(request.Amount)}
+        </div>
+      ),
+    },
+    {
+      key: 'Actions',
+      label: 'Status',
+      render: (request: FinanceRequest) => (
+        <Badge variant={getStatusBadgeVariant(request.Actions)}>
+          {request.Actions}
+        </Badge>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Date Created',
+      render: (request: FinanceRequest) => (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="h-4 w-4" />
+          {formatDate(request.created)}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (request: FinanceRequest) => (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm">
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm">
+            <Edit className="h-4 w-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Request</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete request #{request['Request No.']}? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => handleDeleteRequest(request.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      <Tabs defaultValue="reimbursement" className="w-full">
-        <div className="flex justify-between items-center mb-4">
-          <TabsList className="grid w-full grid-cols-2 md:w-1/3">
-            <TabsTrigger value="reimbursement">Reimbursement</TabsTrigger>
-            <TabsTrigger value="requisition">Requisition</TabsTrigger>
-          </TabsList>
-          <Link href="/finance/requests/create">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Request
-            </Button>
-          </Link>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
+          <p className="text-muted-foreground">
+            Manage reimbursements and requisitions
+          </p>
         </div>
-        <TabsContent value="reimbursement">
-          <ReimbursementTable data={reimbursements} isLoading={isReimbursementLoading} />
-        </TabsContent>
-        <TabsContent value="requisition">
-          <RequisitionTable data={requisitions} isLoading={isRequisitionLoading} />
-        </TabsContent>
-      </Tabs>
+        <Link href="/finance/requests/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Request
+          </Button>
+        </Link>
+      </div>
+
+      {requests.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No requests found</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-sm">
+              You haven't created any finance requests yet. Create your first request to get started.
+            </p>
+            <Link href="/finance/requests/create">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Request
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>All Requests</CardTitle>
+            <CardDescription>
+              {requests.length} request{requests.length !== 1 ? 's' : ''} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveTable
+              data={requests}
+              columns={tableColumns}
+              searchKey="Requested Item"
+              searchPlaceholder="Search requests..."
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
