@@ -1,0 +1,432 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Calendar, User, FileText, DollarSign, Building, Clock, CheckCircle, XCircle, AlertCircle, Download, ExternalLink } from 'lucide-react';
+import { format } from 'date-fns';
+import type { FinanceRequest } from '@/lib/types/finance-request';
+
+const currencies = [
+  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
+  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
+  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
+  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
+  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
+  { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
+];
+
+const getStatusIcon = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return <CheckCircle className="h-5 w-5 text-green-600" />;
+    case 'pending':
+      return <Clock className="h-5 w-5 text-yellow-600" />;
+    case 'rejected':
+      return <XCircle className="h-5 w-5 text-red-600" />;
+    case 'processing':
+      return <AlertCircle className="h-5 w-5 text-blue-600" />;
+    default:
+      return <Clock className="h-5 w-5 text-gray-600" />;
+  }
+};
+
+const getStatusBadgeVariant = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return 'default';
+    case 'pending':
+      return 'secondary';
+    case 'rejected':
+      return 'destructive';
+    case 'processing':
+      return 'outline';
+    default:
+      return 'secondary';
+  }
+};
+
+const getCurrencySymbol = (currencyCode: string) => {
+  const currency = currencies.find(c => c.code === currencyCode);
+  return currency?.symbol || currencyCode;
+};
+
+const formatAmount = (amount: number, currencyCode: string) => {
+  const symbol = getCurrencySymbol(currencyCode);
+  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export default function RequestDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { user, userData } = useAuth();
+  const { toast } = useToast();
+  const [request, setRequest] = useState<FinanceRequest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const requestId = params.id as string;
+
+  useEffect(() => {
+    const fetchRequest = async () => {
+      if (!requestId) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const docRef = doc(db, 'request', requestId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+          
+          // Check if the request belongs to the current user's company
+          if (data.company_id !== companyIdentifier) {
+            setNotFound(true);
+            setLoading(false);
+            return;
+          }
+
+          // Check if the request is not deleted
+          if (data.deleted === true) {
+            setNotFound(true);
+            setLoading(false);
+            return;
+          }
+
+          setRequest({
+            id: docSnap.id,
+            ...data,
+          } as FinanceRequest);
+        } else {
+          setNotFound(true);
+        }
+      } catch (error) {
+        console.error('Error fetching request:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch request details. Please try again.",
+          variant: "destructive",
+        });
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequest();
+  }, [requestId, user, userData, toast]);
+
+  const handleBack = () => {
+    router.push('/finance/requests');
+  };
+
+  const handleDownloadAttachment = (url: string) => {
+    if (url) {
+      window.open(url, '_blank');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 bg-muted rounded animate-pulse" />
+          <div>
+            <div className="h-8 bg-muted rounded w-48 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-32 mt-2 animate-pulse" />
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="h-6 bg-muted rounded w-32 animate-pulse" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex justify-between">
+                  <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+                  <div className="h-4 bg-muted rounded w-32 animate-pulse" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="h-6 bg-muted rounded w-32 animate-pulse" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex justify-between">
+                  <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+                  <div className="h-4 bg-muted rounded w-32 animate-pulse" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !request) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Requests
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Request Not Found</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              The request you're looking for doesn't exist or you don't have permission to view it.
+            </p>
+            <Button onClick={handleBack}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Requests
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Requests
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Request #{request['Request No.']}
+            </h1>
+            <p className="text-muted-foreground">
+              {request.request_type === 'reimbursement' ? 'Reimbursement' : 'Requisition'} Request Details
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {getStatusIcon(request.Actions)}
+          <Badge variant={getStatusBadgeVariant(request.Actions)}>
+            {request.Actions}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Basic Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Request Number</span>
+              <span className="font-medium">#{request['Request No.']}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Type</span>
+              <Badge variant={request.request_type === 'reimbursement' ? 'outline' : 'secondary'}>
+                {request.request_type}
+              </Badge>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Requestor</span>
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{request.Requestor}</span>
+              </div>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Amount</span>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-lg">
+                  {formatAmount(request.Amount, request.Currency || 'PHP')}
+                </span>
+              </div>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Approved By</span>
+              <span className="font-medium">{request['Approved By'] || 'Not specified'}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Created Date</span>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">
+                  {format(request.created.toDate(), 'MMM dd, yyyy HH:mm')}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Request Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Request Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <span className="text-sm font-medium text-muted-foreground">Requested Item</span>
+              <p className="mt-1 text-sm bg-muted p-3 rounded-md">
+                {request['Requested Item']}
+              </p>
+            </div>
+            <Separator />
+            
+            {/* Type-specific fields */}
+            {request.request_type === 'reimbursement' && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Date Released</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {request['Date Released'] 
+                        ? format(request['Date Released'].toDate(), 'MMM dd, yyyy')
+                        : 'Not specified'
+                      }
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {request.request_type === 'requisition' && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Cashback</span>
+                  <span className="font-medium">
+                    {formatAmount(request.Cashback || 0, request.Currency || 'PHP')}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">O.R Number</span>
+                  <span className="font-medium">{request['O.R No.'] || 'Not specified'}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Invoice Number</span>
+                  <span className="font-medium">{request['Invoice No.'] || 'Not specified'}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Date Requested</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {request['Date Requested'] 
+                        ? format(request['Date Requested'].toDate(), 'MMM dd, yyyy')
+                        : 'Not specified'
+                      }
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Attachments */}
+      {(request.Attachments || (request.request_type === 'requisition' && request.Quotation)) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              Attachments
+            </CardTitle>
+            <CardDescription>
+              Click to download or view attachments
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {request.Attachments && (
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Request Attachment</p>
+                      <p className="text-sm text-muted-foreground">Supporting document</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadAttachment(request.Attachments)}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                </div>
+              )}
+              
+              {request.request_type === 'requisition' && request.Quotation && (
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Quotation</p>
+                      <p className="text-sm text-muted-foreground">Price quotation document</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadAttachment(request.Quotation)}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

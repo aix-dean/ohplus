@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X, MoreHorizontal, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
@@ -46,6 +47,7 @@ const statusOptions = [
 export default function RequestsView() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -165,6 +167,10 @@ export default function RequestsView() {
 
     return () => unsubscribe();
   }, [user, userData, toast]);
+
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/finance/requests/details/${requestId}`);
+  };
 
   const handleUpdateStatus = async (requestId: string, newStatus: string) => {
     setUpdatingStatusId(requestId);
@@ -422,7 +428,7 @@ export default function RequestsView() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
