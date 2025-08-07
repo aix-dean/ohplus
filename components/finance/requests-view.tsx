@@ -21,7 +21,7 @@ const ReimbursementTable = ({
 }: { 
   data: ReimbursementRequest[], 
   isLoading: boolean,
-  companyId: string 
+  companyId?: string 
 }) => {
   const [newRows, setNewRows] = useState<NewReimbursementRequest[]>([]);
   const { toast } = useToast();
@@ -72,6 +72,15 @@ const ReimbursementTable = ({
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID not available",
         variant: "destructive"
       });
       return;
@@ -197,7 +206,7 @@ const ReimbursementTable = ({
                 <Button
                   size="sm"
                   onClick={() => saveRow(row)}
-                  disabled={!row.Requestor || !row['Requested Item'] || !row.Amount}
+                  disabled={!row.Requestor || !row['Requested Item'] || !row.Amount || !companyId}
                   className="h-8 w-8 p-0"
                 >
                   <Save className="h-4 w-4" />
@@ -218,7 +227,7 @@ const RequisitionTable = ({
 }: { 
   data: RequisitionRequest[], 
   isLoading: boolean,
-  companyId: string 
+  companyId?: string 
 }) => {
   const [newRows, setNewRows] = useState<NewRequisitionRequest[]>([]);
   const { toast } = useToast();
@@ -271,6 +280,15 @@ const RequisitionTable = ({
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID not available",
         variant: "destructive"
       });
       return;
@@ -420,7 +438,7 @@ const RequisitionTable = ({
                 <Button
                   size="sm"
                   onClick={() => saveRow(row)}
-                  disabled={!row.Requestor || !row['Requested Item'] || !row.Amount}
+                  disabled={!row.Requestor || !row['Requested Item'] || !row.Amount || !companyId}
                   className="h-8 w-8 p-0"
                 >
                   <Save className="h-4 w-4" />
@@ -442,15 +460,16 @@ export default function RequestsView() {
   const [isRequisitionLoading, setIsRequisitionLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.company_id) {
-      setIsReimbursementLoading(false);
-      setIsRequisitionLoading(false);
-      return;
-    }
-
     const requestsCollection = collection(db, 'request');
 
-    const qReimbursement = query(requestsCollection, where('request_type', '==', 'reimbursement'), where('company_id', '==', user.company_id));
+    // Set up reimbursement listener
+    let qReimbursement;
+    if (user?.company_id) {
+      qReimbursement = query(requestsCollection, where('request_type', '==', 'reimbursement'), where('company_id', '==', user.company_id));
+    } else {
+      qReimbursement = query(requestsCollection, where('request_type', '==', 'reimbursement'));
+    }
+
     const unsubscribeReimbursement = onSnapshot(qReimbursement, (querySnapshot) => {
       const reimbursementData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -463,7 +482,14 @@ export default function RequestsView() {
         setIsReimbursementLoading(false);
     });
 
-    const qRequisition = query(requestsCollection, where('request_type', '==', 'requisition'), where('company_id', '==', user.company_id));
+    // Set up requisition listener
+    let qRequisition;
+    if (user?.company_id) {
+      qRequisition = query(requestsCollection, where('request_type', '==', 'requisition'), where('company_id', '==', user.company_id));
+    } else {
+      qRequisition = query(requestsCollection, where('request_type', '==', 'requisition'));
+    }
+
     const unsubscribeRequisition = onSnapshot(qRequisition, (querySnapshot) => {
       const requisitionData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -482,14 +508,6 @@ export default function RequestsView() {
     };
   }, [user]);
 
-  if (!user?.company_id) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-muted-foreground">Please log in to view requests.</p>
-      </div>
-    );
-  }
-
   return (
     <Tabs defaultValue="reimbursement" className="w-full">
       <TabsList className="grid w-full grid-cols-2 md:w-1/3">
@@ -500,14 +518,14 @@ export default function RequestsView() {
         <ReimbursementTable 
           data={reimbursements} 
           isLoading={isReimbursementLoading}
-          companyId={user.company_id}
+          companyId={user?.company_id}
         />
       </TabsContent>
       <TabsContent value="requisition">
         <RequisitionTable 
           data={requisitions} 
           isLoading={isRequisitionLoading}
-          companyId={user.company_id}
+          companyId={user?.company_id}
         />
       </TabsContent>
     </Tabs>
