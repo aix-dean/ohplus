@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Settings, Mail, Shield } from 'lucide-react'
+import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -56,7 +56,6 @@ export default function UserManagementPage() {
     sales: false,
     logistics: false,
     cms: false,
-    finance: false,
   })
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
 
@@ -123,7 +122,6 @@ export default function UserManagementPage() {
       sales: "bg-green-100 text-green-800 hover:bg-green-100",
       logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
       cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-      finance: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
     }
 
     return <Badge className={colorClasses[roleId]}>{role.name}</Badge>
@@ -144,7 +142,6 @@ export default function UserManagementPage() {
           sales: userRoles.includes("sales"),
           logistics: userRoles.includes("logistics"),
           cms: userRoles.includes("cms"),
-          finance: userRoles.includes("finance"),
         }
 
         setSelectedRoles(initialSelectedRoles)

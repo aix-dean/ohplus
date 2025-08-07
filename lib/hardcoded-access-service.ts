@@ -2,7 +2,7 @@ import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore"
 
 // Hardcoded role definitions
-export type RoleType = "admin" | "sales" | "logistics" | "cms" | "finance"
+export type RoleType = "admin" | "sales" | "logistics" | "cms"
 
 export interface HardcodedRole {
   id: RoleType
@@ -53,11 +53,6 @@ export const HARDCODED_ROLES: Record<RoleType, HardcodedRole> = {
         module: "cms",
         actions: ["view", "create", "edit", "delete"],
         description: "Full CMS module access",
-      },
-      {
-        module: "finance",
-        actions: ["view", "create", "edit", "delete"],
-        description: "Full finance module access",
       },
       {
         module: "user-management",
@@ -187,54 +182,6 @@ export const HARDCODED_ROLES: Record<RoleType, HardcodedRole> = {
         module: "media",
         actions: ["view", "create", "edit", "delete"],
         description: "Media asset management",
-      },
-    ],
-  },
-  finance: {
-    id: "finance",
-    name: "Finance Team",
-    description: "Access to financial management and accounting",
-    color: "emerald",
-    permissions: [
-      {
-        module: "finance",
-        actions: ["view", "create", "edit", "delete"],
-        description: "Full finance module access",
-      },
-      {
-        module: "accounting",
-        actions: ["view", "create", "edit", "delete"],
-        description: "Accounting and bookkeeping",
-      },
-      {
-        module: "invoices",
-        actions: ["view", "create", "edit", "delete"],
-        description: "Invoice management",
-      },
-      {
-        module: "expenses",
-        actions: ["view", "create", "edit", "delete"],
-        description: "Expense tracking and management",
-      },
-      {
-        module: "reports",
-        actions: ["view", "create"],
-        description: "Financial reporting",
-      },
-      {
-        module: "budgets",
-        actions: ["view", "create", "edit"],
-        description: "Budget planning and management",
-      },
-      {
-        module: "payments",
-        actions: ["view", "create", "edit"],
-        description: "Payment processing and tracking",
-      },
-      {
-        module: "taxes",
-        actions: ["view", "create", "edit"],
-        description: "Tax management and compliance",
       },
     ],
   },
