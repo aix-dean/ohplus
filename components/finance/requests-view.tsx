@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Eye, Edit, FileText, Calendar, User } from 'lucide-react';
+import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
@@ -40,6 +41,7 @@ export default function RequestsView() {
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const getCurrencySymbol = (currencyCode: string) => {
     const currency = currencies.find(c => c.code === currencyCode);
@@ -50,6 +52,59 @@ export default function RequestsView() {
     const symbol = getCurrencySymbol(currencyCode);
     return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
+
+  // Comprehensive search function that searches across all relevant fields
+  const filteredRequests = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return requests;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return requests.filter((request) => {
+      // Search in basic fields
+      const requestNo = request['Request No.'].toString().toLowerCase();
+      const requestType = request.request_type.toLowerCase();
+      const requestor = request.Requestor.toLowerCase();
+      const requestedItem = request['Requested Item'].toLowerCase();
+      const amount = request.Amount.toString();
+      const currency = (request.Currency || 'PHP').toLowerCase();
+      const approvedBy = (request['Approved By'] || '').toLowerCase();
+      const status = request.Actions.toLowerCase();
+      
+      // Search in date fields
+      const createdDate = request.created ? format(request.created.toDate(), 'MMM dd, yyyy').toLowerCase() : '';
+      
+      // Search in type-specific fields
+      let typeSpecificMatch = false;
+      if (request.request_type === 'reimbursement') {
+        const dateReleased = request['Date Released'] ? format(request['Date Released'].toDate(), 'MMM dd, yyyy').toLowerCase() : '';
+        typeSpecificMatch = dateReleased.includes(query);
+      } else if (request.request_type === 'requisition') {
+        const cashback = (request.Cashback || 0).toString();
+        const orNo = (request['O.R No.'] || '').toLowerCase();
+        const invoiceNo = (request['Invoice No.'] || '').toLowerCase();
+        const dateRequested = request['Date Requested'] ? format(request['Date Requested'].toDate(), 'MMM dd, yyyy').toLowerCase() : '';
+        
+        typeSpecificMatch = cashback.includes(query) || 
+                           orNo.includes(query) || 
+                           invoiceNo.includes(query) || 
+                           dateRequested.includes(query);
+      }
+
+      // Check if query matches any field
+      return requestNo.includes(query) ||
+             requestType.includes(query) ||
+             requestor.includes(query) ||
+             requestedItem.includes(query) ||
+             amount.includes(query) ||
+             currency.includes(query) ||
+             approvedBy.includes(query) ||
+             status.includes(query) ||
+             createdDate.includes(query) ||
+             typeSpecificMatch;
+    });
+  }, [requests, searchQuery]);
 
   useEffect(() => {
     const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
@@ -77,6 +132,13 @@ export default function RequestsView() {
           id: doc.id,
           ...data,
         } as FinanceRequest);
+      });
+      
+      // Sort by creation date (newest first)
+      requestsData.sort((a, b) => {
+        const aTime = a.created?.toDate?.() || new Date(0);
+        const bTime = b.created?.toDate?.() || new Date(0);
+        return bTime.getTime() - aTime.getTime();
       });
       
       console.log(`Found ${requestsData.length} requests`);
@@ -118,6 +180,10 @@ export default function RequestsView() {
     }
   };
 
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case 'approved':
@@ -147,6 +213,7 @@ export default function RequestsView() {
           </div>
           <div className="h-10 bg-muted rounded w-32 animate-pulse" />
         </div>
+        <div className="h-10 bg-muted rounded w-full animate-pulse" />
         <Card>
           <CardHeader>
             <div className="h-6 bg-muted rounded w-32 animate-pulse" />
@@ -181,27 +248,82 @@ export default function RequestsView() {
         </Link>
       </div>
 
+      {/* Search Box */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search requests by number, type, requestor, item, amount, status, or date..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-10"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearSearch}
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>All Requests</CardTitle>
+          <CardTitle>
+            {searchQuery ? (
+              <>
+                Search Results
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({filteredRequests.length} of {requests.length} requests)
+                </span>
+              </>
+            ) : (
+              'All Requests'
+            )}
+          </CardTitle>
           <CardDescription>
-            View and manage your finance requests
+            {searchQuery ? (
+              <>
+                Showing results for "{searchQuery}"
+              </>
+            ) : (
+              'View and manage your finance requests'
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {requests.length === 0 ? (
+          {filteredRequests.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No requests found</h3>
+              <h3 className="mt-4 text-lg font-semibold">
+                {searchQuery ? 'No matching requests found' : 'No requests found'}
+              </h3>
               <p className="mt-2 text-muted-foreground">
-                Get started by creating your first finance request.
+                {searchQuery ? (
+                  <>
+                    Try adjusting your search terms or{' '}
+                    <button
+                      onClick={handleClearSearch}
+                      className="text-primary hover:underline"
+                    >
+                      clear the search
+                    </button>
+                    .
+                  </>
+                ) : (
+                  'Get started by creating your first finance request.'
+                )}
               </p>
-              <Link href="/finance/requests/create">
-                <Button className="mt-4">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Request
-                </Button>
-              </Link>
+              {!searchQuery && (
+                <Link href="/finance/requests/create">
+                  <Button className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Your First Request
+                  </Button>
+                </Link>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -219,7 +341,7 @@ export default function RequestsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requests.map((request) => (
+                  {filteredRequests.map((request) => (
                     <TableRow key={request.id}>
                       <TableCell className="font-medium">
                         #{request['Request No.']}
