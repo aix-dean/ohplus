@@ -150,7 +150,7 @@ export default function RequestsView() {
       
       toast({
         title: "Success",
-        description: `Request status updated to ${newStatus.toLowerCase()}.`,
+        description: `Request status updated to ${newStatus}.`,
       });
     } catch (error) {
       console.error('Error updating request status:', error);
@@ -423,7 +423,7 @@ export default function RequestsView() {
                                 className="text-yellow-600"
                               >
                                 <Clock className="mr-2 h-4 w-4" />
-                                Set to Pending
+                                Mark as Pending
                               </DropdownMenuItem>
                             )}
                             {request.Actions?.toLowerCase() !== 'processing' && (
@@ -432,7 +432,7 @@ export default function RequestsView() {
                                 className="text-blue-600"
                               >
                                 <RefreshCw className="mr-2 h-4 w-4" />
-                                Set to Processing
+                                Mark as Processing
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem 
@@ -453,7 +453,7 @@ export default function RequestsView() {
           </div>
         </CardContent>
       </Card>
-      {/* Status Update Confirmation Dialog */}
+      {/* Status Update Dialog */}
       <AlertDialog open={statusUpdateDialog.open} onOpenChange={(open) => 
         setStatusUpdateDialog(prev => ({ ...prev, open }))
       }>
