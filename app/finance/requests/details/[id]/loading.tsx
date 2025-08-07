@@ -7,15 +7,15 @@ export default function RequestDetailsLoading() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="h-10 w-20 bg-muted rounded animate-pulse" />
+          <div className="h-10 w-10 bg-muted rounded animate-pulse" />
           <div>
             <div className="h-8 bg-muted rounded w-48 animate-pulse" />
             <div className="h-4 bg-muted rounded w-32 mt-2 animate-pulse" />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-5 w-5 bg-muted rounded animate-pulse" />
-          <div className="h-6 w-20 bg-muted rounded animate-pulse" />
+          <div className="h-6 w-6 bg-muted rounded animate-pulse" />
+          <div className="h-6 bg-muted rounded w-20 animate-pulse" />
         </div>
       </div>
 
@@ -73,25 +73,32 @@ export default function RequestDetailsLoading() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <div className="h-5 w-5 bg-muted rounded animate-pulse" />
-            <div className="h-6 bg-muted rounded w-24 animate-pulse" />
+            <div className="h-6 bg-muted rounded w-32 animate-pulse" />
           </div>
-          <div className="h-4 bg-muted rounded w-48 mt-2 animate-pulse" />
+          <div className="h-4 bg-muted rounded w-48 animate-pulse" />
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+        <CardContent className="space-y-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+                  <div className="h-5 w-5 bg-muted rounded animate-pulse" />
                   <div>
-                    <div className="h-4 bg-muted rounded w-24 animate-pulse mb-2" />
-                    <div className="h-3 bg-muted rounded w-32 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-32 animate-pulse mb-2" />
+                    <div className="h-3 bg-muted rounded w-24 animate-pulse mb-1" />
+                    <div className="h-3 bg-muted rounded w-20 animate-pulse" />
                   </div>
                 </div>
-                <div className="h-8 w-16 bg-muted rounded animate-pulse" />
+                <div className="flex items-center gap-2">
+                  <div className="h-8 bg-muted rounded w-20 animate-pulse" />
+                  <div className="h-8 bg-muted rounded w-16 animate-pulse" />
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="border rounded-lg p-4">
+                <div className="h-48 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>
