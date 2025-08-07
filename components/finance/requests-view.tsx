@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X } from 'lucide-react';
+import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
@@ -35,12 +36,22 @@ const currencies = [
   { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
 ];
 
+const statusOptions = [
+  { value: 'Pending', label: 'Pending', variant: 'secondary' as const },
+  { value: 'Approved', label: 'Approved', variant: 'default' as const },
+  { value: 'Rejected', label: 'Rejected', variant: 'destructive' as const },
+  { value: 'Processing', label: 'Processing', variant: 'outline' as const },
+  { value: 'Completed', label: 'Completed', variant: 'default' as const },
+  { value: 'On Hold', label: 'On Hold', variant: 'secondary' as const },
+];
+
 export default function RequestsView() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const getCurrencySymbol = (currencyCode: string) => {
@@ -157,6 +168,29 @@ export default function RequestsView() {
     return () => unsubscribe();
   }, [user, userData, toast]);
 
+  const handleStatusUpdate = async (requestId: string, newStatus: string) => {
+    setUpdatingStatusId(requestId);
+    try {
+      await updateDoc(doc(db, 'request', requestId), {
+        Actions: newStatus
+      });
+      
+      toast({
+        title: "Success",
+        description: `Request status updated to ${newStatus}.`,
+      });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update request status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
   const handleDeleteRequest = async (requestId: string) => {
     setDeletingId(requestId);
     try {
@@ -185,18 +219,8 @@ export default function RequestsView() {
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return 'default';
-      case 'pending':
-        return 'secondary';
-      case 'rejected':
-        return 'destructive';
-      case 'processing':
-        return 'outline';
-      default:
-        return 'secondary';
-    }
+    const statusOption = statusOptions.find(option => option.value.toLowerCase() === status.toLowerCase());
+    return statusOption?.variant || 'secondary';
   };
 
   const getRequestTypeBadgeVariant = (type: string) => {
@@ -366,9 +390,30 @@ export default function RequestsView() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(request.Actions)}>
-                          {request.Actions}
-                        </Badge>
+                        <Select
+                          value={request.Actions}
+                          onValueChange={(value) => handleStatusUpdate(request.id, value)}
+                          disabled={updatingStatusId === request.id}
+                        >
+                          <SelectTrigger className="w-32">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getStatusBadgeVariant(request.Actions)} className="text-xs">
+                                {request.Actions}
+                              </Badge>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map((status) => (
+                              <SelectItem key={status.value} value={status.value}>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={status.variant} className="text-xs">
+                                    {status.label}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
