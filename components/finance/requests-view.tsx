@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Filter, MoreHorizontal, Eye, Trash2, Plus, FileText, DollarSign, Calendar, User } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Eye, Trash2, Plus, FileText, DollarSign, Calendar, User, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const currencies = [
   { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
@@ -70,6 +71,17 @@ export default function RequestsView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusUpdateDialog, setStatusUpdateDialog] = useState<{
+    open: boolean;
+    requestId: string;
+    currentStatus: string;
+    newStatus: string;
+  }>({
+    open: false,
+    requestId: '',
+    currentStatus: '',
+    newStatus: ''
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -125,6 +137,38 @@ export default function RequestsView() {
 
   const handleViewDetails = (requestId: string) => {
     router.push(`/finance/requests/details/${requestId}`);
+  };
+
+  const handleStatusUpdate = async (requestId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, 'request', requestId), {
+        Actions: newStatus,
+        updated: serverTimestamp(),
+      });
+      
+      setStatusUpdateDialog({ open: false, requestId: '', currentStatus: '', newStatus: '' });
+      
+      toast({
+        title: "Success",
+        description: `Request status updated to ${newStatus.toLowerCase()}.`,
+      });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update request status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openStatusUpdateDialog = (requestId: string, currentStatus: string, newStatus: string) => {
+    setStatusUpdateDialog({
+      open: true,
+      requestId,
+      currentStatus,
+      newStatus
+    });
   };
 
   const filteredRequests = requests.filter(request => {
@@ -355,6 +399,42 @@ export default function RequestsView() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
+                            {request.Actions?.toLowerCase() !== 'approved' && (
+                              <DropdownMenuItem 
+                                onClick={() => openStatusUpdateDialog(request.id, request.Actions, 'Approved')}
+                                className="text-green-600"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Approve
+                              </DropdownMenuItem>
+                            )}
+                            {request.Actions?.toLowerCase() !== 'rejected' && (
+                              <DropdownMenuItem 
+                                onClick={() => openStatusUpdateDialog(request.id, request.Actions, 'Rejected')}
+                                className="text-red-600"
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Reject
+                              </DropdownMenuItem>
+                            )}
+                            {request.Actions?.toLowerCase() !== 'pending' && (
+                              <DropdownMenuItem 
+                                onClick={() => openStatusUpdateDialog(request.id, request.Actions, 'Pending')}
+                                className="text-yellow-600"
+                              >
+                                <Clock className="mr-2 h-4 w-4" />
+                                Set to Pending
+                              </DropdownMenuItem>
+                            )}
+                            {request.Actions?.toLowerCase() !== 'processing' && (
+                              <DropdownMenuItem 
+                                onClick={() => openStatusUpdateDialog(request.id, request.Actions, 'Processing')}
+                                className="text-blue-600"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Set to Processing
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => handleDeleteRequest(request.id)}
                               className="text-red-600"
@@ -373,6 +453,28 @@ export default function RequestsView() {
           </div>
         </CardContent>
       </Card>
+      {/* Status Update Confirmation Dialog */}
+      <AlertDialog open={statusUpdateDialog.open} onOpenChange={(open) => 
+        setStatusUpdateDialog(prev => ({ ...prev, open }))
+      }>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Request Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change the status from "{statusUpdateDialog.currentStatus}" to "{statusUpdateDialog.newStatus}"?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleStatusUpdate(statusUpdateDialog.requestId, statusUpdateDialog.newStatus)}
+            >
+              Update Status
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
