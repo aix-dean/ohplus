@@ -7,12 +7,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import StandardPdfViewer from '@/components/standard-pdf-viewer';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PdfViewer } from '@/components/finance/pdf-viewer';
 
 import {
   AlertCircle,
@@ -38,7 +38,6 @@ import {
 } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
-import { getDownloadUrlForPath } from '@/lib/firebase-storage';
 
 type AttachmentType = 'image' | 'video' | 'pdf' | 'document';
 type Attachment = {
@@ -56,7 +55,7 @@ const currencies = [
   { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
   { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
   { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CHF', name: 'Swiss Franc', symbol = 'CHF' },
   { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
   { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
   { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
@@ -108,7 +107,7 @@ const formatAmount = (amount: number, currencyCode: string) => {
 };
 
 const getFileType = (url: string): AttachmentType => {
-  const clean = (url || '').split('?')[0] || '';
+  const clean = url.split('?')[0] || '';
   const extension = clean.split('.').pop()?.toLowerCase() || '';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
   if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v'].includes(extension)) return 'video';
@@ -116,12 +115,12 @@ const getFileType = (url: string): AttachmentType => {
   return 'document';
 };
 
-const getFileName = (urlOrPath: string) => {
+const getFileName = (url: string) => {
   try {
-    const u = new URL(urlOrPath);
+    const u = new URL(url);
     return decodeURIComponent(u.pathname.split('/').pop() || 'attachment');
   } catch {
-    const clean = urlOrPath.split('?')[0];
+    const clean = url.split('?')[0];
     return decodeURIComponent(clean.split('/').pop() || 'attachment');
   }
 };
@@ -160,7 +159,16 @@ export default function RequestDetailsPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Optional PDF inline preview (kept intact so we don't break existing behaviors)
   const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
+
+  const attachmentPdfUrl = useMemo(() => {
+    const url = (request as any)?.Attachments as string | undefined;
+    if (!url) return null;
+    const clean = url.split('?')[0] || '';
+    const ext = clean.split('.').pop()?.toLowerCase();
+    return ext === 'pdf' ? url : null;
+  }, [request]);
 
   const requestId = params.id as string;
 
@@ -183,6 +191,7 @@ export default function RequestDetailsPage() {
 
         const data = docSnap.data() as any;
 
+        // Ownership and deletion checks preserved
         const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
         if (data.company_id !== companyIdentifier || data.deleted === true) {
           setNotFound(true);
@@ -192,10 +201,10 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
-        // Build raw attachment entries (could be storage paths, gs://, or full URLs)
-        const raw: Attachment[] = [];
+        // Build attachments list (unchanged sources)
+        const all: Attachment[] = [];
         if (req.Attachments) {
-          raw.push({
+          all.push({
             url: req.Attachments,
             name: getFileName(req.Attachments),
             type: getFileType(req.Attachments),
@@ -203,28 +212,14 @@ export default function RequestDetailsPage() {
           });
         }
         if (req.request_type === 'requisition' && req.Quotation) {
-          raw.push({
+          all.push({
             url: req.Quotation,
             name: getFileName(req.Quotation),
             type: getFileType(req.Quotation),
             field: 'Quotation',
           });
         }
-
-        // Resolve each raw url to a downloadable HTTPS URL (adds token if required)
-        const resolved = await Promise.all(
-          raw.map(async (att) => {
-            try {
-              const resolvedUrl = await getDownloadUrlForPath(att.url);
-              return { ...att, url: resolvedUrl };
-            } catch (e) {
-              console.warn('Failed to resolve storage URL, keeping original', att.url, e);
-              return att; // keep original, user can still try "Download"
-            }
-          })
-        );
-
-        setAttachments(resolved);
+        setAttachments(all);
       } catch (e) {
         console.error(e);
         toast({
@@ -241,6 +236,7 @@ export default function RequestDetailsPage() {
     fetchRequest();
   }, [requestId, user, userData, toast]);
 
+  // Keyboard navigation when gallery is open inline
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!galleryOpen || galleryItems.length === 0) return;
@@ -252,6 +248,7 @@ export default function RequestDetailsPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [galleryOpen, galleryItems.length]);
 
+  // Fullscreen listeners
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFs);
@@ -271,18 +268,17 @@ export default function RequestDetailsPage() {
   };
 
   const handleView = (att: Attachment) => {
-    // Close other viewers before opening a new one
-    setGalleryOpen(false);
-    setPdfPreview(null);
-
     if (att.type === 'image' || att.type === 'video') {
       const idx = galleryItems.findIndex((g) => g.url === att.url);
       setGalleryIndex(Math.max(0, idx));
       setGalleryOpen(true);
+      // Scroll into view
       setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else if (att.type === 'pdf') {
       setPdfPreview(att);
+      // keep behavior inline; not required by user but does not interfere
     } else {
+      // Document types: no preview; keep download-only behavior
       toast({
         title: 'Preview not available',
         description: 'This file type can only be downloaded.',
@@ -517,10 +513,11 @@ export default function RequestDetailsPage() {
               <Download className="h-5 w-5" />
               Attachments ({attachments.length})
             </CardTitle>
-            <CardDescription>Click "View" to preview files on the page, or "Download" to save locally</CardDescription>
+            <CardDescription>Click "View" to preview images or videos on the page, or "Download" to save locally</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
+              {/* Attachment list rows */}
               <div className="grid gap-4 md:grid-cols-2">
                 {attachments.map((att, idx) => (
                   <div key={`${att.url}-${idx}`} className="flex items-center justify-between p-4 border rounded-lg">
@@ -552,14 +549,28 @@ export default function RequestDetailsPage() {
                 ))}
               </div>
 
+              {/* Inline PDF preview (unchanged behavior; shown only when chosen) */}
               {pdfPreview && (
-                <PdfViewer
-                  url={pdfPreview.url}
-                  fileName={pdfPreview.name}
-                  onClose={() => setPdfPreview(null)}
-                />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Preview: {pdfPreview.name}</h4>
+                    <Button variant="ghost" size="sm" onClick={() => setPdfPreview(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="h-96">
+                      <iframe
+                        src={`${pdfPreview.url}#toolbar=1&navpanes=1&scrollbar=1`}
+                        className="w-full h-full border-0"
+                        title={pdfPreview.name}
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
 
+              {/* Inline Image/Video Gallery Viewer */}
               {galleryOpen && galleryItems.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -589,6 +600,7 @@ export default function RequestDetailsPage() {
                     style={{ minHeight: '360px' }}
                     aria-label="Media viewer"
                   >
+                    {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
                       {galleryItems[galleryIndex].type === 'image' ? (
                         <img
@@ -616,6 +628,7 @@ export default function RequestDetailsPage() {
                       )}
                     </div>
 
+                    {/* Navigation */}
                     {galleryItems.length > 1 && (
                       <>
                         <Button
@@ -640,6 +653,7 @@ export default function RequestDetailsPage() {
                     )}
                   </div>
 
+                  {/* Thumbnails */}
                   {galleryItems.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto pt-2">
                       {galleryItems.map((item, idx) => (
@@ -676,6 +690,24 @@ export default function RequestDetailsPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Standard HTML PDF Viewer for "Attachments" field */}
+      {attachmentPdfUrl && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              PDF Viewer (Attachments)
+            </CardTitle>
+            <CardDescription>
+              Viewing the PDF stored in the "Attachments" field for this request.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StandardPdfViewer url={attachmentPdfUrl} title="Attachment PDF" />
           </CardContent>
         </Card>
       )}
