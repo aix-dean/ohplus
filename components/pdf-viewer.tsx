@@ -43,14 +43,19 @@ export default function PdfViewer({
 
   // Load pdf.js on demand
   const loadPdfJS = useCallback(async () => {
-    // We load the ESM entrypoints dynamically to work in-browser
-    // and set a CDN worker for compatibility.
-    const pdfjsLib = await import('pdfjs-dist/build/pdf');
-    // Ensure a compatible worker is available via CDN
-    // Version pin for reliability. You can bump if needed.
+    // Import the ESM entrypoint
+    const pdfjsLib = await import('pdfjs-dist');
+
+    // Ensure the worker version matches the library version to avoid
+    // "API version does not match the Worker version" errors.
+    // We construct a CDN URL with the exact version exposed by the library.
+    const version = (pdfjsLib as any).version;
+    // Prefer the classic worker file for broad compatibility.
+    // If you ever need the ESM worker, switch to pdf.worker.min.js.
     // @ts-ignore
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
+
     return pdfjsLib;
   }, []);
 
