@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 
 export default function Page() {
   return (
-    <div className="mx-auto w-full p-4 md:p-6">
+    <div className="mx-auto w-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Accounting — Sales Record</h1>
         <p className="text-sm text-muted-foreground">Manage sales records. Edit rows using the button at the end of each row.</p>
