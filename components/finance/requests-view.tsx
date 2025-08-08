@@ -1,53 +1,51 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from '@/components/ui/table';
-import { useToast } from '@/hooks/use-toast';
-import { Search, X, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, MoreHorizontal, Plus, Search, Trash2, User, X } from 'lucide-react';
+
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
-type SortDirection = 'asc' | 'desc';
-type SortColumn =
-  | 'requestNo'
-  | 'type'
-  | 'requestedItem'
-  | 'amount'
-  | 'approvedBy'
-  | 'date'
-  | 'cashback'
-  | 'orNo'
-  | 'invoiceNo'
-  | 'quotation'
-  | 'status';
-
-const STATUS_OPTIONS = ['All', 'Approved', 'Pending', 'Rejected', 'Processing'] as const;
-type StatusFilter = typeof STATUS_OPTIONS[number];
-
-const TYPE_OPTIONS = ['All', 'reimbursement', 'requisition'] as const;
-type TypeFilter = typeof TYPE_OPTIONS[number];
-
+// Currency helpers (kept from existing behavior)
 const currencies = [
   { code: 'PHP', symbol: '₱' },
   { code: 'USD', symbol: '$' },
@@ -67,19 +65,30 @@ const currencies = [
   { code: 'VND', symbol: '₫' },
 ];
 
-function getCurrencySymbol(code?: string) {
-  if (!code) return '';
-  const c = currencies.find((c) => c.code === code);
-  return c?.symbol ?? '';
+function getCurrencySymbol(currencyCode?: string) {
+  if (!currencyCode) return '';
+  const found = currencies.find((c) => c.code === currencyCode);
+  return found?.symbol ?? '';
 }
 
 function formatAmount(amount: number, currencyCode?: string) {
-  const symbol = getCurrencySymbol(currencyCode) || '';
-  return `${symbol}${Number(amount || 0).toLocaleString('en-US', {
+  const sym = getCurrencySymbol(currencyCode || 'PHP');
+  return `${sym}${Number(amount || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
 }
+
+// Status options (kept to preserve update functionality)
+const statusOptions = [
+  { value: 'Pending', label: 'Pending', icon: Clock, color: 'text-yellow-600' },
+  { value: 'Approved', label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
+  { value: 'Rejected', label: 'Rejected', icon: X, color: 'text-red-600' },
+  { value: 'Processing', label: 'Processing', icon: AlertCircle, color: 'text-blue-600' },
+] as const;
+
+type SortDir = 'asc' | 'desc';
+type SortCol = 'requestNo' | 'type' | 'requestor' | 'item' | 'amount' | 'status' | 'date';
 
 function getStatusBadgeVariant(status?: string) {
   switch (status?.toLowerCase?.()) {
@@ -96,23 +105,28 @@ function getStatusBadgeVariant(status?: string) {
   }
 }
 
+function getRequestTypeBadgeVariant(type?: string) {
+  return type === 'reimbursement' ? 'outline' : 'secondary';
+}
+
 export default function RequestsView() {
+  const router = useRouter();
   const { user, userData } = useAuth();
   const { toast } = useToast();
 
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Existing functionalities preserved
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('All');
 
-  // Sorting
-  const [sortColumn, setSortColumn] = useState<SortColumn>('requestNo');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  // New: spreadsheet-like sorting
+  const [sortCol, setSortCol] = useState<SortCol>('requestNo');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Fetch Firestore "request" docs for the user's company
+  // Fetch from Firestore (same constraints)
   useEffect(() => {
     const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
 
@@ -127,23 +141,20 @@ export default function RequestsView() {
       where('deleted', '==', false)
     );
 
-    const unsubscribe = onSnapshot(
+    const unsub = onSnapshot(
       q,
-      (querySnapshot) => {
+      (qs) => {
         const list: FinanceRequest[] = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          list.push({ id: docSnap.id, ...data } as FinanceRequest);
-        });
+        qs.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
 
-        // Default sort: Request No. desc if available, else created desc
+        // initial ordering by created desc (fallback to Request No.)
         list.sort((a, b) => {
-          const aNo = Number(a['Request No.'] ?? 0);
-          const bNo = Number(b['Request No.'] ?? 0);
-          if (aNo && bNo) return bNo - aNo;
-          const aTime = a.created?.toDate?.()?.getTime?.() ?? 0;
-          const bTime = b.created?.toDate?.()?.getTime?.() ?? 0;
-          return bTime - aTime;
+          const at = a.created?.toDate?.()?.getTime?.() ?? 0;
+          const bt = b.created?.toDate?.()?.getTime?.() ?? 0;
+          if (bt !== at) return bt - at;
+          const aNo = Number((a as any)['Request No.'] ?? 0);
+          const bNo = Number((b as any)['Request No.'] ?? 0);
+          return bNo - aNo;
         });
 
         setRequests(list);
@@ -160,78 +171,60 @@ export default function RequestsView() {
       }
     );
 
-    return () => unsubscribe();
+    return () => unsub();
   }, [user, userData, toast]);
 
-  // Helpers for date handling
-  const getRequestDateMs = useCallback((r: FinanceRequest) => {
-    // reimbursement -> 'Date Released'
-    // requisition   -> 'Date Requested'
-    const field =
-      r.request_type === 'reimbursement' ? 'Date Released' : 'Date Requested';
-    // @ts-ignore - dynamic field access
-    const ts = r[field];
-    const d = ts?.toDate?.();
-    return d ? d.getTime() : 0;
-  }, []);
-
-  const getRequestDateLabel = (r: FinanceRequest) => {
-    return r.request_type === 'reimbursement' ? 'Released' : 'Requested';
-  };
-
-  // Filtering
+  // Preserve search across relevant fields
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    if (!q) return requests;
 
     return requests.filter((r) => {
-      // Status filter
-      const status = (r.Actions || '').toString();
-      const matchesStatus =
-        statusFilter === 'All' ? true : status.toLowerCase() === statusFilter.toLowerCase();
+      const requestNo = String((r as any)['Request No.'] ?? '').toLowerCase();
+      const requestType = String((r as any).request_type ?? '').toLowerCase();
+      const requestor = String((r as any).Requestor ?? '').toLowerCase();
+      const requestedItem = String((r as any)['Requested Item'] ?? '').toLowerCase();
+      const amount = String((r as any).Amount ?? '');
+      const currency = String((r as any).Currency ?? 'PHP').toLowerCase();
+      const approvedBy = String((r as any)['Approved By'] ?? '').toLowerCase();
+      const status = String((r as any).Actions ?? '').toLowerCase();
+      const createdDate = (r as any).created
+        ? format((r as any).created.toDate(), 'MMM dd, yyyy').toLowerCase()
+        : '';
 
-      // Type filter
-      const matchesType =
-        typeFilter === 'All' ? true : r.request_type === typeFilter;
-
-      if (!matchesStatus || !matchesType) return false;
-
-      if (!q) return true;
-
-      // Search across all schema fields you care about
-      const requestNo = String(r['Request No.'] ?? '').toLowerCase();
-      const type = String(r.request_type ?? '').toLowerCase();
-      const item = String(r['Requested Item'] ?? '').toLowerCase();
-      const amountStr = String(r.Amount ?? '');
-      const approvedBy = String(r['Approved By'] ?? '').toLowerCase();
-      const statusStr = String(r.Actions ?? '').toLowerCase();
-      const cashbackStr = String((r as any).Cashback ?? '');
+      // Type-specific fields still searchable
+      const dateReleased = (r as any)['Date Released']
+        ? format((r as any)['Date Released'].toDate(), 'MMM dd, yyyy').toLowerCase()
+        : '';
+      const cashback = String((r as any).Cashback ?? '');
       const orNo = String((r as any)['O.R No.'] ?? '').toLowerCase();
       const invoiceNo = String((r as any)['Invoice No.'] ?? '').toLowerCase();
-      const quotation = String((r as any).Quotation ?? '').toLowerCase();
-      const dateStr = (() => {
-        const ms = getRequestDateMs(r);
-        return ms ? format(new Date(ms), 'MMM dd, yyyy').toLowerCase() : '';
-      })();
+      const dateRequested = (r as any)['Date Requested']
+        ? format((r as any)['Date Requested'].toDate(), 'MMM dd, yyyy').toLowerCase()
+        : '';
 
       const haystack = [
         requestNo,
-        type,
-        item,
-        amountStr,
+        requestType,
+        requestor,
+        requestedItem,
+        amount,
+        currency,
         approvedBy,
-        statusStr,
-        cashbackStr,
+        status,
+        createdDate,
+        dateReleased,
+        cashback,
         orNo,
         invoiceNo,
-        quotation,
-        dateStr,
+        dateRequested,
       ];
 
       return haystack.some((s) => s.includes(q));
     });
-  }, [requests, searchQuery, statusFilter, typeFilter, getRequestDateMs]);
+  }, [requests, searchQuery]);
 
-  // Sorting
+  // Sorting logic for spreadsheet headers
   const sorted = useMemo(() => {
     const arr = [...filtered];
 
@@ -241,97 +234,106 @@ export default function RequestsView() {
     arr.sort((a, b) => {
       let res = 0;
 
-      switch (sortColumn) {
+      switch (sortCol) {
         case 'requestNo': {
-          const aNo = Number(a['Request No.'] ?? 0);
-          const bNo = Number(b['Request No.'] ?? 0);
+          const aNo = Number((a as any)['Request No.'] ?? 0);
+          const bNo = Number((b as any)['Request No.'] ?? 0);
           res = aNo - bNo;
           break;
         }
         case 'type': {
-          res = cmpStr(a.request_type, b.request_type);
+          res = cmpStr((a as any).request_type, (b as any).request_type);
           break;
         }
-        case 'requestedItem': {
-          res = cmpStr(a['Requested Item'], b['Requested Item']);
+        case 'requestor': {
+          res = cmpStr((a as any).Requestor, (b as any).Requestor);
+          break;
+        }
+        case 'item': {
+          res = cmpStr((a as any)['Requested Item'], (b as any)['Requested Item']);
           break;
         }
         case 'amount': {
-          const aAmt = Number(a.Amount ?? 0);
-          const bAmt = Number(b.Amount ?? 0);
+          const aAmt = Number((a as any).Amount ?? 0);
+          const bAmt = Number((b as any).Amount ?? 0);
           res = aAmt - bAmt;
           break;
         }
-        case 'approvedBy': {
-          res = cmpStr(a['Approved By'], b['Approved By']);
+        case 'status': {
+          res = cmpStr((a as any).Actions, (b as any).Actions);
           break;
         }
         case 'date': {
-          const aMs = getRequestDateMs(a);
-          const bMs = getRequestDateMs(b);
-          res = aMs - bMs;
-          break;
-        }
-        case 'cashback': {
-          const aVal = Number((a as any).Cashback ?? 0);
-          const bVal = Number((b as any).Cashback ?? 0);
-          res = aVal - bVal;
-          break;
-        }
-        case 'orNo': {
-          res = cmpStr((a as any)['O.R No.'], (b as any)['O.R No.']);
-          break;
-        }
-        case 'invoiceNo': {
-          res = cmpStr((a as any)['Invoice No.'], (b as any)['Invoice No.']);
-          break;
-        }
-        case 'quotation': {
-          res = cmpStr((a as any).Quotation, (b as any).Quotation);
-          break;
-        }
-        case 'status': {
-          res = cmpStr(a.Actions, b.Actions);
+          const at = (a as any).created?.toDate?.()?.getTime?.() ?? 0;
+          const bt = (b as any).created?.toDate?.()?.getTime?.() ?? 0;
+          res = at - bt;
           break;
         }
         default:
           res = 0;
       }
 
-      return sortDirection === 'asc' ? res : -res;
+      return sortDir === 'asc' ? res : -res;
     });
 
     return arr;
-  }, [filtered, sortColumn, sortDirection, getRequestDateMs]);
+  }, [filtered, sortCol, sortDir]);
 
-  const toggleSort = (col: SortColumn) => {
-    if (sortColumn === col) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+  const toggleSort = (col: SortCol) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
-      setSortColumn(col);
-      // Sensible default sort direction per column
-      const defaultDescCols: SortColumn[] = ['requestNo', 'amount', 'date', 'cashback'];
-      setSortDirection(defaultDescCols.includes(col) ? 'desc' : 'asc');
+      setSortCol(col);
+      // Default sensible directions
+      setSortDir(['requestNo', 'amount', 'date'].includes(col) ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: SortCol }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
+  // Existing handlers preserved
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/finance/requests/details/${requestId}`);
+  };
+
+  const handleUpdateStatus = async (requestId: string, newStatus: string) => {
+    setUpdatingStatusId(requestId);
+    try {
+      await updateDoc(doc(db, 'request', requestId), { Actions: newStatus });
+      toast({ title: 'Success', description: `Request status updated to ${newStatus}.` });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update request status. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    setDeletingId(requestId);
+    try {
+      await updateDoc(doc(db, 'request', requestId), { deleted: true });
+      toast({ title: 'Success', description: 'Request moved to trash successfully.' });
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete request. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const clearSearch = () => setSearchQuery('');
-  const clearFilters = () => {
-    setSearchQuery('');
-    setStatusFilter('All');
-    setTypeFilter('All');
-    setSortColumn('requestNo');
-    setSortDirection('desc');
-  };
-
-  const SortIcon = ({ col }: { col: SortColumn }) => {
-    if (sortColumn !== col) return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-4 w-4" />
-    ) : (
-      <ArrowDown className="h-4 w-4" />
-    );
-  };
 
   if (loading) {
     return (
@@ -364,84 +366,63 @@ export default function RequestsView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-start sm:items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
-          <p className="text-muted-foreground">Spreadsheet view following your request schema</p>
+          <p className="text-muted-foreground">
+            Manage your reimbursement and requisition requests
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={clearFilters}>Reset</Button>
-        </div>
+        <Link href="/finance/requests/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Request
+          </Button>
+        </Link>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="relative lg:max-w-md w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by any field (Request No., Item, Amount, Approved By, Status, OR/Invoice, etc.)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10"
-            aria-label="Search requests"
-          />
-          {searchQuery && (
-            <Button
-              aria-label="Clear search"
-              variant="ghost"
-              size="sm"
-              onClick={clearSearch}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Status</span>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger className="w-[170px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Type</span>
-          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-            <SelectTrigger className="w-[170px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              {TYPE_OPTIONS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search requests by number, type, requestor, item, amount, status, or date..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-10"
+          aria-label="Search requests"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearSearch}
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
+      {/* Spreadsheet-like table */}
       <Card>
         <CardHeader>
-          <CardTitle>Requests</CardTitle>
-          <CardDescription>
-            {sorted.length} {sorted.length === 1 ? 'item' : 'items'}
-          </CardDescription>
+          <CardTitle>
+            {searchQuery ? (
+              <>
+                All Requests
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({sorted.length} of {requests.length})
+                </span>
+              </>
+            ) : (
+              'All Requests'
+            )}
+          </CardTitle>
+          <CardDescription>View and manage your finance requests</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-auto">
-            <Table className="min-w-[1200px]">
+            <Table className="min-w-[960px]">
               <TableHeader>
                 <TableRow className="sticky top-0 bg-background z-10">
                   <TableHead className="whitespace-nowrap">
@@ -464,14 +445,24 @@ export default function RequestsView() {
                       <SortIcon col="type" />
                     </button>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap w-[320px]">
+                  <TableHead className="whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => toggleSort('requestedItem')}
+                      onClick={() => toggleSort('requestor')}
                       className="inline-flex items-center gap-1 font-medium"
                     >
-                      {'Requested Item'}
-                      <SortIcon col="requestedItem" />
+                      {'Requestor'}
+                      <SortIcon col="requestor" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('item')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'Item'}
+                      <SortIcon col="item" />
                     </button>
                   </TableHead>
                   <TableHead className="whitespace-nowrap">
@@ -487,11 +478,11 @@ export default function RequestsView() {
                   <TableHead className="whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => toggleSort('approvedBy')}
+                      onClick={() => toggleSort('status')}
                       className="inline-flex items-center gap-1 font-medium"
                     >
-                      {'Approved By'}
-                      <SortIcon col="approvedBy" />
+                      {'Status'}
+                      <SortIcon col="status" />
                     </button>
                   </TableHead>
                   <TableHead className="whitespace-nowrap">
@@ -504,140 +495,163 @@ export default function RequestsView() {
                       <SortIcon col="date" />
                     </button>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('cashback')}
-                      className="inline-flex items-center gap-1 font-medium"
-                    >
-                      {'Cashback'}
-                      <SortIcon col="cashback" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('orNo')}
-                      className="inline-flex items-center gap-1 font-medium"
-                    >
-                      {'O.R No.'}
-                      <SortIcon col="orNo" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('invoiceNo')}
-                      className="inline-flex items-center gap-1 font-medium"
-                    >
-                      {'Invoice No.'}
-                      <SortIcon col="invoiceNo" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('quotation')}
-                      className="inline-flex items-center gap-1 font-medium"
-                    >
-                      {'Quotation'}
-                      <SortIcon col="quotation" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('status')}
-                      className="inline-flex items-center gap-1 font-medium"
-                    >
-                      {'Status'}
-                      <SortIcon col="status" />
-                    </button>
-                  </TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {sorted.map((r) => {
-                  const dateMs = getRequestDateMs(r);
-                  const dateStr = dateMs ? format(new Date(dateMs), 'MMM dd, yyyy') : '—';
-                  const dateBadge = getRequestDateLabel(r); // Released / Requested
 
-                  const cashback = (r as any).Cashback;
-                  const orNo = (r as any)['O.R No.'];
-                  const invoiceNo = (r as any)['Invoice No.'];
-                  const quotation = (r as any).Quotation as string | undefined;
+              <TableBody>
+                {sorted.map((request) => {
+                  const reqNo = (request as any)['Request No.'];
+                  const created = (request as any).created?.toDate?.() as Date | undefined;
+                  const dateStr = created ? format(created, 'MMM dd, yyyy') : '—';
 
                   return (
-                    <TableRow key={r.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium tabular-nums">
-                        #{r['Request No.'] ?? '—'}
+                    <TableRow key={(request as any).id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium tabular-nums">#{reqNo}</TableCell>
+
+                      <TableCell>
+                        <Badge variant={getRequestTypeBadgeVariant((request as any).request_type)}>
+                          {(request as any).request_type}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="capitalize">
-                        {r.request_type ?? '—'}
-                      </TableCell>
-                      <TableCell className="max-w-[360px] truncate">
-                        {r['Requested Item'] ?? '—'}
-                      </TableCell>
-                      <TableCell className="font-medium tabular-nums">
-                        {formatAmount(Number(r.Amount ?? 0), r.Currency ?? 'PHP')}
-                      </TableCell>
-                      <TableCell>{r['Approved By'] || '—'}</TableCell>
+
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">{dateStr}</span>
-                          {dateMs ? (
-                            <Badge variant="outline" className="text-xs">
-                              {dateBadge}
-                            </Badge>
-                          ) : null}
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {(request as any).Requestor}
                         </div>
                       </TableCell>
-                      <TableCell className="tabular-nums">
-                        {typeof cashback === 'number' ? cashback : '—'}
+
+                      <TableCell className="max-w-[280px] truncate">
+                        {(request as any)['Requested Item']}
                       </TableCell>
-                      <TableCell className="tabular-nums">
-                        {orNo || '—'}
+
+                      <TableCell className="font-medium tabular-nums">
+                        {formatAmount((request as any).Amount, (request as any).Currency || 'PHP')}
                       </TableCell>
-                      <TableCell className="tabular-nums">
-                        {invoiceNo || '—'}
-                      </TableCell>
+
                       <TableCell>
-                        {quotation ? (
-                          <a
-                            href={quotation}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                          >
-                            View <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        ) : (
-                          '—'
-                        )}
+                        <Badge variant={getStatusBadgeVariant((request as any).Actions)}>
+                          {(request as any).Actions}
+                        </Badge>
                       </TableCell>
+
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(r.Actions)}>{r.Actions || '—'}</Badge>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {dateStr}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              disabled={
+                                updatingStatusId === (request as any).id ||
+                                deletingId === (request as any).id
+                              }
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+                            <DropdownMenuItem onClick={() => handleViewDetails((request as any).id)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Request
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+
+                            {statusOptions.map((s) => {
+                              const Icon = s.icon;
+                              const isCurrent = (request as any).Actions === s.value;
+                              return (
+                                <DropdownMenuItem
+                                  key={s.value}
+                                  onClick={() =>
+                                    handleUpdateStatus((request as any).id, s.value)
+                                  }
+                                  disabled={isCurrent || updatingStatusId === (request as any).id}
+                                  className={isCurrent ? 'bg-muted' : ''}
+                                >
+                                  <Icon className={`mr-2 h-4 w-4 ${s.color}`} />
+                                  {s.label}
+                                  {isCurrent && (
+                                    <span className="ml-auto text-xs text-muted-foreground">
+                                      Current
+                                    </span>
+                                  )}
+                                </DropdownMenuItem>
+                              );
+                            })}
+
+                            <DropdownMenuSeparator />
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Request
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Request</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this request? This will move the
+                                    request to trash and it can be recovered later if needed.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteRequest((request as any).id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
                 })}
+
                 {sorted.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
-                      No requests found. Adjust filters or search terms.
+                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                      No requests found. Adjust your search.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
+
+          {/* Mobile hint */}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tip: On mobile, scroll the table horizontally to see all columns.
+          </p>
         </CardContent>
       </Card>
-
-      {/* Responsive hint for small screens */}
-      <p className="text-xs text-muted-foreground">
-        Tip: On mobile, scroll the table horizontally to see all columns.
-      </p>
     </div>
   );
 }
