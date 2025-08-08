@@ -3,14 +3,19 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { MoreVertical, Edit, Bell } from "lucide-react"
+import { MoreVertical, Edit, Bell } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("rounded-lg border bg-card text-card-foreground shadow-sm relative isolate", className)}
+    className={cn(
+      "relative isolate rounded-lg border bg-card text-card-foreground shadow-sm",
+      "max-w-full min-w-0 overflow-x-auto md:overflow-visible",
+      "break-words hyphens-auto",
+      className
+    )}
     {...props}
   />
 ))
