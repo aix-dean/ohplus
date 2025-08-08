@@ -369,7 +369,6 @@ export default function CreateRequestPage() {
   };
 
   const isUploading = uploadingFiles.length > 0;
-  const amountPrefix = useMemo(() => pesoSign(formData.Currency), [formData.Currency]);
 
   return (
     <div className="space-y-6">
