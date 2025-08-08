@@ -280,42 +280,7 @@ export function SalesRecordTable() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Net Sales</div>
-            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totals.netSales)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-green-700 dark:text-green-300">Output VAT</div>
-            <div className="text-2xl font-bold text-green-900 dark:text-green-100">{formatCurrency(totals.outputVat)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Total</div>
-            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{formatCurrency(totals.total)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-orange-700 dark:text-orange-300">Creditable Tax</div>
-            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">{formatCurrency(totals.creditableTax)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 border-teal-200 dark:border-teal-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-teal-700 dark:text-teal-300">Amount Collected</div>
-            <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">{formatCurrency(totals.amountCollected)}</div>
-          </CardContent>
-        </Card>
-      </div>
+      
 
       {/* Data Display */}
       {viewMode === 'cards' ? (
