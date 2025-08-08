@@ -54,7 +54,7 @@ export default function ClientLayout({
         </div>
 
         {/* Main content */}
-        <main className="flex-1 flex flex-col min-h-0">
+        <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden">
           {/* Mobile sidebar toggle */}
           {isSmallScreen && (
             <div className="py-4 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-200">
