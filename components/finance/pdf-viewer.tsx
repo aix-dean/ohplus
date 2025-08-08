@@ -12,37 +12,11 @@ type PdfViewerProps = {
   onClose: () => void
 }
 
-/**
- * Ensures Firebase Storage direct-download links render inline in an iframe by:
- * - Forcing Content-Type to application/pdf
- * - Forcing Content-Disposition to inline
- * Keeps existing query params (e.g., token) intact.
- */
-function normalizeFirebasePdfUrl(rawUrl: string) {
-  try {
-    const u = new URL(rawUrl)
-    // Only add if not already present
-    if (!u.searchParams.has('response-content-type')) {
-      u.searchParams.set('response-content-type', 'application/pdf')
-    }
-    if (!u.searchParams.has('response-content-disposition')) {
-      // filename hint helps some browsers
-      const filename = decodeURIComponent(u.pathname.split('/').pop() || 'file.pdf')
-      u.searchParams.set('response-content-disposition', `inline; filename="${filename}"`)
-    }
-    return u.toString()
-  } catch {
-    // If URL parsing fails, fallback to raw
-    return rawUrl
-  }
-}
-
-// Build the final iframe src with a zoom hint using hash parameters that many PDF viewers honor.
-function buildPdfSrc(rawUrl: string, zoomPercent: number) {
-  const normalized = normalizeFirebasePdfUrl(rawUrl)
-  const [base] = normalized.split('#')
+// Build the final iframe src via our proxy with a zoom hint
+function buildProxySrc(rawUrl: string, zoomPercent: number) {
+  const target = encodeURIComponent(rawUrl)
   const params = `#toolbar=1&navpanes=1&scrollbar=1&zoom=${Math.round(zoomPercent)}`
-  return `${base}${params}`
+  return `/api/proxy-pdf?url=${target}${params}`
 }
 
 export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
@@ -51,12 +25,13 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const iframeSrc = useMemo(() => buildPdfSrc(url, zoom), [url, zoom])
+  const iframeSrc = useMemo(() => buildProxySrc(url, zoom), [url, zoom])
 
   const handleDownload = () => {
     try {
       const a = document.createElement('a')
-      a.href = normalizeFirebasePdfUrl(url)
+      // Use the proxy so headers force inline/download correctly
+      a.href = `/api/proxy-pdf?url=${encodeURIComponent(url)}`
       a.download = fileName
       a.target = '_blank'
       document.body.appendChild(a)
@@ -73,7 +48,7 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   }
 
   const handleOpenNewTab = () => {
-    window.open(normalizeFirebasePdfUrl(url), '_blank', 'noopener,noreferrer')
+    window.open(`/api/proxy-pdf?url=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer')
   }
 
   const zoomIn = () => setZoom((z) => Math.min(z + 25, 400))
@@ -121,7 +96,6 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
         </div>
       </CardHeader>
 
-      {/* Scrollable, responsive PDF viewport */}
       <CardContent>
         <div
           ref={containerRef}
@@ -133,7 +107,6 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
             src={iframeSrc}
             title={fileName}
             className="w-full h-full"
-            // Allow fullscreen inside iframe if supported
             allow="fullscreen"
             loading="eager"
           />
