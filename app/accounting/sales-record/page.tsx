@@ -2,8 +2,8 @@ import { SalesRecordTable } from "@/components/accounting/sales-record-table"
 
 export default function Page() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
+    <div className="min-h-screen w-auto bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-2 py-6 max-w-7xl">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col gap-2 mb-4">
