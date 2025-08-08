@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
@@ -12,18 +12,42 @@ type PdfViewerProps = {
   onClose: () => void
 }
 
-// Utility to build an iframe src with a specific zoom level
+/**
+ * Ensures Firebase Storage direct-download links render inline in an iframe by:
+ * - Forcing Content-Type to application/pdf
+ * - Forcing Content-Disposition to inline
+ * Keeps existing query params (e.g., token) intact.
+ */
+function normalizeFirebasePdfUrl(rawUrl: string) {
+  try {
+    const u = new URL(rawUrl)
+    // Only add if not already present
+    if (!u.searchParams.has('response-content-type')) {
+      u.searchParams.set('response-content-type', 'application/pdf')
+    }
+    if (!u.searchParams.has('response-content-disposition')) {
+      // filename hint helps some browsers
+      const filename = decodeURIComponent(u.pathname.split('/').pop() || 'file.pdf')
+      u.searchParams.set('response-content-disposition', `inline; filename="${filename}"`)
+    }
+    return u.toString()
+  } catch {
+    // If URL parsing fails, fallback to raw
+    return rawUrl
+  }
+}
+
+// Build the final iframe src with a zoom hint using hash parameters that many PDF viewers honor.
 function buildPdfSrc(rawUrl: string, zoomPercent: number) {
-  // Strip existing hash and add our own PDF viewer parameters
-  const [base] = rawUrl.split('#')
-  // Common parameters recognized by most PDF viewers in browsers
+  const normalized = normalizeFirebasePdfUrl(rawUrl)
+  const [base] = normalized.split('#')
   const params = `#toolbar=1&navpanes=1&scrollbar=1&zoom=${Math.round(zoomPercent)}`
   return `${base}${params}`
 }
 
 export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   const { toast } = useToast()
-  const [zoom, setZoom] = useState<number>(100) // percent
+  const [zoom, setZoom] = useState<number>(125) // percent
   const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -32,7 +56,7 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   const handleDownload = () => {
     try {
       const a = document.createElement('a')
-      a.href = url
+      a.href = normalizeFirebasePdfUrl(url)
       a.download = fileName
       a.target = '_blank'
       document.body.appendChild(a)
@@ -49,35 +73,31 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   }
 
   const handleOpenNewTab = () => {
-    window.open(url, '_blank', 'noopener,noreferrer')
+    window.open(normalizeFirebasePdfUrl(url), '_blank', 'noopener,noreferrer')
   }
 
   const zoomIn = () => setZoom((z) => Math.min(z + 25, 400))
   const zoomOut = () => setZoom((z) => Math.max(z - 25, 25))
-  const resetZoom = () => setZoom(100)
+  const resetZoom = () => setZoom(125)
 
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return
     try {
       if (!document.fullscreenElement) {
         await containerRef.current.requestFullscreen()
-        setIsFullscreen(true)
       } else {
         await document.exitFullscreen()
-        setIsFullscreen(false)
       }
     } catch (e) {
       console.error('Fullscreen error', e)
     }
   }, [])
 
-  // Keep isFullscreen state in sync with document events
-  // (in case user presses ESC to exit fullscreen)
-  if (typeof window !== 'undefined') {
-    document.onfullscreenchange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-  }
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFs)
+    return () => document.removeEventListener('fullscreenchange', onFs)
+  }, [])
 
   return (
     <Card className="w-full my-6">
@@ -115,6 +135,7 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
             className="w-full h-full"
             // Allow fullscreen inside iframe if supported
             allow="fullscreen"
+            loading="eager"
           />
         </div>
       </CardContent>
