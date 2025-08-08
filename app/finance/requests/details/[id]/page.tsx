@@ -7,7 +7,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import StandardPdfViewer from '@/components/standard-pdf-viewer';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ import {
   DollarSign,
   Download,
   ExternalLink,
+  File as FileGeneric,
   FileText,
   ImageIcon,
   Play,
@@ -34,7 +34,6 @@ import {
   X,
   XCircle,
   Clock,
-  File as FileGeneric
 } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
@@ -107,11 +106,11 @@ const formatAmount = (amount: number, currencyCode: string) => {
 };
 
 const getFileType = (url: string): AttachmentType => {
-  const clean = url.split('?')[0] || '';
-  const extension = clean.split('.').pop()?.toLowerCase() || '';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
-  if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v'].includes(extension)) return 'video';
-  if (extension === 'pdf') return 'pdf';
+  const base = url.split('?')[0] || '';
+  const ext = base.split('.').pop()?.toLowerCase() || '';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
+  if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v'].includes(ext)) return 'video';
+  if (ext === 'pdf') return 'pdf';
   return 'document';
 };
 
@@ -120,8 +119,8 @@ const getFileName = (url: string) => {
     const u = new URL(url);
     return decodeURIComponent(u.pathname.split('/').pop() || 'attachment');
   } catch {
-    const clean = url.split('?')[0];
-    return decodeURIComponent(clean.split('/').pop() || 'attachment');
+    const base = url.split('?')[0];
+    return decodeURIComponent(base.split('/').pop() || 'attachment');
   }
 };
 
@@ -148,7 +147,7 @@ export default function RequestDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Attachment states
+  // Attachment and previews
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const galleryItems = useMemo(
     () => attachments.filter((a) => a.type === 'image' || a.type === 'video'),
@@ -158,25 +157,6 @@ export default function RequestDetailsPage() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Optional PDF inline preview (kept intact so we don't break existing behaviors)
-  const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
-
-  const attachmentPdfUrl = useMemo(() => {
-    const url = (request as any)?.Attachments as string | undefined;
-    if (!url) return null;
-    const clean = url.split('?')[0] || '';
-    const ext = clean.split('.').pop()?.toLowerCase();
-    return ext === 'pdf' ? url : null;
-  }, [request]);
-
-  useEffect(() => {
-    if (attachmentPdfUrl) {
-      console.log('[Requests Details] Using Attachments PDF URL:', attachmentPdfUrl);
-    } else {
-      console.log('[Requests Details] No PDF found in Attachments field or not a PDF.');
-    }
-  }, [attachmentPdfUrl]);
 
   const requestId = params.id as string;
 
@@ -198,9 +178,8 @@ export default function RequestDetailsPage() {
         }
 
         const data = docSnap.data() as any;
-
-        // Ownership and deletion checks preserved
         const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+
         if (data.company_id !== companyIdentifier || data.deleted === true) {
           setNotFound(true);
           return;
@@ -209,7 +188,6 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
-        // Build attachments list (unchanged sources)
         const all: Attachment[] = [];
         if (req.Attachments) {
           all.push({
@@ -244,7 +222,7 @@ export default function RequestDetailsPage() {
     fetchRequest();
   }, [requestId, user, userData, toast]);
 
-  // Keyboard navigation when gallery is open inline
+  // Keyboard nav for gallery
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!galleryOpen || galleryItems.length === 0) return;
@@ -256,7 +234,7 @@ export default function RequestDetailsPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [galleryOpen, galleryItems.length]);
 
-  // Fullscreen listeners
+  // Fullscreen listener
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFs);
@@ -280,13 +258,11 @@ export default function RequestDetailsPage() {
       const idx = galleryItems.findIndex((g) => g.url === att.url);
       setGalleryIndex(Math.max(0, idx));
       setGalleryOpen(true);
-      // Scroll into view
       setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else if (att.type === 'pdf') {
-      setPdfPreview(att);
-      // keep behavior inline; not required by user but does not interfere
+      // No dialog needed; the preview is rendered inline below automatically.
+      toast({ title: 'PDF preview', description: 'Scroll down to view the PDF preview.' });
     } else {
-      // Document types: no preview; keep download-only behavior
       toast({
         title: 'Preview not available',
         description: 'This file type can only be downloaded.',
@@ -374,6 +350,9 @@ export default function RequestDetailsPage() {
       </div>
     );
   }
+
+  // PDF attachment to preview inline (simple, standard HTML iframe)
+  const pdfAttachment = attachments.find((a) => a.type === 'pdf');
 
   return (
     <div className="space-y-6">
@@ -521,18 +500,22 @@ export default function RequestDetailsPage() {
               <Download className="h-5 w-5" />
               Attachments ({attachments.length})
             </CardTitle>
-            <CardDescription>Click "View" to preview images or videos on the page, or "Download" to save locally</CardDescription>
+            <CardDescription>
+              Click "View" to preview images/videos on the page, or "Download" to save locally
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Attachment list rows */}
+              {/* Attachment rows */}
               <div className="grid gap-4 md:grid-cols-2">
                 {attachments.map((att, idx) => (
                   <div key={`${att.url}-${idx}`} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3 min-w-0">
                       <IconForType type={att.type} className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-medium truncate" title={att.name}>{att.name}</p>
+                        <p className="font-medium truncate" title={att.name}>
+                          {att.name}
+                        </p>
                         <p className="text-sm text-muted-foreground capitalize truncate">
                           {att.type} • {att.field}
                         </p>
@@ -549,7 +532,12 @@ export default function RequestDetailsPage() {
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDownload(att)} title="Download">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(att)}
+                        title="Download"
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
                     </div>
@@ -557,28 +545,38 @@ export default function RequestDetailsPage() {
                 ))}
               </div>
 
-              {/* Inline PDF preview (unchanged behavior; shown only when chosen) */}
-              {pdfPreview && (
-                <div className="space-y-4">
+              {/* Simple, standard HTML PDF webview (iframe) */}
+              {pdfAttachment && (
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Preview: {pdfPreview.name}</h4>
-                    <Button variant="ghost" size="sm" onClick={() => setPdfPreview(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="h-96">
-                      <iframe
-                        src={`${pdfPreview.url}#toolbar=1&navpanes=1&scrollbar=1`}
-                        className="w-full h-full border-0"
-                        title={pdfPreview.name}
-                      />
+                    <h4 className="font-medium">PDF Preview</h4>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(pdfAttachment)}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </Button>
+                      <a
+                        href={pdfAttachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm underline text-primary"
+                      >
+                        Open in new tab
+                      </a>
                     </div>
+                  </div>
+                  <div className="w-full h-[70vh] border rounded-lg overflow-hidden">
+                    {/* Standard HTML iframe for PDF preview using the URL from the database */}
+                    <iframe
+                      src={pdfAttachment.url}
+                      title="PDF Attachment Preview"
+                      className="w-full h-full border-0"
+                    />
                   </div>
                 </div>
               )}
 
-              {/* Inline Image/Video Gallery Viewer */}
+              {/* Inline Image/Video Gallery */}
               {galleryOpen && galleryItems.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -586,7 +584,10 @@ export default function RequestDetailsPage() {
                       <span className="text-sm text-muted-foreground">
                         {galleryIndex + 1} / {galleryItems.length}
                       </span>
-                      <span className="font-medium truncate max-w-[60vw]" title={galleryItems[galleryIndex].name}>
+                      <span
+                        className="font-medium truncate max-w-[60vw]"
+                        title={galleryItems[galleryIndex].name}
+                      >
                         {galleryItems[galleryIndex].name}
                       </span>
                     </div>
@@ -608,11 +609,13 @@ export default function RequestDetailsPage() {
                     style={{ minHeight: '360px' }}
                     aria-label="Media viewer"
                   >
-                    {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
                       {galleryItems[galleryIndex].type === 'image' ? (
                         <img
-                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'} 
+                          src={
+                            galleryItems[galleryIndex].url ||
+                            '/placeholder.svg?height=300&width=600&query=image%20preview'
+                           || "/placeholder.svg"}
                           alt={galleryItems[galleryIndex].name}
                           className="mx-auto max-h-[70vh] max-w-full object-contain"
                           crossOrigin="anonymous"
@@ -636,14 +639,15 @@ export default function RequestDetailsPage() {
                       )}
                     </div>
 
-                    {/* Navigation */}
                     {galleryItems.length > 1 && (
                       <>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
-                          onClick={() => setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)}
+                          onClick={() =>
+                            setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)
+                          }
                           aria-label="Previous"
                         >
                           <ChevronLeft className="h-7 w-7" />
@@ -661,7 +665,6 @@ export default function RequestDetailsPage() {
                     )}
                   </div>
 
-                  {/* Thumbnails */}
                   {galleryItems.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto pt-2">
                       {galleryItems.map((item, idx) => (
@@ -682,8 +685,7 @@ export default function RequestDetailsPage() {
                               className="h-18 w-24 object-cover"
                               crossOrigin="anonymous"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  '/placeholder.svg?height=72&width=96';
+                                (e.target as HTMLImageElement).src = '/placeholder.svg?height=72&width=96';
                               }}
                             />
                           ) : (
@@ -698,24 +700,6 @@ export default function RequestDetailsPage() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Standard HTML PDF Viewer for "Attachments" field */}
-      {attachmentPdfUrl && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              PDF Viewer (Attachments)
-            </CardTitle>
-            <CardDescription>
-              Viewing the PDF stored in the "Attachments" field for this request.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <StandardPdfViewer url={attachmentPdfUrl} title="Attachment PDF" viewer="google" />
           </CardContent>
         </Card>
       )}
