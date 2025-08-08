@@ -5,10 +5,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw } from 'lucide-react';
 
-// Configure the PDF.js worker (hosted on a CDN for simplicity)
-// If you prefer to pin a different version, update the version below.
-pdfjs.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js';
+// Use locally hosted ES module worker to avoid CORS/dynamic import issues
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export type PdfViewerProps = {
   src: string;
