@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { db, storage } from '@/lib/firebase';
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Loader2, X } from 'lucide-react';
 
 type RequestType = 'reimbursement' | 'requisition' | 'replenish';
 
@@ -59,8 +59,8 @@ type CreateRequestFormData = {
   'Voucher No.': string;
   'Management Approval': 'Approved' | 'Pending';
   // Uses 'Date Requested' above
-  'Send Report': File | null; // mandatory for replenish
-  'Print Report': File | null; // optional for replenish
+  'Send Report': File | null;
+  'Print Report': File | null;
 };
 
 const currencies = [
@@ -105,11 +105,9 @@ function onlyNumbers(str: string) {
   return /^\d+$/.test(str);
 }
 function lettersAndNumbers(str: string) {
-  // must contain at least one letter and one number; allow spaces
   return /[A-Za-z]/.test(str) && /\d/.test(str) && /^[A-Za-z0-9\s]+$/.test(str);
 }
 function docNumberAllowed(str: string) {
-  // letters, numbers and only (# * + - .) allowed special chars plus spaces
   return /^[A-Za-z0-9#*+\-.\s]+$/.test(str);
 }
 
@@ -122,6 +120,7 @@ export default function CreateRequestPage() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
@@ -153,14 +152,26 @@ export default function CreateRequestPage() {
     'Print Report': null,
   });
 
-  const handleText = (field: keyof CreateRequestFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData((p) => ({ ...p, [field]: e.target.value }));
+  // Preselect type from query (?type=reimbursement|requisition|replenish)
+  useEffect(() => {
+    const t = (searchParams.get('type') || '').toLowerCase();
+    if (t === 'reimbursement' || t === 'requisition' || t === 'replenish') {
+      setFormData((p) => ({ ...p, request_type: t as RequestType }));
+    }
+  }, [searchParams]);
+
+  const handleText =
+    (field: keyof CreateRequestFormData) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setFormData((p) => ({ ...p, [field]: e.target.value }));
 
   const handleSelect = (field: keyof CreateRequestFormData) => (value: any) =>
     setFormData((p) => ({ ...p, [field]: value }));
 
-  const handleFile = (field: 'Attachments' | 'Quotation' | 'Send Report' | 'Print Report') => (file: File | null) =>
-    setFormData((p) => ({ ...p, [field]: file }));
+  const handleFile =
+    (field: 'Attachments' | 'Quotation' | 'Send Report' | 'Print Report') =>
+    (file: File | null) =>
+      setFormData((p) => ({ ...p, [field]: file }));
 
   const companyIdentifier = useMemo(
     () => user?.company_id || userData?.project_id || user?.uid,
@@ -185,20 +196,15 @@ export default function CreateRequestPage() {
 
   const validate = (): string | null => {
     // Shared
-    if (!formData['Request No.'] && !formData['Request No.'].trim()) {
-      // Will auto-generate; allowed to keep current behavior
-    } else if (!onlyNumbers(formData['Request No.'])) {
+    if (formData['Request No.'] && !onlyNumbers(formData['Request No.'])) {
       return 'Request No. must contain numbers only.';
     }
-
     if (!formData.Requestor.trim() || !onlyAlphabet(formData.Requestor)) {
       return 'Requestor is mandatory and must contain alphabets only.';
     }
-
     if (!formData.Amount.trim() || !onlyNumbers(formData.Amount)) {
       return 'Amount is mandatory and must contain numbers only.';
     }
-
     if (!formData['Approved By'].trim() || !onlyAlphabet(formData['Approved By'])) {
       return 'Approved By is mandatory and must contain alphabets only.';
     }
@@ -211,9 +217,6 @@ export default function CreateRequestPage() {
       }
       if (!fileOk(formData.Attachments, true)) {
         return 'Attachments must be a PDF/DOC up to 10 MB.';
-      }
-      if (!['Accept', 'Decline', 'Approved', 'Rejected', 'Pending', 'Processing'].includes(formData.Actions)) {
-        return 'Actions must be Accept or Decline (or existing statuses).';
       }
     } else if (formData.request_type === 'requisition') {
       if (!formData['Date Requested']) return 'Date Requested is mandatory.';
@@ -235,9 +238,6 @@ export default function CreateRequestPage() {
       if (formData.Attachments && !fileOk(formData.Attachments, false)) {
         return 'Attachments must be a PDF/DOC up to 10 MB.';
       }
-      if (!['Approved', 'Decline', 'Rejected', 'Pending', 'Processing'].includes(formData.Actions)) {
-        return 'Actions must be Approved or Decline (or existing statuses).';
-      }
     } else if (formData.request_type === 'replenish') {
       if (!formData['Date Requested']) return 'Date Requested is mandatory.';
       if (!formData.Particulars.trim() || !lettersAndNumbers(formData.Particulars)) {
@@ -254,9 +254,6 @@ export default function CreateRequestPage() {
       }
       if (formData['Print Report'] && !fileOk(formData['Print Report'], false)) {
         return 'Print Report must be a PDF/DOC up to 10 MB.';
-      }
-      if (!['Pending', 'Approved', 'Rejected', 'Processing', 'Send Report', 'Print Report', 'View', 'Edit', 'Delete'].includes(formData.Actions)) {
-        // Keep Actions free-form but nudge valid values; we won't block submission to maintain existing functionality.
       }
     }
 
@@ -299,16 +296,15 @@ export default function CreateRequestPage() {
         attachmentsUrl = await uploadFileToStorage(formData.Attachments, `${basePath}/attachments`);
       }
 
-      // Requisition: attachments optional
+      // Requisition: optional attachments + quotation
       if (formData.request_type === 'requisition' && formData.Attachments) {
         attachmentsUrl = await uploadFileToStorage(formData.Attachments, `${basePath}/attachments`);
       }
-
       if (formData.request_type === 'requisition' && formData.Quotation) {
         quotationUrl = await uploadFileToStorage(formData.Quotation, `${basePath}/quotations`);
       }
 
-      // Replenish
+      // Replenish: send/print report
       if (formData.request_type === 'replenish' && formData['Send Report']) {
         sendReportUrl = await uploadFileToStorage(formData['Send Report'], `${basePath}/send-report`);
       }
@@ -317,8 +313,7 @@ export default function CreateRequestPage() {
       }
 
       // Prepare common document data
-      const requestNo =
-        parseInt(formData['Request No.'], 10) || generateRequestNumber();
+      const requestNo = parseInt(formData['Request No.'], 10) || generateRequestNumber();
 
       const baseData: any = {
         company_id: companyIdentifier,
@@ -337,10 +332,7 @@ export default function CreateRequestPage() {
       let documentData: any = { ...baseData };
 
       if (formData.request_type === 'reimbursement') {
-        // Keep 'Requested Item'
         documentData['Requested Item'] = formData['Requested Item'].trim();
-
-        // Date handling: store as Date; Firestore will convert to Timestamp
         documentData['Date Released'] = new Date(formData['Date Released']);
       } else if (formData.request_type === 'requisition') {
         documentData['Requested Item'] = formData['Requested Item'].trim();
@@ -350,9 +342,8 @@ export default function CreateRequestPage() {
         documentData['Invoice No.'] = formData['Invoice No.'].trim();
         documentData.Quotation = quotationUrl;
       } else if (formData.request_type === 'replenish') {
-        // Mirror Particulars into Requested Item for list compatibility
         documentData.Particulars = formData.Particulars.trim();
-        documentData['Requested Item'] = formData.Particulars.trim();
+        documentData['Requested Item'] = formData.Particulars.trim(); // mirror for list
         documentData['Date Requested'] = new Date(formData['Date Requested']);
         documentData['Total Amount'] = parseFloat(formData['Total Amount']) || 0;
         documentData['Voucher No.'] = formData['Voucher No.'].trim();
@@ -378,7 +369,7 @@ export default function CreateRequestPage() {
   };
 
   const isUploading = uploadingFiles.length > 0;
-  const isPHP = formData.Currency === 'PHP';
+  const amountPrefix = useMemo(() => pesoSign(formData.Currency), [formData.Currency]);
 
   return (
     <div className="space-y-6">
@@ -408,10 +399,7 @@ export default function CreateRequestPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="request_type">Request Type *</Label>
-                <Select
-                  value={formData.request_type}
-                  onValueChange={handleSelect('request_type')}
-                >
+                <Select value={formData.request_type} onValueChange={handleSelect('request_type')}>
                   <SelectTrigger id="request_type">
                     <SelectValue />
                   </SelectTrigger>
@@ -454,48 +442,23 @@ export default function CreateRequestPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount *</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      {isPHP ? '₱' : amountPrefix}
-                    </div>
-                    <Input
-                      id="amount"
-                      className="pl-7"
-                      type="text"
-                      inputMode="numeric"
-                      required
-                      pattern="\d+"
-                      title="Numbers only"
-                      placeholder="0"
-                      value={formData.Amount}
-                      onChange={handleText('Amount')}
-                    />
+                <div className="relative">
+                  <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {amountPrefix}
                   </div>
-                  <div className="w-32">
-                    <Select
-                      value={formData.Currency}
-                      onValueChange={handleSelect('Currency')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currencies.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm">{c.symbol}</span>
-                              <span>{c.code}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Input
+                    id="amount"
+                    className="pl-7"
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    pattern="\d+"
+                    title="Numbers only"
+                    placeholder="0"
+                    value={formData.Amount}
+                    onChange={handleText('Amount')}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Include peso sign shown; only numbers allowed in the field.
-                </p>
               </div>
             </div>
 
@@ -520,14 +483,12 @@ export default function CreateRequestPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Keep existing statuses and include Accept/Decline per module specs */}
                     <SelectItem value="Pending">Pending</SelectItem>
                     <SelectItem value="Approved">Approved</SelectItem>
                     <SelectItem value="Rejected">Rejected</SelectItem>
                     <SelectItem value="Processing">Processing</SelectItem>
                     <SelectItem value="Accept">Accept</SelectItem>
                     <SelectItem value="Decline">Decline</SelectItem>
-                    {/* For replenish, actions are UI actions; we still let users persist text if needed */}
                     <SelectItem value="Send Report">Send Report</SelectItem>
                     <SelectItem value="Print Report">Print Report</SelectItem>
                     <SelectItem value="View">View</SelectItem>
@@ -551,12 +512,8 @@ export default function CreateRequestPage() {
                     value={formData['Requested Item']}
                     onChange={handleText('Requested Item')}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Must include letters and numbers.
-                  </p>
                 </div>
 
-                {/* Date Released */}
                 <div className="space-y-2">
                   <Label htmlFor="date_released">Date Released *</Label>
                   <Input
@@ -581,7 +538,6 @@ export default function CreateRequestPage() {
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       onChange={(e) => handleFile('Attachments')(e.target.files?.[0] || null)}
                       className="flex-1"
-                      disabled={isUploading}
                       required
                     />
                     {formData.Attachments && (
@@ -596,16 +552,12 @@ export default function CreateRequestPage() {
                       </Button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Only PDF/DOC formats. Max 10 MB.
-                  </p>
                 </div>
               </>
             )}
 
             {formData.request_type === 'requisition' && (
               <>
-                {/* Date Requested */}
                 <div className="space-y-2">
                   <Label htmlFor="date_requested">Date Requested *</Label>
                   <Input
@@ -617,7 +569,6 @@ export default function CreateRequestPage() {
                   />
                 </div>
 
-                {/* Requested Item */}
                 <div className="space-y-2">
                   <Label htmlFor="requested_item_req">Requested Item *</Label>
                   <Textarea
@@ -630,7 +581,6 @@ export default function CreateRequestPage() {
                   />
                 </div>
 
-                {/* Cashback and IDs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="cashback">Cashback</Label>
@@ -683,7 +633,6 @@ export default function CreateRequestPage() {
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={(e) => handleFile('Quotation')(e.target.files?.[0] || null)}
                         className="flex-1"
-                        disabled={isUploading}
                       />
                       {formData.Quotation && (
                         <Button
@@ -709,7 +658,6 @@ export default function CreateRequestPage() {
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       onChange={(e) => handleFile('Attachments')(e.target.files?.[0] || null)}
                       className="flex-1"
-                      disabled={isUploading}
                     />
                     {formData.Attachments && (
                       <Button
@@ -729,7 +677,6 @@ export default function CreateRequestPage() {
 
             {formData.request_type === 'replenish' && (
               <>
-                {/* Date Requested */}
                 <div className="space-y-2">
                   <Label htmlFor="date_requested_repl">Date Requested *</Label>
                   <Input
@@ -741,7 +688,6 @@ export default function CreateRequestPage() {
                   />
                 </div>
 
-                {/* Particulars */}
                 <div className="space-y-2">
                   <Label htmlFor="particulars">Particulars *</Label>
                   <Textarea
@@ -754,7 +700,6 @@ export default function CreateRequestPage() {
                   />
                 </div>
 
-                {/* Total and Voucher */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="total_amount">Total Amount *</Label>
@@ -788,7 +733,6 @@ export default function CreateRequestPage() {
                   </div>
                 </div>
 
-                {/* Management Approval */}
                 <div className="space-y-2">
                   <Label htmlFor="mgmt_approval">Management Approval *</Label>
                   <Select
@@ -805,7 +749,6 @@ export default function CreateRequestPage() {
                   </Select>
                 </div>
 
-                {/* Send/Print Report */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="send_report">Send Report (PDF/DOC, max 10MB) *</Label>
@@ -816,7 +759,6 @@ export default function CreateRequestPage() {
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={(e) => handleFile('Send Report')(e.target.files?.[0] || null)}
                         className="flex-1"
-                        disabled={isUploading}
                         required
                       />
                       {formData['Send Report'] && (
@@ -841,7 +783,6 @@ export default function CreateRequestPage() {
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={(e) => handleFile('Print Report')(e.target.files?.[0] || null)}
                         className="flex-1"
-                        disabled={isUploading}
                       />
                       {formData['Print Report'] && (
                         <Button
