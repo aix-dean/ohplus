@@ -325,25 +325,25 @@ export function SalesRecordTable() {
 
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
-          <Table>
+          <Table className="w-full"> {/* Added w-full here */}
             <TableHeader>
               <TableRow>
-                <TableHead>Month</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Service Invoice</TableHead>
-                <TableHead>BS #</TableHead>
-                <TableHead>Clients</TableHead>
-                <TableHead>TIN</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Net Sales</TableHead>
-                <TableHead className="text-right">Output VAT</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Discount</TableHead>
-                <TableHead className="text-right">Creditable Tax</TableHead>
-                <TableHead className="text-right">Amount Collected</TableHead>
-                <TableHead>OR No.</TableHead>
-                <TableHead>Paid/Deposit Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="min-w-[5rem]">Month</TableHead>
+                <TableHead className="min-w-[5rem]">Date</TableHead>
+                <TableHead className="min-w-[8rem]">Service Invoice</TableHead>
+                <TableHead className="min-w-[8rem]">BS #</TableHead>
+                <TableHead>Clients</TableHead> {/* Removed min-w */}
+                <TableHead>TIN</TableHead> {/* Removed min-w */}
+                <TableHead>Description</TableHead> {/* Removed min-w */}
+                <TableHead className="text-right min-w-[10rem]">Net Sales</TableHead>
+                <TableHead className="text-right min-w-[8rem]">Output VAT</TableHead>
+                <TableHead className="text-right min-w-[8rem]">Total</TableHead>
+                <TableHead className="text-right min-w-[8rem]">Discount</TableHead>
+                <TableHead className="text-right min-w-[8rem]">Creditable Tax</TableHead>
+                <TableHead className="text-right min-w-[8rem]">Amount Collected</TableHead>
+                <TableHead className="min-w-[8rem]">OR No.</TableHead>
+                <TableHead className="min-w-[8rem]">Paid/Deposit Date</TableHead>
+                <TableHead className="text-right min-w-[6rem]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -351,21 +351,21 @@ export function SalesRecordTable() {
                 const isEditing = !!editing[row.id]
                 return (
                   <TableRow key={row.id} className={isEditing ? "bg-muted/30" : ""}>
-                    <TableCell className="min-w-[6rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.month} onChange={(e) => updateRow(row.id, { month: e.target.value })} />
                       ) : (
                         <span>{row.month || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[6rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.date} onChange={(e) => updateRow(row.id, { date: e.target.value })} />
                       ) : (
                         <span>{row.date || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[10rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input
                           value={row.serviceInvoice}
@@ -375,28 +375,28 @@ export function SalesRecordTable() {
                         <span>{row.serviceInvoice || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[8rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.bsNumber} onChange={(e) => updateRow(row.id, { bsNumber: e.target.value })} />
                       ) : (
                         <span>{row.bsNumber || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[14rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.clients} onChange={(e) => updateRow(row.id, { clients: e.target.value })} />
                       ) : (
                         <span>{row.clients || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[14rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.tin} onChange={(e) => updateRow(row.id, { tin: e.target.value })} />
                       ) : (
                         <span>{row.tin || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[18rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input
                           value={row.description}
@@ -406,7 +406,7 @@ export function SalesRecordTable() {
                         <span>{row.description || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right min-w-[10rem]">
+                    <TableCell className="text-right">
                       {isEditing ? (
                         <Input
                           type="number"
@@ -424,21 +424,21 @@ export function SalesRecordTable() {
                     <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.discount)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.creditableTax)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.amountCollected)}</TableCell>
-                    <TableCell className="min-w-[10rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.orNo} onChange={(e) => updateRow(row.id, { orNo: e.target.value })} />
                       ) : (
                         <span>{row.orNo || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-[12rem]">
+                    <TableCell>
                       {isEditing ? (
                         <Input value={row.paidDate} onChange={(e) => updateRow(row.id, { paidDate: e.target.value })} />
                       ) : (
                         <span>{row.paidDate || "-"}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right min-w-[8rem]">
+                    <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {isEditing ? (
                           <>
