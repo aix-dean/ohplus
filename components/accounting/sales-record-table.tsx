@@ -324,185 +324,237 @@ export function SalesRecordTable() {
         </div>
 
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-        <div className="w-full overflow-x-auto">
-        <div className="min-w-[1200px]">
-          <Table className="w-full table-auto border-collapse">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[5rem]">Month</TableHead>
-                <TableHead className="min-w-[5rem]">Date</TableHead>
-                <TableHead className="min-w-[8rem]">Service Invoice</TableHead>
-                <TableHead className="min-w-[8rem]">BS #</TableHead>
-                <TableHead>Clients</TableHead>
-                <TableHead>TIN</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right min-w-[10rem]">Net Sales</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Output VAT</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Total</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Discount</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Creditable Tax</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Amount Collected</TableHead>
-                <TableHead className="min-w-[8rem]">OR No.</TableHead>
-                <TableHead className="min-w-[8rem]">Paid/Deposit Date</TableHead>
-                <TableHead className="text-right min-w-[6rem]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((row) => {
-                const isEditing = !!editing[row.id]
-                return (
-                  <TableRow key={row.id} className={isEditing ? "bg-muted/30" : ""}>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.month} onChange={(e) => updateRow(row.id, { month: e.target.value })} />
-                      ) : (
-                        <span>{row.month || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.date} onChange={(e) => updateRow(row.id, { date: e.target.value })} />
-                      ) : (
-                        <span>{row.date || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          value={row.serviceInvoice}
-                          onChange={(e) => updateRow(row.id, { serviceInvoice: e.target.value })}
-                        />
-                      ) : (
-                        <span>{row.serviceInvoice || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.bsNumber} onChange={(e) => updateRow(row.id, { bsNumber: e.target.value })} />
-                      ) : (
-                        <span>{row.bsNumber || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.clients} onChange={(e) => updateRow(row.id, { clients: e.target.value })} />
-                      ) : (
-                        <span>{row.clients || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.tin} onChange={(e) => updateRow(row.id, { tin: e.target.value })} />
-                      ) : (
-                        <span>{row.tin || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          value={row.description}
-                          onChange={(e) => updateRow(row.id, { description: e.target.value })}
-                        />
-                      ) : (
-                        <span>{row.description || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          className="text-right"
-                          value={row.netSales}
-                          onChange={(e) => updateRow(row.id, { netSales: parseNumber(e.target.value) })}
-                        />
-                      ) : (
-                        <span className="tabular-nums">{formatCurrency(row.netSales)}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.outputVat)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.total)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.discount)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.creditableTax)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.amountCollected)}</TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.orNo} onChange={(e) => updateRow(row.id, { orNo: e.target.value })} />
-                      ) : (
-                        <span>{row.orNo || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.paidDate} onChange={(e) => updateRow(row.id, { paidDate: e.target.value })} />
-                      ) : (
-                        <span>{row.paidDate || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Done editing"
-                              onClick={() => toggleEdit(row.id, false)}
-                            >
-                              <Check className="h-4 w-4 text-green-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Cancel editing"
-                              onClick={() => toggleEdit(row.id, false)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Edit row"
-                            onClick={() => toggleEdit(row.id, true)}
-                          >
-                            <PencilLine className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" aria-label="Delete row" onClick={() => deleteRow(row.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center text-muted-foreground">
-                    No rows. Try clearing the search or add a new row.
-                  </TableCell>
-                </TableRow>
-              )}
-              <TableRow className="bg-muted/30">
-                <TableCell colSpan={7} className="font-medium">
-                  Totals
-                </TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.netSales)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.outputVat)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.total)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(0)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.creditableTax)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.amountCollected)}</TableCell>
-                <TableCell colSpan={3} />
-              </TableRow>
-            </TableBody>
-          </Table>
-          </div>
-          </div>
-        </div>
+        <div className="hidden md:block">
+  <div className="overflow-x-auto">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="min-w-[4rem]">Month</TableHead>
+          <TableHead className="min-w-[4rem]">Date</TableHead>
+          <TableHead className="min-w-[7rem]">Invoice</TableHead>
+          <TableHead className="min-w-[6rem]">BS #</TableHead>
+          <TableHead className="min-w-[8rem]">Clients</TableHead>
+          <TableHead className="min-w-[8rem]">TIN</TableHead>
+          <TableHead className="min-w-[10rem]">Description</TableHead>
+          <TableHead className="text-right min-w-[7rem]">Net Sales</TableHead>
+          <TableHead className="text-right min-w-[7rem]">Output VAT</TableHead>
+          <TableHead className="text-right min-w-[6rem]">Total</TableHead>
+          <TableHead className="text-right min-w-[6rem]">Discount</TableHead>
+          <TableHead className="text-right min-w-[7rem]">Creditable Tax</TableHead>
+          <TableHead className="text-right min-w-[7rem]">Amount Collected</TableHead>
+          <TableHead className="min-w-[6rem]">OR No.</TableHead>
+          <TableHead className="min-w-[7rem]">Paid Date</TableHead>
+          <TableHead className="text-right min-w-[5rem]">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filtered.map((row) => {
+          const isEditing = !!editing[row.id]
+          return (
+            <TableRow key={row.id} className={isEditing ? "bg-muted/30" : ""}>
+              <TableCell className="min-w-[4rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.month} 
+                    onChange={(e) => updateRow(row.id, { month: e.target.value })}
+                    className="w-full min-w-[3rem]"
+                  />
+                ) : (
+                  <span>{row.month || "-"}</span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[4rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.date} 
+                    onChange={(e) => updateRow(row.id, { date: e.target.value })}
+                    className="w-full min-w-[3rem]"
+                  />
+                ) : (
+                  <span>{row.date || "-"}</span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[7rem]">
+                {isEditing ? (
+                  <Input
+                    value={row.serviceInvoice}
+                    onChange={(e) => updateRow(row.id, { serviceInvoice: e.target.value })}
+                    className="w-full min-w-[6rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[7rem]" title={row.serviceInvoice}>
+                    {row.serviceInvoice || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[6rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.bsNumber} 
+                    onChange={(e) => updateRow(row.id, { bsNumber: e.target.value })}
+                    className="w-full min-w-[5rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[6rem]" title={row.bsNumber}>
+                    {row.bsNumber || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[8rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.clients} 
+                    onChange={(e) => updateRow(row.id, { clients: e.target.value })}
+                    className="w-full min-w-[7rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[8rem]" title={row.clients}>
+                    {row.clients || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[8rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.tin} 
+                    onChange={(e) => updateRow(row.id, { tin: e.target.value })}
+                    className="w-full min-w-[7rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[8rem]" title={row.tin}>
+                    {row.tin || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[10rem]">
+                {isEditing ? (
+                  <Input
+                    value={row.description}
+                    onChange={(e) => updateRow(row.id, { description: e.target.value })}
+                    className="w-full min-w-[9rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[10rem]" title={row.description}>
+                    {row.description || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="text-right min-w-[7rem]">
+                {isEditing ? (
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    className="text-right w-full min-w-[6rem]"
+                    value={row.netSales}
+                    onChange={(e) => updateRow(row.id, { netSales: parseNumber(e.target.value) })}
+                  />
+                ) : (
+                  <span className="tabular-nums">{formatCurrency(row.netSales)}</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap min-w-[7rem]">
+                {formatCurrency(row.outputVat)}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap min-w-[6rem]">
+                {formatCurrency(row.total)}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap min-w-[6rem]">
+                {formatCurrency(row.discount)}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap min-w-[7rem]">
+                {formatCurrency(row.creditableTax)}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap min-w-[7rem]">
+                {formatCurrency(row.amountCollected)}
+              </TableCell>
+              <TableCell className="min-w-[6rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.orNo} 
+                    onChange={(e) => updateRow(row.id, { orNo: e.target.value })}
+                    className="w-full min-w-[5rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[6rem]" title={row.orNo}>
+                    {row.orNo || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[7rem]">
+                {isEditing ? (
+                  <Input 
+                    value={row.paidDate} 
+                    onChange={(e) => updateRow(row.id, { paidDate: e.target.value })}
+                    className="w-full min-w-[6rem]"
+                  />
+                ) : (
+                  <span className="truncate block max-w-[7rem]" title={row.paidDate}>
+                    {row.paidDate || "-"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="text-right min-w-[5rem]">
+                <div className="flex items-center justify-end gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Done editing"
+                        onClick={() => toggleEdit(row.id, false)}
+                      >
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Cancel editing"
+                        onClick={() => toggleEdit(row.id, false)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Edit row"
+                      onClick={() => toggleEdit(row.id, true)}
+                    >
+                      <PencilLine className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" aria-label="Delete row" onClick={() => deleteRow(row.id)}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          )
+        })}
+        {filtered.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={16} className="text-center text-muted-foreground">
+              No rows. Try clearing the search or add a new row.
+            </TableCell>
+          </TableRow>
+        )}
+        <TableRow className="bg-muted/30">
+          <TableCell colSpan={7} className="font-medium">
+            Totals
+          </TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(totals.netSales)}</TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(totals.outputVat)}</TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(totals.total)}</TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(0)}</TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(totals.creditableTax)}</TableCell>
+          <TableCell className="text-right font-medium">{formatCurrency(totals.amountCollected)}</TableCell>
+          <TableCell colSpan={3} />
+        </TableRow>
+      </TableBody>
+    </Table>
+  </div>
+</div>
       </CardContent>
     </Card>
   )

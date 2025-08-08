@@ -3,16 +3,14 @@ import { Card, CardContent } from "@/components/ui/card"
 
 export default function Page() {
   return (
-    <div className="mx-auto w-full p-4 md:p-6">
+    <div className="container mx-auto p-4 md:p-6 max-w-full">
       <div className="mb-4 md:mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Accounting — Sales Record</h1>
         <p className="text-sm text-muted-foreground">Manage sales records. Edit rows using the button at the end of each row.</p>
       </div>
 
       <div className="space-y-4">
-      <div className="w-full overflow-x-auto">
         <SalesRecordTable />
-      </div>
 
         <Card>
           <CardContent className="pt-4 text-sm text-muted-foreground">
