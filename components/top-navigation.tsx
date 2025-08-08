@@ -169,7 +169,7 @@ export function TopNavigation() {
         className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block`}
       ></div>
 
-      <div className="top-nav-container text-white relative z-10">
+      <div className="top-nav-container text-white relative z-10 overflow-hidden">
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
