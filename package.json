@@ -64,7 +64,6 @@
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "latest",
-    "react-pdf": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "resend": "latest",

@@ -1,114 +1,145 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
+import { useMemo, useRef, useState, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/hooks/use-toast'
+import { ZoomIn, ZoomOut, Download, ExternalLink, X, Expand, Shrink, RotateCw } from 'lucide-react'
 
-// Set up the PDF.js worker to load from a CDN.
-// This is crucial for the PDF rendering to work in the browser.
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+type PdfViewerProps = {
+  url: string
+  fileName: string
+  onClose: () => void
+}
 
-interface PdfViewerProps {
-  url: string;
-  fileName: string;
-  onClose: () => void;
+// Utility to build an iframe src with a specific zoom level
+function buildPdfSrc(rawUrl: string, zoomPercent: number) {
+  // Strip existing hash and add our own PDF viewer parameters
+  const [base] = rawUrl.split('#')
+  // Common parameters recognized by most PDF viewers in browsers
+  const params = `#toolbar=1&navpanes=1&scrollbar=1&zoom=${Math.round(zoomPercent)}`
+  return `${base}${params}`
 }
 
 export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
-  const { toast } = useToast();
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.0);
-  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast()
+  const [zoom, setZoom] = useState<number>(100) // percent
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setPageNumber(1);
-    setIsLoading(false);
-  }, []);
-
-  const onDocumentLoadError = useCallback((error: Error) => {
-    toast({
-      title: 'Error loading PDF',
-      description: 'There was an issue loading the PDF file. Please try downloading it instead.',
-      variant: 'destructive',
-    });
-    console.error('Error while loading document!', error);
-    setIsLoading(false);
-    onClose();
-  }, [toast, onClose]);
-
-  const goToPrevPage = () => setPageNumber((prev) => Math.max(prev - 1, 1));
-  const goToNextPage = () => setPageNumber((prev) => Math.min(prev + 1, numPages || 1));
-
-  const zoomIn = () => setScale((prev) => Math.min(prev + 0.2, 3.0));
-  const zoomOut = () => setScale((prev) => Math.max(prev - 0.2, 0.5));
+  const iframeSrc = useMemo(() => buildPdfSrc(url, zoom), [url, zoom])
 
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.target = '_blank'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (e) {
+      console.error(e)
+      toast({
+        title: 'Download failed',
+        description: 'Unable to download the file. Try opening it in a new tab.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleOpenNewTab = () => {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const zoomIn = () => setZoom((z) => Math.min(z + 25, 400))
+  const zoomOut = () => setZoom((z) => Math.max(z - 25, 25))
+  const resetZoom = () => setZoom(100)
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen()
+        setIsFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    } catch (e) {
+      console.error('Fullscreen error', e)
+    }
+  }, [])
+
+  // Keep isFullscreen state in sync with document events
+  // (in case user presses ESC to exit fullscreen)
+  if (typeof window !== 'undefined') {
+    document.onfullscreenchange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+  }
 
   return (
     <Card className="w-full my-6">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="truncate text-base font-medium" title={fileName}>{fileName}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardTitle className="truncate text-base font-medium" title={fileName}>
+          {fileName}
+        </CardTitle>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleDownload}>
+          <Button variant="outline" size="sm" onClick={handleOpenNewTab} title="Open in new tab">
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownload} title="Download PDF">
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} title="Close viewer">
             <X className="h-4 w-4 mr-2" />
             Close
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="bg-muted/40 p-4 rounded-lg overflow-auto max-h-[70vh] flex justify-center">
-        <Document
-          file={url}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading={<Skeleton className="w-[600px] h-[800px]" />}
-          error={<div className="text-center p-8 text-red-500">Failed to load PDF.</div>}
+
+      {/* Scrollable, responsive PDF viewport */}
+      <CardContent>
+        <div
+          ref={containerRef}
+          className="relative w-full border rounded-lg overflow-hidden bg-background"
+          style={{ height: '70vh' }}
         >
-          <Page pageNumber={pageNumber} scale={scale} renderTextLayer={true} />
-        </Document>
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            title={fileName}
+            className="w-full h-full"
+            // Allow fullscreen inside iframe if supported
+            allow="fullscreen"
+          />
+        </div>
       </CardContent>
-      {numPages && !isLoading && (
-        <CardFooter className="flex items-center justify-center flex-wrap gap-4 pt-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={zoomOut} disabled={scale <= 0.5} aria-label="Zoom out">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium w-12 text-center">{(scale * 100).toFixed(0)}%</span>
-            <Button variant="outline" size="icon" onClick={zoomIn} disabled={scale >= 3.0} aria-label="Zoom in">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={goToPrevPage} disabled={pageNumber <= 1} aria-label="Previous page">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium w-24 text-center" aria-live="polite">
-              Page {pageNumber} of {numPages}
-            </span>
-            <Button variant="outline" size="icon" onClick={goToNextPage} disabled={pageNumber >= numPages} aria-label="Next page">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardFooter>
-      )}
+
+      <CardFooter className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={zoomOut} aria-label="Zoom out" title="Zoom out" disabled={zoom <= 25}>
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium w-16 text-center">{`${zoom}%`}</span>
+          <Button variant="outline" size="icon" onClick={zoomIn} aria-label="Zoom in" title="Zoom in" disabled={zoom >= 400}>
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={resetZoom} aria-label="Reset zoom" title="Reset zoom">
+            <RotateCw className="h-4 w-4 mr-2" />
+            Reset
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={toggleFullscreen} title={isFullscreen ? 'Exit full screen' : 'Enter full screen'}>
+            {isFullscreen ? <Shrink className="h-4 w-4 mr-2" /> : <Expand className="h-4 w-4 mr-2" />}
+            {isFullscreen ? 'Exit full screen' : 'Full screen'}
+          </Button>
+        </div>
+      </CardFooter>
     </Card>
-  );
+  )
 }
