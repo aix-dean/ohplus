@@ -325,8 +325,9 @@ export function SalesRecordTable() {
 
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
-        <div className="min-w-full">
-          <Table className="min-w-max border-collapse">
+        <div className="w-full overflow-x-auto">
+        <div className="min-w-[1200px]">
+          <Table className="w-full table-auto border-collapse">
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[5rem]">Month</TableHead>
@@ -499,6 +500,7 @@ export function SalesRecordTable() {
               </TableRow>
             </TableBody>
           </Table>
+          </div>
           </div>
         </div>
       </CardContent>
