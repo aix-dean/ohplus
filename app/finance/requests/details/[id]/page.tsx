@@ -7,12 +7,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import PdfViewer from '@/components/pdf-viewer';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import PdfViewer from '@/components/pdf-viewer';
 
 import {
   AlertCircle,
@@ -34,7 +34,7 @@ import {
   X,
   XCircle,
   Clock,
-  File as FileGeneric
+  File as FileGeneric,
 } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
@@ -159,7 +159,7 @@ export default function RequestDetailsPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Optional PDF inline preview (kept intact so we don't break existing behaviors)
+  // PDF inline viewer state
   const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
 
   const requestId = params.id as string;
@@ -183,7 +183,7 @@ export default function RequestDetailsPage() {
 
         const data = docSnap.data() as any;
 
-        // Ownership and deletion checks preserved
+        // Ownership and deletion checks
         const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
         if (data.company_id !== companyIdentifier || data.deleted === true) {
           setNotFound(true);
@@ -193,7 +193,6 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
-        // Build attachments list (unchanged sources)
         const all: Attachment[] = [];
         if (req.Attachments) {
           all.push({
@@ -264,13 +263,10 @@ export default function RequestDetailsPage() {
       const idx = galleryItems.findIndex((g) => g.url === att.url);
       setGalleryIndex(Math.max(0, idx));
       setGalleryOpen(true);
-      // Scroll into view
       setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else if (att.type === 'pdf') {
       setPdfPreview(att);
-      // keep behavior inline; not required by user but does not interfere
     } else {
-      // Document types: no preview; keep download-only behavior
       toast({
         title: 'Preview not available',
         description: 'This file type can only be downloaded.',
@@ -283,8 +279,10 @@ export default function RequestDetailsPage() {
     try {
       if (!document.fullscreenElement) {
         await viewerRef.current.requestFullscreen();
+        setIsFullscreen(true);
       } else {
         await document.exitFullscreen();
+        setIsFullscreen(false);
       }
     } catch (err) {
       console.error('Fullscreen toggle error', err);
@@ -505,7 +503,9 @@ export default function RequestDetailsPage() {
               <Download className="h-5 w-5" />
               Attachments ({attachments.length})
             </CardTitle>
-            <CardDescription>Click "View" to preview images or videos on the page, or "Download" to save locally</CardDescription>
+            <CardDescription>
+              Click "View" to preview images/videos/PDFs on the page, or "Download" to save locally
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -528,7 +528,7 @@ export default function RequestDetailsPage() {
                         size="sm"
                         onClick={() => handleView(att)}
                         disabled={att.type === 'document'}
-                        title={att.type === 'document' ? 'Preview not available for this file type' : 'View'}
+                        title={att.type === 'document' ? 'Preview not available' : 'View'}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View
@@ -541,33 +541,17 @@ export default function RequestDetailsPage() {
                 ))}
               </div>
 
-              {/* Inline PDF preview (unchanged behavior; shown only when chosen) */}
+              {/* Inline PDF WebView with zoom/scroll */}
               {pdfPreview && (
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        PDF Preview
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <a href={pdfPreview.url} download={pdfPreview.name} target="_blank" rel="noreferrer">
-                          <Button variant="outline" size="sm">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                        </a>
-                        <Button variant="outline" size="sm" onClick={() => setPdfPreview(null)}>
-                          <X className="h-4 w-4 mr-2" />
-                          Close
-                        </Button>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <PdfViewer src={pdfPreview.url} filename={pdfPreview.name} height={600} />
-                  </CardContent>
-                </Card>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Preview: {pdfPreview.name}</h4>
+                    <Button variant="ghost" size="sm" onClick={() => setPdfPreview(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <PdfViewer src={pdfPreview.url} filename={pdfPreview.name} height={600} />
+                </div>
               )}
 
               {/* Inline Image/Video Gallery Viewer */}
@@ -600,11 +584,10 @@ export default function RequestDetailsPage() {
                     style={{ minHeight: '360px' }}
                     aria-label="Media viewer"
                   >
-                    {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
                       {galleryItems[galleryIndex].type === 'image' ? (
                         <img
-                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'} 
+                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'}
                           alt={galleryItems[galleryIndex].name}
                           className="mx-auto max-h-[70vh] max-w-full object-contain"
                           crossOrigin="anonymous"
@@ -617,18 +600,10 @@ export default function RequestDetailsPage() {
                           controls
                           className="mx-auto max-h-[70vh] max-w-full"
                           src={galleryItems[galleryIndex].url}
-                          onError={() =>
-                            toast({
-                              title: 'Error',
-                              description: 'Unable to load video file.',
-                              variant: 'destructive',
-                            })
-                          }
                         />
                       )}
                     </div>
 
-                    {/* Navigation */}
                     {galleryItems.length > 1 && (
                       <>
                         <Button
@@ -652,41 +627,6 @@ export default function RequestDetailsPage() {
                       </>
                     )}
                   </div>
-
-                  {/* Thumbnails */}
-                  {galleryItems.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pt-2">
-                      {galleryItems.map((item, idx) => (
-                        <button
-                          key={item.url}
-                          type="button"
-                          onClick={() => setGalleryIndex(idx)}
-                          className={`flex-shrink-0 rounded-md overflow-hidden border ${
-                            idx === galleryIndex ? 'ring-2 ring-foreground' : 'border-border'
-                          }`}
-                          title={item.name}
-                          aria-label={`Open ${item.name}`}
-                        >
-                          {item.type === 'image' ? (
-                            <img
-                              src={item.url || '/placeholder.svg?height=72&width=96&query=thumbnail'}
-                              alt={item.name}
-                              className="h-18 w-24 object-cover"
-                              crossOrigin="anonymous"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  '/placeholder.svg?height=72&width=96';
-                              }}
-                            />
-                          ) : (
-                            <div className="h-18 w-24 bg-black/80 flex items-center justify-center text-white">
-                              <Play className="h-6 w-6" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
