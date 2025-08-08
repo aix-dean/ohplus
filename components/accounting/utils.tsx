@@ -1,44 +1,41 @@
-"use client"
+export function uid(prefix = "id"): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
 
-export type Numberish = number | string
-
-export function parseNumber(value: Numberish | undefined | null): number {
+export function parseNumber(value: unknown): number {
   if (value === null || value === undefined) return 0
-  if (typeof value === "number") return isFinite(value) ? value : 0
-  const cleaned = String(value).replace(/,/g, "").trim()
-  const n = Number(cleaned)
-  return isFinite(n) ? n : 0
+  if (typeof value === "number" && !Number.isNaN(value)) return value
+  const str = String(value).replace(/,/g, "").trim()
+  if (!str) return 0
+  const n = Number(str)
+  return Number.isFinite(n) ? n : 0
 }
 
-export function formatCurrency(value: Numberish, opts: Intl.NumberFormatOptions = {}) {
-  const n = parseNumber(value)
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    ...opts,
-  }).format(n)
+export function sumBy<T>(arr: T[], sel: (item: T) => number): number {
+  return arr.reduce((acc, item) => acc + (Number.isFinite(sel(item)) ? sel(item) : 0), 0)
 }
 
-export function formatNumber(value: Numberish, opts: Intl.NumberFormatOptions = {}) {
-  const n = parseNumber(value)
-  return new Intl.NumberFormat("en-PH", {
-    maximumFractionDigits: 2,
-    ...opts,
-  }).format(n)
+export function includesAny<T extends Record<string, any>>(row: T, query: string): boolean {
+  if (!query) return true
+  const q = query.toLowerCase()
+  for (const key of Object.keys(row)) {
+    const val = row[key]
+    if (val === null || val === undefined) continue
+    const s =
+      typeof val === "number"
+        ? String(val)
+        : typeof val === "object"
+          ? JSON.stringify(val)
+          : String(val)
+    if (s.toLowerCase().includes(q)) return true
+  }
+  return false
 }
 
-export function sumBy<T>(arr: T[], pick: (row: T) => number): number {
-  return arr.reduce((acc, r) => acc + (isFinite(pick(r)) ? pick(r) : 0), 0)
-}
-
-export function includesAny(haystack: unknown, needle: string) {
-  if (!needle) return true
-  const flat = JSON.stringify(haystack ?? "").toLowerCase()
-  return flat.includes(needle.toLowerCase())
-}
-
-export function uid(prefix = "row") {
-  return `${prefix}_${Math.random().toString(36).slice(2, 8)}`
+export function formatCurrency(n: number, currency: string = "PHP", locale: string = "en-PH"): string {
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 }).format(n || 0)
+  } catch {
+    return `₱${(n || 0).toFixed(2)}`
+  }
 }
