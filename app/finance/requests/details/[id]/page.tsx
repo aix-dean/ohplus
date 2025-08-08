@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import PdfViewer from '@/components/pdf-viewer';
 
 import {
   AlertCircle,
@@ -26,7 +25,7 @@ import {
   Download,
   ExternalLink,
   FileText,
-  ImageIcon,
+  Image as ImageIcon,
   Play,
   Shrink,
   Expand,
@@ -37,6 +36,7 @@ import {
   File as FileGeneric,
 } from 'lucide-react';
 
+import PdfWebView from '@/components/pdf-webview';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
 type AttachmentType = 'image' | 'video' | 'pdf' | 'document';
@@ -159,7 +159,7 @@ export default function RequestDetailsPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // PDF inline viewer state
+  // PDF preview data (now delegates to PdfWebView component)
   const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
 
   const requestId = params.id as string;
@@ -183,7 +183,7 @@ export default function RequestDetailsPage() {
 
         const data = docSnap.data() as any;
 
-        // Ownership and deletion checks
+        // Ownership and deletion checks preserved
         const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
         if (data.company_id !== companyIdentifier || data.deleted === true) {
           setNotFound(true);
@@ -193,6 +193,7 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
+        // Build attachments list
         const all: Attachment[] = [];
         if (req.Attachments) {
           all.push({
@@ -263,14 +264,13 @@ export default function RequestDetailsPage() {
       const idx = galleryItems.findIndex((g) => g.url === att.url);
       setGalleryIndex(Math.max(0, idx));
       setGalleryOpen(true);
+      // Scroll into view
       setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else if (att.type === 'pdf') {
       setPdfPreview(att);
+      setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else {
-      toast({
-        title: 'Preview not available',
-        description: 'This file type can only be downloaded.',
-      });
+      // Document types: no preview; download-only
     }
   };
 
@@ -279,10 +279,8 @@ export default function RequestDetailsPage() {
     try {
       if (!document.fullscreenElement) {
         await viewerRef.current.requestFullscreen();
-        setIsFullscreen(true);
       } else {
         await document.exitFullscreen();
-        setIsFullscreen(false);
       }
     } catch (err) {
       console.error('Fullscreen toggle error', err);
@@ -528,7 +526,7 @@ export default function RequestDetailsPage() {
                         size="sm"
                         onClick={() => handleView(att)}
                         disabled={att.type === 'document'}
-                        title={att.type === 'document' ? 'Preview not available' : 'View'}
+                        title={att.type === 'document' ? 'Preview not available for this file type' : 'View'}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View
@@ -541,28 +539,25 @@ export default function RequestDetailsPage() {
                 ))}
               </div>
 
-              {/* Inline PDF WebView with zoom/scroll */}
+              {/* Inline PDF WebView */}
               {pdfPreview && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Preview: {pdfPreview.name}</h4>
-                    <Button variant="ghost" size="sm" onClick={() => setPdfPreview(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <PdfViewer src={pdfPreview.url} filename={pdfPreview.name} height={600} />
+                <div ref={viewerRef} className="space-y-4">
+                  <PdfWebView url={pdfPreview.url} name={pdfPreview.name} height={720} />
                 </div>
               )}
 
               {/* Inline Image/Video Gallery Viewer */}
               {galleryOpen && galleryItems.length > 0 && (
-                <div className="space-y-3">
+                <div ref={viewerRef} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground">
                         {galleryIndex + 1} / {galleryItems.length}
                       </span>
-                      <span className="font-medium truncate max-w-[60vw]" title={galleryItems[galleryIndex].name}>
+                      <span
+                        className="font-medium truncate max-w-[60vw]"
+                        title={galleryItems[galleryIndex].name}
+                      >
                         {galleryItems[galleryIndex].name}
                       </span>
                     </div>
@@ -579,11 +574,11 @@ export default function RequestDetailsPage() {
                   </div>
 
                   <div
-                    ref={viewerRef}
                     className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
                     style={{ minHeight: '360px' }}
                     aria-label="Media viewer"
                   >
+                    {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
                       {galleryItems[galleryIndex].type === 'image' ? (
                         <img
@@ -604,13 +599,16 @@ export default function RequestDetailsPage() {
                       )}
                     </div>
 
+                    {/* Navigation */}
                     {galleryItems.length > 1 && (
                       <>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
-                          onClick={() => setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)}
+                          onClick={() =>
+                            setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)
+                          }
                           aria-label="Previous"
                         >
                           <ChevronLeft className="h-7 w-7" />
