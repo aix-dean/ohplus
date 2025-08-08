@@ -193,7 +193,7 @@ export function TopNavigation() {
             {/* Added relative z-20 and flex-shrink-0 */}
             {/* User controls section (bell and profile) - Conditionally rendered */}
             {!isAccountPage && ( // Only render if NOT on the account page
-              <div className="flex items-center mr-2 md:mr-8 relative z-10">
+              <div className="flex items-center mr-6 md:mr-12 relative z-10">
                 {" "}
                 {/* Added relative z-10 */}
                 <button
