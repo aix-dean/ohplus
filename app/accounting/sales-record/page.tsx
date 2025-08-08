@@ -2,7 +2,7 @@ import { SalesRecordTable } from "@/components/accounting/sales-record-table"
 
 export default function Page() {
   return (
-    <div className="min-h-screen w-auto bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen overflow-x-auto bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto px-2 py-6 max-w-7xl">
         {/* Header Section */}
         <div className="mb-8">
