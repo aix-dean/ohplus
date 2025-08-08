@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, X } from 'lucide-react';
+import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface CreateRequestFormData {
@@ -59,6 +60,7 @@ export default function CreateRequestPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
   const [formData, setFormData] = useState<CreateRequestFormData>({
     request_type: 'reimbursement',
     'Request No.': '',
@@ -85,10 +87,29 @@ export default function CreateRequestPage() {
     setFormData(prev => ({ ...prev, [field]: file }));
   };
 
-  const uploadFile = async (file: File): Promise<string> => {
-    // In a real implementation, you would upload to Firebase Storage
-    // For now, we'll return a placeholder URL
-    return `https://example.com/uploads/${file.name}`;
+  const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+    try {
+      setUploadingFiles(prev => [...prev, file.name]);
+      
+      // Create a unique filename with timestamp
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${file.name}`;
+      const storageRef = ref(storage, `${path}/${fileName}`);
+      
+      // Upload file
+      const snapshot = await uploadBytes(storageRef, file);
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      setUploadingFiles(prev => prev.filter(name => name !== file.name));
+      
+      return downloadURL;
+    } catch (error) {
+      setUploadingFiles(prev => prev.filter(name => name !== file.name));
+      console.error('Error uploading file:', error);
+      throw new Error(`Failed to upload ${file.name}`);
+    }
   };
 
   const generateRequestNumber = (): number => {
@@ -122,11 +143,37 @@ export default function CreateRequestPage() {
       let quotationUrl = '';
 
       if (formData.Attachments) {
-        attachmentsUrl = await uploadFile(formData.Attachments);
+        try {
+          attachmentsUrl = await uploadFileToStorage(
+            formData.Attachments, 
+            `finance-requests/${companyIdentifier}/attachments`
+          );
+        } catch (error) {
+          toast({
+            title: "Upload Error",
+            description: "Failed to upload attachment. Please try again.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       if (formData.Quotation) {
-        quotationUrl = await uploadFile(formData.Quotation);
+        try {
+          quotationUrl = await uploadFileToStorage(
+            formData.Quotation, 
+            `finance-requests/${companyIdentifier}/quotations`
+          );
+        } catch (error) {
+          toast({
+            title: "Upload Error",
+            description: "Failed to upload quotation. Please try again.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // Prepare the document data
@@ -185,6 +232,8 @@ export default function CreateRequestPage() {
       setIsSubmitting(false);
     }
   };
+
+  const isUploading = uploadingFiles.length > 0;
 
   return (
     <div className="space-y-6">
@@ -349,9 +398,10 @@ export default function CreateRequestPage() {
                 <Input
                   id="attachments"
                   type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.webm"
                   onChange={(e) => handleFileChange('Attachments', e.target.files?.[0] || null)}
                   className="flex-1"
+                  disabled={isUploading}
                 />
                 {formData.Attachments && (
                   <Button
@@ -359,16 +409,23 @@ export default function CreateRequestPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleFileChange('Attachments', null)}
+                    disabled={isUploading}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 )}
               </div>
               {formData.Attachments && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {formData.Attachments.name}
-                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {uploadingFiles.includes(formData.Attachments.name) && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  <span>Selected: {formData.Attachments.name}</span>
+                </div>
               )}
+              <p className="text-sm text-muted-foreground">
+                Supported formats: PDF, DOC, DOCX, JPG, PNG, MP4, WEBM (Max 10MB)
+              </p>
             </div>
 
             {/* Conditional Fields */}
@@ -457,6 +514,7 @@ export default function CreateRequestPage() {
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                         onChange={(e) => handleFileChange('Quotation', e.target.files?.[0] || null)}
                         className="flex-1"
+                        disabled={isUploading}
                       />
                       {formData.Quotation && (
                         <Button
@@ -464,16 +522,39 @@ export default function CreateRequestPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleFileChange('Quotation', null)}
+                          disabled={isUploading}
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                     {formData.Quotation && (
-                      <p className="text-sm text-muted-foreground">
-                        Selected: {formData.Quotation.name}
-                      </p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        {uploadingFiles.includes(formData.Quotation.name) && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        <span>Selected: {formData.Quotation.name}</span>
+                      </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Upload Progress */}
+            {isUploading && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Uploading files...</span>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {uploadingFiles.map((fileName) => (
+                      <div key={fileName} className="text-xs text-muted-foreground">
+                        • {fileName}
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -482,12 +563,19 @@ export default function CreateRequestPage() {
             {/* Form Actions */}
             <div className="flex justify-end gap-4 pt-6 border-t">
               <Link href="/finance/requests">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" disabled={isSubmitting || isUploading}>
                   Cancel
                 </Button>
               </Link>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating Request...' : 'Create Request'}
+              <Button type="submit" disabled={isSubmitting || isUploading}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Request...
+                  </>
+                ) : (
+                  'Create Request'
+                )}
               </Button>
             </div>
           </form>
