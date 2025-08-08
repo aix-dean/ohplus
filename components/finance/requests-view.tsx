@@ -24,18 +24,29 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, X, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
 type SortDirection = 'asc' | 'desc';
 type SortColumn =
   | 'requestNo'
+  | 'type'
   | 'requestedItem'
   | 'amount'
   | 'approvedBy'
-  | 'dateReleased'
+  | 'date'
+  | 'cashback'
+  | 'orNo'
+  | 'invoiceNo'
+  | 'quotation'
   | 'status';
+
+const STATUS_OPTIONS = ['All', 'Approved', 'Pending', 'Rejected', 'Processing'] as const;
+type StatusFilter = typeof STATUS_OPTIONS[number];
+
+const TYPE_OPTIONS = ['All', 'reimbursement', 'requisition'] as const;
+type TypeFilter = typeof TYPE_OPTIONS[number];
 
 const currencies = [
   { code: 'PHP', symbol: '₱' },
@@ -56,24 +67,21 @@ const currencies = [
   { code: 'VND', symbol: '₫' },
 ];
 
-const STATUS_OPTIONS = ['All', 'Approved', 'Pending', 'Rejected', 'Processing'] as const;
-type StatusFilter = typeof STATUS_OPTIONS[number];
-
 function getCurrencySymbol(code?: string) {
   if (!code) return '';
   const c = currencies.find((c) => c.code === code);
   return c?.symbol ?? '';
 }
 
-function formatAmount(amount: number, currencyCode: string) {
+function formatAmount(amount: number, currencyCode?: string) {
   const symbol = getCurrencySymbol(currencyCode) || '';
-  return `${symbol}${amount.toLocaleString('en-US', {
+  return `${symbol}${Number(amount || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
 }
 
-function getStatusBadgeVariant(status: string) {
+function getStatusBadgeVariant(status?: string) {
   switch (status?.toLowerCase?.()) {
     case 'approved':
       return 'default';
@@ -98,6 +106,7 @@ export default function RequestsView() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('All');
 
   // Sorting
   const [sortColumn, setSortColumn] = useState<SortColumn>('requestNo');
@@ -127,7 +136,7 @@ export default function RequestsView() {
           list.push({ id: docSnap.id, ...data } as FinanceRequest);
         });
 
-        // Default sort newest by "Request No." if available, else by created
+        // Default sort: Request No. desc if available, else created desc
         list.sort((a, b) => {
           const aNo = Number(a['Request No.'] ?? 0);
           const bNo = Number(b['Request No.'] ?? 0);
@@ -154,57 +163,79 @@ export default function RequestsView() {
     return () => unsubscribe();
   }, [user, userData, toast]);
 
-  // Helpers to extract values
-  const getDateReleasedMs = useCallback((r: FinanceRequest) => {
-    // Only reimbursement has 'Date Released'
-    // If missing, return 0 so it sorts last when ascending
-    // For display we will show '—'
-    // Firestore Timestamp has toDate()
-    // @ts-ignore - narrow at runtime
-    const ts = r['Date Released'];
+  // Helpers for date handling
+  const getRequestDateMs = useCallback((r: FinanceRequest) => {
+    // reimbursement -> 'Date Released'
+    // requisition   -> 'Date Requested'
+    const field =
+      r.request_type === 'reimbursement' ? 'Date Released' : 'Date Requested';
+    // @ts-ignore - dynamic field access
+    const ts = r[field];
     const d = ts?.toDate?.();
     return d ? d.getTime() : 0;
   }, []);
 
+  const getRequestDateLabel = (r: FinanceRequest) => {
+    return r.request_type === 'reimbursement' ? 'Released' : 'Requested';
+  };
+
+  // Filtering
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
     return requests.filter((r) => {
       // Status filter
       const status = (r.Actions || '').toString();
-      const statusMatch =
+      const matchesStatus =
         statusFilter === 'All' ? true : status.toLowerCase() === statusFilter.toLowerCase();
 
-      if (!q) return statusMatch;
+      // Type filter
+      const matchesType =
+        typeFilter === 'All' ? true : r.request_type === typeFilter;
 
-      // Search across the requested columns
+      if (!matchesStatus || !matchesType) return false;
+
+      if (!q) return true;
+
+      // Search across all schema fields you care about
       const requestNo = String(r['Request No.'] ?? '').toLowerCase();
+      const type = String(r.request_type ?? '').toLowerCase();
       const item = String(r['Requested Item'] ?? '').toLowerCase();
-      const approvedBy = String(r['Approved By'] ?? '').toLowerCase();
       const amountStr = String(r.Amount ?? '');
+      const approvedBy = String(r['Approved By'] ?? '').toLowerCase();
       const statusStr = String(r.Actions ?? '').toLowerCase();
-      const dateReleasedStr = (() => {
-        const ms = getDateReleasedMs(r);
+      const cashbackStr = String((r as any).Cashback ?? '');
+      const orNo = String((r as any)['O.R No.'] ?? '').toLowerCase();
+      const invoiceNo = String((r as any)['Invoice No.'] ?? '').toLowerCase();
+      const quotation = String((r as any).Quotation ?? '').toLowerCase();
+      const dateStr = (() => {
+        const ms = getRequestDateMs(r);
         return ms ? format(new Date(ms), 'MMM dd, yyyy').toLowerCase() : '';
       })();
 
       const haystack = [
         requestNo,
+        type,
         item,
-        approvedBy,
         amountStr,
+        approvedBy,
         statusStr,
-        dateReleasedStr,
+        cashbackStr,
+        orNo,
+        invoiceNo,
+        quotation,
+        dateStr,
       ];
 
-      return statusMatch && haystack.some((s) => s.includes(q));
+      return haystack.some((s) => s.includes(q));
     });
-  }, [requests, searchQuery, statusFilter, getDateReleasedMs]);
+  }, [requests, searchQuery, statusFilter, typeFilter, getRequestDateMs]);
 
+  // Sorting
   const sorted = useMemo(() => {
     const arr = [...filtered];
 
-    const compareStrings = (a?: string, b?: string) =>
+    const cmpStr = (a?: string, b?: string) =>
       (a ?? '').localeCompare(b ?? '', undefined, { sensitivity: 'base' });
 
     arr.sort((a, b) => {
@@ -217,8 +248,12 @@ export default function RequestsView() {
           res = aNo - bNo;
           break;
         }
+        case 'type': {
+          res = cmpStr(a.request_type, b.request_type);
+          break;
+        }
         case 'requestedItem': {
-          res = compareStrings(a['Requested Item'], b['Requested Item']);
+          res = cmpStr(a['Requested Item'], b['Requested Item']);
           break;
         }
         case 'amount': {
@@ -228,17 +263,35 @@ export default function RequestsView() {
           break;
         }
         case 'approvedBy': {
-          res = compareStrings(a['Approved By'], b['Approved By']);
+          res = cmpStr(a['Approved By'], b['Approved By']);
           break;
         }
-        case 'dateReleased': {
-          const aMs = getDateReleasedMs(a);
-          const bMs = getDateReleasedMs(b);
+        case 'date': {
+          const aMs = getRequestDateMs(a);
+          const bMs = getRequestDateMs(b);
           res = aMs - bMs;
           break;
         }
+        case 'cashback': {
+          const aVal = Number((a as any).Cashback ?? 0);
+          const bVal = Number((b as any).Cashback ?? 0);
+          res = aVal - bVal;
+          break;
+        }
+        case 'orNo': {
+          res = cmpStr((a as any)['O.R No.'], (b as any)['O.R No.']);
+          break;
+        }
+        case 'invoiceNo': {
+          res = cmpStr((a as any)['Invoice No.'], (b as any)['Invoice No.']);
+          break;
+        }
+        case 'quotation': {
+          res = cmpStr((a as any).Quotation, (b as any).Quotation);
+          break;
+        }
         case 'status': {
-          res = compareStrings(a.Actions, b.Actions);
+          res = cmpStr(a.Actions, b.Actions);
           break;
         }
         default:
@@ -249,15 +302,16 @@ export default function RequestsView() {
     });
 
     return arr;
-  }, [filtered, sortColumn, sortDirection, getDateReleasedMs]);
+  }, [filtered, sortColumn, sortDirection, getRequestDateMs]);
 
   const toggleSort = (col: SortColumn) => {
     if (sortColumn === col) {
       setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortColumn(col);
-      // Default direction per column
-      setSortDirection(col === 'requestNo' || col === 'amount' || col === 'dateReleased' ? 'desc' : 'asc');
+      // Sensible default sort direction per column
+      const defaultDescCols: SortColumn[] = ['requestNo', 'amount', 'date', 'cashback'];
+      setSortDirection(defaultDescCols.includes(col) ? 'desc' : 'asc');
     }
   };
 
@@ -265,6 +319,7 @@ export default function RequestsView() {
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('All');
+    setTypeFilter('All');
     setSortColumn('requestNo');
     setSortDirection('desc');
   };
@@ -312,7 +367,7 @@ export default function RequestsView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
-          <p className="text-muted-foreground">Spreadsheet view of requests</p>
+          <p className="text-muted-foreground">Spreadsheet view following your request schema</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={clearFilters}>Reset</Button>
@@ -320,14 +375,15 @@ export default function RequestsView() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col md:flex-row md:items-center gap-3">
-        <div className="relative md:max-w-md w-full">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="relative lg:max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by Request No., Item, Amount, Approved By, Status, or Date Released"
+            placeholder="Search by any field (Request No., Item, Amount, Approved By, Status, OR/Invoice, etc.)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 pr-10"
+            aria-label="Search requests"
           />
           {searchQuery && (
             <Button
@@ -345,13 +401,29 @@ export default function RequestsView() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Status</span>
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[170px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((s) => (
                 <SelectItem key={s} value={s}>
                   {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Type</span>
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPE_OPTIONS.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -369,7 +441,7 @@ export default function RequestsView() {
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-auto">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow className="sticky top-0 bg-background z-10">
                   <TableHead className="whitespace-nowrap">
@@ -383,6 +455,16 @@ export default function RequestsView() {
                     </button>
                   </TableHead>
                   <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('type')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'Type'}
+                      <SortIcon col="type" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap w-[320px]">
                     <button
                       type="button"
                       onClick={() => toggleSort('requestedItem')}
@@ -415,11 +497,51 @@ export default function RequestsView() {
                   <TableHead className="whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => toggleSort('dateReleased')}
+                      onClick={() => toggleSort('date')}
                       className="inline-flex items-center gap-1 font-medium"
                     >
-                      {'Date Released'}
-                      <SortIcon col="dateReleased" />
+                      {'Date'}
+                      <SortIcon col="date" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('cashback')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'Cashback'}
+                      <SortIcon col="cashback" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('orNo')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'O.R No.'}
+                      <SortIcon col="orNo" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('invoiceNo')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'Invoice No.'}
+                      <SortIcon col="invoiceNo" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('quotation')}
+                      className="inline-flex items-center gap-1 font-medium"
+                    >
+                      {'Quotation'}
+                      <SortIcon col="quotation" />
                     </button>
                   </TableHead>
                   <TableHead className="whitespace-nowrap">
@@ -436,28 +558,62 @@ export default function RequestsView() {
               </TableHeader>
               <TableBody>
                 {sorted.map((r) => {
-                  const dateMs = (() => {
-                    // @ts-ignore
-                    const ts = r['Date Released'];
-                    const d = ts?.toDate?.();
-                    return d ? d.getTime() : 0;
-                  })();
+                  const dateMs = getRequestDateMs(r);
                   const dateStr = dateMs ? format(new Date(dateMs), 'MMM dd, yyyy') : '—';
+                  const dateBadge = getRequestDateLabel(r); // Released / Requested
+
+                  const cashback = (r as any).Cashback;
+                  const orNo = (r as any)['O.R No.'];
+                  const invoiceNo = (r as any)['Invoice No.'];
+                  const quotation = (r as any).Quotation as string | undefined;
 
                   return (
                     <TableRow key={r.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium tabular-nums">
                         #{r['Request No.'] ?? '—'}
                       </TableCell>
-                      <TableCell className="max-w-[320px] truncate">
+                      <TableCell className="capitalize">
+                        {r.request_type ?? '—'}
+                      </TableCell>
+                      <TableCell className="max-w-[360px] truncate">
                         {r['Requested Item'] ?? '—'}
                       </TableCell>
                       <TableCell className="font-medium tabular-nums">
                         {formatAmount(Number(r.Amount ?? 0), r.Currency ?? 'PHP')}
                       </TableCell>
                       <TableCell>{r['Approved By'] || '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {dateStr}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{dateStr}</span>
+                          {dateMs ? (
+                            <Badge variant="outline" className="text-xs">
+                              {dateBadge}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {typeof cashback === 'number' ? cashback : '—'}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {orNo || '—'}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {invoiceNo || '—'}
+                      </TableCell>
+                      <TableCell>
+                        {quotation ? (
+                          <a
+                            href={quotation}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            View <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : (
+                          '—'
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(r.Actions)}>{r.Actions || '—'}</Badge>
@@ -467,7 +623,7 @@ export default function RequestsView() {
                 })}
                 {sorted.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
                       No requests found. Adjust filters or search terms.
                     </TableCell>
                   </TableRow>
