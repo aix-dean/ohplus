@@ -189,6 +189,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-accounting-purple",
       contentBgColor: "bg-card-content-accounting",
       members: [],
+      href: "/accounting/dashboard",
       isAvailable: true,
     },
     {
