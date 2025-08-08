@@ -170,7 +170,7 @@ export function TopNavigation() {
       ></div>
 
       <div className="top-nav-container text-white relative z-10 overflow-hidden">
-        <div className="top-nav-content">
+        <div className="top-nav-content flex items-center justify-between w-full px-4 md:px-8">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
               <button
