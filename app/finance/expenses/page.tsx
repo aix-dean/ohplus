@@ -23,11 +23,6 @@ type ExpenseDoc = FinanceRequest & {
   expense_done_by?: string;
 };
 
-function isApproved(d: any): boolean {
-  const candidates = [d?.status, d?.approval_status, d?.approvalStatus, d?.request_status, d?.finance_status];
-  return candidates.some((v: any) => typeof v === 'string' && v.toLowerCase() === 'approved');
-}
-
 const currencyMap: Record<string, string> = {
   PHP: '₱',
   USD: '$',
@@ -83,7 +78,8 @@ export default function ExpensesPage() {
     const q = query(
       collection(db, 'request'),
       where('company_id', '==', companyIdentifier),
-      where('deleted', '==', false)
+      where('deleted', '==', false),
+      where('Actions', '==', 'Approved') // NEW: only approved
     );
 
     const unsub = onSnapshot(
@@ -92,11 +88,8 @@ export default function ExpensesPage() {
         const data: ExpenseDoc[] = [];
         snap.forEach((d) => {
           const docData = d.data() as ExpenseDoc;
-          // Only keep reimbursement/requisition that are Approved
-          if (
-            (docData.request_type === 'reimbursement' || docData.request_type === 'requisition') &&
-            isApproved(docData)
-          ) {
+          // Only keep reimbursement/requisition
+          if (docData.request_type === 'reimbursement' || docData.request_type === 'requisition') {
             data.push({ id: d.id, ...docData } as ExpenseDoc);
           }
         });
@@ -136,8 +129,10 @@ export default function ExpensesPage() {
       const itemName = it['Requested Item']?.toLowerCase?.() ?? '';
       const amount = it.Amount?.toString?.() ?? '';
       const status = (it.expense_done ? 'done' : 'pending');
-      const dateStr = it.created?.toDate?.() ? format(it.created.toDate(), 'MMM dd, yyyy').toLowerCase() : '';
       const currency = (it.Currency || '').toLowerCase();
+      const approvedBy = (it as any)['Approved By'] ? String((it as any)['Approved By']).toLowerCase() : '';
+      const dateObj = getDisplayDate(it);
+      const dateStr = dateObj ? format(dateObj, 'MMM dd, yyyy').toLowerCase() : '';
 
       return (
         requestNo.includes(q) ||
@@ -147,7 +142,8 @@ export default function ExpensesPage() {
         amount.includes(q) ||
         currency.includes(q) ||
         status.includes(q) ||
-        dateStr.includes(q)
+        dateStr.includes(q) ||
+        approvedBy.includes(q)
       );
     });
   }, [items, search]);
@@ -185,6 +181,14 @@ export default function ExpensesPage() {
     },
     [toast, user?.uid]
   );
+
+  function getDisplayDate(r: ExpenseDoc): Date | null {
+    const dateRequested = (r as any)['Date Requested'];
+    const dateReleased = (r as any)['Date Released'];
+    const ts = dateRequested || dateReleased || r.created;
+    if (ts?.toDate) return ts.toDate();
+    return null;
+  }
 
   const renderTable = (rows: ExpenseDoc[]) => {
     if (rows.length === 0) {
@@ -241,7 +245,10 @@ export default function ExpensesPage() {
                 <TableCell>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    {r.created?.toDate?.() ? format(r.created.toDate(), 'MMM dd, yyyy') : '—'}
+                    {(() => {
+                      const dateObj = getDisplayDate(r);
+                      return dateObj ? format(dateObj, 'MMM dd, yyyy') : '—';
+                    })()}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -325,7 +332,7 @@ export default function ExpensesPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Expenses</h2>
           <p className="text-muted-foreground">
-            Approved expenses from reimbursement and requisition modules (only Approved status is shown)
+            Ongoing and history of approved expenses from reimbursement and requisition modules
           </p>
         </div>
         <Link href="/finance/requests/create">
