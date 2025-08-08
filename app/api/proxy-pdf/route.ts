@@ -6,57 +6,96 @@ const ALLOWED_HOSTS = new Set([
   'storage.googleapis.com',
 ])
 
+function isHttpUrl(u: string): boolean {
+  try {
+    const url = new URL(u)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function isGsUrl(u: string): boolean {
+  try {
+    const url = new URL(u)
+    return url.protocol === 'gs:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Convert a gs:// URL or a plain storage path into a canonical Firebase download URL.
+ * Note: If your object requires a token, the bare alt=media URL may be 403.
+ * In that case, pass a full download URL from getDownloadURL instead.
+ */
+function buildFirebaseDownloadUrlFromPathOrGs(input: string): string {
+  // If gs://bucket/path...
+  if (isGsUrl(input)) {
+    const u = new URL(input)
+    const bucket = u.host
+    const path = u.pathname.replace(/^\/+/, '')
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media`
+  }
+
+  // Otherwise treat as a relative path and use configured bucket
+  const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+  if (!bucket) throw new Error('Missing NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET')
+  const path = input.replace(/^\/+/, '')
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media`
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const url = req.nextUrl.searchParams.get('url')
-    if (!url) {
+    const rawParam = req.nextUrl.searchParams.get('url') || ''
+    if (!rawParam) {
       return new Response('Missing url parameter', { status: 400 })
     }
 
-    let parsed: URL
-    try {
-      parsed = new URL(url)
-    } catch {
-      return new Response('Invalid url', { status: 400 })
+    const decoded = decodeURIComponent(rawParam)
+
+    let targetUrl = decoded
+
+    if (isHttpUrl(decoded)) {
+      const u = new URL(decoded)
+      if (!ALLOWED_HOSTS.has(u.host)) {
+        return new Response('Host not allowed', { status: 400 })
+      }
+      targetUrl = decoded
+    } else {
+      // Accept gs://... or plain storage paths and build a canonical download URL
+      targetUrl = buildFirebaseDownloadUrlFromPathOrGs(decoded)
     }
 
-    if (!ALLOWED_HOSTS.has(parsed.host)) {
-      return new Response('Host not allowed', { status: 400 })
-    }
-
-    // Fetch the remote PDF on the server so we control the response headers.
-    const upstream = await fetch(parsed.toString(), {
-      // Ensure PDF preferred
+    const upstream = await fetch(targetUrl, {
       headers: { Accept: 'application/pdf,*/*' },
       cache: 'no-store',
+      redirect: 'follow',
     })
 
     if (!upstream.ok || !upstream.body) {
-      return new Response('Failed to fetch PDF', { status: upstream.status })
+      // Pass through the actual status for easier debugging
+      return new Response(`Failed to fetch PDF (${upstream.status})`, { status: upstream.status })
     }
 
-    // Suggest a filename based on the path
-    const filename = decodeURIComponent(parsed.pathname.split('/').pop() || 'file.pdf')
+    // Derive filename
+    const parsed = new URL(targetUrl)
+    const last = decodeURIComponent(parsed.pathname.split('/').pop() || 'file.pdf')
+    const guess = last.includes('.pdf') ? last : `${last}.pdf`
 
-    // Stream the body back with inline-friendly headers.
     return new Response(upstream.body, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        // Force inline rendering in the browser
-        'Content-Disposition': `inline; filename="${filename}"`,
-        // Allow embedding by removing restrictive frame-ancestors/x-frame-options
-        // (Do not set X-Frame-Options or frame-ancestors here)
-        // Allow cross-origin resource policy to display when framed
+        'Content-Disposition': `inline; filename="${guess}"`,
         'Cross-Origin-Resource-Policy': 'cross-origin',
-        // CORS for safety if accessed directly
         'Access-Control-Allow-Origin': '*',
-        // Basic caching (tweak as desired)
         'Cache-Control': 'public, max-age=300, must-revalidate',
       },
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('proxy-pdf error', err)
-    return new Response('Internal error', { status: 500 })
+    const message = typeof err?.message === 'string' ? err.message : 'Internal error'
+    return new Response(message, { status: 500 })
   }
 }

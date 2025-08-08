@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PdfViewer } from '@/components/finance/pdf-viewer'; // Import the new component
+import { PdfViewer } from '@/components/finance/pdf-viewer';
 
 import {
   AlertCircle,
@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
+import { getDownloadUrlForPath } from '@/lib/firebase-storage';
 
 type AttachmentType = 'image' | 'video' | 'pdf' | 'document';
 type Attachment = {
@@ -107,7 +108,7 @@ const formatAmount = (amount: number, currencyCode: string) => {
 };
 
 const getFileType = (url: string): AttachmentType => {
-  const clean = url.split('?')[0] || '';
+  const clean = (url || '').split('?')[0] || '';
   const extension = clean.split('.').pop()?.toLowerCase() || '';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
   if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v'].includes(extension)) return 'video';
@@ -115,12 +116,12 @@ const getFileType = (url: string): AttachmentType => {
   return 'document';
 };
 
-const getFileName = (url: string) => {
+const getFileName = (urlOrPath: string) => {
   try {
-    const u = new URL(url);
+    const u = new URL(urlOrPath);
     return decodeURIComponent(u.pathname.split('/').pop() || 'attachment');
   } catch {
-    const clean = url.split('?')[0];
+    const clean = urlOrPath.split('?')[0];
     return decodeURIComponent(clean.split('/').pop() || 'attachment');
   }
 };
@@ -191,9 +192,10 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
-        const all: Attachment[] = [];
+        // Build raw attachment entries (could be storage paths, gs://, or full URLs)
+        const raw: Attachment[] = [];
         if (req.Attachments) {
-          all.push({
+          raw.push({
             url: req.Attachments,
             name: getFileName(req.Attachments),
             type: getFileType(req.Attachments),
@@ -201,14 +203,28 @@ export default function RequestDetailsPage() {
           });
         }
         if (req.request_type === 'requisition' && req.Quotation) {
-          all.push({
+          raw.push({
             url: req.Quotation,
             name: getFileName(req.Quotation),
             type: getFileType(req.Quotation),
             field: 'Quotation',
           });
         }
-        setAttachments(all);
+
+        // Resolve each raw url to a downloadable HTTPS URL (adds token if required)
+        const resolved = await Promise.all(
+          raw.map(async (att) => {
+            try {
+              const resolvedUrl = await getDownloadUrlForPath(att.url);
+              return { ...att, url: resolvedUrl };
+            } catch (e) {
+              console.warn('Failed to resolve storage URL, keeping original', att.url, e);
+              return att; // keep original, user can still try "Download"
+            }
+          })
+        );
+
+        setAttachments(resolved);
       } catch (e) {
         console.error(e);
         toast({
@@ -250,7 +266,7 @@ export default function RequestDetailsPage() {
     a.download = att.name;
     a.target = '_blank';
     document.body.appendChild(a);
-a.click();
+    a.click();
     document.body.removeChild(a);
   };
 
@@ -536,7 +552,6 @@ a.click();
                 ))}
               </div>
 
-              {/* NEW: Render the PdfViewer component when a PDF is selected */}
               {pdfPreview && (
                 <PdfViewer
                   url={pdfPreview.url}
@@ -545,7 +560,6 @@ a.click();
                 />
               )}
 
-              {/* Inline Image/Video Gallery Viewer */}
               {galleryOpen && galleryItems.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

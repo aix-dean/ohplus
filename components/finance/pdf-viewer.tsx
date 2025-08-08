@@ -30,7 +30,6 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   const handleDownload = () => {
     try {
       const a = document.createElement('a')
-      // Use the proxy so headers force inline/download correctly
       a.href = `/api/proxy-pdf?url=${encodeURIComponent(url)}`
       a.download = fileName
       a.target = '_blank'
