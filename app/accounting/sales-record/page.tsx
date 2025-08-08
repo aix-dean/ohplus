@@ -10,7 +10,9 @@ export default function Page() {
       </div>
 
       <div className="space-y-4">
+      <div className="w-full overflow-x-auto">
         <SalesRecordTable />
+      </div>
 
         <Card>
           <CardContent className="pt-4 text-sm text-muted-foreground">
