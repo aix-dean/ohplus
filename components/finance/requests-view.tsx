@@ -85,6 +85,8 @@ const statusOptions = [
   { value: 'Approved', label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
   { value: 'Rejected', label: 'Rejected', icon: X, color: 'text-red-600' },
   { value: 'Processing', label: 'Processing', icon: AlertCircle, color: 'text-blue-600' },
+  { value: 'Accept', label: 'Accept', icon: CheckCircle, color: 'text-green-600' },
+  { value: 'Decline', label: 'Decline', icon: X, color: 'text-red-600' },
 ] as const;
 
 type SortDir = 'asc' | 'desc';
@@ -106,7 +108,9 @@ function getStatusBadgeVariant(status?: string) {
 }
 
 function getRequestTypeBadgeVariant(type?: string) {
-  return type === 'reimbursement' ? 'outline' : 'secondary';
+  if (type === 'reimbursement') return 'outline';
+  if (type === 'replenish') return 'default';
+  return 'secondary';
 }
 
 export default function RequestsView() {
@@ -184,6 +188,7 @@ export default function RequestsView() {
       const requestType = String((r as any).request_type ?? '').toLowerCase();
       const requestor = String((r as any).Requestor ?? '').toLowerCase();
       const requestedItem = String((r as any)['Requested Item'] ?? '').toLowerCase();
+      const particulars = String((r as any).Particulars ?? '').toLowerCase();
       const amount = String((r as any).Amount ?? '');
       const currency = String((r as any).Currency ?? 'PHP').toLowerCase();
       const approvedBy = String((r as any)['Approved By'] ?? '').toLowerCase();
@@ -208,6 +213,7 @@ export default function RequestsView() {
         requestType,
         requestor,
         requestedItem,
+        particulars,
         amount,
         currency,
         approvedBy,
@@ -523,11 +529,18 @@ export default function RequestsView() {
                       </TableCell>
 
                       <TableCell className="max-w-[280px] truncate">
-                        {(request as any)['Requested Item']}
+                        {(request as any).request_type === 'replenish'
+                          ? (request as any).Particulars || (request as any)['Requested Item']
+                          : (request as any)['Requested Item']}
                       </TableCell>
 
                       <TableCell className="font-medium tabular-nums">
-                        {formatAmount((request as any).Amount, (request as any).Currency || 'PHP')}
+                        {formatAmount(
+                          (request as any).request_type === 'replenish'
+                            ? ((request as any)['Total Amount'] ?? (request as any).Amount)
+                            : (request as any).Amount,
+                          (request as any).Currency || 'PHP'
+                        )}
                       </TableCell>
 
                       <TableCell>

@@ -43,7 +43,7 @@ type Attachment = {
   url: string;
   name: string;
   type: AttachmentType;
-  field: 'Attachments' | 'Quotation';
+  field: 'Attachments' | 'Quotation' | 'Send Report' | 'Print Report';
 };
 
 const currencies = [
@@ -209,6 +209,26 @@ export default function RequestDetailsPage() {
             type: getFileType(req.Quotation),
             field: 'Quotation',
           });
+        }
+        if (req.request_type === 'replenish') {
+          if ((req as any)['Send Report']) {
+            const url = (req as any)['Send Report'];
+            all.push({
+              url,
+              name: getFileName(url),
+              type: getFileType(url),
+              field: 'Send Report',
+            });
+          }
+          if ((req as any)['Print Report']) {
+            const url = (req as any)['Print Report'];
+            all.push({
+              url,
+              name: getFileName(url),
+              type: getFileType(url),
+              field: 'Print Report',
+            });
+          }
         }
         setAttachments(all);
       } catch (e) {
@@ -487,6 +507,48 @@ export default function RequestDetailsPage() {
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
                       {request['Date Requested'] ? format(request['Date Requested'].toDate(), 'MMM dd, yyyy') : 'Not specified'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+            {request.request_type === 'replenish' && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Particulars</span>
+                  <span className="font-medium max-w-[60%] text-right">{(request as any).Particulars}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Amount</span>
+                  <span className="font-medium">{formatAmount(request.Amount, request.Currency || 'PHP')}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
+                  <span className="font-medium">
+                    {formatAmount((request as any)['Total Amount'] || 0, request.Currency || 'PHP')}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Voucher No.</span>
+                  <span className="font-medium">{(request as any)['Voucher No.'] || 'Not specified'}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Management Approval</span>
+                  <span className="font-medium">{(request as any)['Management Approval'] || 'Pending'}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Date Requested</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {(request as any)['Date Requested']
+                        ? format((request as any)['Date Requested'].toDate(), 'MMM dd, yyyy')
+                        : 'Not specified'}
                     </span>
                   </div>
                 </div>
