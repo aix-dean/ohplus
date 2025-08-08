@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, MoreHorizontal, Plus, Search, Trash2, User, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, MoreHorizontal, Plus, Search, Trash2, User, X, FileText } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
@@ -90,6 +90,23 @@ const statusOptions = [
   { value: 'Accept', label: 'Accept', icon: CheckCircle, color: 'text-green-600' },
   { value: 'Decline', label: 'Decline', icon: X, color: 'text-red-600' },
 ] as const;
+
+const getTypeStatusValues = (type?: string): string[] => {
+  switch ((type || '').toLowerCase()) {
+    case 'reimbursement':
+      return ['Accept', 'Decline'];
+    case 'requisition':
+      return ['Approved', 'Decline'];
+    case 'replenish':
+      return ['Approved', 'Pending'];
+    default:
+      // fallback to existing generic statuses if an unknown type appears
+      return ['Pending', 'Approved', 'Rejected', 'Processing'];
+  }
+};
+
+const getStatusOptionByValue = (value: string) =>
+  statusOptions.find((s) => s.value.toLowerCase() === value.toLowerCase());
 
 type SortDir = 'asc' | 'desc';
 type SortCol = 'requestNo' | 'type' | 'requestor' | 'item' | 'amount' | 'status' | 'date';
@@ -376,6 +393,19 @@ export default function RequestsView() {
     }
   };
 
+  const openReplenishFile = (request: any, key: 'Send Report' | 'Print Report') => {
+    const url = request?.[key];
+    if (url) {
+      // open in a new tab
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      toast({
+        title: 'No file found',
+        description: `${key} file is not attached to this request.`,
+      });
+    }
+  };
+
   const clearSearch = () => setSearchQuery('');
 
   // Table renderer to keep UI consistent across tabs
@@ -550,25 +580,40 @@ export default function RequestsView() {
                             Edit Request
                           </DropdownMenuItem>
 
+                          {/* Replenish-specific quick actions */}
+                          {request.request_type === 'replenish' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Replenish</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => openReplenishFile(request, 'Send Report')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Send Report
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openReplenishFile(request, 'Print Report')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Print Report
+                              </DropdownMenuItem>
+                            </>
+                          )}
+
                           <DropdownMenuSeparator />
                           <DropdownMenuLabel>Update Status</DropdownMenuLabel>
-
-                          {statusOptions.map((s) => {
-                            const Icon = s.icon;
-                            const isCurrent = request.Actions === s.value;
+                          {getTypeStatusValues(request.request_type).map((val) => {
+                            const opt = getStatusOptionByValue(val);
+                            if (!opt) return null;
+                            const Icon = opt.icon;
+                            const isCurrent = request.Actions === opt.value;
                             return (
                               <DropdownMenuItem
-                                key={s.value}
-                                onClick={() => handleUpdateStatus(request.id, s.value)}
+                                key={opt.value}
+                                onClick={() => handleUpdateStatus(request.id, opt.value)}
                                 disabled={isCurrent || updatingStatusId === request.id}
                                 className={isCurrent ? 'bg-muted' : ''}
                               >
-                                <Icon className={`mr-2 h-4 w-4 ${s.color}`} />
-                                {s.label}
+                                <Icon className={`mr-2 h-4 w-4 ${opt.color}`} />
+                                {opt.label}
                                 {isCurrent && (
-                                  <span className="ml-auto text-xs text-muted-foreground">
-                                    Current
-                                  </span>
+                                  <span className="ml-auto text-xs text-muted-foreground">Current</span>
                                 )}
                               </DropdownMenuItem>
                             );
