@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { PdfViewer } from '@/components/finance/pdf-viewer'; // Import the new component
 
 import {
   AlertCircle,
@@ -25,7 +26,7 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Image as ImageIcon,
+  ImageIcon,
   Play,
   Shrink,
   Expand,
@@ -33,10 +34,9 @@ import {
   X,
   XCircle,
   Clock,
-  File as FileGeneric,
+  File as FileGeneric
 } from 'lucide-react';
 
-import PdfWebView from '@/components/pdf-webview';
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
 type AttachmentType = 'image' | 'video' | 'pdf' | 'document';
@@ -159,7 +159,6 @@ export default function RequestDetailsPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // PDF preview data (now delegates to PdfWebView component)
   const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
 
   const requestId = params.id as string;
@@ -183,7 +182,6 @@ export default function RequestDetailsPage() {
 
         const data = docSnap.data() as any;
 
-        // Ownership and deletion checks preserved
         const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
         if (data.company_id !== companyIdentifier || data.deleted === true) {
           setNotFound(true);
@@ -193,7 +191,6 @@ export default function RequestDetailsPage() {
         const req = { id: docSnap.id, ...data } as FinanceRequest;
         setRequest(req);
 
-        // Build attachments list
         const all: Attachment[] = [];
         if (req.Attachments) {
           all.push({
@@ -228,7 +225,6 @@ export default function RequestDetailsPage() {
     fetchRequest();
   }, [requestId, user, userData, toast]);
 
-  // Keyboard navigation when gallery is open inline
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!galleryOpen || galleryItems.length === 0) return;
@@ -240,7 +236,6 @@ export default function RequestDetailsPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [galleryOpen, galleryItems.length]);
 
-  // Fullscreen listeners
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFs);
@@ -255,22 +250,27 @@ export default function RequestDetailsPage() {
     a.download = att.name;
     a.target = '_blank';
     document.body.appendChild(a);
-    a.click();
+a.click();
     document.body.removeChild(a);
   };
 
   const handleView = (att: Attachment) => {
+    // Close other viewers before opening a new one
+    setGalleryOpen(false);
+    setPdfPreview(null);
+
     if (att.type === 'image' || att.type === 'video') {
       const idx = galleryItems.findIndex((g) => g.url === att.url);
       setGalleryIndex(Math.max(0, idx));
       setGalleryOpen(true);
-      // Scroll into view
       setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else if (att.type === 'pdf') {
       setPdfPreview(att);
-      setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
     } else {
-      // Document types: no preview; download-only
+      toast({
+        title: 'Preview not available',
+        description: 'This file type can only be downloaded.',
+      });
     }
   };
 
@@ -501,13 +501,10 @@ export default function RequestDetailsPage() {
               <Download className="h-5 w-5" />
               Attachments ({attachments.length})
             </CardTitle>
-            <CardDescription>
-              Click "View" to preview images/videos/PDFs on the page, or "Download" to save locally
-            </CardDescription>
+            <CardDescription>Click "View" to preview files on the page, or "Download" to save locally</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Attachment list rows */}
               <div className="grid gap-4 md:grid-cols-2">
                 {attachments.map((att, idx) => (
                   <div key={`${att.url}-${idx}`} className="flex items-center justify-between p-4 border rounded-lg">
@@ -539,25 +536,24 @@ export default function RequestDetailsPage() {
                 ))}
               </div>
 
-              {/* Inline PDF WebView */}
+              {/* NEW: Render the PdfViewer component when a PDF is selected */}
               {pdfPreview && (
-                <div ref={viewerRef} className="space-y-4">
-                  <PdfWebView url={pdfPreview.url} name={pdfPreview.name} height={720} />
-                </div>
+                <PdfViewer
+                  url={pdfPreview.url}
+                  fileName={pdfPreview.name}
+                  onClose={() => setPdfPreview(null)}
+                />
               )}
 
               {/* Inline Image/Video Gallery Viewer */}
               {galleryOpen && galleryItems.length > 0 && (
-                <div ref={viewerRef} className="space-y-3">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground">
                         {galleryIndex + 1} / {galleryItems.length}
                       </span>
-                      <span
-                        className="font-medium truncate max-w-[60vw]"
-                        title={galleryItems[galleryIndex].name}
-                      >
+                      <span className="font-medium truncate max-w-[60vw]" title={galleryItems[galleryIndex].name}>
                         {galleryItems[galleryIndex].name}
                       </span>
                     </div>
@@ -574,15 +570,15 @@ export default function RequestDetailsPage() {
                   </div>
 
                   <div
+                    ref={viewerRef}
                     className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
                     style={{ minHeight: '360px' }}
                     aria-label="Media viewer"
                   >
-                    {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
                       {galleryItems[galleryIndex].type === 'image' ? (
                         <img
-                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'}
+                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'} 
                           alt={galleryItems[galleryIndex].name}
                           className="mx-auto max-h-[70vh] max-w-full object-contain"
                           crossOrigin="anonymous"
@@ -595,20 +591,24 @@ export default function RequestDetailsPage() {
                           controls
                           className="mx-auto max-h-[70vh] max-w-full"
                           src={galleryItems[galleryIndex].url}
+                          onError={() =>
+                            toast({
+                              title: 'Error',
+                              description: 'Unable to load video file.',
+                              variant: 'destructive',
+                            })
+                          }
                         />
                       )}
                     </div>
 
-                    {/* Navigation */}
                     {galleryItems.length > 1 && (
                       <>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
-                          onClick={() =>
-                            setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)
-                          }
+                          onClick={() => setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)}
                           aria-label="Previous"
                         >
                           <ChevronLeft className="h-7 w-7" />
@@ -625,6 +625,40 @@ export default function RequestDetailsPage() {
                       </>
                     )}
                   </div>
+
+                  {galleryItems.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pt-2">
+                      {galleryItems.map((item, idx) => (
+                        <button
+                          key={item.url}
+                          type="button"
+                          onClick={() => setGalleryIndex(idx)}
+                          className={`flex-shrink-0 rounded-md overflow-hidden border ${
+                            idx === galleryIndex ? 'ring-2 ring-foreground' : 'border-border'
+                          }`}
+                          title={item.name}
+                          aria-label={`Open ${item.name}`}
+                        >
+                          {item.type === 'image' ? (
+                            <img
+                              src={item.url || '/placeholder.svg?height=72&width=96&query=thumbnail'}
+                              alt={item.name}
+                              className="h-18 w-24 object-cover"
+                              crossOrigin="anonymous"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  '/placeholder.svg?height=72&width=96';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-18 w-24 bg-black/80 flex items-center justify-center text-white">
+                              <Play className="h-6 w-6" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
