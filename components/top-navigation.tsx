@@ -167,6 +167,7 @@ export function TopNavigation() {
       {/* Diagonal section - positioned to always be before the date area */}
       <div
         className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block`}
+        style={{ maxWidth: "100vw", overflow: "hidden" }}
       ></div>
 
       <div className="top-nav-container text-white relative z-10 overflow-hidden">
