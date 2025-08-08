@@ -5,7 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { db } from '@/lib/firebase';
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,7 +51,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, MoreHorizontal, Plus, Search, Trash2, User, X, FileText } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, FileText, MoreHorizontal, Plus, Search, Trash2, User, X } from 'lucide-react';
 
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
@@ -80,17 +89,17 @@ function formatAmount(amount: number, currencyCode?: string) {
   })}`;
 }
 
-// Status options (kept to preserve update functionality)
+// Status options registry (for icons/colors)
 const statusOptions = [
   { value: 'Pending', label: 'Pending', icon: Clock, color: 'text-yellow-600' },
   { value: 'Approved', label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
   { value: 'Rejected', label: 'Rejected', icon: X, color: 'text-red-600' },
   { value: 'Processing', label: 'Processing', icon: AlertCircle, color: 'text-blue-600' },
-  // Some modules specify Accept/Decline; keeping them here preserves functionality if used by data.
   { value: 'Accept', label: 'Accept', icon: CheckCircle, color: 'text-green-600' },
   { value: 'Decline', label: 'Decline', icon: X, color: 'text-red-600' },
 ] as const;
 
+// Make actions dependent on type (menu choices)
 const getTypeStatusValues = (type?: string): string[] => {
   switch ((type || '').toLowerCase()) {
     case 'reimbursement':
@@ -100,7 +109,6 @@ const getTypeStatusValues = (type?: string): string[] => {
     case 'replenish':
       return ['Approved', 'Pending'];
     default:
-      // fallback to existing generic statuses if an unknown type appears
       return ['Pending', 'Approved', 'Rejected', 'Processing'];
   }
 };
@@ -120,18 +128,12 @@ const tabLabels: Record<TabKey, string> = {
 };
 
 function getStatusBadgeVariant(status?: string) {
-  switch (status?.toLowerCase?.()) {
-    case 'approved':
-      return 'default';
-    case 'pending':
-      return 'secondary';
-    case 'rejected':
-      return 'destructive';
-    case 'processing':
-      return 'outline';
-    default:
-      return 'secondary';
-  }
+  const s = status?.toLowerCase?.() || '';
+  if (s === 'approved' || s === 'accept') return 'default';
+  if (s === 'pending') return 'secondary';
+  if (s === 'rejected' || s === 'decline') return 'destructive';
+  if (s === 'processing') return 'outline';
+  return 'secondary';
 }
 
 function getRequestTypeBadgeVariant(type?: string) {
@@ -354,16 +356,74 @@ export default function RequestsView() {
     return sortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
 
-  // Handlers (preserved)
+  // Minimal "notification" creator (ready for a future notifications UI)
+  async function notifyRequestor(request: any, kind: 'approved' | 'declined' | 'pending') {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        company_id: request.company_id,
+        request_id: request.id,
+        request_type: request.request_type,
+        requestor_name: request.Requestor,
+        kind, // 'approved' | 'declined' | 'pending'
+        message:
+          kind === 'approved'
+            ? `Your ${request.request_type} request #${request['Request No.']} was approved.`
+            : kind === 'declined'
+            ? `Your ${request.request_type} request #${request['Request No.']} was declined.`
+            : `Your ${request.request_type} request #${request['Request No.']} is pending management approval.`,
+        created: serverTimestamp(),
+        read: false,
+      });
+    } catch (e) {
+      console.error('Notification save failed:', e);
+    }
+  }
+
+  // Handlers (preserved, with type-aware mapping)
   const handleViewDetails = (requestId: string) => {
     router.push(`/finance/requests/details/${requestId}`);
   };
 
-  const handleUpdateStatus = async (requestId: string, newStatus: string) => {
+  const handleUpdateStatus = async (requestId: string, requestedStatus: string) => {
+    // Find the request to apply type-aware mapping and notifications
+    const req = requests.find((r: any) => r.id === requestId) as any;
+    const type = (req?.request_type || '').toLowerCase();
+
+    // Map "Accept" to "Approved" for reimbursement
+    let finalStatus = requestedStatus;
+    if (type === 'reimbursement') {
+      if (requestedStatus === 'Accept') finalStatus = 'Approved';
+      if (requestedStatus === 'Decline') finalStatus = 'Decline';
+    }
+
     setUpdatingStatusId(requestId);
     try {
-      await updateDoc(doc(db, 'request', requestId), { Actions: newStatus });
-      toast({ title: 'Success', description: `Request status updated to ${newStatus}.` });
+      const updates: any = { Actions: finalStatus };
+
+      // For replenish, also reflect in "Management Approval"
+      if (type === 'replenish' && (finalStatus === 'Approved' || finalStatus === 'Pending')) {
+        updates['Management Approval'] = finalStatus;
+      }
+
+      await updateDoc(doc(db, 'request', requestId), updates);
+
+      // Notifications per spec
+      if (type === 'replenish') {
+        if (finalStatus === 'Approved') await notifyRequestor(req, 'approved');
+        else if (finalStatus === 'Pending') await notifyRequestor(req, 'pending');
+      } else if (type === 'reimbursement' || type === 'requisition') {
+        if (finalStatus === 'Approved') {
+          // Approved items are visible in Expenses (same collection already consumed)
+          await notifyRequestor(req, 'approved');
+        } else if (finalStatus.toLowerCase() === 'decline') {
+          await notifyRequestor(req, 'declined');
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: `Request status updated to ${finalStatus}.`,
+      });
     } catch (error) {
       console.error('Error updating request status:', error);
       toast({
@@ -396,7 +456,6 @@ export default function RequestsView() {
   const openReplenishFile = (request: any, key: 'Send Report' | 'Print Report') => {
     const url = request?.[key];
     if (url) {
-      // open in a new tab
       window.open(url, '_blank', 'noopener,noreferrer');
     } else {
       toast({
@@ -412,19 +471,31 @@ export default function RequestsView() {
   const TableView = ({
     title,
     data,
+    addHref,
+    addLabel,
   }: {
     title: string;
     data: any[];
+    addHref: string;
+    addLabel: string;
   }) => (
     <Card>
-      <CardHeader>
-        <CardTitle>
-          {title}
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            ({data.length} of {activeTab === 'all' ? counts.all : counts[activeTab]} shown)
-          </span>
-        </CardTitle>
-        <CardDescription>View and manage your finance requests</CardDescription>
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle>
+            {title}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({data.length} of {activeTab === 'all' ? counts.all : counts[activeTab]} shown)
+            </span>
+          </CardTitle>
+          <CardDescription>View and manage your finance requests</CardDescription>
+        </div>
+        <Link href={addHref}>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            {addLabel}
+          </Button>
+        </Link>
       </CardHeader>
       <CardContent>
         <div className="relative w-full overflow-auto">
@@ -567,7 +638,7 @@ export default function RequestsView() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
                           <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
@@ -711,7 +782,7 @@ export default function RequestsView() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
           <p className="text-muted-foreground">
-            Manage your reimbursement and requisition requests
+            Manage your reimbursement, requisition, and replenish requests
           </p>
         </div>
         <Link href="/finance/requests/create">
@@ -762,13 +833,15 @@ export default function RequestsView() {
         </TabsList>
 
         <TabsContent value="all" className="mt-4">
-          <TableView title="All Requests" data={sorted} />
+          <TableView title="All Requests" data={sorted} addHref="/finance/requests/create" addLabel="Create Request" />
         </TabsContent>
 
         <TabsContent value="reimbursement" className="mt-4">
           <TableView
             title="Reimbursement Requests"
             data={sorted.filter((r: any) => r.request_type === 'reimbursement')}
+            addHref="/finance/requests/create?type=reimbursement"
+            addLabel="Add Reimbursement"
           />
         </TabsContent>
 
@@ -776,6 +849,8 @@ export default function RequestsView() {
           <TableView
             title="Requisition Requests"
             data={sorted.filter((r: any) => r.request_type === 'requisition')}
+            addHref="/finance/requests/create?type=requisition"
+            addLabel="Add Requisition"
           />
         </TabsContent>
 
@@ -783,6 +858,8 @@ export default function RequestsView() {
           <TableView
             title="Replenish Requests"
             data={sorted.filter((r: any) => r.request_type === 'replenish')}
+            addHref="/finance/requests/create?type=replenish"
+            addLabel="Add Replenish"
           />
         </TabsContent>
       </Tabs>
