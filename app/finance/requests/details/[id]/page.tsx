@@ -170,6 +170,14 @@ export default function RequestDetailsPage() {
     return ext === 'pdf' ? url : null;
   }, [request]);
 
+  useEffect(() => {
+    if (attachmentPdfUrl) {
+      console.log('[Requests Details] Using Attachments PDF URL:', attachmentPdfUrl);
+    } else {
+      console.log('[Requests Details] No PDF found in Attachments field or not a PDF.');
+    }
+  }, [attachmentPdfUrl]);
+
   const requestId = params.id as string;
 
   useEffect(() => {
@@ -707,7 +715,7 @@ export default function RequestDetailsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <StandardPdfViewer url={attachmentPdfUrl} title="Attachment PDF" />
+            <StandardPdfViewer url={attachmentPdfUrl} title="Attachment PDF" viewer="google" />
           </CardContent>
         </Card>
       )}

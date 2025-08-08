@@ -4,31 +4,41 @@ type StandardPdfViewerProps = {
   url: string;
   title?: string;
   height?: number;
+  viewer?: 'google' | 'native';
+  className?: string;
 };
 
 /**
- * Standard HTML PDF viewer that embeds a PDF via an <iframe>.
- * - Adds common PDF toolbar options.
- * - Provides "Open in new tab" and "Download" actions.
+ * Standard HTML PDF viewer.
+ * Defaults to Google Docs Viewer to prevent cross-origin frame blocking for raw PDF URLs.
+ * Provides "Open in new tab" and "Download" actions as fallbacks.
  */
 export default function StandardPdfViewer({
   url,
   title = 'PDF Document',
   height = 640,
+  viewer = 'google',
+  className,
 }: StandardPdfViewerProps) {
-  // Ensure toolbar and navigation controls are enabled in the native browser viewer
-  const src = url.includes('#')
+  const nativeSrc = url.includes('#')
     ? url
     : `${url}#toolbar=1&navpanes=1&scrollbar=1`;
 
+  const googleSrc = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(
+    url
+  )}`;
+
+  const src = viewer === 'google' ? googleSrc : nativeSrc;
+
   return (
-    <section aria-label="PDF viewer" className="w-full">
-      <div className="w-full rounded-md border overflow-hidden">
+    <section aria-label="PDF viewer" className={className}>
+      <div className="w-full rounded-md border overflow-hidden bg-background">
         <iframe
           src={src}
           title={title}
           className="w-full"
           style={{ height }}
+          frameBorder={0}
         />
       </div>
       <div className="mt-2 flex items-center justify-end gap-4">
