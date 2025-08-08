@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import PdfViewer from '@/components/pdf-viewer';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -542,23 +543,31 @@ export default function RequestDetailsPage() {
 
               {/* Inline PDF preview (unchanged behavior; shown only when chosen) */}
               {pdfPreview && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Preview: {pdfPreview.name}</h4>
-                    <Button variant="ghost" size="sm" onClick={() => setPdfPreview(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="h-96">
-                      <iframe
-                        src={`${pdfPreview.url}#toolbar=1&navpanes=1&scrollbar=1`}
-                        className="w-full h-full border-0"
-                        title={pdfPreview.name}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        PDF Preview
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <a href={pdfPreview.url} download={pdfPreview.name} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </a>
+                        <Button variant="outline" size="sm" onClick={() => setPdfPreview(null)}>
+                          <X className="h-4 w-4 mr-2" />
+                          Close
+                        </Button>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PdfViewer src={pdfPreview.url} filename={pdfPreview.name} height={600} />
+                  </CardContent>
+                </Card>
               )}
 
               {/* Inline Image/Video Gallery Viewer */}
