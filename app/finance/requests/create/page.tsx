@@ -122,43 +122,55 @@ export default function CreateRequestPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Derive the 'type' param as a stable primitive to avoid re-running effects on every render
+  const tParam = (searchParams.get('type') || '').toLowerCase();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
 
-  const [formData, setFormData] = useState<CreateRequestFormData>({
-    request_type: 'reimbursement',
-    'Request No.': '',
-    Requestor: user?.displayName || '',
-    'Requested Item': '',
-    Amount: '',
-    Currency: 'PHP',
-    'Approved By': '',
-    Attachments: null,
-    Actions: 'Pending',
+  // Initialize request_type from the URL once. This avoids setState loops from effects.
+  const [formData, setFormData] = useState<CreateRequestFormData>(() => {
+    const initialType: RequestType =
+      tParam === 'reimbursement' || tParam === 'requisition' || tParam === 'replenish'
+        ? (tParam as RequestType)
+        : 'reimbursement';
+    return {
+      request_type: initialType,
+      'Request No.': '',
+      Requestor: user?.displayName || '',
+      'Requested Item': '',
+      Amount: '',
+      Currency: 'PHP',
+      'Approved By': '',
+      Attachments: null,
+      Actions: 'Pending',
 
-    'Date Released': '',
+      'Date Released': '',
 
-    Cashback: '',
-    'O.R No.': '',
-    'Invoice No.': '',
-    Quotation: null,
-    'Date Requested': '',
+      Cashback: '',
+      'O.R No.': '',
+      'Invoice No.': '',
+      Quotation: null,
+      'Date Requested': '',
 
-    Particulars: '',
-    'Total Amount': '',
-    'Voucher No.': '',
-    'Management Approval': 'Pending',
-    'Send Report': null,
-    'Print Report': null,
+      Particulars: '',
+      'Total Amount': '',
+      'Voucher No.': '',
+      'Management Approval': 'Pending',
+      'Send Report': null,
+      'Print Report': null,
+    };
   });
 
-  // Preselect type from query (?type=reimbursement|requisition|replenish)
+  // If the 'type' query param changes while on the page, update request_type only when it actually differs.
   useEffect(() => {
-    const t = (searchParams.get('type') || '').toLowerCase();
-    if (t === 'reimbursement' || t === 'requisition' || t === 'replenish') {
-      setFormData((p) => ({ ...p, request_type: t as RequestType }));
+    if (tParam === 'reimbursement' || tParam === 'requisition' || tParam === 'replenish') {
+      setFormData((p) =>
+        p.request_type === tParam ? p : { ...p, request_type: tParam as RequestType }
+      );
     }
-  }, [searchParams]);
+    // Depend only on the primitive string, not the searchParams object reference.
+  }, [tParam]);
 
   const handleText =
     (field: keyof CreateRequestFormData) =>
@@ -421,7 +433,9 @@ export default function CreateRequestPage() {
                   value={formData['Request No.']}
                   onChange={handleText('Request No.')}
                 />
-                <p className="text-xs text-muted-foreground">Only numbers allowed. Leave blank to auto-generate.</p>
+                <p className="text-xs text-muted-foreground">
+                  Only numbers allowed. Leave blank to auto-generate.
+                </p>
               </div>
             </div>
 
