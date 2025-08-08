@@ -325,16 +325,16 @@ export function SalesRecordTable() {
 
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
-          <Table className="w-full"> {/* Added w-full here */}
+          <Table className="w-full">
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[5rem]">Month</TableHead>
                 <TableHead className="min-w-[5rem]">Date</TableHead>
                 <TableHead className="min-w-[8rem]">Service Invoice</TableHead>
                 <TableHead className="min-w-[8rem]">BS #</TableHead>
-                <TableHead>Clients</TableHead> {/* Removed min-w */}
-                <TableHead>TIN</TableHead> {/* Removed min-w */}
-                <TableHead>Description</TableHead> {/* Removed min-w */}
+                <TableHead>Clients</TableHead>
+                <TableHead>TIN</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead className="text-right min-w-[10rem]">Net Sales</TableHead>
                 <TableHead className="text-right min-w-[8rem]">Output VAT</TableHead>
                 <TableHead className="text-right min-w-[8rem]">Total</TableHead>
