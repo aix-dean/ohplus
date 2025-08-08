@@ -47,7 +47,8 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   }
 
   const handleOpenNewTab = () => {
-    window.open(`/api/proxy-pdf?url=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer')
+    // Open the original Attachments URL directly in a new tab
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const zoomIn = () => setZoom((z) => Math.min(z + 25, 400))
@@ -76,11 +77,11 @@ export function PdfViewer({ url, fileName, onClose }: PdfViewerProps) {
   return (
     <Card className="w-full my-6">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="truncate text-base font-medium" title={fileName}>
-          {fileName}
+        <CardTitle className="truncate text-xs sm:text-sm font-normal" title={url}>
+          {url}
         </CardTitle>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleOpenNewTab} title="Open in new tab">
+          <Button variant="outline" size="sm" onClick={handleOpenNewTab} title="Open original URL">
             <ExternalLink className="h-4 w-4 mr-2" />
             Open
           </Button>

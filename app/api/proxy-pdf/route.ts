@@ -73,9 +73,15 @@ export async function GET(req: NextRequest) {
       redirect: 'follow',
     })
 
-    if (!upstream.ok || !upstream.body) {
-      // Pass through the actual status for easier debugging
-      return new Response(`Failed to fetch PDF (${upstream.status})`, { status: upstream.status })
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => '')
+      return new Response(
+        `Upstream error ${upstream.status}${text ? `: ${text}` : ''}`,
+        { status: upstream.status }
+      )
+    }
+    if (!upstream.body) {
+      return new Response('Upstream did not return a body', { status: 502 })
     }
 
     // Derive filename
@@ -96,6 +102,6 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error('proxy-pdf error', err)
     const message = typeof err?.message === 'string' ? err.message : 'Internal error'
-    return new Response(message, { status: 500 })
+    return new Response(`Proxy error: ${message}`, { status: 500 })
   }
 }
