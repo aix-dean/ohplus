@@ -1,132 +1,175 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Eye, Edit, FileText, Calendar, User, Search, X, MoreHorizontal, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Calendar, CheckCircle, Clock, Edit, Eye, FileText, MoreHorizontal, Plus, Search, Trash2, User, X } from 'lucide-react';
+
 import type { FinanceRequest } from '@/lib/types/finance-request';
 
+// Currency helpers
 const currencies = [
-  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
-  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
-  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
-  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
-  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
-  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
-  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
-  { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
+  { code: 'PHP', symbol: '₱' },
+  { code: 'USD', symbol: '$' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'GBP', symbol: '£' },
+  { code: 'JPY', symbol: '¥' },
+  { code: 'AUD', symbol: 'A$' },
+  { code: 'CAD', symbol: 'C$' },
+  { code: 'CHF', symbol: 'CHF' },
+  { code: 'CNY', symbol: '¥' },
+  { code: 'SGD', symbol: 'S$' },
+  { code: 'HKD', symbol: 'HK$' },
+  { code: 'KRW', symbol: '₩' },
+  { code: 'THB', symbol: '฿' },
+  { code: 'MYR', symbol: 'RM' },
+  { code: 'IDR', symbol: 'Rp' },
+  { code: 'VND', symbol: '₫' },
 ];
 
+function getCurrencySymbol(currencyCode?: string) {
+  if (!currencyCode) return '';
+  const found = currencies.find((c) => c.code === currencyCode);
+  return found?.symbol ?? '';
+}
+
+function formatAmount(amount: number, currencyCode?: string) {
+  const sym = getCurrencySymbol(currencyCode || 'PHP');
+  return `${sym}${Number(amount || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+// Status options registry (for icons/colors)
 const statusOptions = [
   { value: 'Pending', label: 'Pending', icon: Clock, color: 'text-yellow-600' },
   { value: 'Approved', label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
-  { value: 'Rejected', label: 'Rejected', icon: XCircle, color: 'text-red-600' },
+  { value: 'Rejected', label: 'Rejected', icon: X, color: 'text-red-600' },
   { value: 'Processing', label: 'Processing', icon: AlertCircle, color: 'text-blue-600' },
-];
+  { value: 'Accept', label: 'Accept', icon: CheckCircle, color: 'text-green-600' },
+  { value: 'Decline', label: 'Decline', icon: X, color: 'text-red-600' },
+] as const;
+
+// Make actions dependent on type (menu choices)
+const getTypeStatusValues = (type?: string): string[] => {
+  switch ((type || '').toLowerCase()) {
+    case 'reimbursement':
+      return ['Accept', 'Decline'];
+    case 'requisition':
+      return ['Approved', 'Decline'];
+    case 'replenish':
+      return ['Approved', 'Pending'];
+    default:
+      return ['Pending', 'Approved', 'Rejected', 'Processing'];
+  }
+};
+
+const getStatusOptionByValue = (value: string) =>
+  statusOptions.find((s) => s.value.toLowerCase() === value.toLowerCase());
+
+type SortDir = 'asc' | 'desc';
+type SortCol = 'requestNo' | 'type' | 'requestor' | 'item' | 'amount' | 'status' | 'date';
+type TabKey = 'all' | 'reimbursement' | 'requisition' | 'replenish';
+
+const tabLabels: Record<TabKey, string> = {
+  all: 'All',
+  reimbursement: 'Reimbursement',
+  requisition: 'Requisition',
+  replenish: 'Replenish',
+};
+
+function getStatusBadgeVariant(status?: string) {
+  const s = status?.toLowerCase?.() || '';
+  if (s === 'approved' || s === 'accept') return 'default';
+  if (s === 'pending') return 'secondary';
+  if (s === 'rejected' || s === 'decline') return 'destructive';
+  if (s === 'processing') return 'outline';
+  return 'secondary';
+}
+
+function getRequestTypeBadgeVariant(type?: string) {
+  if (type === 'reimbursement') return 'outline';
+  if (type === 'replenish') return 'default';
+  return 'secondary';
+}
 
 export default function RequestsView() {
   const router = useRouter();
   const { user, userData } = useAuth();
   const { toast } = useToast();
+
   const [requests, setRequests] = useState<FinanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Actions state
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+
+  // Search and sort state
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortCol, setSortCol] = useState<SortCol>('requestNo');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const getCurrencySymbol = (currencyCode: string) => {
-    const currency = currencies.find(c => c.code === currencyCode);
-    return currency?.symbol || currencyCode;
-  };
+  // Tabs state
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
 
-  const formatAmount = (amount: number, currencyCode: string) => {
-    const symbol = getCurrencySymbol(currencyCode);
-    return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  // Comprehensive search function that searches across all relevant fields
-  const filteredRequests = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return requests;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    
-    return requests.filter((request) => {
-      // Search in basic fields
-      const requestNo = request['Request No.'].toString().toLowerCase();
-      const requestType = request.request_type.toLowerCase();
-      const requestor = request.Requestor.toLowerCase();
-      const requestedItem = request['Requested Item'].toLowerCase();
-      const amount = request.Amount.toString();
-      const currency = (request.Currency || 'PHP').toLowerCase();
-      const approvedBy = (request['Approved By'] || '').toLowerCase();
-      const status = request.Actions.toLowerCase();
-      
-      // Search in date fields
-      const createdDate = request.created ? format(request.created.toDate(), 'MMM dd, yyyy').toLowerCase() : '';
-      
-      // Search in type-specific fields
-      let typeSpecificMatch = false;
-      if (request.request_type === 'reimbursement') {
-        const dateReleased = request['Date Released'] ? format(request['Date Released'].toDate(), 'MMM dd, yyyy').toLowerCase() : '';
-        typeSpecificMatch = dateReleased.includes(query);
-      } else if (request.request_type === 'requisition') {
-        const cashback = (request.Cashback || 0).toString();
-        const orNo = (request['O.R No.'] || '').toLowerCase();
-        const invoiceNo = (request['Invoice No.'] || '').toLowerCase();
-        const dateRequested = request['Date Requested'] ? format(request['Date Requested'].toDate(), 'MMM dd, yyyy').toLowerCase() : '';
-        
-        typeSpecificMatch = cashback.includes(query) || 
-                           orNo.includes(query) || 
-                           invoiceNo.includes(query) || 
-                           dateRequested.includes(query);
-      }
-
-      // Check if query matches any field
-      return requestNo.includes(query) ||
-             requestType.includes(query) ||
-             requestor.includes(query) ||
-             requestedItem.includes(query) ||
-             amount.includes(query) ||
-             currency.includes(query) ||
-             approvedBy.includes(query) ||
-             status.includes(query) ||
-             createdDate.includes(query) ||
-             typeSpecificMatch;
-    });
-  }, [requests, searchQuery]);
-
+  // Fetch from Firestore (same constraints as before)
   useEffect(() => {
     const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
-    
+
     if (!companyIdentifier) {
-      console.log('No company identifier found');
       setLoading(false);
       return;
     }
-
-    console.log('Fetching requests for company:', companyIdentifier);
 
     const q = query(
       collection(db, 'request'),
@@ -134,61 +177,259 @@ export default function RequestsView() {
       where('deleted', '==', false)
     );
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const requestsData: FinanceRequest[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('Request data:', { id: doc.id, company_id: data.company_id, deleted: data.deleted });
-        requestsData.push({
-          id: doc.id,
-          ...data,
-        } as FinanceRequest);
-      });
-      
-      // Sort by creation date (newest first)
-      requestsData.sort((a, b) => {
-        const aTime = a.created?.toDate?.() || new Date(0);
-        const bTime = b.created?.toDate?.() || new Date(0);
-        return bTime.getTime() - aTime.getTime();
-      });
-      
-      console.log(`Found ${requestsData.length} requests`);
-      setRequests(requestsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching requests:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch requests. Please try again.",
-        variant: "destructive",
-      });
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (qs) => {
+        const list: FinanceRequest[] = [];
+        qs.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
 
-    return () => unsubscribe();
+        // initial ordering by created desc (fallback to Request No.)
+        list.sort((a, b) => {
+          const at = (a as any).created?.toDate?.()?.getTime?.() ?? 0;
+          const bt = (b as any).created?.toDate?.()?.getTime?.() ?? 0;
+          if (bt !== at) return bt - at;
+          const aNo = Number((a as any)['Request No.'] ?? 0);
+          const bNo = Number((b as any)['Request No.'] ?? 0);
+          return bNo - aNo;
+        });
+
+        setRequests(list);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching requests:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch requests. Please try again.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
   }, [user, userData, toast]);
 
+  // Derived counts for tabs
+  const counts = useMemo(() => {
+    const reimbursement = requests.filter((r: any) => r.request_type === 'reimbursement').length;
+    const requisition = requests.filter((r: any) => r.request_type === 'requisition').length;
+    const replenish = requests.filter((r: any) => r.request_type === 'replenish').length;
+    return {
+      all: requests.length,
+      reimbursement,
+      requisition,
+      replenish,
+    };
+  }, [requests]);
+
+  // Search across relevant fields
+  const searched = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return requests;
+
+    return requests.filter((r: any) => {
+      const requestNo = String(r['Request No.'] ?? '').toLowerCase();
+      const requestType = String(r.request_type ?? '').toLowerCase();
+      const requestor = String(r.Requestor ?? '').toLowerCase();
+      const requestedItem = String(r['Requested Item'] ?? '').toLowerCase();
+      const particulars = String(r.Particulars ?? '').toLowerCase();
+      const amount = String(r.Amount ?? '');
+      const totalAmount = String(r['Total Amount'] ?? '');
+      const currency = String(r.Currency ?? 'PHP').toLowerCase();
+      const approvedBy = String(r['Approved By'] ?? '').toLowerCase();
+      const status = String(r.Actions ?? '').toLowerCase();
+      const createdDate = r.created ? format(r.created.toDate(), 'MMM dd, yyyy').toLowerCase() : '';
+
+      // Type-specific fields searchable
+      const dateReleased = r['Date Released']
+        ? format(r['Date Released'].toDate(), 'MMM dd, yyyy').toLowerCase()
+        : '';
+      const cashback = String(r.Cashback ?? '');
+      const orNo = String(r['O.R No.'] ?? '').toLowerCase();
+      const invoiceNo = String(r['Invoice No.'] ?? '').toLowerCase();
+      const dateRequested = r['Date Requested']
+        ? format(r['Date Requested'].toDate(), 'MMM dd, yyyy').toLowerCase()
+        : '';
+      const voucherNo = String(r['Voucher No.'] ?? '').toLowerCase();
+      const mgmtApproval = String(r['Management Approval'] ?? '').toLowerCase();
+
+      const haystack = [
+        requestNo,
+        requestType,
+        requestor,
+        requestedItem,
+        particulars,
+        amount,
+        totalAmount,
+        currency,
+        approvedBy,
+        status,
+        createdDate,
+        dateReleased,
+        cashback,
+        orNo,
+        invoiceNo,
+        dateRequested,
+        voucherNo,
+        mgmtApproval,
+      ];
+
+      return haystack.some((s) => s.includes(q));
+    });
+  }, [requests, searchQuery]);
+
+  // Apply tab filter
+  const tabFiltered = useMemo(() => {
+    if (activeTab === 'all') return searched;
+    return searched.filter((r: any) => r.request_type === activeTab);
+  }, [searched, activeTab]);
+
+  // Sorting for spreadsheet headers
+  const sorted = useMemo(() => {
+    const arr = [...tabFiltered];
+
+    const cmpStr = (a?: string, b?: string) =>
+      (a ?? '').localeCompare(b ?? '', undefined, { sensitivity: 'base' });
+
+    arr.sort((a: any, b: any) => {
+      let res = 0;
+
+      switch (sortCol) {
+        case 'requestNo': {
+          const aNo = Number(a['Request No.'] ?? 0);
+          const bNo = Number(b['Request No.'] ?? 0);
+          res = aNo - bNo;
+          break;
+        }
+        case 'type': {
+          res = cmpStr(a.request_type, b.request_type);
+          break;
+        }
+        case 'requestor': {
+          res = cmpStr(a.Requestor, b.Requestor);
+          break;
+        }
+        case 'item': {
+          res = cmpStr(a['Requested Item'], b['Requested Item']);
+          break;
+        }
+        case 'amount': {
+          // For replenish, prefer Total Amount if present
+          const aAmt = Number((a['Total Amount'] ?? a.Amount) ?? 0);
+          const bAmt = Number((b['Total Amount'] ?? b.Amount) ?? 0);
+          res = aAmt - bAmt;
+          break;
+        }
+        case 'status': {
+          res = cmpStr(a.Actions, b.Actions);
+          break;
+        }
+        case 'date': {
+          const at = a.created?.toDate?.()?.getTime?.() ?? 0;
+          const bt = b.created?.toDate?.()?.getTime?.() ?? 0;
+          res = at - bt;
+          break;
+        }
+        default:
+          res = 0;
+      }
+
+      return sortDir === 'asc' ? res : -res;
+    });
+
+    return arr;
+  }, [tabFiltered, sortCol, sortDir]);
+
+  const toggleSort = (col: SortCol) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortCol(col);
+      // Default sensible directions
+      setSortDir(['requestNo', 'amount', 'date'].includes(col) ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: SortCol }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
+  // Minimal "notification" creator (ready for a future notifications UI)
+  async function notifyRequestor(request: any, kind: 'approved' | 'declined' | 'pending') {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        company_id: request.company_id,
+        request_id: request.id,
+        request_type: request.request_type,
+        requestor_name: request.Requestor,
+        kind, // 'approved' | 'declined' | 'pending'
+        message:
+          kind === 'approved'
+            ? `Your ${request.request_type} request #${request['Request No.']} was approved.`
+            : kind === 'declined'
+            ? `Your ${request.request_type} request #${request['Request No.']} was declined.`
+            : `Your ${request.request_type} request #${request['Request No.']} is pending management approval.`,
+        created: serverTimestamp(),
+        read: false,
+      });
+    } catch (e) {
+      console.error('Notification save failed:', e);
+    }
+  }
+
+  // Handlers (preserved, with type-aware mapping)
   const handleViewDetails = (requestId: string) => {
     router.push(`/finance/requests/details/${requestId}`);
   };
 
-  const handleUpdateStatus = async (requestId: string, newStatus: string) => {
+  const handleUpdateStatus = async (requestId: string, requestedStatus: string) => {
+    // Find the request to apply type-aware mapping and notifications
+    const req = requests.find((r: any) => r.id === requestId) as any;
+    const type = (req?.request_type || '').toLowerCase();
+
+    // Map "Accept" to "Approved" for reimbursement
+    let finalStatus = requestedStatus;
+    if (type === 'reimbursement') {
+      if (requestedStatus === 'Accept') finalStatus = 'Approved';
+      if (requestedStatus === 'Decline') finalStatus = 'Decline';
+    }
+
     setUpdatingStatusId(requestId);
     try {
-      await updateDoc(doc(db, 'request', requestId), {
-        Actions: newStatus
-      });
-      
+      const updates: any = { Actions: finalStatus };
+
+      // For replenish, also reflect in "Management Approval"
+      if (type === 'replenish' && (finalStatus === 'Approved' || finalStatus === 'Pending')) {
+        updates['Management Approval'] = finalStatus;
+      }
+
+      await updateDoc(doc(db, 'request', requestId), updates);
+
+      // Notifications per spec
+      if (type === 'replenish') {
+        if (finalStatus === 'Approved') await notifyRequestor(req, 'approved');
+        else if (finalStatus === 'Pending') await notifyRequestor(req, 'pending');
+      } else if (type === 'reimbursement' || type === 'requisition') {
+        if (finalStatus === 'Approved') {
+          // Approved items are visible in Expenses (same collection already consumed)
+          await notifyRequestor(req, 'approved');
+        } else if (finalStatus.toLowerCase() === 'decline') {
+          await notifyRequestor(req, 'declined');
+        }
+      }
+
       toast({
-        title: "Success",
-        description: `Request status updated to ${newStatus}.`,
+        title: 'Success',
+        description: `Request status updated to ${finalStatus}.`,
       });
     } catch (error) {
       console.error('Error updating request status:', error);
       toast({
-        title: "Error",
-        description: "Failed to update request status. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update request status. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setUpdatingStatusId(null);
@@ -198,48 +439,313 @@ export default function RequestsView() {
   const handleDeleteRequest = async (requestId: string) => {
     setDeletingId(requestId);
     try {
-      await updateDoc(doc(db, 'request', requestId), {
-        deleted: true
-      });
-      
-      toast({
-        title: "Success",
-        description: "Request moved to trash successfully.",
-      });
+      await updateDoc(doc(db, 'request', requestId), { deleted: true });
+      toast({ title: 'Success', description: 'Request moved to trash successfully.' });
     } catch (error) {
       console.error('Error deleting request:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete request. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to delete request. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setDeletingId(null);
     }
   };
 
-  const handleClearSearch = () => {
-    setSearchQuery('');
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return 'default';
-      case 'pending':
-        return 'secondary';
-      case 'rejected':
-        return 'destructive';
-      case 'processing':
-        return 'outline';
-      default:
-        return 'secondary';
+  const openReplenishFile = (request: any, key: 'Send Report' | 'Print Report') => {
+    const url = request?.[key];
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      toast({
+        title: 'No file found',
+        description: `${key} file is not attached to this request.`,
+      });
     }
   };
 
-  const getRequestTypeBadgeVariant = (type: string) => {
-    return type === 'reimbursement' ? 'outline' : 'secondary';
-  };
+  const clearSearch = () => setSearchQuery('');
+
+  // Table renderer to keep UI consistent across tabs
+  const TableView = ({
+    title,
+    data,
+    addHref,
+    addLabel,
+  }: {
+    title: string;
+    data: any[];
+    addHref: string;
+    addLabel: string;
+  }) => (
+    <Card>
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle>
+            {title}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({data.length} of {activeTab === 'all' ? counts.all : counts[activeTab]} shown)
+            </span>
+          </CardTitle>
+          <CardDescription>View and manage your finance requests</CardDescription>
+        </div>
+        <Link href={addHref}>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            {addLabel}
+          </Button>
+        </Link>
+      </CardHeader>
+      <CardContent>
+        <div className="relative w-full overflow-auto">
+          <Table className="min-w-[960px]">
+            <TableHeader>
+              <TableRow className="sticky top-0 bg-background z-10">
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('requestNo')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Request No.'}
+                    <SortIcon col="requestNo" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('type')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Type'}
+                    <SortIcon col="type" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('requestor')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Requestor'}
+                    <SortIcon col="requestor" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('item')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Item'}
+                    <SortIcon col="item" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('amount')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Amount'}
+                    <SortIcon col="amount" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('status')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Status'}
+                    <SortIcon col="status" />
+                  </button>
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('date')}
+                    className="inline-flex items-center gap-1 font-medium"
+                  >
+                    {'Date'}
+                    <SortIcon col="date" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {data.map((request: any) => {
+                const reqNo = request['Request No.'];
+                const created = request.created?.toDate?.() as Date | undefined;
+                const dateStr = created ? format(created, 'MMM dd, yyyy') : '—';
+                const isReplenish = request.request_type === 'replenish';
+
+                return (
+                  <TableRow key={request.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium tabular-nums">#{reqNo}</TableCell>
+
+                    <TableCell>
+                      <Badge variant={getRequestTypeBadgeVariant(request.request_type)}>
+                        {request.request_type}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {request.Requestor}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="max-w-[280px] truncate">
+                      {isReplenish
+                        ? request.Particulars || request['Requested Item']
+                        : request['Requested Item']}
+                    </TableCell>
+
+                    <TableCell className="font-medium tabular-nums">
+                      {formatAmount(
+                        isReplenish ? (request['Total Amount'] ?? request.Amount) : request.Amount,
+                        request.Currency || 'PHP'
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(request.Actions)}>
+                        {request.Actions}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        {dateStr}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            disabled={updatingStatusId === request.id || deletingId === request.id}
+                          >
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+                          <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Request
+                          </DropdownMenuItem>
+
+                          {/* Replenish-specific quick actions */}
+                          {request.request_type === 'replenish' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Replenish</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => openReplenishFile(request, 'Send Report')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Send Report
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openReplenishFile(request, 'Print Report')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Print Report
+                              </DropdownMenuItem>
+                            </>
+                          )}
+
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                          {getTypeStatusValues(request.request_type).map((val) => {
+                            const opt = getStatusOptionByValue(val);
+                            if (!opt) return null;
+                            const Icon = opt.icon;
+                            const isCurrent = request.Actions === opt.value;
+                            return (
+                              <DropdownMenuItem
+                                key={opt.value}
+                                onClick={() => handleUpdateStatus(request.id, opt.value)}
+                                disabled={isCurrent || updatingStatusId === request.id}
+                                className={isCurrent ? 'bg-muted' : ''}
+                              >
+                                <Icon className={`mr-2 h-4 w-4 ${opt.color}`} />
+                                {opt.label}
+                                {isCurrent && (
+                                  <span className="ml-auto text-xs text-muted-foreground">Current</span>
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+
+                          <DropdownMenuSeparator />
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Request
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Request</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this request? This will move the
+                                  request to trash and it can be recovered later if needed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteRequest(request.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+
+              {data.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                    No requests found in this tab. Adjust your search.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile hint */}
+        <p className="mt-3 text-xs text-muted-foreground">
+          Tip: On mobile, scroll the table horizontally to see all columns.
+        </p>
+      </CardContent>
+    </Card>
+  );
 
   if (loading) {
     return (
@@ -254,13 +760,13 @@ export default function RequestsView() {
         <div className="h-10 bg-muted rounded w-full animate-pulse" />
         <Card>
           <CardHeader>
-            <div className="h-6 bg-muted rounded w-32 animate-pulse" />
-            <div className="h-4 bg-muted rounded w-48 animate-pulse" />
+            <div className="h-6 bg-muted rounded w-40 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-64 animate-pulse" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-muted rounded animate-pulse" />
+            <div className="space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-12 bg-muted rounded animate-pulse" />
               ))}
             </div>
           </CardContent>
@@ -271,11 +777,12 @@ export default function RequestsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex items-start sm:items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
           <p className="text-muted-foreground">
-            Manage your reimbursement and requisition requests
+            Manage your reimbursement, requisition, and replenish requests
           </p>
         </div>
         <Link href="/finance/requests/create">
@@ -286,216 +793,76 @@ export default function RequestsView() {
         </Link>
       </div>
 
-      {/* Search Box */}
+      {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search requests by number, type, requestor, item, amount, status, or date..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 pr-10"
+          aria-label="Search requests"
         />
         {searchQuery && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleClearSearch}
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+            onClick={clearSearch}
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
           >
             <X className="h-4 w-4" />
           </Button>
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {searchQuery ? (
-              <>
-                Search Results
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredRequests.length} of {requests.length} requests)
-                </span>
-              </>
-            ) : (
-              'All Requests'
-            )}
-          </CardTitle>
-          <CardDescription>
-            {searchQuery ? (
-              <>
-                Showing results for "{searchQuery}"
-              </>
-            ) : (
-              'View and manage your finance requests'
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredRequests.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">
-                {searchQuery ? 'No matching requests found' : 'No requests found'}
-              </h3>
-              <p className="mt-2 text-muted-foreground">
-                {searchQuery ? (
-                  <>
-                    Try adjusting your search terms or{' '}
-                    <button
-                      onClick={handleClearSearch}
-                      className="text-primary hover:underline"
-                    >
-                      clear the search
-                    </button>
-                    .
-                  </>
-                ) : (
-                  'Get started by creating your first finance request.'
-                )}
-              </p>
-              {!searchQuery && (
-                <Link href="/finance/requests/create">
-                  <Button className="mt-4">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Request
-                  </Button>
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Request No.</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Requestor</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">
-                        #{request['Request No.']}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getRequestTypeBadgeVariant(request.request_type)}>
-                          {request.request_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          {request.Requestor}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {request['Requested Item']}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">
-                          {formatAmount(request.Amount, request.Currency || 'PHP')}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(request.Actions)}>
-                          {request.Actions}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          {format(request.created.toDate(), 'MMM dd, yyyy')}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              className="h-8 w-8 p-0"
-                              disabled={updatingStatusId === request.id || deletingId === request.id}
-                            >
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Request
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Update Status</DropdownMenuLabel>
-                            {statusOptions.map((status) => {
-                              const IconComponent = status.icon;
-                              const isCurrentStatus = request.Actions === status.value;
-                              return (
-                                <DropdownMenuItem
-                                  key={status.value}
-                                  onClick={() => handleUpdateStatus(request.id, status.value)}
-                                  disabled={isCurrentStatus || updatingStatusId === request.id}
-                                  className={isCurrentStatus ? 'bg-muted' : ''}
-                                >
-                                  <IconComponent className={`mr-2 h-4 w-4 ${status.color}`} />
-                                  {status.label}
-                                  {isCurrentStatus && (
-                                    <span className="ml-auto text-xs text-muted-foreground">Current</span>
-                                  )}
-                                </DropdownMenuItem>
-                              );
-                            })}
-                            <DropdownMenuSeparator />
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem
-                                  onSelect={(e) => e.preventDefault()}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Request
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Request</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this request? This will move the request to trash and it can be recovered later if needed.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteRequest(request.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="w-full">
+        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:inline-flex gap-2">
+          <TabsTrigger value="all" className="px-4">
+            {tabLabels.all} ({counts.all})
+          </TabsTrigger>
+          <TabsTrigger value="reimbursement" className="px-4">
+            {tabLabels.reimbursement} ({counts.reimbursement})
+          </TabsTrigger>
+          <TabsTrigger value="requisition" className="px-4">
+            {tabLabels.requisition} ({counts.requisition})
+          </TabsTrigger>
+          <TabsTrigger value="replenish" className="px-4">
+            {tabLabels.replenish} ({counts.replenish})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-4">
+          <TableView title="All Requests" data={sorted} addHref="/finance/requests/create" addLabel="Create Request" />
+        </TabsContent>
+
+        <TabsContent value="reimbursement" className="mt-4">
+          <TableView
+            title="Reimbursement Requests"
+            data={sorted.filter((r: any) => r.request_type === 'reimbursement')}
+            addHref="/finance/requests/create?type=reimbursement"
+            addLabel="Add Reimbursement"
+          />
+        </TabsContent>
+
+        <TabsContent value="requisition" className="mt-4">
+          <TableView
+            title="Requisition Requests"
+            data={sorted.filter((r: any) => r.request_type === 'requisition')}
+            addHref="/finance/requests/create?type=requisition"
+            addLabel="Add Requisition"
+          />
+        </TabsContent>
+
+        <TabsContent value="replenish" className="mt-4">
+          <TableView
+            title="Replenish Requests"
+            data={sorted.filter((r: any) => r.request_type === 'replenish')}
+            addHref="/finance/requests/create?type=replenish"
+            addLabel="Add Replenish"
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
