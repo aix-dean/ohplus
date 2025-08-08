@@ -55,7 +55,7 @@ const currencies = [
   { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
   { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
   { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol = 'CHF' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
   { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
   { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
   { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
