@@ -23,6 +23,11 @@ type ExpenseDoc = FinanceRequest & {
   expense_done_by?: string;
 };
 
+function isApproved(d: any): boolean {
+  const candidates = [d?.status, d?.approval_status, d?.approvalStatus, d?.request_status, d?.finance_status];
+  return candidates.some((v: any) => typeof v === 'string' && v.toLowerCase() === 'approved');
+}
+
 const currencyMap: Record<string, string> = {
   PHP: '₱',
   USD: '$',
@@ -87,8 +92,11 @@ export default function ExpensesPage() {
         const data: ExpenseDoc[] = [];
         snap.forEach((d) => {
           const docData = d.data() as ExpenseDoc;
-          // Only keep reimbursement/requisition
-          if (docData.request_type === 'reimbursement' || docData.request_type === 'requisition') {
+          // Only keep reimbursement/requisition that are Approved
+          if (
+            (docData.request_type === 'reimbursement' || docData.request_type === 'requisition') &&
+            isApproved(docData)
+          ) {
             data.push({ id: d.id, ...docData } as ExpenseDoc);
           }
         });
@@ -317,7 +325,7 @@ export default function ExpensesPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Expenses</h2>
           <p className="text-muted-foreground">
-            Ongoing and history of expenses from reimbursement and requisition modules
+            Approved expenses from reimbursement and requisition modules (only Approved status is shown)
           </p>
         </div>
         <Link href="/finance/requests/create">
