@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@ai-sdk/google':
         specifier: ^0.0.52
-        version: 0.0.52(zod@4.0.15)
+        version: 0.0.52(zod@4.0.17)
       '@google/generative-ai':
         specifier: latest
         version: 0.24.1
@@ -118,7 +118,7 @@ importers:
         version: 0.25.0
       ai:
         specifier: ^3.4.32
-        version: 3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.37.1))(svelte@5.37.1)(vue@3.5.18(typescript@5.0.2))(zod@4.0.15)
+        version: 3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.37.1))(svelte@5.37.1)(vue@3.5.18(typescript@5.0.2))(zod@4.0.17)
       algoliasearch:
         specifier: ^5.12.0
         version: 5.12.0
@@ -159,7 +159,7 @@ importers:
         specifier: latest
         version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       qrcode:
-        specifier: ^1.5.4
+        specifier: latest
         version: 1.5.4
       react:
         specifier: ^19
@@ -181,7 +181,7 @@ importers:
         version: 3.1.2(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react-is@18.3.1)(react@19.0.0)(redux@5.0.1)
       resend:
         specifier: latest
-        version: 6.0.0(@react-email/render@1.2.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
+        version: 6.0.1(@react-email/render@1.2.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -199,7 +199,7 @@ importers:
         version: 1.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       zod:
         specifier: latest
-        version: 4.0.15
+        version: 4.0.17
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -3504,8 +3504,8 @@ packages:
   reselect@5.1.1:
     resolution: {integrity: sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w==}
 
-  resend@6.0.0:
-    resolution: {integrity: sha512-YOqhUbdrAvlC+mAV0Ga7qD8jG+fJTvrYVaIpr5Dgs+557RnC5p/6V3me5fQFK3bEpbBA9Gz3SRf6uG+fZriqUw==}
+  resend@6.0.1:
+    resolution: {integrity: sha512-xNZ0gKAOqQcH83lXsqNOwBbpKROnsZpQr9mXRdG6hrHTF9G9Il2pkoTRtq7rJzXMvCZX+I79oahsbSeaYOWRFA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@react-email/render': ^1.1.0
@@ -4045,35 +4045,35 @@ packages:
     peerDependencies:
       zod: ^3.24.1
 
-  zod@4.0.15:
-    resolution: {integrity: sha512-2IVHb9h4Mt6+UXkyMs0XbfICUh1eUrlJJAOupBHUhLRnKkruawyDddYRCs0Eizt900ntIMk9/4RksYl+FgSpcQ==}
+  zod@4.0.17:
+    resolution: {integrity: sha512-1PHjlYRevNxxdy2JZ8JcNAw7rX8V9P1AKkP+x/xZfxB0K5FYfuV+Ug6P/6NVSR2jHQ+FzDDoDHS04nYUsOIyLQ==}
 
 snapshots:
 
-  '@ai-sdk/google@0.0.52(zod@4.0.15)':
+  '@ai-sdk/google@0.0.52(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 0.0.24
-      '@ai-sdk/provider-utils': 1.0.20(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.20(zod@4.0.17)
       json-schema: 0.4.0
-      zod: 4.0.15
+      zod: 4.0.17
 
-  '@ai-sdk/provider-utils@1.0.20(zod@4.0.15)':
+  '@ai-sdk/provider-utils@1.0.20(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 0.0.24
       eventsource-parser: 1.1.2
       nanoid: 3.3.6
       secure-json-parse: 2.7.0
     optionalDependencies:
-      zod: 4.0.15
+      zod: 4.0.17
 
-  '@ai-sdk/provider-utils@1.0.22(zod@4.0.15)':
+  '@ai-sdk/provider-utils@1.0.22(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 0.0.26
       eventsource-parser: 1.1.2
       nanoid: 3.3.11
       secure-json-parse: 2.7.0
     optionalDependencies:
-      zod: 4.0.15
+      zod: 4.0.17
 
   '@ai-sdk/provider@0.0.24':
     dependencies:
@@ -4083,47 +4083,47 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@0.0.70(react@19.0.0)(zod@4.0.15)':
+  '@ai-sdk/react@0.0.70(react@19.0.0)(zod@4.0.17)':
     dependencies:
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
-      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
+      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.17)
       swr: 2.3.4(react@19.0.0)
       throttleit: 2.1.0
     optionalDependencies:
       react: 19.0.0
-      zod: 4.0.15
+      zod: 4.0.17
 
-  '@ai-sdk/solid@0.0.54(zod@4.0.15)':
+  '@ai-sdk/solid@0.0.54(zod@4.0.17)':
     dependencies:
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
-      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
+      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.17)
     transitivePeerDependencies:
       - zod
 
-  '@ai-sdk/svelte@0.0.57(svelte@5.37.1)(zod@4.0.15)':
+  '@ai-sdk/svelte@0.0.57(svelte@5.37.1)(zod@4.0.17)':
     dependencies:
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
-      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
+      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.17)
       sswr: 2.2.0(svelte@5.37.1)
     optionalDependencies:
       svelte: 5.37.1
     transitivePeerDependencies:
       - zod
 
-  '@ai-sdk/ui-utils@0.0.50(zod@4.0.15)':
+  '@ai-sdk/ui-utils@0.0.50(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 0.0.26
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
       json-schema: 0.4.0
       secure-json-parse: 2.7.0
-      zod-to-json-schema: 3.24.6(zod@4.0.15)
+      zod-to-json-schema: 3.24.6(zod@4.0.17)
     optionalDependencies:
-      zod: 4.0.15
+      zod: 4.0.17
 
-  '@ai-sdk/vue@0.0.59(vue@3.5.18(typescript@5.0.2))(zod@4.0.15)':
+  '@ai-sdk/vue@0.0.59(vue@3.5.18(typescript@5.0.2))(zod@4.0.17)':
     dependencies:
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
-      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
+      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.17)
       swrv: 1.1.0(vue@3.5.18(typescript@5.0.2))
     optionalDependencies:
       vue: 3.5.18(typescript@5.0.2)
@@ -5910,26 +5910,26 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.37.1))(svelte@5.37.1)(vue@3.5.18(typescript@5.0.2))(zod@4.0.15):
+  ai@3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.37.1))(svelte@5.37.1)(vue@3.5.18(typescript@5.0.2))(zod@4.0.17):
     dependencies:
       '@ai-sdk/provider': 0.0.26
-      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.15)
-      '@ai-sdk/react': 0.0.70(react@19.0.0)(zod@4.0.15)
-      '@ai-sdk/solid': 0.0.54(zod@4.0.15)
-      '@ai-sdk/svelte': 0.0.57(svelte@5.37.1)(zod@4.0.15)
-      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.15)
-      '@ai-sdk/vue': 0.0.59(vue@3.5.18(typescript@5.0.2))(zod@4.0.15)
+      '@ai-sdk/provider-utils': 1.0.22(zod@4.0.17)
+      '@ai-sdk/react': 0.0.70(react@19.0.0)(zod@4.0.17)
+      '@ai-sdk/solid': 0.0.54(zod@4.0.17)
+      '@ai-sdk/svelte': 0.0.57(svelte@5.37.1)(zod@4.0.17)
+      '@ai-sdk/ui-utils': 0.0.50(zod@4.0.17)
+      '@ai-sdk/vue': 0.0.59(vue@3.5.18(typescript@5.0.2))(zod@4.0.17)
       '@opentelemetry/api': 1.9.0
       eventsource-parser: 1.1.2
       json-schema: 0.4.0
       jsondiffpatch: 0.6.0
       secure-json-parse: 2.7.0
-      zod-to-json-schema: 3.24.6(zod@4.0.15)
+      zod-to-json-schema: 3.24.6(zod@4.0.17)
     optionalDependencies:
       react: 19.0.0
       sswr: 2.2.0(svelte@5.37.1)
       svelte: 5.37.1
-      zod: 4.0.15
+      zod: 4.0.17
     transitivePeerDependencies:
       - solid-js
       - vue
@@ -7688,7 +7688,7 @@ snapshots:
 
   reselect@5.1.1: {}
 
-  resend@6.0.0(@react-email/render@1.2.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)):
+  resend@6.0.1(@react-email/render@1.2.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)):
     optionalDependencies:
       '@react-email/render': 1.2.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
 
@@ -8377,8 +8377,8 @@ snapshots:
 
   zimmerframe@1.1.2: {}
 
-  zod-to-json-schema@3.24.6(zod@4.0.15):
+  zod-to-json-schema@3.24.6(zod@4.0.17):
     dependencies:
-      zod: 4.0.15
+      zod: 4.0.17
 
-  zod@4.0.15: {}
+  zod@4.0.17: {}

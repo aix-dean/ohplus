@@ -389,7 +389,14 @@ export default function RequestDetailsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Request #{request["Request No."]}</h1>
             <p className="text-muted-foreground">
-              {request.request_type === "reimbursement" ? "Reimbursement" : "Requisition"} Request Details
+              {request.request_type === "reimbursement"
+                ? "Reimbursement"
+                : request.request_type === "requisition"
+                  ? "Requisition"
+                  : request.request_type === "replenish"
+                    ? "Replenish"
+                    : "Request"}{" "}
+              Request Details
             </p>
           </div>
         </div>
@@ -663,7 +670,8 @@ export default function RequestDetailsPage() {
                         <img
                           src={
                             galleryItems[galleryIndex].url ||
-                            "/placeholder.svg?height=300&width=600&query=image%20preview"
+                            "/placeholder.svg?height=300&width=600&query=image%20preview" ||
+                            "/placeholder.svg"
                           }
                           alt={galleryItems[galleryIndex].name}
                           className="mx-auto max-h-[70vh] max-w-full object-contain"

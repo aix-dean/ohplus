@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -14,20 +14,20 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { FileText, MoreVertical, Send, Printer } from "lucide-react"
-import type { ReplenishRequest } from "@/lib/types/finance-request"
+import { FileText, MoreVertical, Printer, Send } from "lucide-react"
+import type { FinanceRequest } from "@/lib/types/finance-request"
 import { generateReplenishRequestPDF } from "@/lib/replenish-pdf"
 
-type Props = {
-  request: ReplenishRequest
-}
+type Props = { request: FinanceRequest }
 
-function base64ToBlob(base64: string, mime = "application/pdf"): Blob {
-  const byteChars = atob(base64)
-  const byteNumbers = new Array(byteChars.length)
-  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
-  const byteArray = new Uint8Array(byteNumbers)
-  return new Blob([byteArray], { type: mime })
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [prefix, data] = dataUrl.split(",")
+  const mime = prefix.substring(prefix.indexOf(":") + 1, prefix.indexOf(";"))
+  const binStr = atob(data)
+  const len = binStr.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
 }
 
 export default function ReplenishReportActions({ request }: Props) {
@@ -45,11 +45,10 @@ export default function ReplenishReportActions({ request }: Props) {
 
   const handlePrint = async () => {
     try {
-      const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
-      if (!base64 || typeof base64 !== "string") throw new Error("Failed to generate PDF")
-      const blob = base64ToBlob(base64)
+      const dataUrl = await generateReplenishRequestPDF(request as any, { returnDataUrl: true })
+      if (!dataUrl || typeof dataUrl !== "string") throw new Error("Failed to generate PDF")
+      const blob = dataUrlToBlob(dataUrl)
       const url = URL.createObjectURL(blob)
-      // Open in a new tab so the user can use the browser's print UI
       window.open(url, "_blank", "noopener,noreferrer")
     } catch (e) {
       console.error(e)
@@ -58,40 +57,47 @@ export default function ReplenishReportActions({ request }: Props) {
   }
 
   const handleSend = async () => {
-    if (!to.trim()) {
+    const toList = to
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const ccList = cc
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+
+    if (toList.length === 0) {
       toast({
         title: "Recipient required",
-        description: "Please add at least one email in the To field.",
+        description: "Add at least one email in the To field.",
         variant: "destructive",
       })
       return
     }
+
     try {
       setSending(true)
-      const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
-      if (!base64 || typeof base64 !== "string") throw new Error("Failed to generate PDF")
-      const blob = base64ToBlob(base64)
-      const fileName = `replenish-request-${String(request["Request No."]) || request.id}.pdf`
-      const form = new FormData()
-      const toList = to
-        .split(",")
-        .map((e) => e.trim())
-        .filter(Boolean)
-      const ccList = cc
-        .split(",")
-        .map((e) => e.trim())
-        .filter(Boolean)
+      const dataUrl = await generateReplenishRequestPDF(request as any, { returnDataUrl: true })
+      if (!dataUrl || typeof dataUrl !== "string") throw new Error("Failed to generate PDF")
+      const base64 = dataUrl.split(",")[1] // strip data URL prefix
+      const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
 
-      form.append("to", JSON.stringify(toList))
-      if (ccList.length > 0) form.append("cc", JSON.stringify(ccList))
-      form.append("subject", subject)
-      form.append("body", message)
-      form.append("attachment_0", new File([blob], fileName, { type: "application/pdf" }))
+      const res = await fetch("/api/reports/replenish/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: toList,
+          cc: ccList,
+          subject,
+          html: message.replace(/\n/g, "<br/>"),
+          pdfBase64: base64,
+          fileName,
+        }),
+      })
 
-      const res = await fetch("/api/send-email", { method: "POST", body: form })
-      const data = await res.json()
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to send email")
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || "Email send failed")
       }
 
       toast({ title: "Report sent", description: "The PDF report was emailed successfully." })
@@ -108,7 +114,7 @@ export default function ReplenishReportActions({ request }: Props) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" aria-label="Replenish report actions">
             <MoreVertical className="h-4 w-4 mr-2" />
             Report
           </Button>
@@ -150,12 +156,7 @@ export default function ReplenishReportActions({ request }: Props) {
               <label htmlFor="cc" className="text-sm text-muted-foreground">
                 CC (optional, comma separated)
               </label>
-              <Input
-                id="cc"
-                placeholder="cc1@example.com, cc2@example.com"
-                value={cc}
-                onChange={(e) => setCc(e.target.value)}
-              />
+              <Input id="cc" placeholder="cc1@example.com" value={cc} onChange={(e) => setCc(e.target.value)} />
             </div>
             <div className="grid gap-1">
               <label htmlFor="subject" className="text-sm text-muted-foreground">
