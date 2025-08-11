@@ -47,7 +47,7 @@ export interface SalesRecord {
   productType: string
 }
 
-export class bookingService {
+export class BookingService {
   private static instance: BookingService
 
   static getInstance(): BookingService {
