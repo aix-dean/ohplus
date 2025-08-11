@@ -59,7 +59,7 @@ export class BookingService {
 
   async getCompletedBookings(companyId: string): Promise<Booking[]> {
     try {
-      const bookingsRef = collection(db, "bookings")
+      const bookingsRef = collection(db, "booking")
       const q = query(
         bookingsRef,
         where("company_id", "==", companyId),
