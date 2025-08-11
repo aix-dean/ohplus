@@ -32,7 +32,7 @@ function includesAny(record: SalesRecord, query: string): boolean {
 function sumBy(records: SalesRecord[], accessor: (record: SalesRecord) => number): number {
   return records.reduce((sum, record) => sum + accessor(record), 0)
 }
-
+console.log(SalesRecord)
 export function SalesRecordTable() {
   const { toast } = useToast()
   const [records, setRecords] = useState<SalesRecord[]>([])
