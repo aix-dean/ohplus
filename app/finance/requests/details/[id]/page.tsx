@@ -12,14 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
 import {
   AlertCircle,
@@ -41,14 +33,12 @@ import {
   X,
   XCircle,
   Clock,
-  MoreVertical,
-  Send as SendIcon,
-  Printer,
   File as FileGeneric,
 } from "lucide-react"
 
 import type { FinanceRequest } from "@/lib/types/finance-request"
-import { generateReplenishRequestPDF } from "@/lib/pdf-service"
+import ReplenishReportActions from "@/components/finance/replenish-report-actions"
+import type { ReplenishRequest } from "@/lib/types/finance-request"
 
 type AttachmentType = "image" | "video" | "pdf" | "document"
 type Attachment = {
@@ -149,16 +139,6 @@ const IconForType = ({ type, className }: { type: AttachmentType; className?: st
   }
 }
 
-function base64ToBlob(base64: string, contentType = "application/pdf"): Blob {
-  const byteCharacters = atob(base64)
-  const byteNumbers = new Array(byteCharacters.length)
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
-  }
-  const byteArray = new Uint8Array(byteNumbers)
-  return new Blob([byteArray], { type: contentType })
-}
-
 export default function RequestDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -179,86 +159,6 @@ export default function RequestDetailsPage() {
 
   // Optional PDF inline preview (kept intact so we don't break existing behaviors)
   const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null)
-
-  const [sendingReport, setSendingReport] = useState(false)
-
-  const handlePrintReplenishReport = async () => {
-    if (!request || request.request_type !== "replenish") return
-    try {
-      const base64 = (await generateReplenishRequestPDF(request as any, true)) as string
-      const blob = base64ToBlob(base64)
-      const url = URL.createObjectURL(blob)
-      const win = window.open(url)
-      if (!win) {
-        // Fallback: open in an <iframe> and trigger print
-        const iframe = document.createElement("iframe")
-        iframe.style.position = "fixed"
-        iframe.style.right = "0"
-        iframe.style.bottom = "0"
-        iframe.style.width = "0"
-        iframe.style.height = "0"
-        iframe.style.border = "0"
-        iframe.src = url
-        document.body.appendChild(iframe)
-        iframe.onload = () => {
-          iframe.contentWindow?.focus()
-          iframe.contentWindow?.print()
-          setTimeout(() => {
-            URL.revokeObjectURL(url)
-            document.body.removeChild(iframe)
-          }, 1000)
-        }
-      } else {
-        win.onload = () => {
-          win.focus()
-          win.print()
-        }
-      }
-      toast({ title: "Print Ready", description: "The Replenish report is ready to print." })
-    } catch (e) {
-      console.error(e)
-      toast({ title: "Error", description: "Failed to generate report for printing.", variant: "destructive" })
-    }
-  }
-
-  const handleSendReplenishReport = async () => {
-    if (!request || request.request_type !== "replenish") return
-    try {
-      const toEmail = window.prompt("Enter recipient email address:")
-      if (!toEmail) return
-      setSendingReport(true)
-
-      // Generate PDF base64 and convert to File
-      const base64 = (await generateReplenishRequestPDF(request as any, true)) as string
-      const blob = base64ToBlob(base64)
-      const fileName = `replenish-request-${String(request["Request No."]).replace(/[^a-z0-9]/gi, "_")}.pdf`
-      const file = new File([blob], fileName, { type: "application/pdf" })
-
-      // Prepare form data according to /api/send-email contract
-      const formData = new FormData()
-      formData.set("to", JSON.stringify([toEmail]))
-      formData.set("subject", `Replenish Report - Request #${request["Request No."]}`)
-      formData.set("body", `Please find attached the Replenish Request Report for Request #${request["Request No."]}.`)
-      formData.append("attachment_0", file, file.name)
-
-      const res = await fetch("/api/send-email", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || "Failed to send email")
-      }
-
-      toast({ title: "Report Sent", description: `Report emailed to ${toEmail}.` })
-    } catch (e: any) {
-      console.error(e)
-      toast({ title: "Email Failed", description: e.message || "Failed to send report.", variant: "destructive" })
-    } finally {
-      setSendingReport(false)
-    }
-  }
 
   const requestId = params.id as string
 
@@ -496,29 +396,7 @@ export default function RequestDetailsPage() {
         <div className="flex items-center gap-2">
           {getStatusIcon(request.Actions)}
           <Badge variant={getStatusBadgeVariant(request.Actions)}>{request.Actions}</Badge>
-
-          {request.request_type === "replenish" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={sendingReport}>
-                  <MoreVertical className="mr-2 h-4 w-4" />
-                  Actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Replenish</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSendReplenishReport}>
-                  <SendIcon className="mr-2 h-4 w-4" />
-                  <span>Send Report</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePrintReplenishReport}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  <span>Print Report</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {request.request_type === "replenish" && <ReplenishReportActions request={request as ReplenishRequest} />}
         </div>
       </div>
 
