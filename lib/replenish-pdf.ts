@@ -2,10 +2,6 @@ import jsPDF from "jspdf"
 import QRCode from "qrcode"
 import type { FinanceRequest } from "@/lib/types/finance-request"
 
-/**
- * Narrow type for replenish-specific fields layered on top of FinanceRequest.
- * We do not import any attachments and we DO NOT render any attachments here.
- */
 type ReplenishRequest = FinanceRequest & {
   Particulars?: string
   ["Total Amount"]?: number
@@ -14,7 +10,6 @@ type ReplenishRequest = FinanceRequest & {
   ["Date Requested"]?: any
 }
 
-/** Safe conversion to Date supporting Firestore Timestamp, string, or number */
 function toSafeDate(value: any): Date {
   try {
     if (!value) return new Date(Number.NaN)
@@ -41,7 +36,6 @@ function fmtCurrency(amount: number | undefined, currency = "PHP"): string {
   return `${currency}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-/** Generate a data URL PNG QR code for a given link */
 async function generateQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, { margin: 1, width: 192 })
@@ -51,10 +45,11 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
 }
 
 /**
- * Generates a user-friendly PDF for a replenish request based solely on the request's fields.
- * It does NOT include any files from the "attachments" collection field(s).
+ * Generates a user-friendly PDF for a replenish request based only on the request fields.
+ * No attachment files are used or embedded.
  *
- * If options.returnBase64 is true, returns base64 (no data: prefix). Otherwise triggers a download.
+ * If options.returnBase64 is true: returns the base64 payload (no data: prefix).
+ * Otherwise, triggers a file download in the browser.
  */
 export async function generateReplenishRequestPDF(
   request: ReplenishRequest,
@@ -66,7 +61,7 @@ export async function generateReplenishRequestPDF(
   const margin = 16
   const contentWidth = pageWidth - margin * 2
 
-  // Header band
+  // Header
   pdf.setFillColor(30, 58, 138) // blue-900
   pdf.rect(0, 0, pageWidth, 26, "F")
   pdf.setTextColor(255, 255, 255)
@@ -77,7 +72,7 @@ export async function generateReplenishRequestPDF(
   pdf.setFontSize(10)
   pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 22)
 
-  // Optional QR linking back to this request view
+  // Optional QR link back to this request
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").toString().replace(/\/$/, "")
   const link = request.id ? `${appUrl}/finance/requests/details/${request.id}` : appUrl || ""
   const qr = link ? await generateQrDataUrl(link) : null
@@ -86,7 +81,7 @@ export async function generateReplenishRequestPDF(
     pdf.addImage(qr, "PNG", pageWidth - margin - size, margin, size, size)
   }
 
-  // Title + status badge
+  // Title + status
   let y = 34
   const status = (request.Actions || "Pending").toUpperCase()
   pdf.setTextColor(0, 0, 0)
@@ -115,7 +110,7 @@ export async function generateReplenishRequestPDF(
 
   y += 10
 
-  // Section: Summary (two columns)
+  // Summary
   const leftX = margin
   const rightX = margin + contentWidth / 2 + 4
   const rowGap = 6
@@ -148,14 +143,14 @@ export async function generateReplenishRequestPDF(
 
   labelValue("Type:", "Replenish", rightX, rY)
   rY += rowGap
-  labelValue("Date Requested:", fmtDate(request["Date Requested"]), rightX, rY)
+  labelValue("Date Requested:", fmtDate((request as any)["Date Requested"]), rightX, rY)
   rY += rowGap
-  labelValue("Voucher No.:", String(request["Voucher No."] || "-"), rightX, rY)
+  labelValue("Voucher No.:", String((request as any)["Voucher No."] || "-"), rightX, rY)
   rY += rowGap
 
   y = Math.max(lY, rY) + 8
 
-  // Section: Financial Summary (cards)
+  // Financial Summary (cards)
   const cardH = 22
   const gap = 6
   const cardW = (contentWidth - gap) / 2
@@ -174,16 +169,15 @@ export async function generateReplenishRequestPDF(
     pdf.text(value, x + 4, y + 15)
     pdf.setTextColor(0, 0, 0)
   }
-
-  drawCard(margin, "Amount", fmtCurrency(request.Amount, request.Currency || "PHP"))
+  drawCard(margin, "Amount", fmtCurrency(Number((request as any).Amount) || 0, (request as any).Currency || "PHP"))
   drawCard(
     margin + cardW + gap,
     "Total Amount",
-    fmtCurrency((request as any)["Total Amount"] || 0, request.Currency || "PHP"),
+    fmtCurrency(Number((request as any)["Total Amount"]) || 0, (request as any).Currency || "PHP"),
   )
   y += cardH + 10
 
-  // Section: Approval
+  // Approval
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(11)
   pdf.text("Approval", margin, y)
@@ -192,11 +186,11 @@ export async function generateReplenishRequestPDF(
   pdf.line(margin, y, pageWidth - margin, y)
   y += 6
 
-  labelValue("Management Approval:", String(request["Management Approval"] || "Pending"), margin, y)
-  labelValue("Approved By:", String(request["Approved By"] || "-"), rightX, y)
+  labelValue("Management Approval:", String((request as any)["Management Approval"] || "Pending"), margin, y)
+  labelValue("Approved By:", String((request as any)["Approved By"] || "-"), rightX, y)
   y += rowGap + 6
 
-  // Section: Particulars
+  // Particulars
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(11)
   pdf.text("Particulars", margin, y)
@@ -206,7 +200,7 @@ export async function generateReplenishRequestPDF(
   pdf.roundedRect(margin, y, contentWidth, blockHeight, 2, 2, "S")
   pdf.setFont("helvetica", "normal")
   pdf.setFontSize(10)
-  const particulars = String((request as any).Particulars || request["Requested Item"] || "-")
+  const particulars = String((request as any).Particulars || (request as any)["Requested Item"] || "-")
   const lines = pdf.splitTextToSize(particulars, contentWidth - 8)
   pdf.text(lines, margin + 4, y + 7)
   y += blockHeight + 8
@@ -229,10 +223,9 @@ export async function generateReplenishRequestPDF(
   pdf.setTextColor(0, 0, 0)
 
   if (options?.returnBase64) {
-    // return only the base64 part (no data: prefix) to keep payloads small
     return pdf.output("datauristring").split(",")[1] || ""
   } else {
-    const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
+    const fileName = `replenish-request-${String((request as any)["Request No."] ?? request.id)}.pdf`
     pdf.save(fileName)
   }
 }

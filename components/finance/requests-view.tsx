@@ -45,16 +45,18 @@ import {
   Clock,
   Edit,
   Eye,
-  FileText,
   MoreHorizontal,
   Plus,
   Search,
   Trash2,
   User,
   X,
+  Printer,
+  Send,
 } from "lucide-react"
 
 import type { FinanceRequest } from "@/lib/types/finance-request"
+import { generateReplenishRequestPDF } from "@/lib/replenish-pdf"
 
 // Currency helpers
 const currencies = [
@@ -143,6 +145,14 @@ function getRequestTypeBadgeVariant(type?: string) {
   return "secondary"
 }
 
+function base64ToBlob(base64: string, mime = "application/pdf"): Blob {
+  const byteChars = atob(base64)
+  const byteNumbers = new Array(byteChars.length)
+  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+  const byteArray = new Uint8Array(byteNumbers)
+  return new Blob([byteArray], { type: mime })
+}
+
 export default function RequestsView() {
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -224,7 +234,7 @@ export default function RequestsView() {
     }
   }, [requests])
 
-  // Search across relevant fields
+  // Search
   const searched = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return requests
@@ -313,7 +323,6 @@ export default function RequestsView() {
           break
         }
         case "amount": {
-          // For replenish, prefer Total Amount if present
           const aAmt = Number(a["Total Amount"] ?? a.Amount ?? 0)
           const bAmt = Number(b["Total Amount"] ?? b.Amount ?? 0)
           res = aAmt - bAmt
@@ -344,7 +353,6 @@ export default function RequestsView() {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"))
     } else {
       setSortCol(col)
-      // Default sensible directions
       setSortDir(["requestNo", "amount", "date"].includes(col) ? "desc" : "asc")
     }
   }
@@ -354,7 +362,7 @@ export default function RequestsView() {
     return sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
   }
 
-  // Minimal "notification" creator
+  // Notifications
   async function notifyRequestor(request: any, kind: "approved" | "declined" | "pending") {
     try {
       await addDoc(collection(db, "notifications"), {
@@ -383,7 +391,6 @@ export default function RequestsView() {
   }
 
   const handleUpdateStatus = async (requestId: string, requestedStatus: string) => {
-    // Find the request to apply type-aware mapping and notifications
     const req = requests.find((r: any) => r.id === requestId) as any
     const type = (req?.request_type || "").toLowerCase()
 
@@ -450,31 +457,67 @@ export default function RequestsView() {
     }
   }
 
-  // NOTE: This currently opens any pre-attached URL in the record for replenish.
-  // If you later want dynamic PDF generation, wire these to a generator instead.
-  const openReplenishFile = (request: any, key: "Send Report" | "Print Report") => {
-    const url = request?.[key]
-    if (url) {
+  // Replenish Report actions: fresh PDF from current fields (no attachments)
+  const handlePrintReplenishReport = async (request: any) => {
+    try {
+      const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
+      if (!base64 || typeof base64 !== "string") throw new Error("Failed to generate PDF")
+      const blob = base64ToBlob(base64)
+      const url = URL.createObjectURL(blob)
       window.open(url, "_blank", "noopener,noreferrer")
-    } else {
-      toast({
-        title: "No file found",
-        description: `${key} file is not attached to this request.`,
-      })
+    } catch (e) {
+      console.error(e)
+      toast({ title: "Unable to print", description: "Failed to generate report.", variant: "destructive" })
+    }
+  }
+
+  const handleSendReplenishReport = async (request: any) => {
+    const toRaw = prompt("To (comma separated emails):", "") || ""
+    const recipients = toRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (recipients.length === 0) return
+
+    try {
+      const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
+      if (!base64 || typeof base64 !== "string") throw new Error("Failed to generate PDF")
+      const blob = base64ToBlob(base64)
+      const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
+
+      const form = new FormData()
+      form.append("to", JSON.stringify(recipients))
+      form.append("subject", `Replenishment Request Report - #${String(request["Request No."] ?? request.id)}`)
+      form.append(
+        "body",
+        `Hello,\n\nPlease find attached the replenishment request report for Request #${String(
+          request["Request No."] ?? request.id,
+        )}.\n\nThank you.`,
+      )
+      form.append("attachment_0", new File([blob], fileName, { type: "application/pdf" }))
+
+      const res = await fetch("/api/send-email", { method: "POST", body: form })
+      const data = await res.json().catch(() => ({}) as any)
+      if (!res.ok) throw new Error(data?.error || "Failed to send email")
+
+      toast({ title: "Report sent", description: "The PDF report was emailed successfully." })
+    } catch (e: any) {
+      console.error(e)
+      toast({ title: "Failed to send", description: e?.message || "An error occurred.", variant: "destructive" })
     }
   }
 
   const clearSearch = () => setSearchQuery("")
 
-  // Table renderer
+  // Table renderer to keep UI consistent across tabs
   const TableView = ({
     title,
-    data = [],
+    data,
     addHref,
     addLabel,
   }: {
     title: string
-    data?: any[]
+    data: any[]
     addHref: string
     addLabel: string
   }) => (
@@ -644,17 +687,17 @@ export default function RequestsView() {
                             Edit Request
                           </DropdownMenuItem>
 
-                          {/* Replenish-specific quick actions */}
-                          {request.request_type === "replenish" && (
+                          {/* Replenish-specific quick actions: now generate a fresh PDF (no attachments) */}
+                          {isReplenish && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Replenish</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => openReplenishFile(request, "Send Report")}>
-                                <FileText className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem onClick={() => handleSendReplenishReport(request)}>
+                                <Send className="mr-2 h-4 w-4" />
                                 Send Report
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openReplenishFile(request, "Print Report")}>
-                                <FileText className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem onClick={() => handlePrintReplenishReport(request)}>
+                                <Printer className="mr-2 h-4 w-4" />
                                 Print Report
                               </DropdownMenuItem>
                             </>
