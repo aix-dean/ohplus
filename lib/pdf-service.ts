@@ -5,6 +5,7 @@ import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import type { ReplenishRequest } from "@/lib/types/finance-request"
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -1194,7 +1195,7 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
               finalImageHeight = (finalImageWidth / uniformImageWidth) * uniformImageHeight
             }
 
-            let currentRow = 0
+            const currentRow = 0
             let currentCol = 0
             let rowStartY = yPosition
 
@@ -1211,14 +1212,14 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
               const imageX = margin + currentCol * (finalImageWidth + imageSpacing)
               const imageY = rowStartY
               if (media.url) {
-                    try {
-                      const base64 = await loadImageAsBase64(media.url)
-                      if (base64) {
-                        pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
-                      }
-                    } catch (error) {
-                      console.error("Error adding product image:", error)
-                    }
+                try {
+                  const base64 = await loadImageAsBase64(media.url)
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
+                  }
+                } catch (error) {
+                  console.error("Error adding product image:", error)
+                }
               }
 
               // Move to next column
@@ -1343,11 +1344,11 @@ export async function generateCostEstimatePDF(
     const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
     const qrCodeUrl = await generateQRCode(costEstimateViewUrl)
 
-    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+    const addText = (text: string, x: number, yPos: number, maxWidth: number, fontSize = 10) => {
       pdf.setFontSize(fontSize)
       const lines = pdf.splitTextToSize(text, maxWidth)
-      pdf.text(lines, x, y)
-      return y + lines.length * fontSize * 0.3
+      pdf.text(lines, x, yPos)
+      return yPos + lines.length * fontSize * 0.3
     }
 
     const checkNewPage = (requiredHeight: number) => {
@@ -2188,5 +2189,207 @@ export async function generateReportPDF(
   } catch (error) {
     console.error("Error generating report PDF:", error)
     throw new Error("Failed to generate report PDF")
+  }
+}
+
+export async function generateReplenishRequestPDF(
+  request: ReplenishRequest,
+  returnBase64 = false,
+): Promise<string | void> {
+  const pdf = new jsPDF("p", "mm", "a4")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 16
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  const addText = (text: string, x: number, yPos: number, maxWidth: number, fontSize = 10) => {
+    pdf.setFontSize(fontSize)
+    const lines = pdf.splitTextToSize(text, maxWidth)
+    pdf.text(lines, x, yPos)
+    return yPos + lines.length * fontSize * 0.32
+  }
+
+  const line = () => {
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(225, 225, 225)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 8
+  }
+
+  // Header bar
+  pdf.setFillColor(30, 58, 138) // blue-900
+  pdf.rect(0, 0, pageWidth, 24, "F")
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(18)
+  pdf.text("REPLENISH REQUEST REPORT", margin, 15)
+
+  // Optional logo on the right
+  try {
+    const logoBase64 = await loadImageAsBase64("/ohplus-new-logo.png")
+    if (logoBase64) {
+      pdf.addImage(logoBase64, "PNG", pageWidth - margin - 18, 5, 18, 14)
+    }
+  } catch {
+    // fail silently
+  }
+
+  // Reset text color
+  pdf.setTextColor(0, 0, 0)
+  y = 32
+
+  // Title + Request number
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(14)
+  pdf.text(`Request #${request["Request No."]}`, margin, y)
+  y += 8
+
+  // Status badge
+  const status = (request.Actions || "").toUpperCase()
+  const statusColor = (() => {
+    switch (status.toLowerCase()) {
+      case "approved":
+        return [34, 197, 94] // green
+      case "pending":
+        return [234, 179, 8] // yellow
+      case "rejected":
+        return [239, 68, 68] // red
+      case "processing":
+        return [59, 130, 246] // blue
+      default:
+        return [107, 114, 128] // gray
+    }
+  })()
+  pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+  pdf.roundedRect(margin, y, 28, 7, 2, 2, "F")
+  pdf.setFontSize(9)
+  pdf.setTextColor(255, 255, 255)
+  pdf.text(status || "N/A", margin + 3, y + 5)
+  pdf.setTextColor(0, 0, 0)
+
+  y += 14
+
+  // Overview section
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(12)
+  pdf.text("Overview", margin, y)
+  y += 4
+  line()
+
+  pdf.setFont("helvetica", "normal")
+  pdf.setFontSize(10)
+
+  const leftX = margin
+  const rightX = margin + contentWidth / 2 + 4
+  let leftY = y
+  let rightY = y
+
+  const createdDate = request.created ? safeToDate(request.created).toLocaleString() : "N/A"
+  const dateRequested = request["Date Requested"] ? safeToDate(request["Date Requested"]).toLocaleDateString() : "N/A"
+
+  const rowsLeft: { label: string; value: string }[] = [
+    { label: "Request Type", value: "Replenish" },
+    { label: "Requestor", value: request.Requestor || "N/A" },
+    { label: "Voucher No.", value: request["Voucher No."] || "N/A" },
+    { label: "Management Approval", value: request["Management Approval"] || "Pending" },
+  ]
+  const rowsRight: { label: string; value: string }[] = [
+    { label: "Created", value: createdDate },
+    { label: "Date Requested", value: dateRequested },
+    { label: "Currency", value: request.Currency || "PHP" },
+    { label: "Status", value: request.Actions || "N/A" },
+  ]
+
+  const drawRow = (x: number, yPos: number, label: string, value: string) => {
+    pdf.setFont("helvetica", "bold")
+    pdf.text(`${label}:`, x, yPos)
+    pdf.setFont("helvetica", "normal")
+    return addText(value, x + 28, yPos, contentWidth / 2 - 36, 10)
+  }
+
+  rowsLeft.forEach((r) => {
+    leftY = drawRow(leftX, leftY, r.label, r.value)
+    leftY += 3
+  })
+  rowsRight.forEach((r) => {
+    rightY = drawRow(rightX, rightY, r.label, r.value)
+    rightY += 3
+  })
+
+  y = Math.max(leftY, rightY) + 6
+
+  // Financials card
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(12)
+  pdf.text("Financial Summary", margin, y)
+  y += 4
+  line()
+
+  const currencyPrefix = "PHP"
+  const amount = Number(request.Amount || 0)
+  const total = Number((request as any)["Total Amount"] || amount)
+  const formattedAmount = formatCurrency(amount)
+  const formattedTotal = formatCurrency(total)
+
+  // Card background
+  const cardY = y
+  const cardH = 28
+  pdf.setFillColor(248, 250, 252)
+  pdf.roundedRect(margin, cardY, contentWidth, cardH, 2, 2, "F")
+  pdf.setDrawColor(229, 231, 235)
+  pdf.roundedRect(margin, cardY, contentWidth, cardH, 2, 2, "S")
+
+  pdf.setFontSize(11)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Amount", margin + 6, cardY + 10)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(`${formattedAmount} (${request.Currency || currencyPrefix})`, margin + 6, cardY + 16)
+
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Total Amount", margin + contentWidth / 2, cardY + 10)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(`${formattedTotal} (${request.Currency || currencyPrefix})`, margin + contentWidth / 2, cardY + 16)
+
+  y = cardY + cardH + 8
+
+  // Particulars
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(12)
+  pdf.text("Particulars", margin, y)
+  y += 4
+  line()
+  pdf.setFont("helvetica", "normal")
+  const particulars = (request as any).Particulars || request["Requested Item"] || "N/A"
+  y = addText(particulars, margin, y, contentWidth, 10)
+  y += 6
+
+  // Notes
+  pdf.setFont("helvetica", "bold")
+  pdf.setFontSize(12)
+  pdf.text("Notes", margin, y)
+  y += 4
+  line()
+  pdf.setFont("helvetica", "normal")
+  y = addText(
+    "This PDF summarizes the details of the replenish request for easy sharing and printing. Values are based on the current record in the system.",
+    margin,
+    y,
+    contentWidth,
+    10,
+  )
+
+  // Footer
+  const footerY = pageHeight - 14
+  pdf.setFontSize(8)
+  pdf.setTextColor(100, 100, 100)
+  pdf.text("Generated by OH Plus Platform", margin, footerY)
+  pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 48, footerY)
+
+  if (returnBase64) {
+    return pdf.output("datauristring").split(",")[1]
+  } else {
+    const fileName = `replenish-request-${String(request["Request No."]).replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.pdf`
+    pdf.save(fileName)
   }
 }
