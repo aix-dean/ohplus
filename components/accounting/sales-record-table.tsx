@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { Search, PencilLine, Check, X, Eye, EyeOff, Filter, Download, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { bookingService, type SalesRecord } from "@/lib/booking-service"
+import { useAuth } from "@/contexts/auth-context"
 
 // Mock company ID - in real app, this would come from auth context
-const COMPANY_ID = "kV2aoZN1xqvw7qv7oNgm"
+// Remove this line:
+// const COMPANY_ID = "kV2aoZN1xqvw7qv7oNgm"
 
 function includesAny(record: SalesRecord, query: string): boolean {
   if (!query) return true
@@ -35,6 +37,7 @@ function sumBy(records: SalesRecord[], accessor: (record: SalesRecord) => number
 
 export function SalesRecordTable() {
   const { toast } = useToast()
+  const { userData } = useAuth()
   const [records, setRecords] = useState<SalesRecord[]>([])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(true)
@@ -58,9 +61,19 @@ export function SalesRecordTable() {
   }, [])
 
   const loadSalesRecords = async () => {
+    if (!userData?.company_id) {
+      toast({
+        title: "❌ Error",
+        description: "No company ID found. Please contact support.",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
-      const salesRecords = await bookingService.getSalesRecords(COMPANY_ID)
+      const salesRecords = await bookingService.getSalesRecords(userData.company_id)
       setRecords(salesRecords)
       toast({
         title: "✅ Data Loaded",
@@ -79,8 +92,10 @@ export function SalesRecordTable() {
   }
 
   useEffect(() => {
-    loadSalesRecords()
-  }, [])
+    if (userData?.company_id) {
+      loadSalesRecords()
+    }
+  }, [userData?.company_id])
 
   const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
