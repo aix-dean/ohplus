@@ -81,7 +81,7 @@ export function SalesRecordTable() {
   useEffect(() => {
     loadSalesRecords()
   }, [])
-  console.log(`Record :${record}`)
+
   const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
   const totals = useMemo(() => {
