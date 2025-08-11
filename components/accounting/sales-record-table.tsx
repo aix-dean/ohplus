@@ -32,7 +32,7 @@ function includesAny(record: SalesRecord, query: string): boolean {
 function sumBy(records: SalesRecord[], accessor: (record: SalesRecord) => number): number {
   return records.reduce((sum, record) => sum + accessor(record), 0)
 }
-console.log(SalesRecord)
+
 export function SalesRecordTable() {
   const { toast } = useToast()
   const [records, setRecords] = useState<SalesRecord[]>([])
@@ -60,7 +60,7 @@ export function SalesRecordTable() {
   const loadSalesRecords = async () => {
     try {
       setLoading(true)
-      const salesRecords = await bookingService.getSalesRecords(COMPANY_ID)
+      const salesRecords = await bookingService.getCompletedBooking(COMPANY_ID)
       setRecords(salesRecords)
       toast({
         title: "✅ Data Loaded",
