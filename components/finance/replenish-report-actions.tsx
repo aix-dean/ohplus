@@ -18,16 +18,15 @@ import { FileText, MoreVertical, Printer, Send } from "lucide-react"
 import type { FinanceRequest } from "@/lib/types/finance-request"
 import { generateReplenishRequestPDF } from "@/lib/replenish-pdf"
 
-type Props = { request: FinanceRequest }
+type Props = {
+  request: FinanceRequest
+}
 
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [prefix, data] = dataUrl.split(",")
-  const mime = prefix.substring(prefix.indexOf(":") + 1, prefix.indexOf(";"))
-  const binStr = atob(data)
-  const len = binStr.length
-  const bytes = new Uint8Array(len)
-  for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i)
-  return new Blob([bytes], { type: mime })
+function base64ToPdfBlob(base64: string): Blob {
+  const byteChars = atob(base64)
+  const bytes = new Uint8Array(byteChars.length)
+  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i)
+  return new Blob([bytes], { type: "application/pdf" })
 }
 
 export default function ReplenishReportActions({ request }: Props) {
@@ -35,76 +34,76 @@ export default function ReplenishReportActions({ request }: Props) {
   const [openSend, setOpenSend] = useState(false)
   const [sending, setSending] = useState(false)
 
-  const defaultSubject = useMemo(() => `Replenishment Request Report - #${request["Request No."]}`, [request])
+  const subjectDefault = useMemo(
+    () => `Replenishment Request Report - #${String(request["Request No."] ?? request.id)}`,
+    [request],
+  )
   const [to, setTo] = useState("")
   const [cc, setCc] = useState("")
-  const [subject, setSubject] = useState(defaultSubject)
+  const [subject, setSubject] = useState(subjectDefault)
   const [message, setMessage] = useState(
-    `Hello,\n\nPlease find attached the replenishment request report for Request #${request["Request No."]}.\n\nThank you.`,
+    `Hello,\n\nPlease find attached the replenishment request report for Request #${String(request["Request No."] ?? request.id)}.\n\nThank you.`,
   )
 
   const handlePrint = async () => {
     try {
-      const dataUrl = await generateReplenishRequestPDF(request as any, { returnDataUrl: true })
-      if (!dataUrl || typeof dataUrl !== "string") throw new Error("Failed to generate PDF")
-      const blob = dataUrlToBlob(dataUrl)
+      const base64 = await generateReplenishRequestPDF(request as any, { returnBase64: true })
+      if (!base64) throw new Error("PDF generation failed")
+      const blob = base64ToPdfBlob(base64)
       const url = URL.createObjectURL(blob)
       window.open(url, "_blank", "noopener,noreferrer")
-    } catch (e) {
-      console.error(e)
-      toast({ title: "Error", description: "Unable to generate report for printing.", variant: "destructive" })
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: "Unable to print",
+        description: "We couldn't generate the PDF for printing.",
+        variant: "destructive",
+      })
     }
   }
 
   const handleSend = async () => {
-    const toList = to
+    const recipients = to
       .split(",")
-      .map((s) => s.trim())
+      .map((e) => e.trim())
       .filter(Boolean)
-    const ccList = cc
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-
-    if (toList.length === 0) {
-      toast({
-        title: "Recipient required",
-        description: "Add at least one email in the To field.",
-        variant: "destructive",
-      })
+    if (recipients.length === 0) {
+      toast({ title: "Missing recipient", description: "Add at least one email.", variant: "destructive" })
       return
     }
 
     try {
       setSending(true)
-      const dataUrl = await generateReplenishRequestPDF(request as any, { returnDataUrl: true })
-      if (!dataUrl || typeof dataUrl !== "string") throw new Error("Failed to generate PDF")
-      const base64 = dataUrl.split(",")[1] // strip data URL prefix
-      const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
+      const base64 = await generateReplenishRequestPDF(request as any, { returnBase64: true })
+      if (!base64) throw new Error("PDF generation failed")
 
-      const res = await fetch("/api/reports/replenish/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: toList,
-          cc: ccList,
-          subject,
-          html: message.replace(/\n/g, "<br/>"),
-          pdfBase64: base64,
-          fileName,
-        }),
+      const blob = base64ToPdfBlob(base64)
+      const file = new File([blob], `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`, {
+        type: "application/pdf",
       })
 
+      const form = new FormData()
+      form.append("to", JSON.stringify(recipients))
+      const ccList = cc
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean)
+      if (ccList.length) form.append("cc", JSON.stringify(ccList))
+      form.append("subject", subject)
+      form.append("body", message)
+      form.append("attachment_0", file)
+
+      const res = await fetch("/api/send-email", { method: "POST", body: form })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || "Email send failed")
+        throw new Error(data?.error || "Email send failed")
       }
 
-      toast({ title: "Report sent", description: "The PDF report was emailed successfully." })
+      toast({ title: "Report sent", description: "The PDF report has been emailed successfully." })
       setOpenSend(false)
-    } catch (e: any) {
-      console.error(e)
-      toast({ title: "Failed to send", description: e?.message || "An error occurred.", variant: "destructive" })
+    } catch (err: any) {
+      console.error(err)
+      toast({ title: "Failed to send", description: err?.message || "Unknown error.", variant: "destructive" })
     } finally {
       setSending(false)
     }
@@ -114,14 +113,15 @@ export default function ReplenishReportActions({ request }: Props) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" aria-label="Replenish report actions">
+          <Button variant="outline" size="sm" aria-label="Replenishment report actions">
             <MoreVertical className="h-4 w-4 mr-2" />
             Report
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Replenish
+            <FileText className="h-4 w-4" />
+            Replenish
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setOpenSend(true)}>
@@ -147,16 +147,16 @@ export default function ReplenishReportActions({ request }: Props) {
               </label>
               <Input
                 id="to"
-                placeholder="name@example.com, other@example.com"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
+                placeholder="name@example.com, other@example.com"
               />
             </div>
             <div className="grid gap-1">
               <label htmlFor="cc" className="text-sm text-muted-foreground">
                 CC (optional, comma separated)
               </label>
-              <Input id="cc" placeholder="cc1@example.com" value={cc} onChange={(e) => setCc(e.target.value)} />
+              <Input id="cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@example.com" />
             </div>
             <div className="grid gap-1">
               <label htmlFor="subject" className="text-sm text-muted-foreground">

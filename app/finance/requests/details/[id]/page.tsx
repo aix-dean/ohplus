@@ -38,7 +38,6 @@ import {
 
 import type { FinanceRequest } from "@/lib/types/finance-request"
 import ReplenishReportActions from "@/components/finance/replenish-report-actions"
-import type { ReplenishRequest } from "@/lib/types/finance-request"
 
 type AttachmentType = "image" | "video" | "pdf" | "document"
 type Attachment = {
@@ -389,21 +388,14 @@ export default function RequestDetailsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Request #{request["Request No."]}</h1>
             <p className="text-muted-foreground">
-              {request.request_type === "reimbursement"
-                ? "Reimbursement"
-                : request.request_type === "requisition"
-                  ? "Requisition"
-                  : request.request_type === "replenish"
-                    ? "Replenish"
-                    : "Request"}{" "}
-              Request Details
+              {request.request_type === "reimbursement" ? "Reimbursement" : "Requisition"} Request Details
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {getStatusIcon(request.Actions)}
           <Badge variant={getStatusBadgeVariant(request.Actions)}>{request.Actions}</Badge>
-          {request.request_type === "replenish" && <ReplenishReportActions request={request as ReplenishRequest} />}
+          {request.request_type === "replenish" && <ReplenishReportActions request={request} />}
         </div>
       </div>
 

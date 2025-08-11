@@ -2,229 +2,235 @@ import jsPDF from "jspdf"
 import QRCode from "qrcode"
 import type { FinanceRequest } from "@/lib/types/finance-request"
 
-type ReplenishLike = FinanceRequest & {
+/**
+ * Narrow type for replenish-specific fields layered on top of FinanceRequest.
+ * We do not import any attachments and we DO NOT render any attachments here.
+ */
+type ReplenishRequest = FinanceRequest & {
   Particulars?: string
-  "Voucher No."?: string
-  "Total Amount"?: number
-  "Management Approval"?: string
-  "Date Requested"?: any
+  ["Total Amount"]?: number
+  ["Voucher No."]?: string
+  ["Management Approval"]?: string
+  ["Date Requested"]?: any
 }
 
-function safeToDate(value: any): Date | null {
+/** Safe conversion to Date supporting Firestore Timestamp, string, or number */
+function toSafeDate(value: any): Date {
   try {
-    if (!value) return null
+    if (!value) return new Date(Number.NaN)
     if (value instanceof Date) return value
     if (typeof value?.toDate === "function") return value.toDate()
-    if (typeof value === "string" || typeof value === "number") return new Date(value)
-    return null
+    return new Date(value)
   } catch {
-    return null
+    return new Date(Number.NaN)
   }
 }
 
-function fmtDateTime(dt: Date | null, withTime = true): string {
-  if (!dt || isNaN(dt.getTime())) return "N/A"
-  return withTime ? dt.toLocaleString() : dt.toLocaleDateString()
+function fmtDateTime(value: any): string {
+  const d = toSafeDate(value)
+  return isNaN(d.getTime()) ? "N/A" : d.toLocaleString()
 }
 
-function fmtMoney(amount: number | string | undefined, currency = "PHP"): string {
-  let n = 0
-  if (typeof amount === "number") n = amount
-  else if (typeof amount === "string") n = Number.parseFloat(amount.replace(/[^\d.-]/g, ""))
-  return `${currency}${(isFinite(n) ? n : 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+function fmtDate(value: any): string {
+  const d = toSafeDate(value)
+  return isNaN(d.getTime()) ? "N/A" : d.toLocaleDateString()
+}
+
+function fmtCurrency(amount: number | undefined, currency = "PHP"): string {
+  const n = typeof amount === "number" ? amount : 0
+  return `${currency}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+/** Generate a data URL PNG QR code for a given link */
+async function generateQrDataUrl(text: string): Promise<string | null> {
+  try {
+    return await QRCode.toDataURL(text, { margin: 1, width: 192 })
+  } catch {
+    return null
+  }
 }
 
 /**
- * Generate a user-friendly PDF for a replenish request.
- * This uses only the request document fields — no attachment files are embedded.
+ * Generates a user-friendly PDF for a replenish request based solely on the request's fields.
+ * It does NOT include any files from the "attachments" collection field(s).
  *
- * If options.returnDataUrl is true, returns a data URL string.
- * Otherwise, it triggers a file download in the browser.
+ * If options.returnBase64 is true, returns base64 (no data: prefix). Otherwise triggers a download.
  */
 export async function generateReplenishRequestPDF(
-  request: ReplenishLike,
-  options?: { returnDataUrl?: boolean; preparedBy?: string },
+  request: ReplenishRequest,
+  options?: { returnBase64?: boolean; preparedBy?: string },
 ): Promise<string | void> {
   const pdf = new jsPDF("p", "mm", "a4")
-  const pageW = pdf.internal.pageSize.getWidth()
-  const pageH = pdf.internal.pageSize.getHeight()
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
   const margin = 16
-  const contentW = pageW - margin * 2
+  const contentWidth = pageWidth - margin * 2
 
-  // Optional QR code linking back to the request details page
-  const link = `${process.env.NEXT_PUBLIC_APP_URL}/finance/requests/details/${request.id}`
-  try {
-    const qrDataUrl = await QRCode.toDataURL(link, { margin: 0 })
-    // Header band
-    pdf.setFillColor(30, 58, 138) // blue-900
-    pdf.rect(0, 0, pageW, 26, "F")
-    pdf.addImage(qrDataUrl, "PNG", pageW - margin - 18, 4, 18, 18) // QR in header
-  } catch {
-    // If QR generation fails, still render header band
-    pdf.setFillColor(30, 58, 138)
-    pdf.rect(0, 0, pageW, 26, "F")
-  }
-
-  // Header text
+  // Header band
+  pdf.setFillColor(30, 58, 138) // blue-900
+  pdf.rect(0, 0, pageWidth, 26, "F")
   pdf.setTextColor(255, 255, 255)
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(18)
   pdf.text("REPLENISHMENT REQUEST", margin, 16)
+  pdf.setFont("helvetica", "normal")
   pdf.setFontSize(10)
-  pdf.text(`Report Generated: ${new Date().toLocaleString()}`, margin, 22)
+  pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 22)
 
-  // Reset text color
-  pdf.setTextColor(0, 0, 0)
+  // Optional QR linking back to this request view
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").toString().replace(/\/$/, "")
+  const link = request.id ? `${appUrl}/finance/requests/details/${request.id}` : appUrl || ""
+  const qr = link ? await generateQrDataUrl(link) : null
+  if (qr) {
+    const size = 18
+    pdf.addImage(qr, "PNG", pageWidth - margin - size, margin, size, size)
+  }
 
+  // Title + status badge
   let y = 34
-
-  // Title row with status badge
+  const status = (request.Actions || "Pending").toUpperCase()
+  pdf.setTextColor(0, 0, 0)
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(16)
-  pdf.text(`Request #${request["Request No."]}`, margin, y)
+  pdf.text(`Request #${String(request["Request No."] ?? request.id)}`, margin, y)
 
-  const status = (request.Actions || "Pending").toUpperCase()
-  const badgeW = Math.max(26, pdf.getTextWidth(status) + 8)
-  const badgeX = pageW - margin - badgeW
-  const badgeY = y - 6
-  const badgeColor =
-    request.Actions?.toLowerCase() === "approved"
+  // Status pill
+  const badgeW = Math.max(28, pdf.getTextWidth(status) + 10)
+  const bx = pageWidth - margin - badgeW
+  const by = y - 6
+  const statusColor =
+    (request.Actions || "").toLowerCase() === "approved"
       ? [34, 197, 94]
-      : request.Actions?.toLowerCase() === "rejected"
+      : (request.Actions || "").toLowerCase() === "rejected"
         ? [239, 68, 68]
-        : request.Actions?.toLowerCase() === "processing"
+        : (request.Actions || "").toLowerCase() === "processing"
           ? [59, 130, 246]
           : [156, 163, 175]
-  pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2])
-  pdf.roundedRect(badgeX, badgeY, badgeW, 10, 2, 2, "F")
+  pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+  pdf.roundedRect(bx, by, badgeW, 10, 2, 2, "F")
   pdf.setTextColor(255, 255, 255)
   pdf.setFontSize(10)
-  pdf.text(status, badgeX + 4, badgeY + 7)
+  pdf.text(status, bx + 5, by + 7)
   pdf.setTextColor(0, 0, 0)
 
   y += 10
 
-  // Summary section
-  const created = safeToDate(request.created)
-  const requested = safeToDate((request as any)["Date Requested"])
-  const preparedBy = options?.preparedBy || request.Requestor || "Prepared by user"
+  // Section: Summary (two columns)
+  const leftX = margin
+  const rightX = margin + contentWidth / 2 + 4
+  const rowGap = 6
+
+  const labelValue = (label: string, value: string, x: number, yy: number) => {
+    pdf.setFont("helvetica", "bold")
+    pdf.setFontSize(10)
+    pdf.text(label, x, yy)
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(10)
+    pdf.text(value || "N/A", x + 32, yy)
+  }
 
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(11)
   pdf.text("Summary", margin, y)
   y += 5
   pdf.setDrawColor(220, 220, 220)
-  pdf.setLineWidth(0.4)
-  pdf.line(margin, y, pageW - margin, y)
+  pdf.line(margin, y, pageWidth - margin, y)
   y += 6
 
-  const rowGap = 6
-  const leftX = margin
-  const rightX = margin + contentW / 2 + 4
+  let lY = y
+  let rY = y
+  labelValue("Requestor:", String(request.Requestor || "-"), leftX, lY)
+  lY += rowGap
+  labelValue("Prepared By:", String(options?.preparedBy || request.Requestor || "-"), leftX, lY)
+  lY += rowGap
+  labelValue("Created:", fmtDateTime(request.created), leftX, lY)
+  lY += rowGap
 
-  const row = (label: string, value: string, x: number, yy: number) => {
-    pdf.setFont("helvetica", "bold")
-    pdf.setFontSize(10)
-    pdf.text(label, x, yy)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(value || "N/A", x + 30, yy)
-  }
+  labelValue("Type:", "Replenish", rightX, rY)
+  rY += rowGap
+  labelValue("Date Requested:", fmtDate(request["Date Requested"]), rightX, rY)
+  rY += rowGap
+  labelValue("Voucher No.:", String(request["Voucher No."] || "-"), rightX, rY)
+  rY += rowGap
 
-  let leftY = y
-  let rightY = y
-  row("Requestor:", request.Requestor, leftX, leftY)
-  leftY += rowGap
-  row("Prepared By:", preparedBy, leftX, leftY)
-  leftY += rowGap
-  row("Created:", fmtDateTime(created, true), leftX, leftY)
-  leftY += rowGap
+  y = Math.max(lY, rY) + 8
 
-  row("Type:", "Replenish", rightX, rightY)
-  rightY += rowGap
-  row("Date Requested:", fmtDateTime(requested, false), rightX, rightY)
-  rightY += rowGap
-  row("Voucher No.:", (request as any)["Voucher No."] || "-", rightX, rightY)
-  rightY += rowGap
-
-  y = Math.max(leftY, rightY) + 8
-
-  // Financial cards
+  // Section: Financial Summary (cards)
   const cardH = 22
   const gap = 6
-  const cardW = (contentW - gap) / 2
-
-  const card = (x: number, title: string, value: string) => {
+  const cardW = (contentWidth - gap) / 2
+  const drawCard = (x: number, title: string, value: string) => {
     pdf.setFillColor(248, 250, 252) // slate-50
     pdf.roundedRect(x, y, cardW, cardH, 2, 2, "F")
-    pdf.setDrawColor(226, 232, 240) // slate-200
+    pdf.setDrawColor(226, 232, 240)
     pdf.roundedRect(x, y, cardW, cardH, 2, 2, "S")
-
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(9)
-    pdf.setTextColor(71, 85, 105)
+    pdf.setTextColor(71, 85, 105) // slate-600
     pdf.text(title, x + 4, y + 7)
-
     pdf.setFont("helvetica", "normal")
     pdf.setFontSize(12)
-    pdf.setTextColor(15, 23, 42)
+    pdf.setTextColor(15, 23, 42) // slate-900
     pdf.text(value, x + 4, y + 15)
+    pdf.setTextColor(0, 0, 0)
   }
 
-  card(margin, "Amount", fmtMoney(request.Amount, request.Currency || "PHP"))
-  card(margin + cardW + gap, "Total Amount", fmtMoney((request as any)["Total Amount"] || 0, request.Currency || "PHP"))
-
+  drawCard(margin, "Amount", fmtCurrency(request.Amount, request.Currency || "PHP"))
+  drawCard(
+    margin + cardW + gap,
+    "Total Amount",
+    fmtCurrency((request as any)["Total Amount"] || 0, request.Currency || "PHP"),
+  )
   y += cardH + 10
 
-  // Approval section
+  // Section: Approval
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(11)
   pdf.text("Approval", margin, y)
   y += 5
   pdf.setDrawColor(220, 220, 220)
-  pdf.line(margin, y, pageW - margin, y)
+  pdf.line(margin, y, pageWidth - margin, y)
   y += 6
 
-  pdf.setFont("helvetica", "normal")
-  pdf.setFontSize(10)
-  row("Management Approval:", (request as any)["Management Approval"] || "Pending", margin, y)
-  row("Approved By:", request["Approved By"] || "-", rightX, y)
-  y += rowGap + 8
+  labelValue("Management Approval:", String(request["Management Approval"] || "Pending"), margin, y)
+  labelValue("Approved By:", String(request["Approved By"] || "-"), rightX, y)
+  y += rowGap + 6
 
-  // Particulars block
+  // Section: Particulars
   pdf.setFont("helvetica", "bold")
   pdf.setFontSize(11)
   pdf.text("Particulars", margin, y)
   y += 5
-
-  const blockH = 30
   pdf.setDrawColor(226, 232, 240)
-  pdf.roundedRect(margin, y, contentW, blockH, 2, 2, "S")
-  const text = (request as any).Particulars || request["Requested Item"] || "-"
-  const textLines = pdf.splitTextToSize(text, contentW - 8)
+  const blockHeight = 30
+  pdf.roundedRect(margin, y, contentWidth, blockHeight, 2, 2, "S")
   pdf.setFont("helvetica", "normal")
   pdf.setFontSize(10)
-  pdf.text(textLines, margin + 4, y + 7)
-  y += blockH + 8
+  const particulars = String((request as any).Particulars || request["Requested Item"] || "-")
+  const lines = pdf.splitTextToSize(particulars, contentWidth - 8)
+  pdf.text(lines, margin + 4, y + 7)
+  y += blockHeight + 8
 
   // Note
   pdf.setFont("helvetica", "italic")
   pdf.setFontSize(9)
   pdf.setTextColor(100, 116, 139)
-  pdf.text("This report includes details stored in the request only. No attachments are included.", margin, y)
+  pdf.text("This report reflects the currently saved details of the replenishment request.", margin, y)
+  pdf.setTextColor(0, 0, 0)
 
   // Footer
-  const footerY = pageH - 12
+  const fy = pageHeight - 12
   pdf.setDrawColor(229, 231, 235)
-  pdf.line(margin, footerY, pageW - margin, footerY)
+  pdf.line(margin, fy, pageWidth - margin, fy)
+  pdf.setFont("helvetica", "normal")
   pdf.setFontSize(8)
   pdf.setTextColor(100, 116, 139)
-  pdf.text("Generated by OH Plus Platform", margin, footerY + 5)
+  pdf.text("Generated by OH Plus Platform", margin, fy + 5)
+  pdf.setTextColor(0, 0, 0)
 
-  if (options?.returnDataUrl) {
-    return pdf.output("datauristring")
+  if (options?.returnBase64) {
+    // return only the base64 part (no data: prefix) to keep payloads small
+    return pdf.output("datauristring").split(",")[1] || ""
   } else {
     const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
     pdf.save(fileName)
