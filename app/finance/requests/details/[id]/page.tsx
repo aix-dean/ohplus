@@ -1,17 +1,17 @@
-'use client';
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/auth-context';
-import { useToast } from '@/hooks/use-toast';
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { format } from "date-fns"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 
 import {
   AlertCircle,
@@ -33,282 +33,280 @@ import {
   X,
   XCircle,
   Clock,
-  File as FileGeneric
-} from 'lucide-react';
+  File as FileGeneric,
+} from "lucide-react"
 
-import type { FinanceRequest } from '@/lib/types/finance-request';
+import type { FinanceRequest } from "@/lib/types/finance-request"
+import ReplenishReportActions from "@/components/finance/replenish-report-actions"
 
-type AttachmentType = 'image' | 'video' | 'pdf' | 'document';
+type AttachmentType = "image" | "video" | "pdf" | "document"
 type Attachment = {
-  url: string;
-  name: string;
-  type: AttachmentType;
-  field: 'Attachments' | 'Quotation' | 'Send Report' | 'Print Report';
-};
+  url: string
+  name: string
+  type: AttachmentType
+  field: "Attachments" | "Quotation" | "Send Report" | "Print Report"
+}
 
 const currencies = [
-  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
-  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
-  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
-  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
-  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
-  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
-  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
-  { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
-];
+  { code: "PHP", name: "Philippine Peso", symbol: "₱" },
+  { code: "USD", name: "US Dollar", symbol: "$" },
+  { code: "EUR", name: "Euro", symbol: "€" },
+  { code: "GBP", name: "British Pound", symbol: "£" },
+  { code: "JPY", name: "Japanese Yen", symbol: "¥" },
+  { code: "AUD", name: "Australian Dollar", symbol: "A$" },
+  { code: "CAD", name: "Canadian Dollar", symbol: "C$" },
+  { code: "CHF", name: "Swiss Franc", symbol: "CHF" },
+  { code: "CNY", name: "Chinese Yuan", symbol: "¥" },
+  { code: "SGD", name: "Singapore Dollar", symbol: "S$" },
+  { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$" },
+  { code: "KRW", name: "South Korean Won", symbol: "₩" },
+  { code: "THB", name: "Thai Baht", symbol: "฿" },
+  { code: "MYR", name: "Malaysian Ringgit", symbol: "RM" },
+  { code: "IDR", name: "Indonesian Rupiah", symbol: "Rp" },
+  { code: "VND", name: "Vietnamese Dong", symbol: "₫" },
+]
 
 const getStatusIcon = (status: string) => {
-  switch ((status || '').toLowerCase()) {
-    case 'approved':
-      return <CheckCircle className="h-5 w-5 text-green-600" />;
-    case 'pending':
-      return <Clock className="h-5 w-5 text-yellow-600" />;
-    case 'rejected':
-      return <XCircle className="h-5 w-5 text-red-600" />;
-    case 'processing':
-      return <AlertCircle className="h-5 w-5 text-blue-600" />;
+  switch ((status || "").toLowerCase()) {
+    case "approved":
+      return <CheckCircle className="h-5 w-5 text-green-600" />
+    case "pending":
+      return <Clock className="h-5 w-5 text-yellow-600" />
+    case "rejected":
+      return <XCircle className="h-5 w-5 text-red-600" />
+    case "processing":
+      return <AlertCircle className="h-5 w-5 text-blue-600" />
     default:
-      return <Clock className="h-5 w-5 text-gray-600" />;
+      return <Clock className="h-5 w-5 text-gray-600" />
   }
-};
+}
 
 const getStatusBadgeVariant = (status: string) => {
-  switch ((status || '').toLowerCase()) {
-    case 'approved':
-      return 'default';
-    case 'pending':
-      return 'secondary';
-    case 'rejected':
-      return 'destructive';
-    case 'processing':
-      return 'outline';
+  switch ((status || "").toLowerCase()) {
+    case "approved":
+      return "default"
+    case "pending":
+      return "secondary"
+    case "rejected":
+      return "destructive"
+    case "processing":
+      return "outline"
     default:
-      return 'secondary';
+      return "secondary"
   }
-};
+}
 
 const getCurrencySymbol = (currencyCode: string) => {
-  const currency = currencies.find((c) => c.code === currencyCode);
-  return currency?.symbol || currencyCode;
-};
+  const currency = currencies.find((c) => c.code === currencyCode)
+  return currency?.symbol || currencyCode
+}
 
 const formatAmount = (amount: number, currencyCode: string) => {
-  const symbol = getCurrencySymbol(currencyCode);
-  return `${symbol}${(amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+  const symbol = getCurrencySymbol(currencyCode)
+  return `${symbol}${(amount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
 const getFileType = (url: string): AttachmentType => {
-  const clean = url.split('?')[0] || '';
-  const extension = clean.split('.').pop()?.toLowerCase() || '';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
-  if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v'].includes(extension)) return 'video';
-  if (extension === 'pdf') return 'pdf';
-  return 'document';
-};
+  const clean = url.split("?")[0] || ""
+  const extension = clean.split(".").pop()?.toLowerCase() || ""
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) return "image"
+  if (["mp4", "webm", "ogg", "mov", "avi", "m4v"].includes(extension)) return "video"
+  if (extension === "pdf") return "pdf"
+  return "document"
+}
 
 const getFileName = (url: string) => {
   try {
-    const u = new URL(url);
-    return decodeURIComponent(u.pathname.split('/').pop() || 'attachment');
+    const u = new URL(url)
+    return decodeURIComponent(u.pathname.split("/").pop() || "attachment")
   } catch {
-    const clean = url.split('?')[0];
-    return decodeURIComponent(clean.split('/').pop() || 'attachment');
+    const clean = url.split("?")[0]
+    return decodeURIComponent(clean.split("/").pop() || "attachment")
   }
-};
+}
 
 const IconForType = ({ type, className }: { type: AttachmentType; className?: string }) => {
   switch (type) {
-    case 'image':
-      return <ImageIcon className={className} />;
-    case 'video':
-      return <Play className={className} />;
-    case 'pdf':
-      return <FileText className={className} />;
+    case "image":
+      return <ImageIcon className={className} />
+    case "video":
+      return <Play className={className} />
+    case "pdf":
+      return <FileText className={className} />
     default:
-      return <FileGeneric className={className} />;
+      return <FileGeneric className={className} />
   }
-};
+}
 
 export default function RequestDetailsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { user, userData } = useAuth();
-  const { toast } = useToast();
+  const params = useParams()
+  const router = useRouter()
+  const { user, userData } = useAuth()
+  const { toast } = useToast()
 
-  const [request, setRequest] = useState<FinanceRequest | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [request, setRequest] = useState<FinanceRequest | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
   // Attachment states
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const galleryItems = useMemo(
-    () => attachments.filter((a) => a.type === 'image' || a.type === 'video'),
-    [attachments]
-  );
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
-  const viewerRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const galleryItems = useMemo(() => attachments.filter((a) => a.type === "image" || a.type === "video"), [attachments])
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [galleryIndex, setGalleryIndex] = useState(0)
+  const viewerRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Optional PDF inline preview (kept intact so we don't break existing behaviors)
-  const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<Attachment | null>(null)
 
-  const requestId = params.id as string;
+  const requestId = params.id as string
 
   useEffect(() => {
     const fetchRequest = async () => {
       if (!requestId) {
-        setNotFound(true);
-        setLoading(false);
-        return;
+        setNotFound(true)
+        setLoading(false)
+        return
       }
 
       try {
-        const docRef = doc(db, 'request', requestId);
-        const docSnap = await getDoc(docRef);
+        const docRef = doc(db, "request", requestId)
+        const docSnap = await getDoc(docRef)
 
         if (!docSnap.exists()) {
-          setNotFound(true);
-          return;
+          setNotFound(true)
+          return
         }
 
-        const data = docSnap.data() as any;
+        const data = docSnap.data() as any
 
         // Ownership and deletion checks preserved
-        const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+        const companyIdentifier = user?.company_id || userData?.project_id || user?.uid
         if (data.company_id !== companyIdentifier || data.deleted === true) {
-          setNotFound(true);
-          return;
+          setNotFound(true)
+          return
         }
 
-        const req = { id: docSnap.id, ...data } as FinanceRequest;
-        setRequest(req);
+        const req = { id: docSnap.id, ...data } as FinanceRequest
+        setRequest(req)
 
         // Build attachments list (unchanged sources)
-        const all: Attachment[] = [];
+        const all: Attachment[] = []
         if (req.Attachments) {
           all.push({
             url: req.Attachments,
             name: getFileName(req.Attachments),
             type: getFileType(req.Attachments),
-            field: 'Attachments',
-          });
+            field: "Attachments",
+          })
         }
-        if (req.request_type === 'requisition' && req.Quotation) {
+        if (req.request_type === "requisition" && req.Quotation) {
           all.push({
             url: req.Quotation,
             name: getFileName(req.Quotation),
             type: getFileType(req.Quotation),
-            field: 'Quotation',
-          });
+            field: "Quotation",
+          })
         }
-        if (req.request_type === 'replenish') {
-          if ((req as any)['Send Report']) {
-            const url = (req as any)['Send Report'];
+        if (req.request_type === "replenish") {
+          if ((req as any)["Send Report"]) {
+            const url = (req as any)["Send Report"]
             all.push({
               url,
               name: getFileName(url),
               type: getFileType(url),
-              field: 'Send Report',
-            });
+              field: "Send Report",
+            })
           }
-          if ((req as any)['Print Report']) {
-            const url = (req as any)['Print Report'];
+          if ((req as any)["Print Report"]) {
+            const url = (req as any)["Print Report"]
             all.push({
               url,
               name: getFileName(url),
               type: getFileType(url),
-              field: 'Print Report',
-            });
+              field: "Print Report",
+            })
           }
         }
-        setAttachments(all);
+        setAttachments(all)
       } catch (e) {
-        console.error(e);
+        console.error(e)
         toast({
-          title: 'Error',
-          description: 'Failed to fetch request details.',
-          variant: 'destructive',
-        });
-        setNotFound(true);
+          title: "Error",
+          description: "Failed to fetch request details.",
+          variant: "destructive",
+        })
+        setNotFound(true)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchRequest();
-  }, [requestId, user, userData, toast]);
+    fetchRequest()
+  }, [requestId, user, userData, toast])
 
   // Keyboard navigation when gallery is open inline
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!galleryOpen || galleryItems.length === 0) return;
-      if (e.key === 'ArrowRight') setGalleryIndex((i) => (i + 1) % galleryItems.length);
-      if (e.key === 'ArrowLeft') setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length);
-      if (e.key === 'Escape') setGalleryOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [galleryOpen, galleryItems.length]);
+      if (!galleryOpen || galleryItems.length === 0) return
+      if (e.key === "ArrowRight") setGalleryIndex((i) => (i + 1) % galleryItems.length)
+      if (e.key === "ArrowLeft") setGalleryIndex((i) => (i - 1 + galleryItems.length) % galleryItems.length)
+      if (e.key === "Escape") setGalleryOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [galleryOpen, galleryItems.length])
 
   // Fullscreen listeners
   useEffect(() => {
-    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
-  }, []);
+    const onFs = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener("fullscreenchange", onFs)
+    return () => document.removeEventListener("fullscreenchange", onFs)
+  }, [])
 
-  const handleBack = () => router.push('/finance/requests');
+  const handleBack = () => router.push("/finance/requests")
 
   const handleDownload = (att: Attachment) => {
-    const a = document.createElement('a');
-    a.href = att.url;
-    a.download = att.name;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+    const a = document.createElement("a")
+    a.href = att.url
+    a.download = att.name
+    a.target = "_blank"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
 
   const handleView = (att: Attachment) => {
-    if (att.type === 'image' || att.type === 'video') {
-      const idx = galleryItems.findIndex((g) => g.url === att.url);
-      setGalleryIndex(Math.max(0, idx));
-      setGalleryOpen(true);
+    if (att.type === "image" || att.type === "video") {
+      const idx = galleryItems.findIndex((g) => g.url === att.url)
+      setGalleryIndex(Math.max(0, idx))
+      setGalleryOpen(true)
       // Scroll into view
-      setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
-    } else if (att.type === 'pdf') {
-      setPdfPreview(att);
+      setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0)
+    } else if (att.type === "pdf") {
+      setPdfPreview(att)
       // keep behavior inline; not required by user but does not interfere
     } else {
       // Document types: no preview; keep download-only behavior
       toast({
-        title: 'Preview not available',
-        description: 'This file type can only be downloaded.',
-      });
+        title: "Preview not available",
+        description: "This file type can only be downloaded.",
+      })
     }
-  };
+  }
 
   const toggleFullscreen = async () => {
-    if (!viewerRef.current) return;
+    if (!viewerRef.current) return
     try {
       if (!document.fullscreenElement) {
-        await viewerRef.current.requestFullscreen();
+        await viewerRef.current.requestFullscreen()
       } else {
-        await document.exitFullscreen();
+        await document.exitFullscreen()
       }
     } catch (err) {
-      console.error('Fullscreen toggle error', err);
+      console.error("Fullscreen toggle error", err)
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -349,7 +347,7 @@ export default function RequestDetailsPage() {
           </Card>
         </div>
       </div>
-    );
+    )
   }
 
   if (notFound || !request) {
@@ -375,7 +373,7 @@ export default function RequestDetailsPage() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   return (
@@ -388,15 +386,16 @@ export default function RequestDetailsPage() {
             Back to Requests
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Request #{request['Request No.']}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Request #{request["Request No."]}</h1>
             <p className="text-muted-foreground">
-              {request.request_type === 'reimbursement' ? 'Reimbursement' : 'Requisition'} Request Details
+              {request.request_type === "reimbursement" ? "Reimbursement" : "Requisition"} Request Details
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {getStatusIcon(request.Actions)}
           <Badge variant={getStatusBadgeVariant(request.Actions)}>{request.Actions}</Badge>
+          {request.request_type === "replenish" && <ReplenishReportActions request={request} />}
         </div>
       </div>
 
@@ -412,12 +411,12 @@ export default function RequestDetailsPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-muted-foreground">Request Number</span>
-              <span className="font-medium">#{request['Request No.']}</span>
+              <span className="font-medium">#{request["Request No."]}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-muted-foreground">Type</span>
-              <Badge variant={request.request_type === 'reimbursement' ? 'outline' : 'secondary'}>
+              <Badge variant={request.request_type === "reimbursement" ? "outline" : "secondary"}>
                 {request.request_type}
               </Badge>
             </div>
@@ -434,15 +433,13 @@ export default function RequestDetailsPage() {
               <span className="text-sm font-medium text-muted-foreground">Amount</span>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-lg">
-                  {formatAmount(request.Amount, request.Currency || 'PHP')}
-                </span>
+                <span className="font-medium text-lg">{formatAmount(request.Amount, request.Currency || "PHP")}</span>
               </div>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-muted-foreground">Approved By</span>
-              <span className="font-medium">{request['Approved By'] || 'Not specified'}</span>
+              <span className="font-medium">{request["Approved By"] || "Not specified"}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
@@ -450,7 +447,7 @@ export default function RequestDetailsPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">
-                  {request.created ? format(request.created.toDate(), 'MMM dd, yyyy HH:mm') : 'N/A'}
+                  {request.created ? format(request.created.toDate(), "MMM dd, yyyy HH:mm") : "N/A"}
                 </span>
               </div>
             </div>
@@ -468,37 +465,37 @@ export default function RequestDetailsPage() {
           <CardContent className="space-y-4">
             <div>
               <span className="text-sm font-medium text-muted-foreground">Requested Item</span>
-              <p className="mt-1 text-sm bg-muted p-3 rounded-md">{request['Requested Item']}</p>
+              <p className="mt-1 text-sm bg-muted p-3 rounded-md">{request["Requested Item"]}</p>
             </div>
             <Separator />
-            {request.request_type === 'reimbursement' && (
+            {request.request_type === "reimbursement" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-muted-foreground">Date Released</span>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">
-                    {request['Date Released'] ? format(request['Date Released'].toDate(), 'MMM dd, yyyy') : 'Not specified'}
+                    {request["Date Released"]
+                      ? format(request["Date Released"].toDate(), "MMM dd, yyyy")
+                      : "Not specified"}
                   </span>
                 </div>
               </div>
             )}
-            {request.request_type === 'requisition' && (
+            {request.request_type === "requisition" && (
               <>
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Cashback</span>
-                  <span className="font-medium">
-                    {formatAmount(request.Cashback || 0, request.Currency || 'PHP')}
-                  </span>
+                  <span className="font-medium">{formatAmount(request.Cashback || 0, request.Currency || "PHP")}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">O.R Number</span>
-                  <span className="font-medium">{request['O.R No.'] || 'Not specified'}</span>
+                  <span className="font-medium">{request["O.R No."] || "Not specified"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Invoice Number</span>
-                  <span className="font-medium">{request['Invoice No.'] || 'Not specified'}</span>
+                  <span className="font-medium">{request["Invoice No."] || "Not specified"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
@@ -506,13 +503,15 @@ export default function RequestDetailsPage() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {request['Date Requested'] ? format(request['Date Requested'].toDate(), 'MMM dd, yyyy') : 'Not specified'}
+                      {request["Date Requested"]
+                        ? format(request["Date Requested"].toDate(), "MMM dd, yyyy")
+                        : "Not specified"}
                     </span>
                   </div>
                 </div>
               </>
             )}
-            {request.request_type === 'replenish' && (
+            {request.request_type === "replenish" && (
               <>
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Particulars</span>
@@ -521,24 +520,24 @@ export default function RequestDetailsPage() {
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Amount</span>
-                  <span className="font-medium">{formatAmount(request.Amount, request.Currency || 'PHP')}</span>
+                  <span className="font-medium">{formatAmount(request.Amount, request.Currency || "PHP")}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
                   <span className="font-medium">
-                    {formatAmount((request as any)['Total Amount'] || 0, request.Currency || 'PHP')}
+                    {formatAmount((request as any)["Total Amount"] || 0, request.Currency || "PHP")}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Voucher No.</span>
-                  <span className="font-medium">{(request as any)['Voucher No.'] || 'Not specified'}</span>
+                  <span className="font-medium">{(request as any)["Voucher No."] || "Not specified"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">Management Approval</span>
-                  <span className="font-medium">{(request as any)['Management Approval'] || 'Pending'}</span>
+                  <span className="font-medium">{(request as any)["Management Approval"] || "Pending"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
@@ -546,9 +545,9 @@ export default function RequestDetailsPage() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {(request as any)['Date Requested']
-                        ? format((request as any)['Date Requested'].toDate(), 'MMM dd, yyyy')
-                        : 'Not specified'}
+                      {(request as any)["Date Requested"]
+                        ? format((request as any)["Date Requested"].toDate(), "MMM dd, yyyy")
+                        : "Not specified"}
                     </span>
                   </div>
                 </div>
@@ -566,7 +565,9 @@ export default function RequestDetailsPage() {
               <Download className="h-5 w-5" />
               Attachments ({attachments.length})
             </CardTitle>
-            <CardDescription>Click "View" to preview images or videos on the page, or "Download" to save locally</CardDescription>
+            <CardDescription>
+              Click "View" to preview images or videos on the page, or "Download" to save locally
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -577,7 +578,9 @@ export default function RequestDetailsPage() {
                     <div className="flex items-center gap-3 min-w-0">
                       <IconForType type={att.type} className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-medium truncate" title={att.name}>{att.name}</p>
+                        <p className="font-medium truncate" title={att.name}>
+                          {att.name}
+                        </p>
                         <p className="text-sm text-muted-foreground capitalize truncate">
                           {att.type} • {att.field}
                         </p>
@@ -588,8 +591,8 @@ export default function RequestDetailsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleView(att)}
-                        disabled={att.type === 'document'}
-                        title={att.type === 'document' ? 'Preview not available for this file type' : 'View'}
+                        disabled={att.type === "document"}
+                        title={att.type === "document" ? "Preview not available for this file type" : "View"}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View
@@ -638,7 +641,7 @@ export default function RequestDetailsPage() {
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={toggleFullscreen}>
                         {isFullscreen ? <Shrink className="h-4 w-4 mr-2" /> : <Expand className="h-4 w-4 mr-2" />}
-                        {isFullscreen ? 'Exit full screen' : 'Full screen'}
+                        {isFullscreen ? "Exit full screen" : "Full screen"}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setGalleryOpen(false)}>
                         <X className="h-4 w-4 mr-2" />
@@ -650,19 +653,23 @@ export default function RequestDetailsPage() {
                   <div
                     ref={viewerRef}
                     className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
-                    style={{ minHeight: '360px' }}
+                    style={{ minHeight: "360px" }}
                     aria-label="Media viewer"
                   >
                     {/* Media */}
                     <div className="max-h-[70vh] w-full flex items-center justify-center p-4">
-                      {galleryItems[galleryIndex].type === 'image' ? (
+                      {galleryItems[galleryIndex].type === "image" ? (
                         <img
-                          src={galleryItems[galleryIndex].url || '/placeholder.svg?height=300&width=600&query=image%20preview'} 
+                          src={
+                            galleryItems[galleryIndex].url ||
+                            "/placeholder.svg?height=300&width=600&query=image%20preview" ||
+                            "/placeholder.svg"
+                          }
                           alt={galleryItems[galleryIndex].name}
                           className="mx-auto max-h-[70vh] max-w-full object-contain"
                           crossOrigin="anonymous"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/placeholder.svg?height=300&width=600';
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=300&width=600"
                           }}
                         />
                       ) : (
@@ -672,9 +679,9 @@ export default function RequestDetailsPage() {
                           src={galleryItems[galleryIndex].url}
                           onError={() =>
                             toast({
-                              title: 'Error',
-                              description: 'Unable to load video file.',
-                              variant: 'destructive',
+                              title: "Error",
+                              description: "Unable to load video file.",
+                              variant: "destructive",
                             })
                           }
                         />
@@ -715,20 +722,19 @@ export default function RequestDetailsPage() {
                           type="button"
                           onClick={() => setGalleryIndex(idx)}
                           className={`flex-shrink-0 rounded-md overflow-hidden border ${
-                            idx === galleryIndex ? 'ring-2 ring-foreground' : 'border-border'
+                            idx === galleryIndex ? "ring-2 ring-foreground" : "border-border"
                           }`}
                           title={item.name}
                           aria-label={`Open ${item.name}`}
                         >
-                          {item.type === 'image' ? (
+                          {item.type === "image" ? (
                             <img
-                              src={item.url || '/placeholder.svg?height=72&width=96&query=thumbnail'}
+                              src={item.url || "/placeholder.svg?height=72&width=96&query=thumbnail"}
                               alt={item.name}
                               className="h-18 w-24 object-cover"
                               crossOrigin="anonymous"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  '/placeholder.svg?height=72&width=96';
+                                ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=72&width=96"
                               }}
                             />
                           ) : (
@@ -747,5 +753,5 @@ export default function RequestDetailsPage() {
         </Card>
       )}
     </div>
-  );
+  )
 }
