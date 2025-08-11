@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import {
@@ -173,9 +175,18 @@ export default function RequestsView() {
   // Tabs state
   const [activeTab, setActiveTab] = useState<TabKey>("all")
 
+  // Send dialog state
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendFor, setSendFor] = useState<FinanceRequest | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sendTo, setSendTo] = useState("")
+  const [sendCc, setSendCc] = useState("")
+  const [sendSubject, setSendSubject] = useState("")
+  const [sendMessage, setSendMessage] = useState("")
+
   // Fetch from Firestore
   useEffect(() => {
-    const companyIdentifier = user?.company_id || userData?.project_id || user?.uid
+    const companyIdentifier = (user as any)?.company_id || (userData as any)?.project_id || (user as any)?.uid
 
     if (!companyIdentifier) {
       setLoading(false)
@@ -457,7 +468,7 @@ export default function RequestsView() {
     }
   }
 
-  // Replenish Report actions: fresh PDF from current fields (no attachments)
+  // Replenish Report: Print (fresh PDF)
   const handlePrintReplenishReport = async (request: any) => {
     try {
       const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
@@ -471,39 +482,63 @@ export default function RequestsView() {
     }
   }
 
-  const handleSendReplenishReport = async (request: any) => {
-    const toRaw = prompt("To (comma separated emails):", "") || ""
-    const recipients = toRaw
+  // Replenish Report: Send dialog open
+  const openSendDialog = (request: FinanceRequest) => {
+    setSendFor(request)
+    const reqNo = String((request as any)["Request No."] ?? request.id)
+    setSendSubject(`Replenishment Request Report - #${reqNo}`)
+    setSendMessage(
+      `Hello,\n\nPlease find attached the replenishment request report for Request #${reqNo}.\n\nThank you.`,
+    )
+    setSendTo("")
+    setSendCc("")
+    setSendOpen(true)
+  }
+
+  // Replenish Report: Send submit
+  const handleSendSubmit = async () => {
+    if (!sendFor) return
+    const recipients = sendTo
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
-    if (recipients.length === 0) return
-
+    if (recipients.length === 0) {
+      toast({
+        title: "Recipient required",
+        description: "Please add at least one email in the To field.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      const base64 = await generateReplenishRequestPDF(request, { returnBase64: true })
+      setSending(true)
+      const base64 = await generateReplenishRequestPDF(sendFor as any, { returnBase64: true })
       if (!base64 || typeof base64 !== "string") throw new Error("Failed to generate PDF")
       const blob = base64ToBlob(base64)
-      const fileName = `replenish-request-${String(request["Request No."] ?? request.id)}.pdf`
+      const fileName = `replenish-request-${String((sendFor as any)["Request No."] ?? (sendFor as any).id)}.pdf`
 
       const form = new FormData()
       form.append("to", JSON.stringify(recipients))
-      form.append("subject", `Replenishment Request Report - #${String(request["Request No."] ?? request.id)}`)
-      form.append(
-        "body",
-        `Hello,\n\nPlease find attached the replenishment request report for Request #${String(
-          request["Request No."] ?? request.id,
-        )}.\n\nThank you.`,
-      )
+      const ccList = sendCc
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (ccList.length) form.append("cc", JSON.stringify(ccList))
+      form.append("subject", sendSubject)
+      form.append("body", sendMessage)
       form.append("attachment_0", new File([blob], fileName, { type: "application/pdf" }))
 
       const res = await fetch("/api/send-email", { method: "POST", body: form })
-      const data = await res.json().catch(() => ({}) as any)
-      if (!res.ok) throw new Error(data?.error || "Failed to send email")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as any)?.error || "Failed to send email")
 
       toast({ title: "Report sent", description: "The PDF report was emailed successfully." })
+      setSendOpen(false)
     } catch (e: any) {
       console.error(e)
       toast({ title: "Failed to send", description: e?.message || "An error occurred.", variant: "destructive" })
+    } finally {
+      setSending(false)
     }
   }
 
@@ -687,12 +722,12 @@ export default function RequestsView() {
                             Edit Request
                           </DropdownMenuItem>
 
-                          {/* Replenish-specific quick actions: now generate a fresh PDF (no attachments) */}
+                          {/* Replenish-specific quick actions: fresh PDF (no attachments) */}
                           {isReplenish && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Replenish</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleSendReplenishReport(request)}>
+                              <DropdownMenuItem onClick={() => openSendDialog(request)}>
                                 <Send className="mr-2 h-4 w-4" />
                                 Send Report
                               </DropdownMenuItem>
@@ -895,6 +930,54 @@ export default function RequestsView() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Send Report Dialog */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Replenishment Report</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1">
+              <label htmlFor="to" className="text-sm text-muted-foreground">
+                To (comma separated)
+              </label>
+              <Input
+                id="to"
+                placeholder="name@example.com, other@example.com"
+                value={sendTo}
+                onChange={(e) => setSendTo(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="cc" className="text-sm text-muted-foreground">
+                CC (optional, comma separated)
+              </label>
+              <Input id="cc" placeholder="cc1@example.com" value={sendCc} onChange={(e) => setSendCc(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="subject" className="text-sm text-muted-foreground">
+                Subject
+              </label>
+              <Input id="subject" value={sendSubject} onChange={(e) => setSendSubject(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="message" className="text-sm text-muted-foreground">
+                Message
+              </label>
+              <Textarea id="message" rows={5} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendSubmit} disabled={sending}>
+              {sending ? "Sending..." : "Send"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
