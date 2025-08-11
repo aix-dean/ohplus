@@ -60,7 +60,7 @@ export function SalesRecordTable() {
   const loadSalesRecords = async () => {
     try {
       setLoading(true)
-      const salesRecords = await bookingService.getCompletedBooking(COMPANY_ID)
+      const salesRecords = await bookingService.getCompletedBookings(COMPANY_ID)
       setRecords(salesRecords)
       toast({
         title: "✅ Data Loaded",
