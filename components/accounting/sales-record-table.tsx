@@ -1,134 +1,91 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { uid, parseNumber, sumBy, includesAny, formatCurrency } from "./utils"
+import { formatCurrency } from "./utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Save, Undo2, Search, Trash2, PencilLine, Check, X, Eye, EyeOff, Filter, Download } from 'lucide-react'
+import { Search, PencilLine, Check, X, Eye, EyeOff, Filter, Download, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { bookingService, type SalesRecord } from "@/lib/booking-service"
 
-type SalesRecordRow = {
-  id: string
-  month: string
-  date: string
-  serviceInvoice: string
-  bsNumber: string
-  clients: string
-  tin: string
-  description: string
-  netSales: number
-  // computed (view only)
-  outputVat: number
-  total: number
-  discount: number
-  creditableTax: number
-  amountCollected: number
-  orNo: string
-  paidDate: string
+// Mock company ID - in real app, this would come from auth context
+const COMPANY_ID = "kV2aoZN1xqvw7qv7oNgm"
+
+function includesAny(record: SalesRecord, query: string): boolean {
+  if (!query) return true
+  const searchQuery = query.toLowerCase()
+  return (
+    record.clients.toLowerCase().includes(searchQuery) ||
+    record.serviceInvoice.toLowerCase().includes(searchQuery) ||
+    record.bsNumber.toLowerCase().includes(searchQuery) ||
+    record.description.toLowerCase().includes(searchQuery) ||
+    record.tin.toLowerCase().includes(searchQuery) ||
+    record.orNo.toLowerCase().includes(searchQuery) ||
+    record.paymentMethod.toLowerCase().includes(searchQuery) ||
+    record.productType.toLowerCase().includes(searchQuery)
+  )
 }
 
-const STORAGE_KEY = "acc_sales_record_v1"
-
-const MOCK_ROWS: SalesRecordRow[] = [
-  {
-    id: uid("sr"),
-    month: "Dec",
-    date: "13",
-    serviceInvoice: "SI-2412001",
-    bsNumber: "BS-1001",
-    clients: "Acme Foods Inc.",
-    tin: "123-456-789-000",
-    description: "LED Billboard Rental - December",
-    netSales: 100000,
-    outputVat: 12000,
-    total: 112000,
-    discount: 0,
-    creditableTax: 2000,
-    amountCollected: 110000,
-    orNo: "OR-5001",
-    paidDate: "2024-12-14",
-  },
-  {
-    id: uid("sr"),
-    month: "Dec",
-    date: "13",
-    serviceInvoice: "SI-2412002",
-    bsNumber: "BS-1002",
-    clients: "ByteTech Corp.",
-    tin: "987-654-321-000",
-    description: "Static Billboard Rental - Dec",
-    netSales: 50000,
-    outputVat: 6000,
-    total: 56000,
-    discount: 0,
-    creditableTax: 1000,
-    amountCollected: 55000,
-    orNo: "OR-5002",
-    paidDate: "2024-12-15",
-  },
-]
-
-function recompute(row: SalesRecordRow): SalesRecordRow {
-  const net = parseNumber(row.netSales)
-  const outputVat = net * 0.12
-  const total = net + outputVat
-  const creditableTax = net * 0.02
-  const amountCollected = total - creditableTax
-  return {
-    ...row,
-    outputVat,
-    total,
-    discount: 0,
-    creditableTax,
-    amountCollected,
-  }
+function sumBy(records: SalesRecord[], accessor: (record: SalesRecord) => number): number {
+  return records.reduce((sum, record) => sum + accessor(record), 0)
 }
 
 export function SalesRecordTable() {
   const { toast } = useToast()
-  const [rows, setRows] = useState<SalesRecordRow[]>([])
+  const [records, setRecords] = useState<SalesRecord[]>([])
   const [query, setQuery] = useState("")
-  const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Record<string, boolean>>({})
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table")
   const [showComputed, setShowComputed] = useState(true)
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as SalesRecordRow[]
-        setRows(parsed.map(recompute))
-      } catch {
-        setRows(MOCK_ROWS.map(recompute))
-      }
-    } else {
-      setRows(MOCK_ROWS.map(recompute))
-    }
-  }, [])
 
   // Auto-switch to cards on mobile
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
-        setViewMode('cards')
+        setViewMode("cards")
       } else {
-        setViewMode('table')
+        setViewMode("table")
       }
     }
 
     handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  const filtered = useMemo(() => rows.filter((r) => includesAny(r, query)), [rows, query])
+  const loadSalesRecords = async () => {
+    try {
+      setLoading(true)
+      const salesRecords = await bookingService.getSalesRecords(COMPANY_ID)
+      setRecords(salesRecords)
+      toast({
+        title: "✅ Data Loaded",
+        description: `Loaded ${salesRecords.length} sales records from bookings.`,
+      })
+    } catch (error) {
+      console.error("Error loading sales records:", error)
+      toast({
+        title: "❌ Error",
+        description: "Failed to load sales records. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSalesRecords()
+  }, [])
+
+  const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
   const totals = useMemo(() => {
-    const base = filtered.length ? filtered : rows
+    const base = filtered.length ? filtered : records
     return {
       netSales: sumBy(base, (r) => r.netSales),
       outputVat: sumBy(base, (r) => r.outputVat),
@@ -136,78 +93,104 @@ export function SalesRecordTable() {
       creditableTax: sumBy(base, (r) => r.creditableTax),
       amountCollected: sumBy(base, (r) => r.amountCollected),
     }
-  }, [filtered, rows])
+  }, [filtered, records])
 
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
-    setDirty(false)
-    toast({ 
-      title: "✅ Saved Successfully", 
-      description: "Sales records have been saved to your browser." 
-    })
-  }
-
-  function resetToMock() {
-    setRows(MOCK_ROWS.map(recompute))
-    setDirty(true)
-    setEditing({})
-    toast({ 
-      title: "🔄 Data Loaded", 
-      description: "Mock data has been loaded." 
-    })
-  }
-
-  function addRow() {
-    const newRow: SalesRecordRow = recompute({
-      id: uid("sr"),
-      month: "",
-      date: "",
-      serviceInvoice: "",
-      bsNumber: "",
-      clients: "",
-      tin: "",
-      description: "",
-      netSales: 0,
-      outputVat: 0,
-      total: 0,
-      discount: 0,
-      creditableTax: 0,
-      amountCollected: 0,
-      orNo: "",
-      paidDate: "",
-    })
-    setRows((r) => [newRow, ...r])
-    setEditing((e) => ({ ...e, [newRow.id]: true }))
-    setDirty(true)
-  }
-
-  function updateRow(id: string, patch: Partial<SalesRecordRow>) {
-    setRows((prev) =>
+  function updateRecord(id: string, patch: Partial<SalesRecord>) {
+    setRecords((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r
-        const next = { ...r, ...patch }
-        return recompute(next)
-      })
-    )
-    setDirty(true)
-  }
+        const updated = { ...r, ...patch }
 
-  function deleteRow(id: string) {
-    setRows((prev) => prev.filter((r) => r.id !== id))
-    setDirty(true)
-    setEditing((e) => {
-      const copy = { ...e }
-      delete copy[id]
-      return copy
-    })
-    toast({ 
-      title: "🗑️ Record Deleted", 
-      description: "Sales record has been removed." 
-    })
+        // Recalculate computed values if netSales changed
+        if (patch.netSales !== undefined) {
+          const netSales = patch.netSales
+          updated.outputVat = netSales * 0.12
+          updated.total = netSales + updated.outputVat
+          updated.creditableTax = netSales * 0.02
+          updated.amountCollected = updated.total - updated.creditableTax
+        }
+
+        return updated
+      }),
+    )
   }
 
   function toggleEdit(id: string, state?: boolean) {
     setEditing((prev) => ({ ...prev, [id]: state ?? !prev[id] }))
+  }
+
+  const exportToCSV = () => {
+    const headers = [
+      "Month",
+      "Date",
+      "Service Invoice",
+      "BS Number",
+      "Client",
+      "TIN",
+      "Description",
+      "Net Sales",
+      "Output VAT",
+      "Total",
+      "Creditable Tax",
+      "Amount Collected",
+      "OR Number",
+      "Paid Date",
+      "Payment Method",
+      "Product Type",
+      "Quantity",
+    ]
+
+    const csvContent = [
+      headers.join(","),
+      ...filtered.map((record) =>
+        [
+          record.month,
+          record.date,
+          record.serviceInvoice,
+          record.bsNumber,
+          `"${record.clients}"`,
+          record.tin,
+          `"${record.description}"`,
+          record.netSales,
+          record.outputVat,
+          record.total,
+          record.creditableTax,
+          record.amountCollected,
+          record.orNo,
+          record.paidDate,
+          record.paymentMethod,
+          record.productType,
+          record.quantity,
+        ].join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `sales-records-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "📊 Export Complete",
+      description: "Sales records exported to CSV file.",
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white dark:bg-slate-800">
+          <CardContent className="p-12 text-center">
+            <RefreshCw className="h-12 w-12 mx-auto mb-4 animate-spin opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Loading Sales Records</h3>
+            <p className="text-sm text-muted-foreground">Fetching completed bookings...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -219,11 +202,10 @@ export function SalesRecordTable() {
             <div>
               <CardTitle className="text-xl font-semibold">Sales Records</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {filtered.length} of {rows.length} records
-                {dirty && <Badge variant="secondary" className="ml-2">Unsaved changes</Badge>}
+                {filtered.length} of {records.length} records from completed bookings
               </p>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Search */}
               <div className="relative flex-1 sm:w-80">
@@ -235,7 +217,7 @@ export function SalesRecordTable() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button
@@ -245,70 +227,100 @@ export function SalesRecordTable() {
                   className="hidden lg:flex"
                 >
                   {showComputed ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                  {showComputed ? 'Hide' : 'Show'} Computed
+                  {showComputed ? "Hide" : "Show"} Computed
                 </Button>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
+                  onClick={() => setViewMode(viewMode === "table" ? "cards" : "table")}
                   className="hidden lg:flex"
                 >
                   <Filter className="h-4 w-4 mr-2" />
-                  {viewMode === 'table' ? 'Card View' : 'Table View'}
+                  {viewMode === "table" ? "Card View" : "Table View"}
                 </Button>
               </div>
             </div>
           </div>
-          
+
           {/* Action Bar */}
           <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <Button onClick={addRow} className="bg-green-600 hover:bg-green-700 text-white">
-              <Plus className="mr-2 h-4 w-4" /> Add Record
+            <Button onClick={loadSalesRecords} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
             </Button>
-            <Button variant="outline" onClick={save} disabled={!dirty}>
-              <Save className="mr-2 h-4 w-4" /> Save Changes
-            </Button>
-            <Button variant="outline" onClick={resetToMock}>
-              <Undo2 className="mr-2 h-4 w-4" /> Load Sample Data
-            </Button>
-            <Button variant="outline" className="ml-auto">
-              <Download className="mr-2 h-4 w-4" /> Export
+            <Button onClick={exportToCSV} variant="outline" className="ml-auto bg-transparent">
+              <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
           </div>
         </CardHeader>
       </Card>
 
       {/* Summary Cards */}
-      
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Net Sales</div>
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totals.netSales)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-green-700 dark:text-green-300">Output VAT</div>
+            <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+              {formatCurrency(totals.outputVat)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Total</div>
+            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              {formatCurrency(totals.total)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-orange-700 dark:text-orange-300">Creditable Tax</div>
+            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+              {formatCurrency(totals.creditableTax)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 border-teal-200 dark:border-teal-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-teal-700 dark:text-teal-300">Amount Collected</div>
+            <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">
+              {formatCurrency(totals.amountCollected)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Data Display */}
-      {viewMode === 'cards' ? (
-        <CardsView 
-          rows={filtered} 
-          editing={editing} 
-          onEdit={toggleEdit} 
-          onUpdate={updateRow} 
-          onDelete={deleteRow} 
-        />
+      {viewMode === "cards" ? (
+        <CardsView records={filtered} editing={editing} onEdit={toggleEdit} onUpdate={updateRecord} />
       ) : (
-        <TableView 
-          rows={filtered} 
-          editing={editing} 
+        <TableView
+          records={filtered}
+          editing={editing}
           showComputed={showComputed}
-          onEdit={toggleEdit} 
-          onUpdate={updateRow} 
-          onDelete={deleteRow} 
+          onEdit={toggleEdit}
+          onUpdate={updateRecord}
         />
       )}
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !loading && (
         <Card className="bg-white dark:bg-slate-800">
           <CardContent className="p-12 text-center">
             <div className="text-muted-foreground">
               <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">No records found</h3>
-              <p className="text-sm">Try adjusting your search or add a new record to get started.</p>
+              <p className="text-sm">Try adjusting your search or refresh the data.</p>
             </div>
           </CardContent>
         </Card>
@@ -317,159 +329,139 @@ export function SalesRecordTable() {
   )
 }
 
-function CardsView({ 
-  rows, 
-  editing, 
-  onEdit, 
-  onUpdate, 
-  onDelete 
+function CardsView({
+  records,
+  editing,
+  onEdit,
+  onUpdate,
 }: {
-  rows: SalesRecordRow[]
+  records: SalesRecord[]
   editing: Record<string, boolean>
   onEdit: (id: string, state?: boolean) => void
-  onUpdate: (id: string, patch: Partial<SalesRecordRow>) => void
-  onDelete: (id: string) => void
+  onUpdate: (id: string, patch: Partial<SalesRecord>) => void
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {rows.map((row) => {
-        const isEditing = !!editing[row.id]
+      {records.map((record) => {
+        const isEditing = !!editing[record.id]
         return (
-          <Card key={row.id} className={`bg-white dark:bg-slate-800 transition-all duration-200 ${isEditing ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'}`}>
+          <Card
+            key={record.id}
+            className={`bg-white dark:bg-slate-800 transition-all duration-200 ${isEditing ? "ring-2 ring-blue-500 shadow-lg" : "hover:shadow-md"}`}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-lg">{row.clients || "New Client"}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{row.serviceInvoice}</p>
+                  <CardTitle className="text-lg">{record.clients}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{record.serviceInvoice}</p>
+                  <Badge variant="secondary" className="mt-1">
+                    {record.productType}
+                  </Badge>
                 </div>
                 <div className="flex gap-1">
                   {isEditing ? (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onEdit(row.id, false)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, false)}>
                         <Check className="h-4 w-4 text-green-600" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onEdit(row.id, false)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, false)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => onEdit(row.id, true)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, true)}>
                       <PencilLine className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onDelete(row.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Field
                   label="Month"
-                  value={row.month}
+                  value={record.month}
                   editing={isEditing}
-                  onChange={(v) => onUpdate(row.id, { month: v })}
+                  onChange={(v) => onUpdate(record.id, { month: v })}
                 />
                 <Field
                   label="Date"
-                  value={row.date}
+                  value={record.date}
                   editing={isEditing}
-                  onChange={(v) => onUpdate(row.id, { date: v })}
+                  onChange={(v) => onUpdate(record.id, { date: v })}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <Field
                   label="BS Number"
-                  value={row.bsNumber}
+                  value={record.bsNumber}
                   editing={isEditing}
-                  onChange={(v) => onUpdate(row.id, { bsNumber: v })}
+                  onChange={(v) => onUpdate(record.id, { bsNumber: v })}
                 />
                 <Field
                   label="OR Number"
-                  value={row.orNo}
+                  value={record.orNo}
                   editing={isEditing}
-                  onChange={(v) => onUpdate(row.id, { orNo: v })}
+                  onChange={(v) => onUpdate(record.id, { orNo: v })}
                 />
               </div>
-              
-              <Field
-                label="Client Name"
-                value={row.clients}
-                editing={isEditing}
-                onChange={(v) => onUpdate(row.id, { clients: v })}
-              />
-              
+
               <Field
                 label="TIN"
-                value={row.tin}
+                value={record.tin}
                 editing={isEditing}
-                onChange={(v) => onUpdate(row.id, { tin: v })}
+                onChange={(v) => onUpdate(record.id, { tin: v })}
               />
-              
+
               <Field
                 label="Description"
-                value={row.description}
-                editing={isEditing}
-                onChange={(v) => onUpdate(row.id, { description: v })}
+                value={record.description}
+                editing={false} // Keep description read-only as it comes from booking
+                onChange={() => {}}
               />
-              
+
               <Field
                 label="Net Sales"
-                value={String(row.netSales)}
+                value={String(record.netSales)}
                 editing={isEditing}
                 numeric
-                onChange={(v) => onUpdate(row.id, { netSales: parseNumber(v) })}
+                onChange={(v) => onUpdate(record.id, { netSales: Number.parseFloat(v) || 0 })}
               />
-              
-              <Field
-                label="Paid Date"
-                value={row.paidDate}
-                editing={isEditing}
-                onChange={(v) => onUpdate(row.id, { paidDate: v })}
-              />
-              
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Payment Method
+                  </div>
+                  <div className="text-sm font-medium">{record.paymentMethod}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantity</div>
+                  <div className="text-sm font-medium">{record.quantity}</div>
+                </div>
+              </div>
+
               {/* Computed Values */}
               <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                 <h4 className="text-sm font-medium mb-3 text-muted-foreground">Computed Values</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <div className="text-muted-foreground">Output VAT</div>
-                    <div className="font-medium">{formatCurrency(row.outputVat)}</div>
+                    <div className="font-medium">{formatCurrency(record.outputVat)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Total</div>
-                    <div className="font-medium">{formatCurrency(row.total)}</div>
+                    <div className="font-medium">{formatCurrency(record.total)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Creditable Tax</div>
-                    <div className="font-medium">{formatCurrency(row.creditableTax)}</div>
+                    <div className="font-medium">{formatCurrency(record.creditableTax)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Amount Collected</div>
-                    <div className="font-medium">{formatCurrency(row.amountCollected)}</div>
+                    <div className="font-medium">{formatCurrency(record.amountCollected)}</div>
                   </div>
                 </div>
               </div>
@@ -481,20 +473,18 @@ function CardsView({
   )
 }
 
-function TableView({ 
-  rows, 
-  editing, 
+function TableView({
+  records,
+  editing,
   showComputed,
-  onEdit, 
-  onUpdate, 
-  onDelete 
+  onEdit,
+  onUpdate,
 }: {
-  rows: SalesRecordRow[]
+  records: SalesRecord[]
   editing: Record<string, boolean>
   showComputed: boolean
   onEdit: (id: string, state?: boolean) => void
-  onUpdate: (id: string, patch: Partial<SalesRecordRow>) => void
-  onDelete: (id: string) => void
+  onUpdate: (id: string, patch: Partial<SalesRecord>) => void
 }) {
   return (
     <Card className="bg-white dark:bg-slate-800">
@@ -519,98 +509,75 @@ function TableView({
                 </>
               )}
               <TableHead className="font-semibold">OR No.</TableHead>
-              <TableHead className="font-semibold">Paid Date</TableHead>
+              <TableHead className="font-semibold">Payment</TableHead>
+              <TableHead className="font-semibold">Type</TableHead>
               <TableHead className="font-semibold text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => {
-              const isEditing = !!editing[row.id]
+            {records.map((record) => {
+              const isEditing = !!editing[record.id]
               return (
-                <TableRow 
-                  key={row.id} 
-                  className={`transition-colors ${isEditing ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                <TableRow
+                  key={record.id}
+                  className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
                 >
                   <TableCell>
                     {isEditing ? (
-                      <Input 
-                        value={row.month} 
-                        onChange={(e) => onUpdate(row.id, { month: e.target.value })}
+                      <Input
+                        value={record.month}
+                        onChange={(e) => onUpdate(record.id, { month: e.target.value })}
                         className="w-20"
                       />
                     ) : (
-                      <span>{row.month || "-"}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <Input 
-                        value={row.date} 
-                        onChange={(e) => onUpdate(row.id, { date: e.target.value })}
-                        className="w-20"
-                      />
-                    ) : (
-                      <span>{row.date || "-"}</span>
+                      <span>{record.month || "-"}</span>
                     )}
                   </TableCell>
                   <TableCell>
                     {isEditing ? (
                       <Input
-                        value={row.serviceInvoice}
-                        onChange={(e) => onUpdate(row.id, { serviceInvoice: e.target.value })}
-                        className="w-32"
+                        value={record.date}
+                        onChange={(e) => onUpdate(record.id, { date: e.target.value })}
+                        className="w-20"
                       />
                     ) : (
-                      <span className="font-mono text-sm">{row.serviceInvoice || "-"}</span>
+                      <span>{record.date || "-"}</span>
                     )}
                   </TableCell>
                   <TableCell>
+                    <span className="font-mono text-sm">{record.serviceInvoice}</span>
+                  </TableCell>
+                  <TableCell>
                     {isEditing ? (
-                      <Input 
-                        value={row.bsNumber} 
-                        onChange={(e) => onUpdate(row.id, { bsNumber: e.target.value })}
+                      <Input
+                        value={record.bsNumber}
+                        onChange={(e) => onUpdate(record.id, { bsNumber: e.target.value })}
                         className="w-24"
                       />
                     ) : (
-                      <span className="font-mono text-sm">{row.bsNumber || "-"}</span>
+                      <span className="font-mono text-sm">{record.bsNumber}</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    {isEditing ? (
-                      <Input 
-                        value={row.clients} 
-                        onChange={(e) => onUpdate(row.id, { clients: e.target.value })}
-                        className="w-40"
-                      />
-                    ) : (
-                      <div className="max-w-40">
-                        <span className="font-medium">{row.clients || "-"}</span>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <Input 
-                        value={row.tin} 
-                        onChange={(e) => onUpdate(row.id, { tin: e.target.value })}
-                        className="w-36"
-                      />
-                    ) : (
-                      <span className="font-mono text-sm">{row.tin || "-"}</span>
-                    )}
+                    <div className="max-w-40">
+                      <span className="font-medium">{record.clients}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {isEditing ? (
                       <Input
-                        value={row.description}
-                        onChange={(e) => onUpdate(row.id, { description: e.target.value })}
-                        className="w-48"
+                        value={record.tin}
+                        onChange={(e) => onUpdate(record.id, { tin: e.target.value })}
+                        className="w-36"
                       />
                     ) : (
-                      <div className="max-w-48">
-                        <span className="text-sm">{row.description || "-"}</span>
-                      </div>
+                      <span className="font-mono text-sm">{record.tin || "-"}</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-48">
+                      <span className="text-sm">{record.description}</span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     {isEditing ? (
@@ -618,50 +585,53 @@ function TableView({
                         type="number"
                         inputMode="decimal"
                         className="text-right w-32"
-                        value={row.netSales}
-                        onChange={(e) => onUpdate(row.id, { netSales: parseNumber(e.target.value) })}
+                        value={record.netSales}
+                        onChange={(e) => onUpdate(record.id, { netSales: Number.parseFloat(e.target.value) || 0 })}
                       />
                     ) : (
-                      <span className="font-mono font-medium">{formatCurrency(row.netSales)}</span>
+                      <span className="font-mono font-medium">{formatCurrency(record.netSales)}</span>
                     )}
                   </TableCell>
                   {showComputed && (
                     <>
                       <TableCell className="text-right">
-                        <span className="font-mono text-green-700 dark:text-green-400">{formatCurrency(row.outputVat)}</span>
+                        <span className="font-mono text-green-700 dark:text-green-400">
+                          {formatCurrency(record.outputVat)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-mono font-medium">{formatCurrency(row.total)}</span>
+                        <span className="font-mono font-medium">{formatCurrency(record.total)}</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-mono text-orange-700 dark:text-orange-400">{formatCurrency(row.creditableTax)}</span>
+                        <span className="font-mono text-orange-700 dark:text-orange-400">
+                          {formatCurrency(record.creditableTax)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-mono text-blue-700 dark:text-blue-400">{formatCurrency(row.amountCollected)}</span>
+                        <span className="font-mono text-blue-700 dark:text-blue-400">
+                          {formatCurrency(record.amountCollected)}
+                        </span>
                       </TableCell>
                     </>
                   )}
                   <TableCell>
                     {isEditing ? (
-                      <Input 
-                        value={row.orNo} 
-                        onChange={(e) => onUpdate(row.id, { orNo: e.target.value })}
+                      <Input
+                        value={record.orNo}
+                        onChange={(e) => onUpdate(record.id, { orNo: e.target.value })}
                         className="w-24"
                       />
                     ) : (
-                      <span className="font-mono text-sm">{row.orNo || "-"}</span>
+                      <span className="font-mono text-sm">{record.orNo}</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    {isEditing ? (
-                      <Input 
-                        value={row.paidDate} 
-                        onChange={(e) => onUpdate(row.id, { paidDate: e.target.value })}
-                        className="w-32"
-                      />
-                    ) : (
-                      <span className="text-sm">{row.paidDate || "-"}</span>
-                    )}
+                    <span className="text-sm">{record.paymentMethod}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs">
+                      {record.productType}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -671,7 +641,7 @@ function TableView({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => onEdit(row.id, false)}
+                            onClick={() => onEdit(record.id, false)}
                           >
                             <Check className="h-4 w-4 text-green-600" />
                           </Button>
@@ -679,29 +649,16 @@ function TableView({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => onEdit(row.id, false)}
+                            onClick={() => onEdit(record.id, false)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         </>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onEdit(row.id, true)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, true)}>
                           <PencilLine className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => onDelete(row.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
