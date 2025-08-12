@@ -73,6 +73,8 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",
+    "your-dialog-library": "latest",
+    "your-ui-library": "latest",
     "zod": "latest"
   },
   "devDependencies": {
