@@ -1,16 +1,19 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X } from "lucide-react"
+import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { getPaginatedClients, type Client } from "@/lib/client-service"
+import { ClientDialog } from "@/components/client-dialog"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -28,7 +31,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
-  bir_2307?: File | null // Changed from string to File for file upload
+  bir_2307?: File | null
   collection_date?: string
   // Supplies specific fields
   date?: string
@@ -57,9 +60,65 @@ const initialFormData: CollectibleFormData = {
 export default function CreateCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
+  const { user } = useAuth()
+
+  const [clientSearchTerm, setClientSearchTerm] = useState("")
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([])
+  const [isSearchingClients, setIsSearchingClients] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
+  const debouncedClientSearchTerm = useDebounce(clientSearchTerm, 500)
+  const clientSearchRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (user?.uid) {
+        setIsSearchingClients(true)
+        try {
+          const result = await getPaginatedClients(10, null, debouncedClientSearchTerm.trim(), null, user.uid)
+          setClientSearchResults(result.items)
+        } catch (error) {
+          console.error("Error fetching clients:", error)
+          setClientSearchResults([])
+        } finally {
+          setIsSearchingClients(false)
+        }
+      } else {
+        setClientSearchResults([])
+      }
+    }
+    fetchClients()
+  }, [debouncedClientSearchTerm, user?.uid])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
+    setIsClientDropdownOpen(false)
+    setClientSearchTerm("")
+  }
+
+  const handleNewClientSuccess = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
+    setIsNewClientDialogOpen(false)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,12 +171,69 @@ export default function CreateCollectiblePage() {
 
       <div className="space-y-2">
         <Label htmlFor="client_name">Client Name</Label>
-        <Input
-          id="client_name"
-          value={formData.client_name}
-          onChange={(e) => handleInputChange("client_name", e.target.value)}
-          required
-        />
+        <div className="relative" ref={clientSearchRef}>
+          <div className="relative">
+            <Input
+              placeholder="Search or select client..."
+              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              onChange={(e) => {
+                setClientSearchTerm(e.target.value)
+                setSelectedClient(null)
+                setFormData((prev) => ({ ...prev, client_name: "" }))
+              }}
+              onFocus={() => {
+                setIsClientDropdownOpen(true)
+                if (selectedClient) {
+                  setClientSearchTerm("")
+                }
+              }}
+              className="pr-10"
+              required
+            />
+            {isSearchingClients && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+            )}
+          </div>
+          {/* Results dropdown */}
+          {isClientDropdownOpen && (
+            <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+              <div className="p-2">
+                {/* Always show "Add New Client" option at the top */}
+                <div
+                  className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                  onClick={() => setIsNewClientDialogOpen(true)}
+                >
+                  <PlusCircle className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium text-blue-700">Add New Client</span>
+                </div>
+
+                {clientSearchResults.length > 0 ? (
+                  clientSearchResults.map((result) => (
+                    <div
+                      key={result.id}
+                      className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                      onClick={() => handleClientSelect(result)}
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {result.name} ({result.company})
+                        </p>
+                        <p className="text-xs text-gray-500">{result.email}</p>
+                      </div>
+                      {selectedClient?.id === result.id && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-2">
+                    {clientSearchTerm.trim() && !isSearchingClients
+                      ? `No clients found for "${clientSearchTerm}".`
+                      : "Start typing to search for clients."}
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -398,6 +514,12 @@ export default function CreateCollectiblePage() {
           </form>
         </CardContent>
       </Card>
+
+      <ClientDialog
+        open={isNewClientDialogOpen}
+        onOpenChange={setIsNewClientDialogOpen}
+        onSuccess={handleNewClientSuccess}
+      />
     </div>
   )
 }
