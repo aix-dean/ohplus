@@ -17,6 +17,8 @@ import type { Campaign, CampaignTimelineEvent } from "@/lib/types/campaign"
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalActivities } from "@/lib/proposal-activity-service"
 
+export type { Campaign, CampaignTimelineEvent } from "@/lib/types/campaign"
+
 // Create a campaign from a proposal
 export async function createCampaignFromProposal(proposal: Proposal, userId: string): Promise<string> {
   try {
@@ -387,18 +389,24 @@ function mapProposalActivityToTimelineType(activityType: string): CampaignTimeli
 // Helper function to get timeline event type from status
 function getTimelineEventType(status: Campaign["status"]): CampaignTimelineEvent["type"] {
   switch (status) {
+    case "proposal_draft":
+      return "proposal_draft"
     case "proposal_sent":
       return "proposal_sent"
     case "proposal_accepted":
       return "proposal_accepted"
     case "proposal_declined":
       return "proposal_declined"
+    case "cost_estimate_pending":
+      return "cost_estimate_pending"
     case "cost_estimate_sent":
       return "cost_estimate_sent"
     case "cost_estimate_approved":
       return "cost_estimate_approved"
     case "cost_estimate_declined":
       return "cost_estimate_declined"
+    case "quotation_pending":
+      return "quotation_pending"
     case "quotation_sent":
       return "quotation_sent"
     case "quotation_accepted":
@@ -411,6 +419,8 @@ function getTimelineEventType(status: Campaign["status"]): CampaignTimelineEvent
       return "campaign_started"
     case "campaign_completed":
       return "campaign_completed"
+    case "campaign_cancelled":
+      return "campaign_cancelled"
     default:
       return "note_added"
   }

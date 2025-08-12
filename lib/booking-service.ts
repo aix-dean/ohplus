@@ -1,5 +1,14 @@
 import { db } from "./firebase"
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  startAfter,
+  type DocumentSnapshot,
+} from "firebase/firestore"
 
 export interface Booking {
   id: string
@@ -47,6 +56,22 @@ export interface SalesRecord {
   productType: string
 }
 
+export interface PaginationOptions {
+  page: number
+  pageSize: number
+  lastDoc?: DocumentSnapshot
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  totalCount: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+  currentPage: number
+  totalPages: number
+  lastDoc?: DocumentSnapshot
+}
+
 export class BookingService {
   private static instance: BookingService
 
@@ -57,15 +82,35 @@ export class BookingService {
     return BookingService.instance
   }
 
-  async getCompletedBookings(companyId: string): Promise<Booking[]> {
+  async getCompletedBookingsCount(companyId: string): Promise<number> {
     try {
       const bookingsRef = collection(db, "booking")
-      const q = query(
+      const q = query(bookingsRef, where("company_id", "==", companyId), where("status", "==", "COMPLETED"))
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error fetching completed bookings count:", error)
+      throw error
+    }
+  }
+
+  async getCompletedBookings(companyId: string, options?: PaginationOptions): Promise<Booking[]> {
+    try {
+      const bookingsRef = collection(db, "booking")
+      let q = query(
         bookingsRef,
         where("company_id", "==", companyId),
         where("status", "==", "COMPLETED"),
         orderBy("created", "desc"),
       )
+
+      if (options) {
+        if (options.lastDoc) {
+          q = query(q, startAfter(options.lastDoc))
+        }
+        q = query(q, limit(options.pageSize))
+      }
 
       const querySnapshot = await getDocs(q)
       const bookings: Booking[] = []
@@ -122,12 +167,49 @@ export class BookingService {
     }
   }
 
-  async getSalesRecords(companyId: string): Promise<SalesRecord[]> {
+  async getSalesRecords(companyId: string, options?: PaginationOptions): Promise<SalesRecord[]> {
     try {
-      const bookings = await this.getCompletedBookings(companyId)
+      const bookings = await this.getCompletedBookings(companyId, options)
       return bookings.map((booking) => this.convertBookingToSalesRecord(booking))
     } catch (error) {
       console.error("Error getting sales records:", error)
+      throw error
+    }
+  }
+
+  async getPaginatedSalesRecords(companyId: string, options: PaginationOptions): Promise<PaginatedResult<SalesRecord>> {
+    try {
+      const [totalCount, bookings] = await Promise.all([
+        this.getCompletedBookingsCount(companyId),
+        this.getCompletedBookings(companyId, options),
+      ])
+
+      const salesRecords = bookings.map((booking) => this.convertBookingToSalesRecord(booking))
+      const totalPages = Math.ceil(totalCount / options.pageSize)
+
+      // Get the last document for cursor-based pagination
+      const bookingsRef = collection(db, "booking")
+      const lastQuery = query(
+        bookingsRef,
+        where("company_id", "==", companyId),
+        where("status", "==", "COMPLETED"),
+        orderBy("created", "desc"),
+        limit(options.pageSize * options.page),
+      )
+      const lastSnapshot = await getDocs(lastQuery)
+      const lastDoc = lastSnapshot.docs[lastSnapshot.docs.length - 1]
+
+      return {
+        data: salesRecords,
+        totalCount,
+        hasNextPage: options.page < totalPages,
+        hasPreviousPage: options.page > 1,
+        currentPage: options.page,
+        totalPages,
+        lastDoc,
+      }
+    } catch (error) {
+      console.error("Error getting paginated sales records:", error)
       throw error
     }
   }
