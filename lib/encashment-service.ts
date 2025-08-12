@@ -200,6 +200,102 @@ export async function createMultiplePettyCashTransactions(
   }
 }
 
+export async function getSettings(type?: string): Promise<PettyCashSettings[]> {
+  try {
+    const q = query(collection(db, "encashment_settings"), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const settings: PettyCashSettings[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data() as PettyCashSettings
+      if (!type || data.type === type) {
+        settings.push({ id: doc.id, ...data })
+      }
+    })
+
+    return settings
+  } catch (error) {
+    console.error("Error fetching settings:", error)
+    return []
+  }
+}
+
+export async function getTransactions(type?: string): Promise<PettyCashRow[]> {
+  try {
+    const q = query(collection(db, "encashment_transactions"), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const transactions: PettyCashRow[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data() as PettyCashRow
+      if (data.deleted !== true && (!type || data.type === type)) {
+        transactions.push({ id: doc.id, ...data })
+      }
+    })
+
+    return transactions
+  } catch (error) {
+    console.error("Error fetching transactions:", error)
+    return []
+  }
+}
+
+export async function createSettings(settings: Omit<PettyCashSettings, "id" | "created" | "updated">): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, "encashment_settings"), {
+      ...settings,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    })
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating settings:", error)
+    throw error
+  }
+}
+
+export async function createTransaction(
+  transaction: Omit<PettyCashRow, "id" | "created" | "updated">,
+): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, "encashment_transactions"), {
+      ...transaction,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    })
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating transaction:", error)
+    throw error
+  }
+}
+
+export async function updateTransaction(id: string, transaction: Partial<PettyCashRow>): Promise<void> {
+  try {
+    const transactionRef = doc(db, "encashment_transactions", id)
+    await updateDoc(transactionRef, {
+      ...transaction,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error updating transaction:", error)
+    throw error
+  }
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  try {
+    const transactionRef = doc(db, "encashment_transactions", id)
+    await updateDoc(transactionRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error soft deleting transaction:", error)
+    throw error
+  }
+}
+
 export const encashmentService = {
   // Settings operations
   createPettyCashSettings,
@@ -214,4 +310,11 @@ export const encashmentService = {
   deletePettyCashTransaction,
   createMultiplePettyCashTransactions,
   deleteMultiplePettyCashTransactions,
+
+  getSettings,
+  getTransactions,
+  createSettings,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
 }
