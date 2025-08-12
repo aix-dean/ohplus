@@ -116,17 +116,20 @@ export function PettyCashFundTable() {
 
   const calculateTotals = (data: any[]) => {
     const base = data.length ? data : rows
-    const gross = sumBy(base, (r) => r.grossAmount)
-    const netOfVat = sumBy(base, (r) => r.netOfVat)
-    const inputVat = sumBy(base, (r) => r.inputVat)
-    const oneP = sumBy(base, (r) => r.onePercent)
-    const twoP = sumBy(base, (r) => r.twoPercent)
-    const netAmount = sumBy(base, (r) => r.netAmount)
-    const balanceForDeposit = settings.pettyCashFundAmount - netAmount
+    const gross = sumBy(base, (r) => parseNumber(r.grossAmount) || 0)
+    const netOfVat = sumBy(base, (r) => parseNumber(r.netOfVat) || 0)
+    const inputVat = sumBy(base, (r) => parseNumber(r.inputVat) || 0)
+    const oneP = sumBy(base, (r) => parseNumber(r.onePercent) || 0)
+    const twoP = sumBy(base, (r) => parseNumber(r.twoPercent) || 0)
+    const netAmount = sumBy(base, (r) => parseNumber(r.netAmount) || 0)
+
+    const fundAmount = parseNumber(settings.pettyCashFundAmount) || 0
+    const balanceForDeposit = fundAmount - netAmount
     const totalPettyCashFund = netAmount
-    const pcfAmountBalance = settings.pettyCashFundAmount - totalPettyCashFund
-    setTotalFundUsage(totalPettyCashFund)
-    setRemainingBalanceForDeposit(balanceForDeposit)
+    const pcfAmountBalance = fundAmount - totalPettyCashFund
+
+    setTotalFundUsage(isNaN(totalPettyCashFund) ? 0 : totalPettyCashFund)
+    setRemainingBalanceForDeposit(isNaN(balanceForDeposit) ? 0 : balanceForDeposit)
   }
 
   async function addRow() {
@@ -573,22 +576,22 @@ export function PettyCashFundTable() {
                     TOTALS
                   </TableCell>
                   <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
-                    {formatCurrency(sumBy(rows, (r) => r.grossAmount))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.grossAmount)))}
                   </TableCell>
                   <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
-                    {formatCurrency(sumBy(rows, (r) => r.netOfVat))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.netOfVat)))}
                   </TableCell>
                   <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
-                    {formatCurrency(sumBy(rows, (r) => r.inputVat))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.inputVat)))}
                   </TableCell>
                   <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
-                    {formatCurrency(sumBy(rows, (r) => r.onePercent))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.onePercent)))}
                   </TableCell>
                   <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
-                    {formatCurrency(sumBy(rows, (r) => r.twoPercent))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.twoPercent)))}
                   </TableCell>
                   <TableCell className="text-right font-bold text-blue-600 py-4 px-4 text-lg">
-                    {formatCurrency(sumBy(rows, (r) => r.netAmount))}
+                    {formatCurrency(sumBy(rows, (r) => parseNumber(r.netAmount)))}
                   </TableCell>
                   <TableCell className="py-4 px-4" />
                 </TableRow>
@@ -605,17 +608,19 @@ function includesAny(obj: any, query: string): boolean {
   return Object.values(obj).some((value) => value.toString().toLowerCase().includes(query.toLowerCase()))
 }
 
-function parseNumber(value: string | number | undefined | null): number {
-  if (value === null || value === undefined) return 0
-  if (typeof value === "number") return value
+const parseNumber = (value: any): number => {
+  if (value === null || value === undefined || value === "") return 0
+  if (typeof value === "number") return isNaN(value) ? 0 : value
   if (typeof value === "string") {
-    return Number.parseFloat(value.replace(/,/g, "")) || 0
+    const cleaned = value.replace(/[₱,\s]/g, "")
+    const parsed = Number.parseFloat(cleaned)
+    return isNaN(parsed) ? 0 : parsed
   }
   return 0
 }
 
 function sumBy(arr: any[], key: string): number {
-  return arr.reduce((sum, item) => sum + item[key], 0)
+  return arr.reduce((sum, item) => sum + parseNumber(item[key]), 0)
 }
 
 function uid(prefix: string): string {
