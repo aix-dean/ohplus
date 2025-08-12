@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
+import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle, CheckIcon as Checkbox } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
@@ -27,6 +27,7 @@ interface CollectibleFormData {
   invoice_no: string
   next_collection_date: string
   status: "pending" | "collected" | "overdue"
+  next_status?: "pending" | "collected" | "overdue"
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -55,10 +56,12 @@ const initialFormData: CollectibleFormData = {
   invoice_no: "",
   next_collection_date: "",
   status: "pending",
+  next_status: "pending",
 }
 
 export default function CreateCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
+  const [showNextCollection, setShowNextCollection] = useState(false)
   const router = useRouter()
   const { user } = useAuth()
 
@@ -70,6 +73,18 @@ export default function CreateCollectiblePage() {
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
   const debouncedClientSearchTerm = useDebounce(clientSearchTerm, 500)
   const clientSearchRef = useRef<HTMLDivElement>(null)
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
+    setIsClientDropdownOpen(false)
+  }
+
+  const handleNewClientSuccess = (newClient: Client) => {
+    setSelectedClient(newClient)
+    setFormData((prev) => ({ ...prev, client_name: newClient.company || newClient.name }))
+    setIsNewClientDialogOpen(false)
+  }
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -108,17 +123,20 @@ export default function CreateCollectiblePage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleClientSelect = (client: Client) => {
-    setSelectedClient(client)
-    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
-    setIsClientDropdownOpen(false)
-    setClientSearchTerm("")
-  }
-
-  const handleNewClientSuccess = (client: Client) => {
-    setSelectedClient(client)
-    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
-    setIsNewClientDialogOpen(false)
+  const handleNextBir2307Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    if (
+      file &&
+      ![
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ].includes(file.type)
+    ) {
+      alert("Please upload only PDF or DOC files")
+      return
+    }
+    setFormData((prev) => ({ ...prev, next_bir_2307: file }))
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,15 +332,76 @@ export default function CreateCollectiblePage() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="next_collection_date">Next Collection Date</Label>
-        <Input
-          id="next_collection_date"
-          type="date"
-          value={formData.next_collection_date}
-          onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
-          required
-        />
+        <div className="flex items-center space-x-2">
+          <Checkbox id="proceed_next_collection" checked={showNextCollection} onCheckedChange={setShowNextCollection} />
+          <Label htmlFor="proceed_next_collection">Proceed to set the next collection date?</Label>
+        </div>
       </div>
+
+      {showNextCollection && (
+        <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+          <h3 className="font-medium text-gray-900">Next Collection Details</h3>
+
+          <div className="space-y-2">
+            <Label htmlFor="next_collection_date">Next Collection Date</Label>
+            <Input
+              id="next_collection_date"
+              type="date"
+              value={formData.next_collection_date}
+              onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
+              required={showNextCollection}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="next_bir_2307">BIR 2307 (Next Collection)</Label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              <input
+                type="file"
+                id="next_bir_2307"
+                accept=".pdf,.doc,.docx"
+                onChange={handleNextBir2307Change}
+                className="hidden"
+              />
+              <label
+                htmlFor="next_bir_2307"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+              >
+                <Upload className="h-8 w-8 text-gray-400" />
+                <span className="text-sm text-gray-600">Click to upload or drag and drop</span>
+                <span className="text-xs text-gray-500">PDF, DOC files only</span>
+              </label>
+              {formData.next_bir_2307 && (
+                <div className="mt-2 flex items-center justify-between bg-gray-100 p-2 rounded">
+                  <span className="text-sm text-gray-700">{formData.next_bir_2307.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData((prev) => ({ ...prev, next_bir_2307: null }))}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="next_status">Status (Next Collection)</Label>
+            <Select value={formData.next_status} onValueChange={(value) => handleInputChange("next_status", value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="collected">Collected</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
