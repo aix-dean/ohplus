@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
+import { encashmentService } from "@/lib/encashment-service"
 
 type RevolvingSettings = {
   companyName: string
@@ -35,6 +36,8 @@ type RevolvingRow = {
   onePercent: number
   twoPercent: number
   netAmount: number
+  type: string
+  deleted: boolean
 }
 
 const STORAGE_KEY = "acc_encash_rvf_rows_v1"
@@ -77,6 +80,8 @@ const MOCK_ROWS: RevolvingRow[] = [
     onePercent: 0,
     twoPercent: 0,
     netAmount: 0,
+    type: "REVOLVING_FUND",
+    deleted: false,
   }),
 ]
 
@@ -86,22 +91,52 @@ export function RevolvingFundTable() {
   const [settings, setSettings] = useState<RevolvingSettings>(MOCK_SETTINGS)
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEY_SETTINGS)
-      if (s) setSettings(JSON.parse(s) as RevolvingSettings)
-    } catch {}
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved) as RevolvingRow[]
-        setRows(parsed.map(compute))
-        return
-      }
-    } catch {}
-    setRows(MOCK_ROWS)
+    loadData()
   }, [])
+
+  async function loadData() {
+    try {
+      setLoading(true)
+
+      // Load settings
+      const savedSettings = await encashmentService.getSettings("REVOLVING_FUND")
+      if (savedSettings) {
+        setSettings(savedSettings as RevolvingSettings)
+      }
+
+      // Load transactions filtered by type and not deleted
+      const transactions = await encashmentService.getTransactions("REVOLVING_FUND")
+      if (transactions && transactions.length > 0) {
+        setRows(transactions.map(compute))
+      } else {
+        // Fallback to localStorage for migration
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY)
+          if (saved) {
+            const parsed = JSON.parse(saved) as RevolvingRow[]
+            setRows(parsed.map((row) => compute({ ...row, type: "REVOLVING_FUND", deleted: false })))
+          } else {
+            setRows(MOCK_ROWS)
+          }
+        } catch {
+          setRows(MOCK_ROWS)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading revolving fund data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load revolving fund data",
+        variant: "destructive",
+      })
+      setRows(MOCK_ROWS)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => rows.filter((r) => includesAny(r, query)), [rows, query])
 
@@ -148,6 +183,8 @@ export function RevolvingFundTable() {
       onePercent: 0,
       twoPercent: 0,
       netAmount: 0,
+      type: "REVOLVING_FUND",
+      deleted: false,
     })
     setRows((r) => [row, ...r])
     setDirty(true)
@@ -163,22 +200,65 @@ export function RevolvingFundTable() {
     setDirty(true)
   }
 
-  function deleteRow(id: string) {
-    setRows((prev) => prev.filter((r) => r.id !== id))
-    setDirty(true)
+  async function deleteRow(id: string) {
+    try {
+      await encashmentService.softDeleteTransaction(id)
+      setRows((prev) => prev.filter((r) => r.id !== id))
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction",
+        variant: "destructive",
+      })
+    }
   }
 
-  function saveAll() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
-    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings))
-    setDirty(false)
-    toast({ title: "Saved", description: "Revolving Fund saved to your browser." })
+  async function saveAll() {
+    try {
+      // Save settings
+      await encashmentService.saveSettings("REVOLVING_FUND", settings)
+
+      // Save transactions
+      for (const row of rows) {
+        await encashmentService.saveTransaction({
+          ...row,
+          type: "REVOLVING_FUND",
+          deleted: false,
+        })
+      }
+
+      setDirty(false)
+      toast({
+        title: "Success",
+        description: "Revolving Fund data saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving revolving fund data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save revolving fund data",
+        variant: "destructive",
+      })
+    }
   }
 
   function resetMock() {
     setRows(MOCK_ROWS)
     setSettings(MOCK_SETTINGS)
     setDirty(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-gray-500">Loading revolving fund data...</div>
+      </div>
+    )
   }
 
   return (
