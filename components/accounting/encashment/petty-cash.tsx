@@ -605,8 +605,13 @@ function includesAny(obj: any, query: string): boolean {
   return Object.values(obj).some((value) => value.toString().toLowerCase().includes(query.toLowerCase()))
 }
 
-function parseNumber(value: string): number {
-  return Number.parseFloat(value.replace(/,/g, "")) || 0
+function parseNumber(value: string | number | undefined | null): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    return Number.parseFloat(value.replace(/,/g, "")) || 0
+  }
+  return 0
 }
 
 function sumBy(arr: any[], key: string): number {
