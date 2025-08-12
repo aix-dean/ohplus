@@ -1,29 +1,34 @@
 import { SalesRecordTable } from "@/components/accounting/sales-record-table"
-import { Card, CardContent } from "@/components/ui/card"
 
 export default function Page() {
   return (
-    <div className="mx-auto w-full p-4 md:p-6">
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Accounting — Sales Record</h1>
-        <p className="text-sm text-muted-foreground">Manage sales records. Edit rows using the button at the end of each row.</p>
-      </div>
+    <div className="min-h-screen overflow-x-auto bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-2 py-6 max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Accounting</span>
+              <span>/</span>
+              <span>Sales Record</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Sales Record Management
+            </h1>
+            <p className="text-muted-foreground max-w-2xl">
+              Track and manage your sales records with automated calculations for VAT, taxes, and collections. 
+              All data is stored locally in your browser.
+            </p>
+          </div>
+        </div>
 
-      <div className="space-y-4">
-        <SalesRecordTable />
-
-        <Card>
-          <CardContent className="pt-4 text-sm text-muted-foreground">
-            Notes:
-            <ul className="list-disc pl-6 mt-2 space-y-1">
-              <li>Output VAT = Net Sales × 0.12</li>
-              <li>Total = Net Sales + Output VAT</li>
-              <li>Creditable Tax = Net Sales × 0.02</li>
-              <li>Amount Collected = Invoice Amount − Creditable Tax (Invoice Amount assumed to be Total)</li>
-              <li>Use Save to persist to your browser. Load Mock Data to restore example entries.</li>
-            </ul>
-          </CardContent>
-        </Card>
+        {/* Main Content */}
+        <div className="space-y-6">
+          <SalesRecordTable />
+          
+          {/* Information Cards */}
+          
+        </div>
       </div>
     </div>
   )

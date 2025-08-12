@@ -1,116 +1,106 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { uid, parseNumber, sumBy, includesAny, formatCurrency } from "./utils"
+import { formatCurrency } from "./utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Save, Undo2, Search, Trash2, PencilLine, Check, X } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { Search, PencilLine, Check, X, Eye, EyeOff, Filter, Download, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { bookingService, type SalesRecord } from "@/lib/booking-service"
+import { useAuth } from "@/contexts/auth-context"
 
-type SalesRecordRow = {
-  id: string
-  month: string
-  date: string
-  serviceInvoice: string
-  bsNumber: string
-  clients: string
-  tin: string
-  description: string
-  netSales: number
-  // computed (view only)
-  outputVat: number
-  total: number
-  discount: number
-  creditableTax: number
-  amountCollected: number
-  orNo: string
-  paidDate: string
+// Mock company ID - in real app, this would come from auth context
+// Remove this line:
+// const COMPANY_ID = "kV2aoZN1xqvw7qv7oNgm"
+
+function includesAny(record: SalesRecord, query: string): boolean {
+  if (!query) return true
+  const searchQuery = query.toLowerCase()
+  return (
+    record.clients.toLowerCase().includes(searchQuery) ||
+    record.serviceInvoice.toLowerCase().includes(searchQuery) ||
+    record.bsNumber.toLowerCase().includes(searchQuery) ||
+    record.description.toLowerCase().includes(searchQuery) ||
+    record.tin.toLowerCase().includes(searchQuery) ||
+    record.orNo.toLowerCase().includes(searchQuery) ||
+    record.paymentMethod.toLowerCase().includes(searchQuery) ||
+    record.productType.toLowerCase().includes(searchQuery)
+  )
 }
 
-const STORAGE_KEY = "acc_sales_record_v1"
-
-const MOCK_ROWS: SalesRecordRow[] = [
-  {
-    id: uid("sr"),
-    month: "Dec",
-    date: "13",
-    serviceInvoice: "SI-2412001",
-    bsNumber: "BS-1001",
-    clients: "Acme Foods Inc.",
-    tin: "123-456-789-000",
-    description: "LED Billboard Rental - December",
-    netSales: 100000,
-    outputVat: 12000,
-    total: 112000,
-    discount: 0,
-    creditableTax: 2000,
-    amountCollected: 110000,
-    orNo: "OR-5001",
-    paidDate: "2024-12-14",
-  },
-  {
-    id: uid("sr"),
-    month: "Dec",
-    date: "13",
-    serviceInvoice: "SI-2412002",
-    bsNumber: "BS-1002",
-    clients: "ByteTech Corp.",
-    tin: "987-654-321-000",
-    description: "Static Billboard Rental - Dec",
-    netSales: 50000,
-    outputVat: 6000,
-    total: 56000,
-    discount: 0,
-    creditableTax: 1000,
-    amountCollected: 55000,
-    orNo: "OR-5002",
-    paidDate: "2024-12-15",
-  },
-]
-
-function recompute(row: SalesRecordRow): SalesRecordRow {
-  const net = parseNumber(row.netSales)
-  const outputVat = net * 0.12
-  const total = net + outputVat
-  const creditableTax = net * 0.02
-  const amountCollected = total - creditableTax // Invoice Amount assumed = Total (per spec)
-  return {
-    ...row,
-    outputVat,
-    total,
-    discount: 0,
-    creditableTax,
-    amountCollected,
-  }
+function sumBy(records: SalesRecord[], accessor: (record: SalesRecord) => number): number {
+  return records.reduce((sum, record) => sum + accessor(record), 0)
 }
 
 export function SalesRecordTable() {
   const { toast } = useToast()
-  const [rows, setRows] = useState<SalesRecordRow[]>([])
+  const { userData } = useAuth()
+  const [records, setRecords] = useState<SalesRecord[]>([])
   const [query, setQuery] = useState("")
-  const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Record<string, boolean>>({})
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table")
+  const [showComputed, setShowComputed] = useState(true)
 
+  // Auto-switch to cards on mobile
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as SalesRecordRow[]
-        setRows(parsed.map(recompute))
-      } catch {
-        setRows(MOCK_ROWS.map(recompute))
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setViewMode("cards")
+      } else {
+        setViewMode("table")
       }
-    } else {
-      setRows(MOCK_ROWS.map(recompute))
     }
+
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  const filtered = useMemo(() => rows.filter((r) => includesAny(r, query)), [rows, query])
+  const loadSalesRecords = async () => {
+    if (!userData?.company_id) {
+      toast({
+        title: "❌ Error",
+        description: "No company ID found. Please contact support.",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const salesRecords = await bookingService.getSalesRecords(userData.company_id)
+      setRecords(salesRecords)
+      toast({
+        title: "✅ Data Loaded",
+        description: `Loaded ${salesRecords.length} sales records from bookings.`,
+      })
+    } catch (error) {
+      console.error("Error loading sales records:", error)
+      toast({
+        title: "❌ Error",
+        description: "Failed to load sales records. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      loadSalesRecords()
+    }
+  }, [userData?.company_id])
+
+  const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
   const totals = useMemo(() => {
-    const base = filtered.length ? filtered : rows
+    const base = filtered.length ? filtered : records
     return {
       netSales: sumBy(base, (r) => r.netSales),
       outputVat: sumBy(base, (r) => r.outputVat),
@@ -118,388 +108,580 @@ export function SalesRecordTable() {
       creditableTax: sumBy(base, (r) => r.creditableTax),
       amountCollected: sumBy(base, (r) => r.amountCollected),
     }
-  }, [filtered, rows])
+  }, [filtered, records])
 
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
-    setDirty(false)
-    toast({ title: "Saved", description: "Sales Record saved to your browser." })
-  }
-
-  function resetToMock() {
-    setRows(MOCK_ROWS.map(recompute))
-    setDirty(true)
-    setEditing({})
-  }
-
-  function addRow() {
-    const newRow: SalesRecordRow = recompute({
-      id: uid("sr"),
-      month: "",
-      date: "",
-      serviceInvoice: "",
-      bsNumber: "",
-      clients: "",
-      tin: "",
-      description: "",
-      netSales: 0,
-      outputVat: 0,
-      total: 0,
-      discount: 0,
-      creditableTax: 0,
-      amountCollected: 0,
-      orNo: "",
-      paidDate: "",
-    })
-    setRows((r) => [newRow, ...r])
-    setEditing((e) => ({ ...e, [newRow.id]: true }))
-    setDirty(true)
-  }
-
-  function updateRow(id: string, patch: Partial<SalesRecordRow>) {
-    setRows((prev) =>
+  function updateRecord(id: string, patch: Partial<SalesRecord>) {
+    setRecords((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r
-        const next = { ...r, ...patch }
-        return recompute(next)
-      })
-    )
-    setDirty(true)
-  }
+        const updated = { ...r, ...patch }
 
-  function deleteRow(id: string) {
-    setRows((prev) => prev.filter((r) => r.id !== id))
-    setDirty(true)
-    setEditing((e) => {
-      const copy = { ...e }
-      delete copy[id]
-      return copy
-    })
+        // Recalculate computed values if netSales changed
+        if (patch.netSales !== undefined) {
+          const netSales = patch.netSales
+          updated.outputVat = netSales * 0.12
+          updated.total = netSales + updated.outputVat
+          updated.creditableTax = netSales * 0.02
+          updated.amountCollected = updated.total - updated.creditableTax
+        }
+
+        return updated
+      }),
+    )
   }
 
   function toggleEdit(id: string, state?: boolean) {
     setEditing((prev) => ({ ...prev, [id]: state ?? !prev[id] }))
   }
 
+  const exportToCSV = () => {
+    const headers = [
+      "Month",
+      "Date",
+      "Service Invoice",
+      "BS Number",
+      "Client",
+      "TIN",
+      "Description",
+      "Net Sales",
+      "Output VAT",
+      "Total",
+      "Creditable Tax",
+      "Amount Collected",
+      "OR Number",
+      "Paid Date",
+      "Payment Method",
+      "Product Type",
+      "Quantity",
+    ]
+
+    const csvContent = [
+      headers.join(","),
+      ...filtered.map((record) =>
+        [
+          record.month,
+          record.date,
+          record.serviceInvoice,
+          record.bsNumber,
+          `"${record.clients}"`,
+          record.tin,
+          `"${record.description}"`,
+          record.netSales,
+          record.outputVat,
+          record.total,
+          record.creditableTax,
+          record.amountCollected,
+          record.orNo,
+          record.paidDate,
+          record.paymentMethod,
+          record.productType,
+          record.quantity,
+        ].join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `sales-records-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "📊 Export Complete",
+      description: "Sales records exported to CSV file.",
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white dark:bg-slate-800">
+          <CardContent className="p-12 text-center">
+            <RefreshCw className="h-12 w-12 mx-auto mb-4 animate-spin opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Loading Sales Records</h3>
+            <p className="text-sm text-muted-foreground">Fetching completed bookings...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <Card>
-      <CardHeader className="gap-2">
-        <CardTitle>Sales Record</CardTitle>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={addRow} className="bg-[#16a34a] hover:bg-[#15803d] text-white">
-              <Plus className="mr-2 h-4 w-4" /> Add Row
-            </Button>
-            <Button variant="outline" onClick={save} disabled={!dirty}>
-              <Save className="mr-2 h-4 w-4" /> Save
-            </Button>
-            <Button variant="outline" onClick={resetToMock}>
-              <Undo2 className="mr-2 h-4 w-4" /> Load Mock Data
-            </Button>
-          </div>
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search any field..."
-              className="pl-8"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search rows"
-            />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Mobile list (stacked cards) */}
-        <div className="space-y-3 md:hidden">
-          {filtered.map((row) => {
-            const isEditing = !!editing[row.id]
-            return (
-              <div key={row.id} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="font-medium">{row.clients || "New Client"}</div>
-                  <div className="flex gap-1">
-                    {isEditing ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Done editing"
-                          onClick={() => toggleEdit(row.id, false)}
-                        >
-                          <Check className="h-4 w-4 text-green-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Cancel editing"
-                          onClick={() => toggleEdit(row.id, false)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Edit row"
-                        onClick={() => toggleEdit(row.id, true)}
-                      >
-                        <PencilLine className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" aria-label="Delete row" onClick={() => deleteRow(row.id)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
+    <div className="space-y-6">
+      {/* Header Controls */}
+      <Card className="bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-semibold">Sales Records</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {filtered.length} of {records.length} records from completed bookings
+              </p>
+            </div>
 
-                <div className="mt-2 grid grid-cols-1 gap-2">
-                  <Field
-                    label="Month"
-                    value={row.month}
-                    editing={isEditing}
-                    onChange={(v) => updateRow(row.id, { month: v })}
-                  />
-                  <Field label="Date" value={row.date} editing={isEditing} onChange={(v) => updateRow(row.id, { date: v })} />
-                  <Field
-                    label="Service Invoice"
-                    value={row.serviceInvoice}
-                    editing={isEditing}
-                    onChange={(v) => updateRow(row.id, { serviceInvoice: v })}
-                  />
-                  <Field label="BS #" value={row.bsNumber} editing={isEditing} onChange={(v) => updateRow(row.id, { bsNumber: v })} />
-                  <Field label="Clients" value={row.clients} editing={isEditing} onChange={(v) => updateRow(row.id, { clients: v })} />
-                  <Field label="TIN" value={row.tin} editing={isEditing} onChange={(v) => updateRow(row.id, { tin: v })} />
-                  <Field
-                    label="Description"
-                    value={row.description}
-                    editing={isEditing}
-                    onChange={(v) => updateRow(row.id, { description: v })}
-                  />
-                  <Field
-                    label="Net Sales"
-                    value={String(row.netSales)}
-                    editing={isEditing}
-                    numeric
-                    onChange={(v) => updateRow(row.id, { netSales: parseNumber(v) })}
-                  />
-                  <ReadField label="Output VAT" value={formatCurrency(row.outputVat)} />
-                  <ReadField label="Total" value={formatCurrency(row.total)} />
-                  <ReadField label="Discount" value={formatCurrency(row.discount)} />
-                  <ReadField label="Creditable Tax" value={formatCurrency(row.creditableTax)} />
-                  <ReadField label="Amount Collected" value={formatCurrency(row.amountCollected)} />
-                  <Field label="OR No." value={row.orNo} editing={isEditing} onChange={(v) => updateRow(row.id, { orNo: v })} />
-                  <Field
-                    label="Paid/Deposit Date"
-                    value={row.paidDate}
-                    editing={isEditing}
-                    onChange={(v) => updateRow(row.id, { paidDate: v })}
-                  />
-                </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Search */}
+              <div className="relative flex-1 sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search records..."
+                  className="pl-10 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
               </div>
-            )
-          })}
 
-          {filtered.length === 0 && (
-            <div className="rounded-md border p-4 text-center text-muted-foreground">No rows match the search.</div>
-          )}
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowComputed(!showComputed)}
+                  className="hidden lg:flex"
+                >
+                  {showComputed ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                  {showComputed ? "Hide" : "Show"} Computed
+                </Button>
 
-          {/* Mobile totals */}
-          <div className="rounded-lg border p-3">
-            <div className="font-medium mb-2">Totals</div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-muted-foreground">Net Sales</div>
-              <div className="text-right font-medium">{formatCurrency(totals.netSales)}</div>
-              <div className="text-muted-foreground">Output VAT</div>
-              <div className="text-right font-medium">{formatCurrency(totals.outputVat)}</div>
-              <div className="text-muted-foreground">Total</div>
-              <div className="text-right font-medium">{formatCurrency(totals.total)}</div>
-              <div className="text-muted-foreground">Creditable Tax</div>
-              <div className="text-right font-medium">{formatCurrency(totals.creditableTax)}</div>
-              <div className="text-muted-foreground">Amount Collected</div>
-              <div className="text-right font-medium">{formatCurrency(totals.amountCollected)}</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewMode(viewMode === "table" ? "cards" : "table")}
+                  className="hidden lg:flex"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  {viewMode === "table" ? "Card View" : "Table View"}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <Table className="w-full"> {/* Added w-full here */}
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[5rem]">Month</TableHead>
-                <TableHead className="min-w-[5rem]">Date</TableHead>
-                <TableHead className="min-w-[8rem]">Service Invoice</TableHead>
-                <TableHead className="min-w-[8rem]">BS #</TableHead>
-                <TableHead>Clients</TableHead> {/* Removed min-w */}
-                <TableHead>TIN</TableHead> {/* Removed min-w */}
-                <TableHead>Description</TableHead> {/* Removed min-w */}
-                <TableHead className="text-right min-w-[10rem]">Net Sales</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Output VAT</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Total</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Discount</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Creditable Tax</TableHead>
-                <TableHead className="text-right min-w-[8rem]">Amount Collected</TableHead>
-                <TableHead className="min-w-[8rem]">OR No.</TableHead>
-                <TableHead className="min-w-[8rem]">Paid/Deposit Date</TableHead>
-                <TableHead className="text-right min-w-[6rem]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((row) => {
-                const isEditing = !!editing[row.id]
-                return (
-                  <TableRow key={row.id} className={isEditing ? "bg-muted/30" : ""}>
-                    <TableCell>
+          {/* Action Bar */}
+          <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <Button onClick={loadSalesRecords} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+            </Button>
+            <Button onClick={exportToCSV} variant="outline" className="ml-auto bg-transparent">
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Net Sales</div>
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totals.netSales)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-green-700 dark:text-green-300">Output VAT</div>
+            <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+              {formatCurrency(totals.outputVat)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Total</div>
+            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              {formatCurrency(totals.total)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-orange-700 dark:text-orange-300">Creditable Tax</div>
+            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+              {formatCurrency(totals.creditableTax)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 border-teal-200 dark:border-teal-800">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-teal-700 dark:text-teal-300">Amount Collected</div>
+            <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">
+              {formatCurrency(totals.amountCollected)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Data Display */}
+      {viewMode === "cards" ? (
+        <CardsView records={filtered} editing={editing} onEdit={toggleEdit} onUpdate={updateRecord} />
+      ) : (
+        <TableView
+          records={filtered}
+          editing={editing}
+          showComputed={showComputed}
+          onEdit={toggleEdit}
+          onUpdate={updateRecord}
+        />
+      )}
+
+      {filtered.length === 0 && !loading && (
+        <Card className="bg-white dark:bg-slate-800">
+          <CardContent className="p-12 text-center">
+            <div className="text-muted-foreground">
+              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">No records found</h3>
+              <p className="text-sm">Try adjusting your search or refresh the data.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function CardsView({
+  records,
+  editing,
+  onEdit,
+  onUpdate,
+}: {
+  records: SalesRecord[]
+  editing: Record<string, boolean>
+  onEdit: (id: string, state?: boolean) => void
+  onUpdate: (id: string, patch: Partial<SalesRecord>) => void
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {records.map((record) => {
+        const isEditing = !!editing[record.id]
+        return (
+          <Card
+            key={record.id}
+            className={`bg-white dark:bg-slate-800 transition-all duration-200 ${isEditing ? "ring-2 ring-blue-500 shadow-lg" : "hover:shadow-md"}`}
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg">{record.clients}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{record.serviceInvoice}</p>
+                  <Badge variant="secondary" className="mt-1">
+                    {record.productType}
+                  </Badge>
+                </div>
+                <div className="flex gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, false)}>
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, true)}>
+                      <PencilLine className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label="Month"
+                  value={record.month}
+                  editing={isEditing}
+                  onChange={(v) => onUpdate(record.id, { month: v })}
+                />
+                <Field
+                  label="Date"
+                  value={record.date}
+                  editing={isEditing}
+                  onChange={(v) => onUpdate(record.id, { date: v })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label="BS Number"
+                  value={record.bsNumber}
+                  editing={isEditing}
+                  onChange={(v) => onUpdate(record.id, { bsNumber: v })}
+                />
+                <Field
+                  label="OR Number"
+                  value={record.orNo}
+                  editing={isEditing}
+                  onChange={(v) => onUpdate(record.id, { orNo: v })}
+                />
+              </div>
+
+              <Field
+                label="TIN"
+                value={record.tin}
+                editing={isEditing}
+                onChange={(v) => onUpdate(record.id, { tin: v })}
+              />
+
+              <Field
+                label="Description"
+                value={record.description}
+                editing={false} // Keep description read-only as it comes from booking
+                onChange={() => {}}
+              />
+
+              <Field
+                label="Net Sales"
+                value={String(record.netSales)}
+                editing={isEditing}
+                numeric
+                onChange={(v) => onUpdate(record.id, { netSales: Number.parseFloat(v) || 0 })}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Payment Method
+                  </div>
+                  <div className="text-sm font-medium">{record.paymentMethod}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantity</div>
+                  <div className="text-sm font-medium">{record.quantity}</div>
+                </div>
+              </div>
+
+              {/* Computed Values */}
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="text-sm font-medium mb-3 text-muted-foreground">Computed Values</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Output VAT</div>
+                    <div className="font-medium">{formatCurrency(record.outputVat)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Total</div>
+                    <div className="font-medium">{formatCurrency(record.total)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Creditable Tax</div>
+                    <div className="font-medium">{formatCurrency(record.creditableTax)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Amount Collected</div>
+                    <div className="font-medium">{formatCurrency(record.amountCollected)}</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
+function TableView({
+  records,
+  editing,
+  showComputed,
+  onEdit,
+  onUpdate,
+}: {
+  records: SalesRecord[]
+  editing: Record<string, boolean>
+  showComputed: boolean
+  onEdit: (id: string, state?: boolean) => void
+  onUpdate: (id: string, patch: Partial<SalesRecord>) => void
+}) {
+  return (
+    <Card className="bg-white dark:bg-slate-800">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50 dark:bg-slate-900/50">
+              <TableHead className="font-semibold">Month</TableHead>
+              <TableHead className="font-semibold">Date</TableHead>
+              <TableHead className="font-semibold">Invoice</TableHead>
+              <TableHead className="font-semibold">BS #</TableHead>
+              <TableHead className="font-semibold">Client</TableHead>
+              <TableHead className="font-semibold">TIN</TableHead>
+              <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold text-right">Net Sales</TableHead>
+              {showComputed && (
+                <>
+                  <TableHead className="font-semibold text-right">Output VAT</TableHead>
+                  <TableHead className="font-semibold text-right">Total</TableHead>
+                  <TableHead className="font-semibold text-right">Creditable Tax</TableHead>
+                  <TableHead className="font-semibold text-right">Amount Collected</TableHead>
+                </>
+              )}
+              <TableHead className="font-semibold">OR No.</TableHead>
+              <TableHead className="font-semibold">Payment</TableHead>
+              <TableHead className="font-semibold">Type</TableHead>
+              <TableHead className="font-semibold text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {records.map((record) => {
+              const isEditing = !!editing[record.id]
+              return (
+                <TableRow
+                  key={record.id}
+                  className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+                >
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        value={record.month}
+                        onChange={(e) => onUpdate(record.id, { month: e.target.value })}
+                        className="w-20"
+                      />
+                    ) : (
+                      <span>{record.month || "-"}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        value={record.date}
+                        onChange={(e) => onUpdate(record.id, { date: e.target.value })}
+                        className="w-20"
+                      />
+                    ) : (
+                      <span>{record.date || "-"}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-mono text-sm">{record.serviceInvoice}</span>
+                  </TableCell>
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        value={record.bsNumber}
+                        onChange={(e) => onUpdate(record.id, { bsNumber: e.target.value })}
+                        className="w-24"
+                      />
+                    ) : (
+                      <span className="font-mono text-sm">{record.bsNumber}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-40">
+                      <span className="font-medium">{record.clients}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        value={record.tin}
+                        onChange={(e) => onUpdate(record.id, { tin: e.target.value })}
+                        className="w-36"
+                      />
+                    ) : (
+                      <span className="font-mono text-sm">{record.tin || "-"}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-48">
+                      <span className="text-sm">{record.description}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        className="text-right w-32"
+                        value={record.netSales}
+                        onChange={(e) => onUpdate(record.id, { netSales: Number.parseFloat(e.target.value) || 0 })}
+                      />
+                    ) : (
+                      <span className="font-mono font-medium">{formatCurrency(record.netSales)}</span>
+                    )}
+                  </TableCell>
+                  {showComputed && (
+                    <>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-green-700 dark:text-green-400">
+                          {formatCurrency(record.outputVat)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono font-medium">{formatCurrency(record.total)}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-orange-700 dark:text-orange-400">
+                          {formatCurrency(record.creditableTax)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-blue-700 dark:text-blue-400">
+                          {formatCurrency(record.amountCollected)}
+                        </span>
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        value={record.orNo}
+                        onChange={(e) => onUpdate(record.id, { orNo: e.target.value })}
+                        className="w-24"
+                      />
+                    ) : (
+                      <span className="font-mono text-sm">{record.orNo}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">{record.paymentMethod}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs">
+                      {record.productType}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
                       {isEditing ? (
-                        <Input value={row.month} onChange={(e) => updateRow(row.id, { month: e.target.value })} />
-                      ) : (
-                        <span>{row.month || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.date} onChange={(e) => updateRow(row.id, { date: e.target.value })} />
-                      ) : (
-                        <span>{row.date || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          value={row.serviceInvoice}
-                          onChange={(e) => updateRow(row.id, { serviceInvoice: e.target.value })}
-                        />
-                      ) : (
-                        <span>{row.serviceInvoice || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.bsNumber} onChange={(e) => updateRow(row.id, { bsNumber: e.target.value })} />
-                      ) : (
-                        <span>{row.bsNumber || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.clients} onChange={(e) => updateRow(row.id, { clients: e.target.value })} />
-                      ) : (
-                        <span>{row.clients || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.tin} onChange={(e) => updateRow(row.id, { tin: e.target.value })} />
-                      ) : (
-                        <span>{row.tin || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          value={row.description}
-                          onChange={(e) => updateRow(row.id, { description: e.target.value })}
-                        />
-                      ) : (
-                        <span>{row.description || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          className="text-right"
-                          value={row.netSales}
-                          onChange={(e) => updateRow(row.id, { netSales: parseNumber(e.target.value) })}
-                        />
-                      ) : (
-                        <span className="tabular-nums">{formatCurrency(row.netSales)}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.outputVat)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.total)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.discount)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.creditableTax)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.amountCollected)}</TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.orNo} onChange={(e) => updateRow(row.id, { orNo: e.target.value })} />
-                      ) : (
-                        <span>{row.orNo || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input value={row.paidDate} onChange={(e) => updateRow(row.id, { paidDate: e.target.value })} />
-                      ) : (
-                        <span>{row.paidDate || "-"}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Done editing"
-                              onClick={() => toggleEdit(row.id, false)}
-                            >
-                              <Check className="h-4 w-4 text-green-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Cancel editing"
-                              onClick={() => toggleEdit(row.id, false)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
+                        <>
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Edit row"
-                            onClick={() => toggleEdit(row.id, true)}
+                            className="h-8 w-8"
+                            onClick={() => onEdit(record.id, false)}
                           >
-                            <PencilLine className="h-4 w-4" />
+                            <Check className="h-4 w-4 text-green-600" />
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" aria-label="Delete row" onClick={() => deleteRow(row.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onEdit(record.id, false)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record.id, true)}>
+                          <PencilLine className="h-4 w-4" />
                         </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center text-muted-foreground">
-                    No rows. Try clearing the search or add a new row.
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
-              )}
-              <TableRow className="bg-muted/30">
-                <TableCell colSpan={7} className="font-medium">
-                  Totals
-                </TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.netSales)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.outputVat)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.total)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(0)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.creditableTax)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.amountCollected)}</TableCell>
-                <TableCell colSpan={3} />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </Card>
   )
 }
@@ -518,27 +700,19 @@ function Field({
   numeric?: boolean
 }) {
   return (
-    <div className="grid grid-cols-1 gap-1">
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
       {editing ? (
         <Input
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
           inputMode={numeric ? "decimal" : "text"}
           type={numeric ? "number" : "text"}
+          className="bg-slate-50 dark:bg-slate-900"
         />
       ) : (
-        <div className="text-sm">{value || "-"}</div>
+        <div className="text-sm font-medium min-h-[20px]">{value || "-"}</div>
       )}
-    </div>
-  )
-}
-
-function ReadField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-1 gap-1">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm tabular-nums">{value}</div>
     </div>
   )
 }

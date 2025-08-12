@@ -166,11 +166,12 @@ export function TopNavigation() {
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
       <div
-        className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block`}
+        className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} transform skew-x-[-20deg] z-0 hidden md:block`}
+        style={{ maxWidth: "100vw", overflow: "hidden" }}
       ></div>
 
-      <div className="top-nav-container text-white relative z-10">
-        <div className="top-nav-content">
+      <div className="top-nav-container text-white relative z-10 overflow-hidden">
+        <div className="top-nav-content flex items-center justify-between w-full px-4 md:px-8">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
               <button
@@ -192,7 +193,7 @@ export function TopNavigation() {
             {/* Added relative z-20 and flex-shrink-0 */}
             {/* User controls section (bell and profile) - Conditionally rendered */}
             {!isAccountPage && ( // Only render if NOT on the account page
-              <div className="flex items-center mr-2 md:mr-8 relative z-10">
+              <div className="flex items-center mr-6 md:mr-12 relative z-10">
                 {" "}
                 {/* Added relative z-10 */}
                 <button

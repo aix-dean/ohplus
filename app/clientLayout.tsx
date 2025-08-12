@@ -54,7 +54,7 @@ export default function ClientLayout({
         </div>
 
         {/* Main content */}
-        <main className="flex-1 flex flex-col min-h-0">
+        <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden">
           {/* Mobile sidebar toggle */}
           {isSmallScreen && (
             <div className="py-4 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-200">
@@ -69,7 +69,7 @@ export default function ClientLayout({
 
           {/* Router content area */}
           <div className="flex-1 overflow-y-auto">
-            <div className="py-6 px-4 sm:px-6 lg:px-8">{children}</div>
+            <div className="py-6 px-2 sm:px-4 lg:px-8">{children}</div>
           </div>
         </main>
       </div>
