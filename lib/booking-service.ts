@@ -54,12 +54,18 @@ export interface SalesRecord {
   paymentMethod: string
   quantity: number
   productType: string
+  status: string
 }
 
 export interface PaginationOptions {
   page: number
   pageSize: number
   lastDoc?: DocumentSnapshot
+}
+
+export interface FilterOptions {
+  type?: string
+  status?: string
 }
 
 export interface PaginatedResult<T> {
@@ -82,10 +88,18 @@ export class BookingService {
     return BookingService.instance
   }
 
-  async getCompletedBookingsCount(companyId: string): Promise<number> {
+  async getCompletedBookingsCount(companyId: string, filters?: FilterOptions): Promise<number> {
     try {
       const bookingsRef = collection(db, "booking")
-      const q = query(bookingsRef, where("company_id", "==", companyId))
+      let q = query(bookingsRef, where("company_id", "==", companyId))
+
+      // Apply filters
+      if (filters?.status) {
+        q = query(q, where("status", "==", filters.status))
+      }
+      if (filters?.type) {
+        q = query(q, where("type", "==", filters.type))
+      }
 
       const querySnapshot = await getDocs(q)
       return querySnapshot.size
@@ -95,15 +109,26 @@ export class BookingService {
     }
   }
 
-  async getCompletedBookings(companyId: string, options?: PaginationOptions): Promise<Booking[]> {
+  async getCompletedBookings(
+    companyId: string,
+    options?: PaginationOptions,
+    filters?: FilterOptions,
+  ): Promise<Booking[]> {
     try {
       const bookingsRef = collection(db, "booking")
-      let q = query(
-        bookingsRef,
-        where("company_id", "==", companyId),
-        where("status", "==", "COMPLETED"),
-        orderBy("created", "desc"),
-      )
+      let q = query(bookingsRef, where("company_id", "==", companyId), orderBy("created", "desc"))
+
+      // Apply filters
+      if (filters?.status) {
+        q = query(q, where("status", "==", filters.status))
+      } else {
+        // Default to completed if no status filter
+        q = query(q, where("status", "==", "COMPLETED"))
+      }
+
+      if (filters?.type) {
+        q = query(q, where("type", "==", filters.type))
+      }
 
       if (options) {
         if (options.lastDoc) {
@@ -164,12 +189,17 @@ export class BookingService {
       paymentMethod: booking.payment_method,
       quantity: booking.quantity,
       productType: booking.type,
+      status: booking.status, // Added status field
     }
   }
 
-  async getSalesRecords(companyId: string, options?: PaginationOptions): Promise<SalesRecord[]> {
+  async getSalesRecords(
+    companyId: string,
+    options?: PaginationOptions,
+    filters?: FilterOptions,
+  ): Promise<SalesRecord[]> {
     try {
-      const bookings = await this.getCompletedBookings(companyId, options)
+      const bookings = await this.getCompletedBookings(companyId, options, filters)
       return bookings.map((booking) => this.convertBookingToSalesRecord(booking))
     } catch (error) {
       console.error("Error getting sales records:", error)
@@ -177,11 +207,15 @@ export class BookingService {
     }
   }
 
-  async getPaginatedSalesRecords(companyId: string, options: PaginationOptions): Promise<PaginatedResult<SalesRecord>> {
+  async getPaginatedSalesRecords(
+    companyId: string,
+    options: PaginationOptions,
+    filters?: FilterOptions,
+  ): Promise<PaginatedResult<SalesRecord>> {
     try {
       const [totalCount, bookings] = await Promise.all([
-        this.getCompletedBookingsCount(companyId),
-        this.getCompletedBookings(companyId, options),
+        this.getCompletedBookingsCount(companyId, filters),
+        this.getCompletedBookings(companyId, options, filters),
       ])
 
       const salesRecords = bookings.map((booking) => this.convertBookingToSalesRecord(booking))
@@ -189,13 +223,24 @@ export class BookingService {
 
       // Get the last document for cursor-based pagination
       const bookingsRef = collection(db, "booking")
-      const lastQuery = query(
+      let lastQuery = query(
         bookingsRef,
         where("company_id", "==", companyId),
-        where("status", "==", "COMPLETED"),
         orderBy("created", "desc"),
         limit(options.pageSize * options.page),
       )
+
+      // Apply same filters to last query
+      if (filters?.status) {
+        lastQuery = query(lastQuery, where("status", "==", filters.status))
+      } else {
+        lastQuery = query(lastQuery, where("status", "==", "COMPLETED"))
+      }
+
+      if (filters?.type) {
+        lastQuery = query(lastQuery, where("type", "==", filters.type))
+      }
+
       const lastSnapshot = await getDocs(lastQuery)
       const lastDoc = lastSnapshot.docs[lastSnapshot.docs.length - 1]
 
