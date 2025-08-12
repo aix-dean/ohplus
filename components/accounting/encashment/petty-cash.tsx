@@ -82,6 +82,26 @@ export function PettyCashFundTable() {
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [totalFundUsage, setTotalFundUsage] = useState(0)
   const [remainingBalanceForDeposit, setRemainingBalanceForDeposit] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
+  const [transactionForm, setTransactionForm] = useState({
+    category: "",
+    month: "",
+    date: "",
+    pcvNo: "",
+    supplier: "",
+    description: "",
+    account: "",
+    document: "",
+    tin: "",
+    address: "",
+    grossAmount: "",
+    netOfVat: "",
+    inputVat: "",
+    onePercent: "",
+    twoPercent: "",
+    netAmount: "",
+  })
 
   useEffect(() => {
     loadData()
@@ -149,15 +169,19 @@ export function PettyCashFundTable() {
     setRemainingBalanceForDeposit(isNaN(balanceForDeposit) ? 0 : balanceForDeposit)
   }
 
-  async function addRow(formData: any) {
+  function addRow(formData: any) {
+    setIsTransactionModalOpen(true)
+  }
+
+  async function handleTransactionSubmit() {
     const newRow = {
-      ...formData,
-      grossAmount: parseNumber(formData.grossAmount),
-      netOfVat: parseNumber(formData.netOfVat),
-      inputVat: parseNumber(formData.inputVat),
-      onePercent: parseNumber(formData.onePercent),
-      twoPercent: parseNumber(formData.twoPercent),
-      netAmount: parseNumber(formData.netAmount),
+      ...transactionForm,
+      grossAmount: parseNumber(transactionForm.grossAmount),
+      netOfVat: parseNumber(transactionForm.netOfVat),
+      inputVat: parseNumber(transactionForm.inputVat),
+      onePercent: parseNumber(transactionForm.onePercent),
+      twoPercent: parseNumber(transactionForm.twoPercent),
+      netAmount: parseNumber(transactionForm.netAmount),
       type: "PETTYCASH",
       deleted: false,
     }
@@ -167,10 +191,50 @@ export function PettyCashFundTable() {
       const rowWithId = { ...newRow, id }
       setRows((r) => [rowWithId, ...r])
       toast.success("New transaction added successfully.")
+
+      // Reset form and close modal
+      setTransactionForm({
+        category: "",
+        month: "",
+        date: "",
+        pcvNo: "",
+        supplier: "",
+        description: "",
+        account: "",
+        document: "",
+        tin: "",
+        address: "",
+        grossAmount: "",
+        netOfVat: "",
+        inputVat: "",
+        onePercent: "",
+        twoPercent: "",
+        netAmount: "",
+      })
+      setIsTransactionModalOpen(false)
     } catch (error) {
       console.error("Error adding transaction:", error)
       toast.error("Failed to add transaction. Please try again.")
     }
+  }
+
+  function handleGrossAmountChange(value: string) {
+    const gross = parseNumber(value)
+    const netOfVat = gross / 1.12
+    const inputVat = netOfVat * 0.12
+    const onePercent = netOfVat * 0.01
+    const twoPercent = netOfVat * 0.02
+    const netAmount = gross - onePercent - twoPercent
+
+    setTransactionForm((prev) => ({
+      ...prev,
+      grossAmount: value,
+      netOfVat: netOfVat.toFixed(2),
+      inputVat: inputVat.toFixed(2),
+      onePercent: onePercent.toFixed(2),
+      twoPercent: twoPercent.toFixed(2),
+      netAmount: netAmount.toFixed(2),
+    }))
   }
 
   async function updateRow(id: string, patch: any) {
@@ -248,8 +312,6 @@ export function PettyCashFundTable() {
       setSelectedRows(filtered.map((row) => row.id!))
     }
   }
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const handleSaveAndClose = async () => {
     await saveSettings()
@@ -610,6 +672,169 @@ export function PettyCashFundTable() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isTransactionModalOpen} onOpenChange={setIsTransactionModalOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Transaction</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Category</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.category}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, category: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Month</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.month}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, month: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Date</label>
+                <Input
+                  type="date"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.date}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">PCV No.</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.pcvNo}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, pcvNo: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Supplier</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.supplier}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, supplier: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.description}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Account</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.account}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, account: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Document</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.document}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, document: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">TIN</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.tin}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, tin: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Address</label>
+                <Input
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.address}
+                  onChange={(e) => setTransactionForm((prev) => ({ ...prev, address: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Gross Amount</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  value={transactionForm.grossAmount}
+                  onChange={(e) => handleGrossAmountChange(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Net of VAT</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50"
+                  value={transactionForm.netOfVat}
+                  readOnly
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Input VAT</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50"
+                  value={transactionForm.inputVat}
+                  readOnly
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">1%</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50"
+                  value={transactionForm.onePercent}
+                  readOnly
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">2%</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50"
+                  value={transactionForm.twoPercent}
+                  readOnly
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Net Amount</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50"
+                  value={transactionForm.netAmount}
+                  readOnly
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsTransactionModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleTransactionSubmit} className="bg-green-600 hover:bg-green-700 text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Transaction
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
