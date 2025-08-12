@@ -845,7 +845,10 @@ function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | undefined | null): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return "₱0.00"
+  }
   return value.toLocaleString("en-US", { style: "currency", currency: "PHP" })
 }
 
