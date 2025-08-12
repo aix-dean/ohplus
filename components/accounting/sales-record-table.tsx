@@ -5,11 +5,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight, Filter } from "lucide-react"
 import { sumBy } from "lodash"
-import { bookingService, type SalesRecord, type PaginationOptions, type PaginatedResult } from "@/lib/booking-service"
+import {
+  bookingService,
+  type SalesRecord,
+  type PaginationOptions,
+  type PaginatedResult,
+  type FilterOptions,
+} from "@/lib/booking-service"
 import { useAuth } from "@/contexts/auth-context"
+
+const BOOKING_TYPES = ["RENTAL", "MERCHANDISE", "SERVICES"] as const
+const BOOKING_STATUSES = ["COMPLETED", "CANCELLED", "FOR CONTRACT", "ONGOING", "PENDING", "PAID", "UPCOMING"] as const
 
 function includesAny(record: SalesRecord, query: string): boolean {
   if (!query) return true
@@ -43,6 +53,9 @@ export function SalesRecordTable() {
   const [hasPreviousPage, setHasPreviousPage] = useState(false)
   const [lastDoc, setLastDoc] = useState<any>(null)
 
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+
   const loadSalesRecords = async (page = 1) => {
     if (!userData?.company_id) {
       toast({
@@ -62,9 +75,14 @@ export function SalesRecordTable() {
         lastDoc: page > 1 ? lastDoc : undefined,
       }
 
+      const filters: FilterOptions = {}
+      if (typeFilter !== "all") filters.type = typeFilter
+      if (statusFilter !== "all") filters.status = statusFilter
+
       const result: PaginatedResult<SalesRecord> = await bookingService.getPaginatedSalesRecords(
         userData.company_id,
         options,
+        filters,
       )
 
       setRecords(result.data)
@@ -74,7 +92,6 @@ export function SalesRecordTable() {
       setHasPreviousPage(result.hasPreviousPage)
       setCurrentPage(result.currentPage)
       setLastDoc(result.lastDoc)
-      
     } catch (error) {
       console.error("Error loading sales records:", error)
       toast({
@@ -92,6 +109,13 @@ export function SalesRecordTable() {
       loadSalesRecords(1)
     }
   }, [userData?.company_id])
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      setCurrentPage(1)
+      loadSalesRecords(1)
+    }
+  }, [typeFilter, statusFilter])
 
   const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
@@ -115,6 +139,11 @@ export function SalesRecordTable() {
     loadSalesRecords(currentPage)
   }
 
+  const handleClearFilters = () => {
+    setTypeFilter("all")
+    setStatusFilter("all")
+  }
+
   const exportToCSV = () => {
     const headers = [
       "Month",
@@ -133,6 +162,7 @@ export function SalesRecordTable() {
       "Paid Date",
       "Payment Method",
       "Product Type",
+      "Status",
       "Quantity",
     ]
 
@@ -156,6 +186,7 @@ export function SalesRecordTable() {
           record.paidDate,
           record.paymentMethod,
           record.productType,
+          record.status,
           record.quantity,
         ].join(","),
       ),
@@ -262,8 +293,7 @@ export function SalesRecordTable() {
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -272,6 +302,43 @@ export function SalesRecordTable() {
             onChange={(e) => setQuery(e.target.value)}
             className="pl-10"
           />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-500" />
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {BOOKING_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {BOOKING_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(typeFilter !== "all" || statusFilter !== "all") && (
+            <Button variant="outline" size="sm" onClick={handleClearFilters}>
+              Clear Filters
+            </Button>
+          )}
         </div>
       </div>
 
@@ -301,6 +368,7 @@ export function SalesRecordTable() {
                   <TableHead className="font-semibold">OR No.</TableHead>
                   <TableHead className="font-semibold">Payment</TableHead>
                   <TableHead className="font-semibold">Type</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -400,6 +468,25 @@ export function SalesRecordTable() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">{record.productType}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            record.status === "COMPLETED"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                              : record.status === "CANCELLED"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                                : record.status === "ONGOING"
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                                  : record.status === "PENDING"
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
+                                    : record.status === "PAID"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                      : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                          }`}
+                        >
+                          {record.status}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
