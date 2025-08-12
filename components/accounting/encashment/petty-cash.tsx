@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
@@ -203,216 +202,316 @@ export function PettyCashFundTable() {
   }
 
   return (
-    <Card>
-      <CardHeader className="gap-2">
-        <CardTitle>Petty Cash Fund</CardTitle>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          <Input
-            placeholder="Company Name"
-            value={settings.companyName}
-            onChange={(e) => {
-              setSettings((s) => ({ ...s, companyName: e.target.value }))
-              setDirty(true)
-            }}
-          />
-          <Input
-            placeholder="PCF Replenishment"
-            value={settings.pettyCashFundReplenishment}
-            onChange={(e) => {
-              setSettings((s) => ({ ...s, pettyCashFundReplenishment: e.target.value }))
-              setDirty(true)
-            }}
-          />
-          <Input
-            placeholder="Cut-off Period"
-            value={settings.cutOffPeriod}
-            onChange={(e) => {
-              setSettings((s) => ({ ...s, cutOffPeriod: e.target.value }))
-              setDirty(true)
-            }}
-          />
-          <Input
-            placeholder="Petty Cash Fund"
-            value={settings.pettyCashFundName}
-            onChange={(e) => {
-              setSettings((s) => ({ ...s, pettyCashFundName: e.target.value }))
-              setDirty(true)
-            }}
-          />
-          <Input
-            type="number"
-            inputMode="decimal"
-            placeholder="Amount"
-            value={settings.pettyCashFundAmount}
-            onChange={(e) => {
-              setSettings((s) => ({ ...s, pettyCashFundAmount: parseNumber(e.target.value) }))
-              setDirty(true)
-            }}
-          />
+    <div className="space-y-6">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">Petty Cash Fund</h2>
+          <p className="text-sm text-gray-600 mt-1">Manage your petty cash transactions and balances</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-2">
-            <Button onClick={addRow} className="bg-[#16a34a] hover:bg-[#15803d] text-white">
-              <Plus className="mr-2 h-4 w-4" /> Add Row
+
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Company Name</label>
+              <Input
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={settings.companyName}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, companyName: e.target.value }))
+                  setDirty(true)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Replenishment Period</label>
+              <Input
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={settings.pettyCashFundReplenishment}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, pettyCashFundReplenishment: e.target.value }))
+                  setDirty(true)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Cut-off Period</label>
+              <Input
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={settings.cutOffPeriod}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, cutOffPeriod: e.target.value }))
+                  setDirty(true)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Fund Name</label>
+              <Input
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={settings.pettyCashFundName}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, pettyCashFundName: e.target.value }))
+                  setDirty(true)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Fund Amount</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={settings.pettyCashFundAmount}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, pettyCashFundAmount: parseNumber(e.target.value) }))
+                  setDirty(true)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <Button onClick={addRow} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+              <Plus className="mr-2 h-4 w-4" /> Add Transaction
             </Button>
-            <Button variant="outline" onClick={saveAll} disabled={!dirty}>
-              <Save className="mr-2 h-4 w-4" /> Save
+            <Button
+              variant="outline"
+              onClick={saveAll}
+              disabled={!dirty}
+              className="border-gray-300 hover:bg-gray-50 bg-transparent"
+            >
+              <Save className="mr-2 h-4 w-4" /> Save Changes
             </Button>
-            <Button variant="outline" onClick={resetMock}>
-              <Undo2 className="mr-2 h-4 w-4" /> Load Mock Data
+            <Button variant="outline" onClick={resetMock} className="border-gray-300 hover:bg-gray-50 bg-transparent">
+              <Undo2 className="mr-2 h-4 w-4" /> Load Sample Data
             </Button>
           </div>
           <div className="relative w-full sm:w-80">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search any field..."
-              className="pl-8"
+              placeholder="Search transactions..."
+              className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead>Month</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>PCV No.</TableHead>
-                <TableHead>Supplier Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Account Title</TableHead>
-                <TableHead>Doc Type/No.</TableHead>
-                <TableHead>TIN No.</TableHead>
-                <TableHead>Company Address</TableHead>
-                <TableHead className="text-right">Gross Amount</TableHead>
-                <TableHead className="text-right">Net of VAT</TableHead>
-                <TableHead className="text-right">Input VAT</TableHead>
-                <TableHead className="text-right">1%</TableHead>
-                <TableHead className="text-right">2%</TableHead>
-                <TableHead className="text-right">Net Amount</TableHead>
-                <TableHead />
+              <TableRow className="bg-gray-50 border-b border-gray-200">
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Category</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Month</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Date</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">PCV No.</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Supplier</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Description</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Account</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Document</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">TIN</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">Address</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">Gross Amount</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">Net of VAT</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">Input VAT</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">1% Tax</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">2% Tax</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 text-right">Net Amount</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="min-w-[10rem]">
-                    <Input value={row.category} onChange={(e) => updateRow(row.id, { category: e.target.value })} />
-                  </TableCell>
-                  <TableCell className="min-w-[6rem]">
-                    <Input value={row.month} onChange={(e) => updateRow(row.id, { month: e.target.value })} />
-                  </TableCell>
-                  <TableCell className="min-w-[6rem]">
-                    <Input value={row.date} onChange={(e) => updateRow(row.id, { date: e.target.value })} />
-                  </TableCell>
-                  <TableCell className="min-w-[8rem]">
+              {filtered.map((row, index) => (
+                <TableRow
+                  key={row.id}
+                  className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+                >
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                      value={row.category}
+                      onChange={(e) => updateRow(row.id, { category: e.target.value })}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                      value={row.month}
+                      onChange={(e) => updateRow(row.id, { month: e.target.value })}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                      value={row.date}
+                      onChange={(e) => updateRow(row.id, { date: e.target.value })}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.pettyCashVoucherNo}
                       onChange={(e) => updateRow(row.id, { pettyCashVoucherNo: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[12rem]">
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.supplierName}
                       onChange={(e) => updateRow(row.id, { supplierName: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[16rem]">
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.description}
                       onChange={(e) => updateRow(row.id, { description: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[12rem]">
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.accountTitle}
                       onChange={(e) => updateRow(row.id, { accountTitle: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[12rem]">
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.documentTypeNo}
                       onChange={(e) => updateRow(row.id, { documentTypeNo: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[12rem]">
-                    <Input value={row.tinNo} onChange={(e) => updateRow(row.id, { tinNo: e.target.value })} />
-                  </TableCell>
-                  <TableCell className="min-w-[16rem]">
+                  <TableCell className="py-3 px-4">
                     <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                      value={row.tinNo}
+                      onChange={(e) => updateRow(row.id, { tinNo: e.target.value })}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    <Input
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                       value={row.companyAddress}
                       onChange={(e) => updateRow(row.id, { companyAddress: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="text-right min-w-[10rem]">
+                  <TableCell className="py-3 px-4 text-right">
                     <Input
                       type="number"
                       inputMode="decimal"
-                      className="text-right"
+                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-right"
                       value={row.grossAmount}
                       onChange={(e) => updateRow(row.id, { grossAmount: parseNumber(e.target.value) })}
                     />
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.netOfVat)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.inputVat)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.onePercent)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.twoPercent)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{formatCurrency(row.netAmount)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => deleteRow(row.id)} aria-label="Delete row">
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                    {formatCurrency(row.netOfVat)}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                    {formatCurrency(row.inputVat)}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                    {formatCurrency(row.onePercent)}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                    {formatCurrency(row.twoPercent)}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-right text-sm font-bold text-gray-900">
+                    {formatCurrency(row.netAmount)}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteRow(row.id)}
+                      className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Delete row"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={17} className="text-center text-muted-foreground">
-                    No rows. Try clearing the search or add a new row.
+                  <TableCell colSpan={17} className="text-center text-gray-500 py-8">
+                    No transactions found. Try adjusting your search or add a new transaction.
                   </TableCell>
                 </TableRow>
               )}
-              <TableRow className="bg-muted/30">
-                <TableCell colSpan={10} className="font-medium">
-                  Totals
+              <TableRow className="bg-blue-50 border-t-2 border-blue-200">
+                <TableCell colSpan={10} className="font-bold text-gray-900 py-4 px-4">
+                  TOTALS
                 </TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.gross)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.netOfVat)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.inputVat)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.oneP)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.twoP)}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(totals.netAmount)}</TableCell>
-                <TableCell />
+                <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
+                  {formatCurrency(totals.gross)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
+                  {formatCurrency(totals.netOfVat)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
+                  {formatCurrency(totals.inputVat)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
+                  {formatCurrency(totals.oneP)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-gray-900 py-4 px-4">
+                  {formatCurrency(totals.twoP)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-blue-600 py-4 px-4 text-lg">
+                  {formatCurrency(totals.netAmount)}
+                </TableCell>
+                <TableCell className="py-4 px-4" />
               </TableRow>
             </TableBody>
           </Table>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Balance for Deposit</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{formatCurrency(totals.balanceForDeposit)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Total Petty Cash Fund</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{formatCurrency(totals.totalPettyCashFund)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">PCF Amount Balance</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{formatCurrency(totals.pcfAmountBalance)}</CardContent>
-          </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-700">Balance for Deposit</p>
+              <p className="text-2xl font-bold text-green-900 mt-1">{formatCurrency(totals.balanceForDeposit)}</p>
+            </div>
+            <div className="h-12 w-12 bg-green-200 rounded-full flex items-center justify-center">
+              <div className="h-6 w-6 bg-green-600 rounded-full"></div>
+            </div>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-700">Total Fund Usage</p>
+              <p className="text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totals.totalPettyCashFund)}</p>
+            </div>
+            <div className="h-12 w-12 bg-blue-200 rounded-full flex items-center justify-between">
+              <div className="h-6 w-6 bg-blue-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-purple-700">Remaining Balance</p>
+              <p className="text-2xl font-bold text-purple-900 mt-1">{formatCurrency(totals.pcfAmountBalance)}</p>
+            </div>
+            <div className="h-12 w-12 bg-purple-200 rounded-full flex items-center justify-center">
+              <div className="h-6 w-6 bg-purple-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
