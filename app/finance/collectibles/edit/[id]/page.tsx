@@ -203,6 +203,13 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
     handleInputChange("bir_2307", null)
   }
 
+  const triggerFileReplace = () => {
+    const fileInput = document.getElementById("bir_2307_replace") as HTMLInputElement
+    if (fileInput) {
+      fileInput.click()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -634,18 +641,15 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                 </div>
                 <div className="flex items-center space-x-2">
                   {typeof formData.bir_2307 === "string" && (
-                    <label htmlFor="bir_2307_replace" className="cursor-pointer">
-                      <Button type="button" variant="ghost" size="sm" className="text-blue-500 hover:text-blue-700">
-                        Replace
-                      </Button>
-                      <input
-                        id="bir_2307_replace"
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                        onChange={handleFileChange}
-                      />
-                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={triggerFileReplace}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      Replace
+                    </Button>
                   )}
                   <Button
                     type="button"
@@ -657,6 +661,13 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
+                <input
+                  id="bir_2307_replace"
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                />
               </div>
             )}
           </div>
