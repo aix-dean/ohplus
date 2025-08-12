@@ -13,6 +13,21 @@ import { Card, CardContent } from "@/components/ui/card"
 const STORAGE_KEY = "acc_encash_pcf_rows_v1"
 const STORAGE_KEY_SETTINGS = "acc_encash_pcf_settings_v1"
 
+const parseNumber = (value: any): number => {
+  if (value === null || value === undefined || value === "") return 0
+  if (typeof value === "number") return isNaN(value) ? 0 : value
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[₱,\s]/g, "")
+    const parsed = Number.parseFloat(cleaned)
+    return isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
+
+function sumBy(arr: any[], key: string): number {
+  return arr.reduce((sum, item) => sum + parseNumber(item[key]), 0)
+}
+
 // Assumptions: 1% = 0.01, 2% = 0.02
 function compute(row: any): any {
   const gross = parseNumber(row.grossAmount)
@@ -606,21 +621,6 @@ export function PettyCashFundTable() {
 
 function includesAny(obj: any, query: string): boolean {
   return Object.values(obj).some((value) => value.toString().toLowerCase().includes(query.toLowerCase()))
-}
-
-const parseNumber = (value: any): number => {
-  if (value === null || value === undefined || value === "") return 0
-  if (typeof value === "number") return isNaN(value) ? 0 : value
-  if (typeof value === "string") {
-    const cleaned = value.replace(/[₱,\s]/g, "")
-    const parsed = Number.parseFloat(cleaned)
-    return isNaN(parsed) ? 0 : parsed
-  }
-  return 0
-}
-
-function sumBy(arr: any[], key: string): number {
-  return arr.reduce((sum, item) => sum + parseNumber(item[key]), 0)
 }
 
 function uid(prefix: string): string {
