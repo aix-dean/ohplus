@@ -102,19 +102,4 @@ export function getMaxUsersForPlan(planType: SubscriptionPlanType): number {
   }
 }
 
-export interface SubscriptionData {
-  id: string
-  licenseKey: string
-  planType: SubscriptionPlanType
-  billingCycle: BillingCycle
-  uid: string
-  startDate: Date
-  endDate: Date | null
-  status: SubscriptionStatus
-  maxProducts: number
-  maxUsers: number
-  trialEndDate: Date | null
-  companyId: string | null
-  createdAt: Date
-  updatedAt: Date
-}
+export type SubscriptionData = Subscription

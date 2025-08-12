@@ -146,10 +146,8 @@ export async function createJobOrder(
   console.log("Status (service):", status)
 
   try {
-    const joNumber = generateJONumber()
     const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
       ...jobOrderData,
-      joNumber: joNumber,
       createdBy: createdBy,
       status: status,
       createdAt: serverTimestamp(),
@@ -175,10 +173,8 @@ export async function createMultipleJobOrders(
     const jobOrderIds: string[] = []
 
     for (const jobOrderData of jobOrdersData) {
-      const joNumber = generateJONumber()
       const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
         ...jobOrderData,
-        joNumber: joNumber,
         createdBy: createdBy,
         status: status,
         createdAt: serverTimestamp(),
@@ -274,11 +270,9 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
 }
 
 export function generateJONumber(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  const time = String(now.getTime()).slice(-4)
-
-  return `JO-${year}${month}${day}-${time}`
+  const timestamp = Date.now()
+  const randomSuffix = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0")
+  return `JO-${timestamp}-${randomSuffix}`
 }
