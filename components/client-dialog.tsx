@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useRef, useState } from "react" // Import useRef
+import { useEffect, useRef, useState } from "react" // Import useRef
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,7 @@ interface ClientDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
+export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
   const { user } = useAuth() // Get current user from auth context
   const [loading, setLoading] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -37,6 +37,24 @@ function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogPro
     address: client?.address || "", // Company Address
     companyLogoUrl: client?.companyLogoUrl || "", // Existing logo URL
   })
+
+  // Reset form data and logo states when dialog opens for a new client or when client prop changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        company: client?.company || "",
+        industry: client?.industry || "",
+        name: client?.name || "",
+        designation: client?.designation || "",
+        phone: client?.phone || "",
+        email: client?.email || "",
+        address: client?.address || "",
+        companyLogoUrl: client?.companyLogoUrl || "",
+      })
+      setLogoFile(null) // Clear selected file
+      setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
+    }
+  }, [open, client])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -248,7 +266,3 @@ function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogPro
     </Dialog>
   )
 }
-
-// Export both as named and default export to support different import patterns
-export { ClientDialog }
-export default ClientDialog

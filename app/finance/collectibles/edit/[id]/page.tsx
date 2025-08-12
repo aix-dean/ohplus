@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +13,8 @@ import { useRouter } from "next/navigation"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
-import { query, collection, where, getDocs, limit } from "firebase/firestore"
-import { debounce } from "lodash"
-import ClientDialog from "@/components/client-dialog"
+import { getPaginatedClients, type Client } from "@/lib/client-service"
+import { ClientDialog } from "@/components/client-dialog"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -29,14 +28,11 @@ interface CollectibleFormData {
   invoice_no: string
   next_collection_date: string
   status: "pending" | "collected" | "overdue"
-  proceed_next_collection: boolean
-  next_collection_bir_2307?: File | string | null
-  next_collection_status: "pending" | "collected" | "overdue"
   // Sites specific fields
   booking_no?: string
   site?: string
   covered_period?: string
-  bir_2307?: File | string | null
+  bir_2307?: File | string | null // Changed to support both File and existing file reference
   collection_date?: string
   // Supplies specific fields
   date?: string
@@ -46,9 +42,6 @@ interface CollectibleFormData {
   due_for_collection?: string
   date_paid?: string
   net_amount_collection?: number
-  vendor_name?: string
-  tin_no?: string
-  business_address?: string
 }
 
 const initialFormData: CollectibleFormData = {
@@ -63,25 +56,24 @@ const initialFormData: CollectibleFormData = {
   invoice_no: "",
   next_collection_date: "",
   status: "pending",
-  proceed_next_collection: false,
-  next_collection_status: "pending",
 }
 
 export default function EditCollectiblePage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const router = useRouter()
   const { user } = useAuth()
+
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [clientSearchTerm, setClientSearchTerm] = useState("")
-  const [clientSearchResults, setClientSearchResults] = useState<any[]>([])
-  const [selectedClient, setSelectedClient] = useState<any>(null)
-  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([])
   const [isSearchingClients, setIsSearchingClients] = useState(false)
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
   const clientSearchRef = useRef<HTMLDivElement>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const fetchCollectible = async () => {
@@ -107,9 +99,6 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
             invoice_no: data.invoice_no || "",
             next_collection_date: data.next_collection_date || "",
             status: data.status || "pending",
-            proceed_next_collection: data.proceed_next_collection || false,
-            next_collection_bir_2307: data.next_collection_bir_2307 || null,
-            next_collection_status: data.next_collection_status || "pending",
             // Sites specific fields
             booking_no: data.booking_no || "",
             site: data.site || "",
@@ -124,10 +113,6 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
             due_for_collection: data.due_for_collection || "",
             date_paid: data.date_paid || "",
             net_amount_collection: data.net_amount_collection || 0,
-            // Added vendor fields initialization
-            vendor_name: data.vendor_name || "",
-            tin_no: data.tin_no || "",
-            business_address: data.business_address || "",
           }
 
           setFormData(collectibleData)
@@ -146,6 +131,39 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
       fetchCollectible()
     }
   }, [params.id])
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (user?.uid) {
+        setIsSearchingClients(true)
+        try {
+          const result = await getPaginatedClients(10, null, clientSearchTerm.trim(), null, user.uid)
+          setClientSearchResults(result.items)
+        } catch (error) {
+          console.error("Error fetching clients:", error)
+          setClientSearchResults([])
+        } finally {
+          setIsSearchingClients(false)
+        }
+      } else {
+        setClientSearchResults([])
+      }
+    }
+    fetchClients()
+  }, [clientSearchTerm, user?.uid])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -196,13 +214,6 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         next_collection_date: formData.next_collection_date,
         status: formData.status,
         updated: serverTimestamp(),
-        // Added next collection fields to update data
-        proceed_next_collection: formData.proceed_next_collection,
-        next_collection_status: formData.next_collection_status,
-        // Added vendor fields to update data
-        vendor_name: formData.vendor_name,
-        tin_no: formData.tin_no,
-        business_address: formData.business_address,
       }
 
       // Add type-specific fields
@@ -234,72 +245,17 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
     }
   }
 
-  const searchClients = useCallback(
-    debounce(async (searchTerm: string) => {
-      if (!searchTerm.trim() || !user?.uid) {
-        setClientSearchResults([])
-        setIsSearchingClients(false)
-        return
-      }
-
-      setIsSearchingClients(true)
-      try {
-        const clientsQuery = query(
-          collection(db, "clients"),
-          where("company_id", "==", user.company_id || user.uid),
-          where("deleted", "==", false),
-          limit(10),
-        )
-
-        const querySnapshot = await getDocs(clientsQuery)
-        const clients = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-
-        const filteredClients = clients.filter(
-          (client) =>
-            client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.email?.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
-
-        setClientSearchResults(filteredClients)
-      } catch (error) {
-        console.error("Error searching clients:", error)
-        setClientSearchResults([])
-      } finally {
-        setIsSearchingClients(false)
-      }
-    }, 300),
-    [user],
-  )
-
-  const handleClientSelect = (client: any) => {
+  const handleClientSelect = (client: Client) => {
     setSelectedClient(client)
     setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
     setIsClientDropdownOpen(false)
     setClientSearchTerm("")
   }
 
-  const handleNewClientSuccess = (newClient: any) => {
-    handleClientSelect(newClient)
+  const handleNewClientSuccess = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
     setIsNewClientDialogOpen(false)
-  }
-
-  const handleNextCollectionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.type === "application/pdf" || file.name.endsWith(".doc") || file.name.endsWith(".docx")) {
-        setFormData((prev) => ({ ...prev, next_collection_bir_2307: file }))
-      } else {
-        alert("Please select a PDF or DOC file.")
-      }
-    }
-  }
-
-  const removeNextCollectionFile = () => {
-    setFormData((prev) => ({ ...prev, next_collection_bir_2307: null }))
   }
 
   const renderFormFields = () => (
@@ -386,29 +342,24 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="vendor_name">Vendor Name</Label>
+        <Label htmlFor="net_amount">Net Amount</Label>
         <Input
-          id="vendor_name"
-          value={formData.vendor_name || ""}
-          onChange={(e) => handleInputChange("vendor_name", e.target.value)}
+          id="net_amount"
+          type="number"
+          value={formData.net_amount}
+          onChange={(e) => handleInputChange("net_amount", Number.parseFloat(e.target.value) || 0)}
+          required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="tin_no">TIN No.</Label>
+        <Label htmlFor="total_amount">Total Amount</Label>
         <Input
-          id="tin_no"
-          value={formData.tin_no || ""}
-          onChange={(e) => handleInputChange("tin_no", e.target.value)}
-        />
-      </div>
-
-      <div className="md:col-span-2 space-y-2">
-        <Label htmlFor="business_address">Business Address</Label>
-        <Input
-          id="business_address"
-          value={formData.business_address || ""}
-          onChange={(e) => handleInputChange("business_address", e.target.value)}
+          id="total_amount"
+          type="number"
+          value={formData.total_amount}
+          onChange={(e) => handleInputChange("total_amount", Number.parseFloat(e.target.value) || 0)}
+          required
         />
       </div>
 
@@ -427,126 +378,241 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         </Select>
       </div>
 
-      <div className="md:col-span-2 space-y-4 border-t pt-4">
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="proceed_next_collection"
-            checked={formData.proceed_next_collection}
-            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
-            Proceed to set the next collection date?
-          </Label>
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="bank_name">Bank Name</Label>
+        <Input
+          id="bank_name"
+          value={formData.bank_name}
+          onChange={(e) => handleInputChange("bank_name", e.target.value)}
+          required
+        />
+      </div>
 
-        {formData.proceed_next_collection && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_date">Next Collection Date</Label>
-              <Input
-                id="next_collection_date"
-                type="date"
-                value={formData.next_collection_date}
-                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
-                required
-              />
-            </div>
+      <div className="space-y-2">
+        <Label htmlFor="bi_no">BI No</Label>
+        <Input
+          id="bi_no"
+          value={formData.bi_no}
+          onChange={(e) => handleInputChange("bi_no", e.target.value)}
+          required
+        />
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_status">Status</Label>
-              <Select
-                value={formData.next_collection_status}
-                onValueChange={(value) => handleInputChange("next_collection_status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="collected">Collected</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="space-y-2">
+        <Label htmlFor="or_no">OR No</Label>
+        <Input
+          id="or_no"
+          value={formData.or_no}
+          onChange={(e) => handleInputChange("or_no", e.target.value)}
+          required
+        />
+      </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
-              {!formData.next_collection_bir_2307 ? (
-                <div className="flex items-center justify-center w-full">
-                  <label
-                    htmlFor="next_collection_bir_2307"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Click to upload</span> BIR 2307 for Next Collection
-                      </p>
-                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
-                    </div>
-                    <input
-                      id="next_collection_bir_2307"
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleNextCollectionFileChange}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                  <div className="flex items-center space-x-2">
-                    {formData.next_collection_bir_2307 instanceof File ? (
-                      <>
-                        <Upload className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-gray-700">{formData.next_collection_bir_2307.name}</span>
-                        <span className="text-xs text-gray-500">
-                          ({(formData.next_collection_bir_2307.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-gray-700">
-                          Existing file: {formData.next_collection_bir_2307}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeNextCollectionFile}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+      <div className="space-y-2">
+        <Label htmlFor="invoice_no">Invoice No</Label>
+        <Input
+          id="invoice_no"
+          value={formData.invoice_no}
+          onChange={(e) => handleInputChange("invoice_no", e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="next_collection_date">Next Collection Date</Label>
+        <Input
+          id="next_collection_date"
+          type="date"
+          value={formData.next_collection_date}
+          onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="status">Status</Label>
+        <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="collected">Collected</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Conditional Fields based on type */}
       {formData.type === "sites" && (
         <>
           <div className="space-y-2">
+            <Label htmlFor="booking_no">Booking No</Label>
+            <Input
+              id="booking_no"
+              value={formData.booking_no || ""}
+              onChange={(e) => handleInputChange("booking_no", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="site">Site</Label>
+            <Input id="site" value={formData.site || ""} onChange={(e) => handleInputChange("site", e.target.value)} />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
             <Input
               id="covered_period"
-              type="date"
               value={formData.covered_period || ""}
               onChange={(e) => handleInputChange("covered_period", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bir_2307">BIR 2307 (PDF/DOC only)</Label>
+            {!formData.bir_2307 ? (
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="bir_2307"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                    <p className="mb-2 text-sm text-gray-500">
+                      <span className="font-semibold">Click to upload</span> BIR 2307
+                    </p>
+                    <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                  </div>
+                  <input
+                    id="bir_2307"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center space-x-2">
+                  {formData.bir_2307 instanceof File ? (
+                    <>
+                      <Upload className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">{formData.bir_2307.name}</span>
+                      <span className="text-xs text-gray-500">
+                        ({(formData.bir_2307.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Existing file: {formData.bir_2307}</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {typeof formData.bir_2307 === "string" && (
+                    <label htmlFor="bir_2307_replace" className="cursor-pointer">
+                      <Button type="button" variant="ghost" size="sm" className="text-blue-500 hover:text-blue-700">
+                        Replace
+                      </Button>
+                      <input
+                        id="bir_2307_replace"
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="collection_date">Collection Date</Label>
+            <Input
+              id="collection_date"
+              type="date"
+              value={formData.collection_date || ""}
+              onChange={(e) => handleInputChange("collection_date", e.target.value)}
             />
           </div>
         </>
       )}
 
-      {formData.type === "supplies" && <></>}
+      {formData.type === "supplies" && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="date">Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.date || ""}
+              onChange={(e) => handleInputChange("date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="product">Product</Label>
+            <Input
+              id="product"
+              value={formData.product || ""}
+              onChange={(e) => handleInputChange("product", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="transfer_date">Transfer Date</Label>
+            <Input
+              id="transfer_date"
+              type="date"
+              value={formData.transfer_date || ""}
+              onChange={(e) => handleInputChange("transfer_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bs_no">BS No</Label>
+            <Input
+              id="bs_no"
+              value={formData.bs_no || ""}
+              onChange={(e) => handleInputChange("bs_no", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="due_for_collection">Due for Collection</Label>
+            <Input
+              id="due_for_collection"
+              type="date"
+              value={formData.due_for_collection || ""}
+              onChange={(e) => handleInputChange("due_for_collection", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="date_paid">Date Paid</Label>
+            <Input
+              id="date_paid"
+              type="date"
+              value={formData.date_paid || ""}
+              onChange={(e) => handleInputChange("date_paid", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="net_amount_collection">Net Amount Collection</Label>
+            <Input
+              id="net_amount_collection"
+              type="number"
+              value={formData.net_amount_collection || 0}
+              onChange={(e) => handleInputChange("net_amount_collection", Number.parseFloat(e.target.value) || 0)}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 
@@ -589,7 +655,7 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
   }
 
   return (
-    <div className="container mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/finance/collectibles">
           <Button variant="outline" size="sm">
@@ -610,18 +676,12 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {renderFormFields()}
-            {submitError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{submitError}</div>
-            )}
-            <div className="flex justify-end gap-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/finance/collectibles")}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Link href="/finance/collectibles">
+                <Button variant="outline" type="button">
+                  Cancel
+                </Button>
+              </Link>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Updating..." : "Update Collectible"}
               </Button>
