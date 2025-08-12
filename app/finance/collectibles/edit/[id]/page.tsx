@@ -73,38 +73,38 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         const collectibleDoc = await getDoc(doc(db, "collectibles", params.id))
 
         if (collectibleDoc.exists()) {
-          const collectibleData = collectibleDoc.data()
+          const data = collectibleDoc.data()
 
-          // Convert Firestore data to form data format
-          const formattedData: CollectibleFormData = {
-            type: collectibleData.type || "sites",
-            client_name: collectibleData.client_name || "",
-            net_amount: collectibleData.net_amount || 0,
-            total_amount: collectibleData.total_amount || 0,
-            mode_of_payment: collectibleData.mode_of_payment || "",
-            bank_name: collectibleData.bank_name || "",
-            bi_no: collectibleData.bi_no || "",
-            or_no: collectibleData.or_no || "",
-            invoice_no: collectibleData.invoice_no || "",
-            next_collection_date: collectibleData.next_collection_date || "",
-            status: collectibleData.status || "pending",
+          // Convert Firestore data to form format
+          const collectibleData: CollectibleFormData = {
+            type: data.type || "sites",
+            client_name: data.client_name || "",
+            net_amount: data.net_amount || 0,
+            total_amount: data.total_amount || 0,
+            mode_of_payment: data.mode_of_payment || "",
+            bank_name: data.bank_name || "",
+            bi_no: data.bi_no || "",
+            or_no: data.or_no || "",
+            invoice_no: data.invoice_no || "",
+            next_collection_date: data.next_collection_date || "",
+            status: data.status || "pending",
             // Sites specific fields
-            booking_no: collectibleData.booking_no || "",
-            site: collectibleData.site || "",
-            covered_period: collectibleData.covered_period || "",
-            bir_2307: collectibleData.bir_2307 || null,
-            collection_date: collectibleData.collection_date || "",
+            booking_no: data.booking_no || "",
+            site: data.site || "",
+            covered_period: data.covered_period || "",
+            bir_2307: data.bir_2307 || null,
+            collection_date: data.collection_date || "",
             // Supplies specific fields
-            date: collectibleData.date || "",
-            product: collectibleData.product || "",
-            transfer_date: collectibleData.transfer_date || "",
-            bs_no: collectibleData.bs_no || "",
-            due_for_collection: collectibleData.due_for_collection || "",
-            date_paid: collectibleData.date_paid || "",
-            net_amount_collection: collectibleData.net_amount_collection || 0,
+            date: data.date || "",
+            product: data.product || "",
+            transfer_date: data.transfer_date || "",
+            bs_no: data.bs_no || "",
+            due_for_collection: data.due_for_collection || "",
+            date_paid: data.date_paid || "",
+            net_amount_collection: data.net_amount_collection || 0,
           }
 
-          setFormData(formattedData)
+          setFormData(collectibleData)
         } else {
           setError("Collectible not found")
         }
@@ -169,7 +169,6 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         next_collection_date: formData.next_collection_date,
         status: formData.status,
         updated: serverTimestamp(),
-        company_id: user?.company_id || user?.uid || "default_company",
       }
 
       // Add type-specific fields
@@ -177,8 +176,8 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         if (formData.booking_no) updateData.booking_no = formData.booking_no
         if (formData.site) updateData.site = formData.site
         if (formData.covered_period) updateData.covered_period = formData.covered_period
-        if (formData.bir_2307) updateData.bir_2307 = formData.bir_2307
         if (formData.collection_date) updateData.collection_date = formData.collection_date
+        if (formData.bir_2307) updateData.bir_2307 = formData.bir_2307
       } else if (formData.type === "supplies") {
         if (formData.date) updateData.date = formData.date
         if (formData.product) updateData.product = formData.product
@@ -528,7 +527,7 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
           </Link>
           <div>
             <h1 className="text-3xl font-bold">Edit Collectible</h1>
-            <p className="text-muted-foreground text-red-500">{error}</p>
+            <p className="text-red-500">{error}</p>
           </div>
         </div>
       </div>
@@ -563,7 +562,9 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                   Cancel
                 </Button>
               </Link>
-              <Button type="submit">Update Collectible</Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Updating..." : "Update Collectible"}
+              </Button>
             </div>
           </form>
         </CardContent>
