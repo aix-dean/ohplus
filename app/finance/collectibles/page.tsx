@@ -153,6 +153,13 @@ export default function CollectiblesPage() {
     }).format(amount)
   }
 
+  const displayValue = (value: string | number | undefined | null): string => {
+    if (value === null || value === undefined || value === "" || (typeof value === "string" && value.trim() === "")) {
+      return "-"
+    }
+    return String(value)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -263,19 +270,19 @@ export default function CollectiblesPage() {
                 <TableBody>
                   {filteredCollectibles.map((collectible) => (
                     <TableRow key={collectible.id}>
-                      <TableCell className="font-medium">{collectible.client_name}</TableCell>
+                      <TableCell className="font-medium">{displayValue(collectible.client_name)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{collectible.type}</Badge>
                       </TableCell>
-                      <TableCell>{collectible.invoice_no}</TableCell>
-                      <TableCell>{collectible.or_no}</TableCell>
-                      <TableCell>{collectible.bi_no}</TableCell>
-                      <TableCell>{formatCurrency(collectible.net_amount)}</TableCell>
-                      <TableCell>{formatCurrency(collectible.total_amount)}</TableCell>
-                      <TableCell>{collectible.mode_of_payment}</TableCell>
-                      <TableCell>{collectible.bank_name}</TableCell>
+                      <TableCell>{displayValue(collectible.invoice_no)}</TableCell>
+                      <TableCell>{displayValue(collectible.or_no)}</TableCell>
+                      <TableCell>{displayValue(collectible.bi_no)}</TableCell>
+                      <TableCell>{collectible.net_amount ? formatCurrency(collectible.net_amount) : "-"}</TableCell>
+                      <TableCell>{collectible.total_amount ? formatCurrency(collectible.total_amount) : "-"}</TableCell>
+                      <TableCell>{displayValue(collectible.mode_of_payment)}</TableCell>
+                      <TableCell>{displayValue(collectible.bank_name)}</TableCell>
                       <TableCell>{getStatusBadge(collectible.status)}</TableCell>
-                      <TableCell>{collectible.next_collection_date}</TableCell>
+                      <TableCell>{displayValue(collectible.next_collection_date)}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
                           <Link href={`/finance/collectibles/edit/${collectible.id}`}>
