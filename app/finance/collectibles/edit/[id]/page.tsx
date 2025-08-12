@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, FileText, PlusCircle, CheckCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Upload, X, FileText, PlusCircle, CheckCircle, Loader2, Eye } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
@@ -28,6 +28,9 @@ interface CollectibleFormData {
   invoice_no: string
   next_collection_date: string
   status: "pending" | "collected" | "overdue"
+  proceed_next_collection: boolean
+  next_collection_status: "pending" | "collected" | "overdue"
+  next_collection_bir_2307?: File | string | null
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -56,6 +59,8 @@ const initialFormData: CollectibleFormData = {
   invoice_no: "",
   next_collection_date: "",
   status: "pending",
+  proceed_next_collection: false,
+  next_collection_status: "pending",
 }
 
 export default function EditCollectiblePage({ params }: { params: { id: string } }) {
@@ -99,6 +104,13 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
             invoice_no: data.invoice_no || "",
             next_collection_date: data.next_collection_date || "",
             status: data.status || "pending",
+            proceed_next_collection: !!(
+              data.next_collection_date ||
+              data.next_collection_status ||
+              data.next_collection_bir_2307
+            ),
+            next_collection_status: data.next_collection_status || "pending",
+            next_collection_bir_2307: data.next_collection_bir_2307 || null,
             // Sites specific fields
             booking_no: data.booking_no || "",
             site: data.site || "",
@@ -201,7 +213,7 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
       const collectibleRef = doc(db, "collectibles", params.id)
 
       // Prepare update data, filtering out undefined values
-      const updateData: any = {
+      const collectibleData: any = {
         type: formData.type,
         client_name: formData.client_name,
         net_amount: formData.net_amount,
@@ -211,29 +223,37 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         bi_no: formData.bi_no,
         or_no: formData.or_no,
         invoice_no: formData.invoice_no,
-        next_collection_date: formData.next_collection_date,
         status: formData.status,
         updated: serverTimestamp(),
       }
 
       // Add type-specific fields
       if (formData.type === "sites") {
-        if (formData.booking_no) updateData.booking_no = formData.booking_no
-        if (formData.site) updateData.site = formData.site
-        if (formData.covered_period) updateData.covered_period = formData.covered_period
-        if (formData.collection_date) updateData.collection_date = formData.collection_date
-        if (formData.bir_2307) updateData.bir_2307 = formData.bir_2307
+        if (formData.booking_no) collectibleData.booking_no = formData.booking_no
+        if (formData.site) collectibleData.site = formData.site
+        if (formData.covered_period) collectibleData.covered_period = formData.covered_period
+        if (formData.collection_date) collectibleData.collection_date = formData.collection_date
+        if (formData.bir_2307) collectibleData.bir_2307 = formData.bir_2307
       } else if (formData.type === "supplies") {
-        if (formData.date) updateData.date = formData.date
-        if (formData.product) updateData.product = formData.product
-        if (formData.transfer_date) updateData.transfer_date = formData.transfer_date
-        if (formData.bs_no) updateData.bs_no = formData.bs_no
-        if (formData.due_for_collection) updateData.due_for_collection = formData.due_for_collection
-        if (formData.date_paid) updateData.date_paid = formData.date_paid
-        if (formData.net_amount_collection) updateData.net_amount_collection = formData.net_amount_collection
+        if (formData.date) collectibleData.date = formData.date
+        if (formData.product) collectibleData.product = formData.product
+        if (formData.transfer_date) collectibleData.transfer_date = formData.transfer_date
+        if (formData.bs_no) collectibleData.bs_no = formData.bs_no
+        if (formData.due_for_collection) collectibleData.due_for_collection = formData.due_for_collection
+        if (formData.date_paid) collectibleData.date_paid = formData.date_paid
+        if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      await updateDoc(collectibleRef, updateData)
+      // Add next collection fields only if checkbox is checked
+      if (formData.proceed_next_collection) {
+        collectibleData.next_collection_date = formData.next_collection_date
+        collectibleData.next_collection_status = formData.next_collection_status
+        if (formData.next_collection_bir_2307) {
+          collectibleData.next_collection_bir_2307 = formData.next_collection_bir_2307
+        }
+      }
+
+      await updateDoc(collectibleRef, collectibleData)
 
       // Navigate back to collectibles list
       router.push("/finance/collectibles")
@@ -422,15 +442,115 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="next_collection_date">Next Collection Date</Label>
-        <Input
-          id="next_collection_date"
-          type="date"
-          value={formData.next_collection_date}
-          onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
-          required
-        />
+      <div className="md:col-span-2 space-y-4">
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="proceed_next_collection"
+            checked={formData.proceed_next_collection}
+            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
+            Proceed to set the next collection date?
+          </Label>
+        </div>
+
+        {formData.proceed_next_collection && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_date">Next Collection Date</Label>
+              <Input
+                id="next_collection_date"
+                type="date"
+                value={formData.next_collection_date}
+                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_status">Status for Next Collection</Label>
+              <Select
+                value={formData.next_collection_status}
+                onValueChange={(value) => handleInputChange("next_collection_status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="collected">Collected</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
+              {!formData.next_collection_bir_2307 ? (
+                <div className="flex items-center justify-center w-full">
+                  <label
+                    htmlFor="next_collection_bir_2307"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> BIR 2307 for Next Collection
+                      </p>
+                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                    </div>
+                    <input
+                      id="next_collection_bir_2307"
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleInputChange("next_collection_bir_2307", file)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 bg-white border border-gray-300 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-700">
+                      {typeof formData.next_collection_bir_2307 === "string"
+                        ? "Existing file"
+                        : formData.next_collection_bir_2307?.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {typeof formData.next_collection_bir_2307 === "string" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(formData.next_collection_bir_2307 as string, "_blank")}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleInputChange("next_collection_bir_2307", null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
