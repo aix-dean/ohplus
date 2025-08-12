@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Upload, X, FileText } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -28,7 +28,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
-  bir_2307?: string
+  bir_2307?: File | string | null // Changed to support both File and existing file reference
   collection_date?: string
   // Supplies specific fields
   date?: string
@@ -77,6 +77,28 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ]
+      if (!allowedTypes.includes(file.type)) {
+        alert("Only PDF and DOC files are allowed")
+        e.target.value = ""
+        return
+      }
+      handleInputChange("bir_2307", file)
+    }
+  }
+
+  const removeFile = () => {
+    handleInputChange("bir_2307", null)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -236,12 +258,74 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bir_2307">BIR 2307</Label>
-            <Input
-              id="bir_2307"
-              value={formData.bir_2307 || ""}
-              onChange={(e) => handleInputChange("bir_2307", e.target.value)}
-            />
+            <Label htmlFor="bir_2307">BIR 2307 (PDF/DOC only)</Label>
+            {!formData.bir_2307 ? (
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="bir_2307"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                    <p className="mb-2 text-sm text-gray-500">
+                      <span className="font-semibold">Click to upload</span> BIR 2307
+                    </p>
+                    <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                  </div>
+                  <input
+                    id="bir_2307"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center space-x-2">
+                  {formData.bir_2307 instanceof File ? (
+                    <>
+                      <Upload className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">{formData.bir_2307.name}</span>
+                      <span className="text-xs text-gray-500">
+                        ({(formData.bir_2307.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Existing file: {formData.bir_2307}</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {typeof formData.bir_2307 === "string" && (
+                    <label htmlFor="bir_2307_replace" className="cursor-pointer">
+                      <Button type="button" variant="ghost" size="sm" className="text-blue-500 hover:text-blue-700">
+                        Replace
+                      </Button>
+                      <input
+                        id="bir_2307_replace"
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="collection_date">Collection Date</Label>
