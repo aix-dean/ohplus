@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Plus, Undo2, Search, Trash2, Settings } from "lucide-react"
+import { Plus, Search, Trash2, Settings } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber as parseNumberUtil, sumBy as sumByUtil, uid } from "../utils"
 import { encashmentService } from "@/lib/encashment-service"
@@ -47,29 +47,17 @@ type AdditionalRow = {
 const STORAGE_KEY = "acc_encash_add_rows_v1"
 const STORAGE_KEY_SETTINGS = "acc_encash_add_settings_v1"
 
-const MOCK_SETTINGS: AdditionalSettings = {
-  type: "ADDITIONAL_ENCASHMENT",
-  fundLabel: "Additional Encashments Fund",
-  fundAmount: 100000,
-  deleted: false,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}
-
-function compute(row: AdditionalRow): AdditionalRow {
-  const gross = parseNumberUtil(row.grossAmount)
-  const netOfVat = gross / 1.12
-  const inputVat = gross - netOfVat
-  const onePercent = netOfVat * 0.01
-  const twoPercent = netOfVat * 0.02
-  const netAmount = gross - onePercent - twoPercent
-  return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
-}
-
 export function AdditionalEncashmentsTable() {
   const { toast } = useToast()
   const [rows, setRows] = useState<AdditionalRow[]>([])
-  const [settings, setSettings] = useState<AdditionalSettings>(MOCK_SETTINGS)
+  const [settings, setSettings] = useState<AdditionalSettings>({
+    type: "ADDITIONAL_ENCASHMENT",
+    fundLabel: "",
+    fundAmount: 0,
+    deleted: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
@@ -291,11 +279,6 @@ export function AdditionalEncashmentsTable() {
     }
   }
 
-  function resetMock() {
-    setRows([])
-    setSettings(MOCK_SETTINGS)
-  }
-
   if (loading) {
     return <div className="flex items-center justify-center p-8">Loading...</div>
   }
@@ -513,10 +496,6 @@ export function AdditionalEncashmentsTable() {
                 Delete ({selectedRows.size})
               </Button>
             )}
-
-            <Button variant="outline" onClick={resetMock} className="border-gray-300 hover:bg-gray-50 bg-transparent">
-              <Undo2 className="mr-2 h-4 w-4" /> Load Sample Data
-            </Button>
           </div>
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -734,4 +713,14 @@ export function AdditionalEncashmentsTable() {
       </div>
     </div>
   )
+}
+
+function compute(row: AdditionalRow): AdditionalRow {
+  const gross = parseNumberUtil(row.grossAmount)
+  const netOfVat = gross / 1.12
+  const inputVat = gross - netOfVat
+  const onePercent = netOfVat * 0.01
+  const twoPercent = netOfVat * 0.02
+  const netAmount = gross - onePercent - twoPercent
+  return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
 }

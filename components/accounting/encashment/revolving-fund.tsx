@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Plus, Save, Undo2, Trash2, Settings } from "lucide-react"
+import { Plus, Save, Trash2, Settings } from "lucide-react"
 import { encashmentService } from "@/lib/encashment-service"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
@@ -55,46 +55,20 @@ function compute(row: RevolvingRow): RevolvingRow {
   return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
 }
 
-const MOCK_SETTINGS: RevolvingSettings = {
-  companyName: "OOH Plus Inc.",
-  revolvingFundName: "Revolving Fund",
-  revolvingFundReplenishment: "Dec 2024",
-  cutOffPeriod: "Dec 1–31, 2024",
-  revolvingFundAmount: 350000,
-}
-
-const MOCK_ROWS: RevolvingRow[] = [
-  compute({
-    id: uid("rvf"),
-    category: "Repairs",
-    month: "Dec",
-    date: "09",
-    pettyCashVoucherNo: "RVF-001",
-    supplierName: "FixIt Co",
-    description: "LED panel repairs",
-    accountTitle: "Repairs and Maintenance",
-    documentTypeNo: "SI-3001",
-    tinNo: "333-444-555-000",
-    companyAddress: "Quezon City",
-    grossAmount: 33600,
-    netOfVat: 0,
-    inputVat: 0,
-    onePercent: 0,
-    twoPercent: 0,
-    netAmount: 0,
-    type: "REVOLVING_FUND",
-    deleted: false,
-  }),
-]
-
 export function RevolvingFundTable() {
   const { toast } = useToast()
   const [rows, setRows] = useState<RevolvingRow[]>([])
-  const [settings, setSettings] = useState<RevolvingSettings>(MOCK_SETTINGS)
+  const [settings, setSettings] = useState<RevolvingSettings>({
+    companyName: "",
+    revolvingFundName: "",
+    revolvingFundReplenishment: "",
+    cutOffPeriod: "",
+    revolvingFundAmount: 0,
+  })
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [newTransaction, setNewTransaction] = useState({
     category: "",
@@ -135,11 +109,9 @@ export function RevolvingFundTable() {
           if (saved) {
             const parsed = JSON.parse(saved) as RevolvingRow[]
             setRows(parsed.map((row) => compute({ ...row, type: "REVOLVING_FUND", deleted: false })))
-          } else {
-            setRows(MOCK_ROWS)
           }
         } catch {
-          setRows(MOCK_ROWS)
+          // No action needed if localStorage fails
         }
       }
     } catch (error) {
@@ -149,7 +121,6 @@ export function RevolvingFundTable() {
         description: "Failed to load revolving fund data",
         variant: "destructive",
       })
-      setRows(MOCK_ROWS)
     } finally {
       setLoading(false)
     }
@@ -282,12 +253,6 @@ export function RevolvingFundTable() {
     }
   }
 
-  function resetMock() {
-    setRows(MOCK_ROWS)
-    setSettings(MOCK_SETTINGS)
-    setDirty(true)
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -305,7 +270,7 @@ export function RevolvingFundTable() {
             <h3 className="text-lg font-semibold text-gray-900">Revolving Fund</h3>
             <p className="text-sm text-gray-600">Manage revolving fund settings and transactions</p>
           </div>
-          <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
+          <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 <Settings className="mr-2 h-4 w-4" />
@@ -330,13 +295,13 @@ export function RevolvingFundTable() {
                   />
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setShowConfigModal(false)}>
+                  <Button variant="outline" onClick={() => setIsConfigModalOpen(false)}>
                     Cancel
                   </Button>
                   <Button
                     onClick={() => {
                       saveAll()
-                      setShowConfigModal(false)
+                      setIsConfigModalOpen(false)
                     }}
                   >
                     Save Configuration
@@ -515,9 +480,6 @@ export function RevolvingFundTable() {
               className="border-gray-300 hover:bg-gray-50 bg-transparent"
             >
               <Save className="mr-2 h-4 w-4" /> Save Changes
-            </Button>
-            <Button variant="outline" onClick={resetMock} className="border-gray-300 hover:bg-gray-50 bg-transparent">
-              <Undo2 className="mr-2 h-4 w-4" /> Load Sample Data
             </Button>
           </div>
           <div className="relative w-full sm:w-80">

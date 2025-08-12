@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, Plus, Save, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
+import { Trash2, Plus, Save, RefreshCw, Settings } from "lucide-react"
+import { useToast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { encashmentService } from "@/lib/encashment-service"
 import { Card, CardContent } from "@/components/ui/card"
@@ -39,42 +39,46 @@ function compute(row: any): any {
   return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
 }
 
-const MOCK_SETTINGS = {
-  companyName: "OOH Plus Inc.",
-  pettyCashFundReplenishment: "Dec 2024",
-  cutOffPeriod: "Dec 1–31, 2024",
-  pettyCashFundName: "Petty Cash Fund",
-  pettyCashFundAmount: 200000,
+type PettyCashRow = {
+  id: string
+  category: string
+  month: string
+  date: string
+  pettyCashVoucherNo: string
+  supplierName: string
+  description: string
+  accountTitle: string
+  documentTypeNo: string
+  tinNo: string
+  companyAddress: string
+  grossAmount: number
+  netOfVat: number
+  inputVat: number
+  onePercent: number
+  twoPercent: number
+  netAmount: number
+  deleted: boolean
+  type: string
 }
 
-const MOCK_ROWS = [
-  compute({
-    id: uid("pcf"),
-    category: "Office Supplies",
-    month: "Dec",
-    date: "15",
-    pettyCashVoucherNo: "PCV-001",
-    supplierName: "Office Depot",
-    description: "Printer paper and pens",
-    accountTitle: "Office Supplies",
-    documentTypeNo: "OR-1234",
-    tinNo: "123-456-789-000",
-    companyAddress: "Makati City",
-    grossAmount: 1120,
-    netOfVat: 0,
-    inputVat: 0,
-    onePercent: 0,
-    twoPercent: 0,
-    netAmount: 0,
-    deleted: false,
-    type: "PETTYCASH",
-  }),
-]
+type PettyCashSettings = {
+  companyName: string
+  pettyCashFundReplenishment: string
+  cutOffPeriod: string
+  pettyCashFundName: string
+  pettyCashFundAmount: number
+}
 
-// Export component as PettyCashFundTable to match import
 export function PettyCashFundTable() {
-  const [rows, setRows] = useState<any[]>([])
-  const [settings, setSettings] = useState<any>(MOCK_SETTINGS)
+  const { toast } = useToast()
+  const [rows, setRows] = useState<PettyCashRow[]>([])
+  const [settings, setSettings] = useState<PettyCashSettings>({
+    companyName: "",
+    pettyCashFundReplenishment: "",
+    cutOffPeriod: "",
+    pettyCashFundName: "",
+    pettyCashFundAmount: 0,
+  })
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -82,7 +86,7 @@ export function PettyCashFundTable() {
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [totalFundUsage, setTotalFundUsage] = useState(0)
   const [remainingBalanceForDeposit, setRemainingBalanceForDeposit] = useState(0)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [transactionForm, setTransactionForm] = useState({
     category: "",
@@ -145,8 +149,8 @@ export function PettyCashFundTable() {
         return
       }
     } catch {}
-    setRows(MOCK_ROWS)
-    calculateTotals(MOCK_ROWS)
+    setRows([])
+    calculateTotals([])
   }
 
   const filtered = useMemo(() => rows.filter((r) => includesAny(r, query)), [rows, query])
@@ -295,12 +299,6 @@ export function PettyCashFundTable() {
     }
   }
 
-  function resetMock() {
-    setRows(MOCK_ROWS)
-    setSettings(MOCK_SETTINGS)
-    setDirty(true)
-  }
-
   function toggleRowSelection(id: string) {
     setSelectedRows((prev) => (prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]))
   }
@@ -315,7 +313,7 @@ export function PettyCashFundTable() {
 
   const handleSaveAndClose = async () => {
     await saveSettings()
-    setIsModalOpen(false)
+    setIsConfigModalOpen(false)
   }
 
   return (
@@ -326,10 +324,10 @@ export function PettyCashFundTable() {
             <h2 className="text-xl font-semibold text-gray-900">Petty Cash Fund</h2>
             <p className="text-sm text-gray-600 mt-1">Manage petty cash fund settings and transactions</p>
           </div>
-          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="h-4 w-4 mr-2" />
+                <Settings className="h-4 w-4 mr-2" />
                 Configure Fund
               </Button>
             </DialogTrigger>
@@ -399,7 +397,7 @@ export function PettyCashFundTable() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                  <Button variant="outline" onClick={() => setIsConfigModalOpen(false)}>
                     Cancel
                   </Button>
                   <Button
