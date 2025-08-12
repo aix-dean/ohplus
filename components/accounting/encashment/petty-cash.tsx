@@ -1,25 +1,13 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
-
-// Export as named export PettyCashFundTable instead of default export
-export { PettyCashFundTable }
-
 import type React from "react"
 import { useState, useMemo } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "your-dialog-library"
-import {
-  Button,
-  Checkbox,
-  Input,
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-  TableFooter,
-} from "your-ui-library"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from "@/components/ui/table"
 
 interface Transaction {
   id: string
@@ -129,19 +117,56 @@ function PettyCashFundTable() {
 
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault()
-    // Logic to add transaction
+    const newTransaction: Transaction = {
+      ...formData,
+      id: Date.now().toString(),
+      type: "PETTYCASH",
+    }
+    setTransactions((prev) => [...prev, newTransaction])
+    setShowTransactionModal(false)
+    // Reset form
+    setFormData({
+      category: "",
+      month: "",
+      date: "",
+      pcvNo: "",
+      supplier: "",
+      description: "",
+      account: "",
+      document: "",
+      tin: "",
+      address: "",
+      grossAmount: 0,
+      netOfVat: 0,
+      inputVat: 0,
+      onePercent: 0,
+      twoPercent: 0,
+      netAmount: 0,
+    })
   }
 
   const handleSelectAll = (checked: boolean) => {
     setSelectedTransactions(checked ? transactions.map((t) => t.id) : [])
   }
 
-  const handleSelectTransaction = (id: string) => {
-    setSelectedTransactions((prev) => (checked) => (checked ? [...prev, id] : prev.filter((tid) => tid !== id)))
+  const handleSelectTransaction = (id: string, checked: boolean) => {
+    setSelectedTransactions((prev) => (checked ? [...prev, id] : prev.filter((tid) => tid !== id)))
   }
 
   return (
-    <div>
+    <div className="space-y-6">
+      {/* Header with Add Transaction Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold">Petty Cash Fund</h2>
+          <p className="text-sm text-gray-600">Manage petty cash fund settings and transactions</p>
+        </div>
+        <Button onClick={() => setShowTransactionModal(true)} className="bg-green-600 hover:bg-green-700">
+          + Add Transaction
+        </Button>
+      </div>
+
+      {/* Transaction Modal */}
       <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -324,73 +349,85 @@ function PettyCashFundTable() {
         </DialogContent>
       </Dialog>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">
-              <Checkbox
-                checked={selectedTransactions.length === transactions.length}
-                onCheckedChange={handleSelectAll}
-              />
-            </TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Month</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>PCV No.</TableHead>
-            <TableHead>Supplier</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Account</TableHead>
-            <TableHead>Document</TableHead>
-            <TableHead>TIN</TableHead>
-            <TableHead>Address</TableHead>
-            <TableHead className="text-right">Gross Amount</TableHead>
-            <TableHead className="text-right">Net of VAT</TableHead>
-            <TableHead className="text-right">Input VAT</TableHead>
-            <TableHead className="text-right">1%</TableHead>
-            <TableHead className="text-right">2%</TableHead>
-            <TableHead className="text-right">Net Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.map((transaction) => (
-            <TableRow key={transaction.id}>
-              <TableCell>
+      {/* Transactions Table */}
+      <div className="bg-white rounded-lg border shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedTransactions.includes(transaction.id)}
-                  onCheckedChange={() => handleSelectTransaction(transaction.id)}
+                  checked={selectedTransactions.length === transactions.length && transactions.length > 0}
+                  onCheckedChange={handleSelectAll}
                 />
-              </TableCell>
-              <TableCell>{transaction.category}</TableCell>
-              <TableCell>{transaction.month}</TableCell>
-              <TableCell>{transaction.date}</TableCell>
-              <TableCell>{transaction.pcvNo}</TableCell>
-              <TableCell>{transaction.supplier}</TableCell>
-              <TableCell>{transaction.description}</TableCell>
-              <TableCell>{transaction.account}</TableCell>
-              <TableCell>{transaction.document}</TableCell>
-              <TableCell>{transaction.tin}</TableCell>
-              <TableCell>{transaction.address}</TableCell>
-              <TableCell className="text-right">₱{transaction.grossAmount.toFixed(2)}</TableCell>
-              <TableCell className="text-right">₱{transaction.netOfVat.toFixed(2)}</TableCell>
-              <TableCell className="text-right">₱{transaction.inputVat.toFixed(2)}</TableCell>
-              <TableCell className="text-right">₱{transaction.onePercent.toFixed(2)}</TableCell>
-              <TableCell className="text-right">₱{transaction.twoPercent.toFixed(2)}</TableCell>
-              <TableCell className="text-right font-semibold">₱{transaction.netAmount.toFixed(2)}</TableCell>
+              </TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Month</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>PCV No.</TableHead>
+              <TableHead>Supplier</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Account</TableHead>
+              <TableHead>Document</TableHead>
+              <TableHead>TIN</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead className="text-right">Gross Amount</TableHead>
+              <TableHead className="text-right">Net of VAT</TableHead>
+              <TableHead className="text-right">Input VAT</TableHead>
+              <TableHead className="text-right">1%</TableHead>
+              <TableHead className="text-right">2%</TableHead>
+              <TableHead className="text-right">Net Amount</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-        <TableFooter>
-          <TableRow className="bg-gray-50 font-semibold">
-            <TableCell colSpan={11}>TOTALS</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalGrossAmount.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalNetOfVat.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalInputVat.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalOnePercent.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalTwoPercent.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₱{calculateTotals.totalNetAmount.toFixed(2)}</TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {transactions.map((transaction) => (
+              <TableRow key={transaction.id}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedTransactions.includes(transaction.id)}
+                    onCheckedChange={(checked) => handleSelectTransaction(transaction.id, checked as boolean)}
+                  />
+                </TableCell>
+                <TableCell>{transaction.category}</TableCell>
+                <TableCell>{transaction.month}</TableCell>
+                <TableCell>{transaction.date}</TableCell>
+                <TableCell>{transaction.pcvNo}</TableCell>
+                <TableCell>{transaction.supplier}</TableCell>
+                <TableCell>{transaction.description}</TableCell>
+                <TableCell>{transaction.account}</TableCell>
+                <TableCell>{transaction.document}</TableCell>
+                <TableCell>{transaction.tin}</TableCell>
+                <TableCell>{transaction.address}</TableCell>
+                <TableCell className="text-right">₱{transaction.grossAmount.toFixed(2)}</TableCell>
+                <TableCell className="text-right">₱{transaction.netOfVat.toFixed(2)}</TableCell>
+                <TableCell className="text-right">₱{transaction.inputVat.toFixed(2)}</TableCell>
+                <TableCell className="text-right">₱{transaction.onePercent.toFixed(2)}</TableCell>
+                <TableCell className="text-right">₱{transaction.twoPercent.toFixed(2)}</TableCell>
+                <TableCell className="text-right font-semibold">₱{transaction.netAmount.toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
+            {transactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={17} className="text-center py-8 text-gray-500">
+                  No transactions found. Click "Add Transaction" to get started.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          <TableFooter>
+            <TableRow className="bg-gray-50 font-semibold">
+              <TableCell colSpan={11}>TOTALS</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalGrossAmount.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalNetOfVat.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalInputVat.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalOnePercent.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalTwoPercent.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₱{calculateTotals.totalNetAmount.toFixed(2)}</TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
     </div>
   )
 }
+
+export { PettyCashFundTable }
