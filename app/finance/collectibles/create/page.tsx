@@ -260,12 +260,17 @@ export default function CreateCollectiblePage() {
 
       <div className="space-y-2">
         <Label htmlFor="mode_of_payment">Mode of Payment</Label>
-        <Input
-          id="mode_of_payment"
-          value={formData.mode_of_payment}
-          onChange={(e) => handleInputChange("mode_of_payment", e.target.value)}
-          required
-        />
+        <Select value={formData.mode_of_payment} onValueChange={(value) => handleInputChange("mode_of_payment", value)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select payment method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Cash">Cash</SelectItem>
+            <SelectItem value="Credit/Debit Card">Credit/Debit Card</SelectItem>
+            <SelectItem value="Gcash">Gcash</SelectItem>
+            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
