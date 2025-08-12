@@ -85,7 +85,7 @@ export class BookingService {
   async getCompletedBookingsCount(companyId: string): Promise<number> {
     try {
       const bookingsRef = collection(db, "booking")
-      const q = query(bookingsRef, where("company_id", "==", companyId), where("status", "==", "COMPLETED"))
+      const q = query(bookingsRef, where("company_id", "==", companyId))
 
       const querySnapshot = await getDocs(q)
       return querySnapshot.size
