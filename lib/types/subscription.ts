@@ -101,5 +101,3 @@ export function getMaxUsersForPlan(planType: SubscriptionPlanType): number {
       return 12 // Default to 12 users
   }
 }
-
-export type SubscriptionData = Subscription

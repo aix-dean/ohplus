@@ -518,6 +518,8 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   })
   yPosition += headerRowHeight
 
+
+
   for (const item of quotation.items) {
     checkNewPage(dataRowHeight + 5) // Check for space for the next row
     pdf.setFillColor(255, 255, 255) // bg-white
@@ -857,5 +859,3 @@ export async function getQuotationsPaginated(
 
   return { quotations, lastVisibleId, hasMore }
 }
-
-export type { QuotationProduct, Quotation } from "@/lib/types/quotation"

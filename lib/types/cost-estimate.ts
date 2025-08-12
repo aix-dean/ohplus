@@ -31,5 +31,3 @@ export interface CostEstimate {
   durationDays?: number | null // New field for duration in days
   validUntil?: Date | null // Add this new field
 }
-
-export type CostEstimateClient = ProposalClient
