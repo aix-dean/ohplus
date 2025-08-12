@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, FileText } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -57,22 +60,65 @@ const initialFormData: CollectibleFormData = {
 export default function EditCollectiblePage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { user } = useAuth()
 
   useEffect(() => {
-    // TODO: Replace with actual API call to fetch collectible by ID
     const fetchCollectible = async () => {
       try {
-        // Mock data for now - replace with actual API call
-        console.log("Fetching collectible with ID:", params.id)
-        setLoading(false)
+        setLoading(true)
+        setError(null)
+
+        const collectibleDoc = await getDoc(doc(db, "collectibles", params.id))
+
+        if (collectibleDoc.exists()) {
+          const collectibleData = collectibleDoc.data()
+
+          // Convert Firestore data to form data format
+          const formattedData: CollectibleFormData = {
+            type: collectibleData.type || "sites",
+            client_name: collectibleData.client_name || "",
+            net_amount: collectibleData.net_amount || 0,
+            total_amount: collectibleData.total_amount || 0,
+            mode_of_payment: collectibleData.mode_of_payment || "",
+            bank_name: collectibleData.bank_name || "",
+            bi_no: collectibleData.bi_no || "",
+            or_no: collectibleData.or_no || "",
+            invoice_no: collectibleData.invoice_no || "",
+            next_collection_date: collectibleData.next_collection_date || "",
+            status: collectibleData.status || "pending",
+            // Sites specific fields
+            booking_no: collectibleData.booking_no || "",
+            site: collectibleData.site || "",
+            covered_period: collectibleData.covered_period || "",
+            bir_2307: collectibleData.bir_2307 || null,
+            collection_date: collectibleData.collection_date || "",
+            // Supplies specific fields
+            date: collectibleData.date || "",
+            product: collectibleData.product || "",
+            transfer_date: collectibleData.transfer_date || "",
+            bs_no: collectibleData.bs_no || "",
+            due_for_collection: collectibleData.due_for_collection || "",
+            date_paid: collectibleData.date_paid || "",
+            net_amount_collection: collectibleData.net_amount_collection || 0,
+          }
+
+          setFormData(formattedData)
+        } else {
+          setError("Collectible not found")
+        }
       } catch (error) {
         console.error("Error fetching collectible:", error)
+        setError("Failed to load collectible data")
+      } finally {
         setLoading(false)
       }
     }
 
-    fetchCollectible()
+    if (params.id) {
+      fetchCollectible()
+    }
   }, [params.id])
 
   const handleInputChange = (field: string, value: any) => {
@@ -101,14 +147,58 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
     handleInputChange("bir_2307", null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // TODO: Replace with actual API call to update collectible
-    console.log("Updating collectible:", formData)
+    try {
+      setLoading(true)
 
-    // Navigate back to collectibles list
-    router.push("/finance/collectibles")
+      const collectibleRef = doc(db, "collectibles", params.id)
+
+      // Prepare update data, filtering out undefined values
+      const updateData: any = {
+        type: formData.type,
+        client_name: formData.client_name,
+        net_amount: formData.net_amount,
+        total_amount: formData.total_amount,
+        mode_of_payment: formData.mode_of_payment,
+        bank_name: formData.bank_name,
+        bi_no: formData.bi_no,
+        or_no: formData.or_no,
+        invoice_no: formData.invoice_no,
+        next_collection_date: formData.next_collection_date,
+        status: formData.status,
+        updated: serverTimestamp(),
+        company_id: user?.company_id || user?.uid || "default_company",
+      }
+
+      // Add type-specific fields
+      if (formData.type === "sites") {
+        if (formData.booking_no) updateData.booking_no = formData.booking_no
+        if (formData.site) updateData.site = formData.site
+        if (formData.covered_period) updateData.covered_period = formData.covered_period
+        if (formData.bir_2307) updateData.bir_2307 = formData.bir_2307
+        if (formData.collection_date) updateData.collection_date = formData.collection_date
+      } else if (formData.type === "supplies") {
+        if (formData.date) updateData.date = formData.date
+        if (formData.product) updateData.product = formData.product
+        if (formData.transfer_date) updateData.transfer_date = formData.transfer_date
+        if (formData.bs_no) updateData.bs_no = formData.bs_no
+        if (formData.due_for_collection) updateData.due_for_collection = formData.due_for_collection
+        if (formData.date_paid) updateData.date_paid = formData.date_paid
+        if (formData.net_amount_collection) updateData.net_amount_collection = formData.net_amount_collection
+      }
+
+      await updateDoc(collectibleRef, updateData)
+
+      // Navigate back to collectibles list
+      router.push("/finance/collectibles")
+    } catch (error) {
+      console.error("Error updating collectible:", error)
+      setError("Failed to update collectible")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderFormFields = () => (
@@ -420,6 +510,25 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
           <div>
             <h1 className="text-3xl font-bold">Edit Collectible</h1>
             <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/finance/collectibles">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold">Edit Collectible</h1>
+            <p className="text-muted-foreground text-red-500">{error}</p>
           </div>
         </div>
       </div>
