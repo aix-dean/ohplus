@@ -852,12 +852,6 @@ export default function RequestsView() {
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
           <p className="text-muted-foreground">Manage your reimbursement, requisition, and replenish requests</p>
         </div>
-        <Link href="/finance/requests/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Request
-          </Button>
-        </Link>
       </div>
 
       {/* Search */}

@@ -2,7 +2,34 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Calendar, BarChart3, Truck, AlertTriangle, FileText, Settings, ShieldCheck, BookOpen, Package, MessageCircle, FileCheck, Sparkles, ChevronLeft, ChevronRight, TrendingUp, ClipboardList, CloudRain, Cog, Monitor, Wifi, HardDrive, DollarSign, Receipt, CreditCard } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  BarChart3,
+  Truck,
+  AlertTriangle,
+  FileText,
+  Settings,
+  ShieldCheck,
+  BookOpen,
+  Package,
+  MessageCircle,
+  FileCheck,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  ClipboardList,
+  CloudRain,
+  Cog,
+  Monitor,
+  Wifi,
+  HardDrive,
+  DollarSign,
+  Receipt,
+  CreditCard,
+} from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
@@ -81,17 +108,19 @@ const navigationItems = [
       { title: "Reports", href: "/finance/reports", icon: BarChart3 },
       { title: "Budget Planning", href: "/finance/budget", icon: Calendar },
       { title: "Tax Management", href: "/finance/tax", icon: FileText },
-    },
-    {
-      section: "accounting",
-      title: "Accounting",
-      icon: DollarSign,
-      items: [
-        { title: "Sales Record", href: "/accounting/sales-record", icon: FileText },
-        { title: "Sales and Collection", href: "/accounting/sales-and-collection", icon: Receipt },
-        { title: "Encashment", href: "/accounting/encashment", icon: CreditCard },
-      ],
-    },
+      { title: "Collectibles", href: "/finance/collectibles", icon: Package },
+    ],
+  },
+  {
+    section: "accounting",
+    title: "Accounting",
+    icon: DollarSign,
+    items: [
+      { title: "Sales Record", href: "/accounting/sales-record", icon: FileText },
+      { title: "Sales and Collection", href: "/accounting/sales-and-collection", icon: Receipt },
+      { title: "Encashment", href: "/accounting/encashment", icon: CreditCard },
+    ],
+  },
   {
     section: "it",
     title: "IT",
@@ -163,9 +192,9 @@ export function SideNavigation() {
     currentSection !== "logistics" &&
     currentSection !== "cms" &&
     currentSection !== "business" &&
-    currentSection !== "it"
-    && currentSection !== "finance"
-    && currentSection !== "accounting"
+    currentSection !== "it" &&
+    currentSection !== "finance" &&
+    currentSection !== "accounting"
   ) {
     return null
   }
@@ -754,6 +783,7 @@ export function SideNavigation() {
                   { title: "Payments", href: "/finance/payments", icon: DollarSign },
                   { title: "Tax Management", href: "/finance/tax", icon: FileText },
                   { title: "Financial Analysis", href: "/finance/analysis", icon: TrendingUp },
+                  { title: "Collectibles", href: "/finance/collectibles", icon: Package },
                   { title: "Settings", href: "/finance/settings", icon: Cog },
                 ].map((item) => {
                   const Icon = item.icon
