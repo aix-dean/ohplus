@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
+import { formatCurrency, includesAny, parseNumber, sumBy } from "../utils"
 
 type AdditionalSettings = {
   fundLabel: string
@@ -37,6 +37,8 @@ type AdditionalRow = {
 const STORAGE_KEY = "acc_encash_add_rows_v1"
 const STORAGE_KEY_SETTINGS = "acc_encash_add_settings_v1"
 
+const generateId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
 function compute(row: AdditionalRow): AdditionalRow {
   const gross = parseNumber(row.grossAmount)
   const netOfVat = gross / 1.12
@@ -54,7 +56,7 @@ const MOCK_SETTINGS: AdditionalSettings = {
 
 const MOCK_ROWS: AdditionalRow[] = [
   compute({
-    id: uid("add"),
+    id: generateId("add"),
     category: "Miscellaneous",
     month: "Dec",
     date: "10",
@@ -125,7 +127,7 @@ export function AdditionalEncashmentsTable() {
 
   function addRow() {
     const row = compute({
-      id: uid("add"),
+      id: generateId("add"),
       category: "",
       month: "",
       date: "",

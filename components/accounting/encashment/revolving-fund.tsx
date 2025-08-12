@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
+import { parseNumber, sumBy } from "../utils"
 
 type RevolvingSettings = {
   companyName: string
@@ -40,6 +40,22 @@ type RevolvingRow = {
 const STORAGE_KEY = "acc_encash_rvf_rows_v1"
 const STORAGE_KEY_SETTINGS = "acc_encash_rvf_settings_v1"
 
+const generateId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+const includesAny = (obj: any, query: string): boolean => {
+  if (!query) return true
+  const searchQuery = query.toLowerCase()
+  return Object.values(obj).some((value) => String(value).toLowerCase().includes(searchQuery))
+}
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(amount)
+}
+
 function compute(row: RevolvingRow): RevolvingRow {
   const gross = parseNumber(row.grossAmount)
   const netOfVat = gross / 1.12
@@ -60,7 +76,7 @@ const MOCK_SETTINGS: RevolvingSettings = {
 
 const MOCK_ROWS: RevolvingRow[] = [
   compute({
-    id: uid("rvf"),
+    id: generateId("rvf"),
     category: "Repairs",
     month: "Dec",
     date: "09",
@@ -131,7 +147,7 @@ export function RevolvingFundTable() {
 
   function addRow() {
     const row = compute({
-      id: uid("rvf"),
+      id: generateId("rvf"),
       category: "",
       month: "",
       date: "",
