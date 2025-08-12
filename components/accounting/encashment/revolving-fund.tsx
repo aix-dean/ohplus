@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Save, Undo2, Search, Trash2 } from 'lucide-react'
+import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
 
@@ -115,7 +115,7 @@ export function RevolvingFundTable() {
     const twoP = sumBy(base, (r) => r.twoPercent)
     const netAmount = sumBy(base, (r) => r.netAmount)
     const balanceForDeposit = settings.revolvingFundAmount - netAmount
-    const totalRevolvingFund = netAmount - balanceForDeposit
+    const totalRevolvingFund = netAmount
     const rvfAmountBalance = settings.revolvingFundAmount - totalRevolvingFund
     return {
       gross,
@@ -159,7 +159,7 @@ export function RevolvingFundTable() {
       prev.map((r) => {
         if (r.id !== id) return r
         return compute({ ...r, ...patch })
-      })
+      }),
     )
     setDirty(true)
   }
@@ -244,7 +244,12 @@ export function RevolvingFundTable() {
           </div>
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search any field..." className="pl-8" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input
+              placeholder="Search any field..."
+              className="pl-8"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </div>
         </div>
       </CardHeader>
@@ -297,7 +302,10 @@ export function RevolvingFundTable() {
                     />
                   </TableCell>
                   <TableCell className="min-w-[16rem]">
-                    <Input value={row.description} onChange={(e) => updateRow(row.id, { description: e.target.value })} />
+                    <Input
+                      value={row.description}
+                      onChange={(e) => updateRow(row.id, { description: e.target.value })}
+                    />
                   </TableCell>
                   <TableCell className="min-w-[12rem]">
                     <Input
