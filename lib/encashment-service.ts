@@ -7,6 +7,7 @@ import {
   doc,
   query,
   orderBy,
+  where,
   serverTimestamp,
   type Timestamp,
 } from "firebase/firestore"
@@ -41,6 +42,8 @@ export interface PettyCashRow {
   onePercent: number
   twoPercent: number
   netAmount: number
+  type: string // Added type field for filtering
+  deleted: boolean // Added deleted field for soft delete
   created?: Timestamp
   updated?: Timestamp
 }
@@ -106,6 +109,7 @@ export async function createPettyCashTransaction(
   try {
     const docRef = await addDoc(collection(db, "encashment_transactions"), {
       ...transaction,
+      deleted: false, // Set deleted to false by default
       created: serverTimestamp(),
       updated: serverTimestamp(),
     })
@@ -118,7 +122,12 @@ export async function createPettyCashTransaction(
 
 export async function getPettyCashTransactions(): Promise<PettyCashRow[]> {
   try {
-    const q = query(collection(db, "encashment_transactions"), orderBy("created", "desc"))
+    const q = query(
+      collection(db, "encashment_transactions"),
+      where("type", "==", "PETTYCASH"),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
     const querySnapshot = await getDocs(q)
 
     const transactions: PettyCashRow[] = []
@@ -162,6 +171,7 @@ export async function createMultiplePettyCashTransactions(
     const promises = transactions.map((transaction) =>
       addDoc(collection(db, "encashment_transactions"), {
         ...transaction,
+        deleted: false, // Set deleted to false by default
         created: serverTimestamp(),
         updated: serverTimestamp(),
       }),
@@ -185,6 +195,35 @@ export async function deleteMultiplePettyCashTransactions(ids: string[]): Promis
   }
 }
 
+export async function softDeletePettyCashTransaction(id: string): Promise<void> {
+  try {
+    const transactionRef = doc(db, "encashment_transactions", id)
+    await updateDoc(transactionRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error soft deleting petty cash transaction:", error)
+    throw error
+  }
+}
+
+export async function softDeleteMultiplePettyCashTransactions(ids: string[]): Promise<void> {
+  try {
+    const promises = ids.map((id) => {
+      const transactionRef = doc(db, "encashment_transactions", id)
+      return updateDoc(transactionRef, {
+        deleted: true,
+        updated: serverTimestamp(),
+      })
+    })
+    await Promise.all(promises)
+  } catch (error) {
+    console.error("Error soft deleting multiple petty cash transactions:", error)
+    throw error
+  }
+}
+
 export const encashmentService = {
   // Settings operations
   createPettyCashSettings,
@@ -199,4 +238,6 @@ export const encashmentService = {
   deletePettyCashTransaction,
   createMultiplePettyCashTransactions,
   deleteMultiplePettyCashTransactions,
+  softDeletePettyCashTransaction, // Added soft delete methods
+  softDeleteMultiplePettyCashTransactions,
 }

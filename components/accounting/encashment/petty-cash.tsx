@@ -1,13 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from "@/components/ui/table"
+import { Trash2 } from "lucide-react" // Added trash icon
+import { encashmentService } from "@/lib/encashment-service" // Added service import
+import { toast } from "sonner" // Added toast for notifications
 
 interface Transaction {
   id: string
@@ -28,6 +31,7 @@ interface Transaction {
   twoPercent: number
   netAmount: number
   type: "PETTYCASH"
+  deleted: boolean // Added deleted field
 }
 
 const parseNumber = (value: any): number => {
@@ -50,32 +54,37 @@ function PettyCashFundTable() {
   const [settings, setSettings] = useState<{ fundAmount: string }>({ fundAmount: "" })
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [loading, setLoading] = useState(false) // Added loading state
 
-  const calculateTotals = useMemo(() => {
-    const totalGrossAmount = sumBy(transactions, "grossAmount")
-    const totalNetOfVat = sumBy(transactions, "netOfVat")
-    const totalInputVat = sumBy(transactions, "inputVat")
-    const totalOnePercent = sumBy(transactions, "onePercent")
-    const totalTwoPercent = sumBy(transactions, "twoPercent")
-    const totalNetAmount = sumBy(transactions, "netAmount")
+  useEffect(() => {
+    loadTransactions()
+  }, [])
 
-    const fundAmount = parseNumber(settings.fundAmount)
-    const balanceForDeposit = fundAmount - totalNetAmount
-    const totalPettyCashFund = totalNetAmount - balanceForDeposit
-    const pcfAmountBalance = fundAmount - totalPettyCashFund
-
-    return {
-      totalGrossAmount,
-      totalNetOfVat,
-      totalInputVat,
-      totalOnePercent,
-      totalTwoPercent,
-      totalNetAmount,
-      balanceForDeposit,
-      totalPettyCashFund,
-      pcfAmountBalance,
+  const loadTransactions = async () => {
+    try {
+      setLoading(true)
+      const data = await encashmentService.getPettyCashTransactions()
+      setTransactions(
+        data.map((t) => ({
+          ...t,
+          id: t.id!,
+          pcvNo: t.pettyCashVoucherNo,
+          supplier: t.supplierName,
+          account: t.accountTitle,
+          document: t.documentTypeNo,
+          tin: t.tinNo,
+          address: t.companyAddress,
+          type: "PETTYCASH" as const,
+          deleted: t.deleted || false,
+        })),
+      )
+    } catch (error) {
+      console.error("Error loading transactions:", error)
+      toast.error("Failed to load transactions")
+    } finally {
+      setLoading(false)
     }
-  }, [transactions, settings.fundAmount])
+  }
 
   const [formData, setFormData] = useState<Omit<Transaction, "id" | "type">>({
     category: "",
@@ -115,34 +124,61 @@ function PettyCashFundTable() {
     }))
   }
 
-  const handleAddTransaction = (e: React.FormEvent) => {
+  const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newTransaction: Transaction = {
-      ...formData,
-      id: Date.now().toString(),
-      type: "PETTYCASH",
+    try {
+      setLoading(true)
+      const transactionData = {
+        category: formData.category,
+        month: formData.month,
+        date: formData.date,
+        pettyCashVoucherNo: formData.pcvNo,
+        supplierName: formData.supplier,
+        description: formData.description,
+        accountTitle: formData.account,
+        documentTypeNo: formData.document,
+        tinNo: formData.tin,
+        companyAddress: formData.address,
+        grossAmount: formData.grossAmount,
+        netOfVat: formData.netOfVat,
+        inputVat: formData.inputVat,
+        onePercent: formData.onePercent,
+        twoPercent: formData.twoPercent,
+        netAmount: formData.netAmount,
+        type: "PETTYCASH", // Added type field
+        deleted: false, // Added deleted field
+      }
+
+      await encashmentService.createPettyCashTransaction(transactionData)
+      toast.success("Transaction added successfully")
+      setShowTransactionModal(false)
+      loadTransactions() // Reload transactions from database
+
+      // Reset form
+      setFormData({
+        category: "",
+        month: "",
+        date: "",
+        pcvNo: "",
+        supplier: "",
+        description: "",
+        account: "",
+        document: "",
+        tin: "",
+        address: "",
+        grossAmount: 0,
+        netOfVat: 0,
+        inputVat: 0,
+        onePercent: 0,
+        twoPercent: 0,
+        netAmount: 0,
+      })
+    } catch (error) {
+      console.error("Error adding transaction:", error)
+      toast.error("Failed to add transaction")
+    } finally {
+      setLoading(false)
     }
-    setTransactions((prev) => [...prev, newTransaction])
-    setShowTransactionModal(false)
-    // Reset form
-    setFormData({
-      category: "",
-      month: "",
-      date: "",
-      pcvNo: "",
-      supplier: "",
-      description: "",
-      account: "",
-      document: "",
-      tin: "",
-      address: "",
-      grossAmount: 0,
-      netOfVat: 0,
-      inputVat: 0,
-      onePercent: 0,
-      twoPercent: 0,
-      netAmount: 0,
-    })
   }
 
   const handleSelectAll = (checked: boolean) => {
@@ -153,6 +189,63 @@ function PettyCashFundTable() {
     setSelectedTransactions((prev) => (checked ? [...prev, id] : prev.filter((tid) => tid !== id)))
   }
 
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      setLoading(true)
+      await encashmentService.softDeletePettyCashTransaction(id)
+      toast.success("Transaction deleted successfully")
+      loadTransactions() // Reload transactions
+    } catch (error) {
+      console.error("Error deleting transaction:", error)
+      toast.error("Failed to delete transaction")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedTransactions.length === 0) return
+
+    try {
+      setLoading(true)
+      await encashmentService.softDeleteMultiplePettyCashTransactions(selectedTransactions)
+      toast.success(`${selectedTransactions.length} transactions deleted successfully`)
+      setSelectedTransactions([])
+      loadTransactions() // Reload transactions
+    } catch (error) {
+      console.error("Error deleting transactions:", error)
+      toast.error("Failed to delete transactions")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const calculateTotals = useMemo(() => {
+    const totalGrossAmount = sumBy(transactions, "grossAmount")
+    const totalNetOfVat = sumBy(transactions, "netOfVat")
+    const totalInputVat = sumBy(transactions, "inputVat")
+    const totalOnePercent = sumBy(transactions, "onePercent")
+    const totalTwoPercent = sumBy(transactions, "twoPercent")
+    const totalNetAmount = sumBy(transactions, "netAmount")
+
+    const fundAmount = parseNumber(settings.fundAmount)
+    const balanceForDeposit = fundAmount - totalNetAmount
+    const totalPettyCashFund = totalNetAmount - balanceForDeposit
+    const pcfAmountBalance = fundAmount - totalPettyCashFund
+
+    return {
+      totalGrossAmount,
+      totalNetOfVat,
+      totalInputVat,
+      totalOnePercent,
+      totalTwoPercent,
+      totalNetAmount,
+      balanceForDeposit,
+      totalPettyCashFund,
+      pcfAmountBalance,
+    }
+  }, [transactions, settings.fundAmount])
+
   return (
     <div className="space-y-6">
       {/* Header with Add Transaction Button */}
@@ -161,9 +254,21 @@ function PettyCashFundTable() {
           <h2 className="text-xl font-semibold">Petty Cash Fund</h2>
           <p className="text-sm text-gray-600">Manage petty cash fund settings and transactions</p>
         </div>
-        <Button onClick={() => setShowTransactionModal(true)} className="bg-green-600 hover:bg-green-700">
-          + Add Transaction
-        </Button>
+        <div className="flex gap-2">
+          {selectedTransactions.length > 0 && (
+            <Button onClick={handleDeleteSelected} variant="destructive" disabled={loading}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Selected ({selectedTransactions.length})
+            </Button>
+          )}
+          <Button
+            onClick={() => setShowTransactionModal(true)}
+            className="bg-green-600 hover:bg-green-700"
+            disabled={loading}
+          >
+            + Add Transaction
+          </Button>
+        </div>
       </div>
 
       {/* Transaction Modal */}
@@ -376,6 +481,7 @@ function PettyCashFundTable() {
               <TableHead className="text-right">1%</TableHead>
               <TableHead className="text-right">2%</TableHead>
               <TableHead className="text-right">Net Amount</TableHead>
+              <TableHead className="w-12">Actions</TableHead> {/* Added actions column */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -403,12 +509,25 @@ function PettyCashFundTable() {
                 <TableCell className="text-right">₱{transaction.onePercent.toFixed(2)}</TableCell>
                 <TableCell className="text-right">₱{transaction.twoPercent.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-semibold">₱{transaction.netAmount.toFixed(2)}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteTransaction(transaction.id)}
+                    disabled={loading}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {transactions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={17} className="text-center py-8 text-gray-500">
-                  No transactions found. Click "Add Transaction" to get started.
+                <TableCell colSpan={18} className="text-center py-8 text-gray-500">
+                  {loading
+                    ? "Loading transactions..."
+                    : 'No transactions found. Click "Add Transaction" to get started.'}
                 </TableCell>
               </TableRow>
             )}
@@ -422,6 +541,7 @@ function PettyCashFundTable() {
               <TableCell className="text-right">₱{calculateTotals.totalOnePercent.toFixed(2)}</TableCell>
               <TableCell className="text-right">₱{calculateTotals.totalTwoPercent.toFixed(2)}</TableCell>
               <TableCell className="text-right">₱{calculateTotals.totalNetAmount.toFixed(2)}</TableCell>
+              <TableCell></TableCell> {/* Empty cell for actions column */}
             </TableRow>
           </TableFooter>
         </Table>
