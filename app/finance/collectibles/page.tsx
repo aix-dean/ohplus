@@ -271,7 +271,7 @@ export default function CollectiblesPage() {
     if (type === "select" && options) {
       return (
         <Select value={value as string} onValueChange={(val) => updateEditData(collectible.id, field, val)}>
-          <SelectTrigger className="h-8">
+          <SelectTrigger className="h-8 min-w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -296,7 +296,7 @@ export default function CollectiblesPage() {
             type === "number" ? Number.parseFloat(e.target.value) || 0 : e.target.value,
           )
         }
-        className="h-8"
+        className="h-8 min-w-[100px] w-full"
       />
     )
   }
@@ -332,7 +332,7 @@ export default function CollectiblesPage() {
         onChange={(e) =>
           updateNewRowData(field, type === "number" ? Number.parseFloat(e.target.value) || 0 : e.target.value)
         }
-        className="h-8 text-xs"
+        className="h-8 text-xs min-w-[100px] w-full"
         placeholder={field === "client_name" ? "Required" : ""}
       />
     )
@@ -438,7 +438,7 @@ export default function CollectiblesPage() {
               handleFileUpload(file, collectible.id, fieldName)
             }
           }}
-          className="h-8 text-xs"
+          className="h-8 text-xs min-w-[150px]"
           disabled={isUploading}
         />
         {isUploading && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -517,46 +517,50 @@ export default function CollectiblesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Client Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Invoice No</TableHead>
-                  <TableHead>OR No</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Net Amount</TableHead>
-                  <TableHead>Payment Mode</TableHead>
-                  <TableHead>Bank Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Next Collection</TableHead>
+                  <TableHead className="min-w-[150px]">Client Name</TableHead>
+                  <TableHead className="min-w-[80px]">Type</TableHead>
+                  <TableHead className="min-w-[100px]">Invoice No</TableHead>
+                  <TableHead className="min-w-[80px]">OR No</TableHead>
+                  <TableHead className="min-w-[120px]">Total Amount</TableHead>
+                  <TableHead className="min-w-[120px]">Net Amount</TableHead>
+                  <TableHead className="min-w-[140px]">Payment Mode</TableHead>
+                  <TableHead className="min-w-[120px]">Bank Name</TableHead>
+                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="min-w-[140px]">Next Collection</TableHead>
                   {/* Conditional columns based on type filter */}
                   {(typeFilter === "all" || typeFilter === "sites") && (
                     <>
-                      <TableHead>Booking No</TableHead>
-                      <TableHead>Site</TableHead>
-                      <TableHead>Collection Date</TableHead>
-                      <TableHead>BIR 2307</TableHead>
-                      {showNextCollectionFields && <TableHead>Next Collection BIR 2307</TableHead>}
+                      <TableHead className="min-w-[100px]">Booking No</TableHead>
+                      <TableHead className="min-w-[120px]">Site</TableHead>
+                      <TableHead className="min-w-[130px]">Collection Date</TableHead>
+                      <TableHead className="min-w-[120px]">BIR 2307</TableHead>
+                      {showNextCollectionFields && (
+                        <TableHead className="min-w-[160px]">Next Collection BIR 2307</TableHead>
+                      )}
                     </>
                   )}
                   {(typeFilter === "all" || typeFilter === "supplies") && (
                     <>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Due Collection</TableHead>
+                      <TableHead className="min-w-[120px]">Product</TableHead>
+                      <TableHead className="min-w-[100px]">Date</TableHead>
+                      <TableHead className="min-w-[130px]">Due Collection</TableHead>
                     </>
                   )}
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="min-w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isAddingNew && (
                   <TableRow className="bg-blue-50">
-                    <TableCell>{renderNewRowCell("client_name")}</TableCell>
-                    <TableCell>{renderNewRowCell("type", "select", ["sites", "supplies"])}</TableCell>
-                    <TableCell>{renderNewRowCell("invoice_no")}</TableCell>
-                    <TableCell>{renderNewRowCell("or_no")}</TableCell>
-                    <TableCell>{renderNewRowCell("total_amount", "number")}</TableCell>
-                    <TableCell>{renderNewRowCell("net_amount", "number")}</TableCell>
-                    <TableCell>
+                    <TableCell className="min-w-[150px]">{renderNewRowCell("client_name")}</TableCell>
+                    <TableCell className="min-w-[80px]">
+                      {renderNewRowCell("type", "select", ["sites", "supplies"])}
+                    </TableCell>
+                    <TableCell className="min-w-[100px]">{renderNewRowCell("invoice_no")}</TableCell>
+                    <TableCell className="min-w-[80px]">{renderNewRowCell("or_no")}</TableCell>
+                    <TableCell className="min-w-[120px]">{renderNewRowCell("total_amount", "number")}</TableCell>
+                    <TableCell className="min-w-[120px]">{renderNewRowCell("net_amount", "number")}</TableCell>
+                    <TableCell className="min-w-[140px]">
                       {renderNewRowCell("mode_of_payment", "select", [
                         "Cash",
                         "Credit/Debit Card",
@@ -564,33 +568,48 @@ export default function CollectiblesPage() {
                         "Bank Transfer",
                       ])}
                     </TableCell>
-                    <TableCell>{renderNewRowCell("bank_name")}</TableCell>
-                    <TableCell>{renderNewRowCell("status", "select", ["pending", "collected", "overdue"])}</TableCell>
-                    <TableCell>{renderNewRowCell("next_collection_date", "date")}</TableCell>
+                    <TableCell className="min-w-[120px]">{renderNewRowCell("bank_name")}</TableCell>
+                    <TableCell className="min-w-[100px]">
+                      {renderNewRowCell("status", "select", ["pending", "collected", "overdue"])}
+                    </TableCell>
+                    <TableCell className="min-w-[140px]">{renderNewRowCell("next_collection_date", "date")}</TableCell>
                     {/* Conditional fields for new row */}
                     {(typeFilter === "all" || typeFilter === "sites") && (
                       <>
-                        <TableCell>{newRowData.type === "sites" ? renderNewRowCell("booking_no") : ""}</TableCell>
-                        <TableCell>{newRowData.type === "sites" ? renderNewRowCell("site") : ""}</TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[100px]">
+                          {newRowData.type === "sites" ? renderNewRowCell("booking_no") : ""}
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          {newRowData.type === "sites" ? renderNewRowCell("site") : ""}
+                        </TableCell>
+                        <TableCell className="min-w-[130px]">
                           {newRowData.type === "sites" ? renderNewRowCell("collection_date", "date") : ""}
                         </TableCell>
-                        <TableCell>{newRowData.type === "sites" ? renderNewRowCell("bir_2307") : ""}</TableCell>
+                        <TableCell className="min-w-[120px]">
+                          {newRowData.type === "sites" ? renderNewRowCell("bir_2307") : ""}
+                        </TableCell>
                         {showNextCollectionFields && (
-                          <TableCell>{newRowData.type === "sites" ? renderNewRowCell("next_bir_2307") : ""}</TableCell>
+                          <TableCell className="min-w-[160px]">
+                            {newRowData.type === "sites" ? renderNewRowCell("next_bir_2307") : ""}
+                          </TableCell>
                         )}
                       </>
                     )}
+
                     {(typeFilter === "all" || typeFilter === "supplies") && (
                       <>
-                        <TableCell>{newRowData.type === "supplies" ? renderNewRowCell("product") : ""}</TableCell>
-                        <TableCell>{newRowData.type === "supplies" ? renderNewRowCell("date", "date") : ""}</TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[120px]">
+                          {newRowData.type === "supplies" ? renderNewRowCell("product") : ""}
+                        </TableCell>
+                        <TableCell className="min-w-[100px]">
+                          {newRowData.type === "supplies" ? renderNewRowCell("date", "date") : ""}
+                        </TableCell>
+                        <TableCell className="min-w-[130px]">
                           {newRowData.type === "supplies" ? renderNewRowCell("due_for_collection", "date") : ""}
                         </TableCell>
                       </>
                     )}
-                    <TableCell>
+                    <TableCell className="min-w-[120px]">
                       <div className="flex space-x-1">
                         <Button size="sm" onClick={saveNewRow}>
                           <Check className="h-4 w-4" />
@@ -616,13 +635,19 @@ export default function CollectiblesPage() {
                 ) : (
                   filteredCollectibles.map((collectible) => (
                     <TableRow key={collectible.id} className={editingId === collectible.id ? "bg-yellow-50" : ""}>
-                      <TableCell>{renderEditableCell(collectible, "client_name")}</TableCell>
-                      <TableCell>{renderEditableCell(collectible, "type", "select", ["sites", "supplies"])}</TableCell>
-                      <TableCell>{renderEditableCell(collectible, "invoice_no")}</TableCell>
-                      <TableCell>{renderEditableCell(collectible, "or_no")}</TableCell>
-                      <TableCell>{renderEditableCell(collectible, "total_amount", "number")}</TableCell>
-                      <TableCell>{renderEditableCell(collectible, "net_amount", "number")}</TableCell>
-                      <TableCell>
+                      <TableCell className="min-w-[150px]">{renderEditableCell(collectible, "client_name")}</TableCell>
+                      <TableCell className="min-w-[80px]">
+                        {renderEditableCell(collectible, "type", "select", ["sites", "supplies"])}
+                      </TableCell>
+                      <TableCell className="min-w-[100px]">{renderEditableCell(collectible, "invoice_no")}</TableCell>
+                      <TableCell className="min-w-[80px]">{renderEditableCell(collectible, "or_no")}</TableCell>
+                      <TableCell className="min-w-[120px]">
+                        {renderEditableCell(collectible, "total_amount", "number")}
+                      </TableCell>
+                      <TableCell className="min-w-[120px]">
+                        {renderEditableCell(collectible, "net_amount", "number")}
+                      </TableCell>
+                      <TableCell className="min-w-[140px]">
                         {renderEditableCell(collectible, "mode_of_payment", "select", [
                           "Cash",
                           "Credit/Debit Card",
@@ -630,26 +655,28 @@ export default function CollectiblesPage() {
                           "Bank Transfer",
                         ])}
                       </TableCell>
-                      <TableCell>{renderEditableCell(collectible, "bank_name")}</TableCell>
-                      <TableCell>
+                      <TableCell className="min-w-[120px]">{renderEditableCell(collectible, "bank_name")}</TableCell>
+                      <TableCell className="min-w-[100px]">
                         {renderEditableCell(collectible, "status", "select", ["pending", "collected", "overdue"])}
                       </TableCell>
-                      <TableCell>{renderEditableCell(collectible, "next_collection_date", "date")}</TableCell>
+                      <TableCell className="min-w-[140px]">
+                        {renderEditableCell(collectible, "next_collection_date", "date")}
+                      </TableCell>
                       {/* Conditional columns */}
                       {(typeFilter === "all" || typeFilter === "sites") && (
                         <>
-                          <TableCell>
+                          <TableCell className="min-w-[100px]">
                             {collectible.type === "sites" ? renderEditableCell(collectible, "booking_no") : ""}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-[120px]">
                             {collectible.type === "sites" ? renderEditableCell(collectible, "site") : ""}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-[130px]">
                             {collectible.type === "sites"
                               ? renderEditableCell(collectible, "collection_date", "date")
                               : ""}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-[120px]">
                             {collectible.type === "sites" ? (
                               <FileUploadCell
                                 collectible={collectible}
@@ -661,7 +688,7 @@ export default function CollectiblesPage() {
                             )}
                           </TableCell>
                           {showNextCollectionFields && (
-                            <TableCell>
+                            <TableCell className="min-w-[160px]">
                               {collectible.type === "sites" ? (
                                 <FileUploadCell
                                   collectible={collectible}
@@ -677,20 +704,20 @@ export default function CollectiblesPage() {
                       )}
                       {(typeFilter === "all" || typeFilter === "supplies") && (
                         <>
-                          <TableCell>
+                          <TableCell className="min-w-[120px]">
                             {collectible.type === "supplies" ? renderEditableCell(collectible, "product") : ""}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-[100px]">
                             {collectible.type === "supplies" ? renderEditableCell(collectible, "date", "date") : ""}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-[130px]">
                             {collectible.type === "supplies"
                               ? renderEditableCell(collectible, "due_for_collection", "date")
                               : ""}
                           </TableCell>
                         </>
                       )}
-                      <TableCell>
+                      <TableCell className="min-w-[120px]">
                         <div className="flex space-x-1">
                           {editingId === collectible.id ? (
                             <>
