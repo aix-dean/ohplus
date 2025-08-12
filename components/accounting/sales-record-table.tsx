@@ -15,6 +15,7 @@ import {
   type FilterOptions,
 } from "@/lib/booking-service"
 import { useAuth } from "@/contexts/auth-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const BOOKING_TYPES = ["RENTAL", "MERCHANDISE", "SERVICES"] as const
 const BOOKING_STATUSES = ["COMPLETED", "CANCELLED", "FOR CONTRACT", "ONGOING", "PENDING", "PAID", "UPCOMING"] as const
@@ -291,6 +292,55 @@ export function SalesRecordTable() {
           </Button>
           <Button variant="outline" size="sm" onClick={handlePageRefresh} disabled={loading}>
             Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Search Bar and Filters Section */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex-1 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search records..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 items-center">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {BOOKING_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {BOOKING_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" onClick={handleClearFilters}>
+            Clear Filters
           </Button>
         </div>
       </div>
