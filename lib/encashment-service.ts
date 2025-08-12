@@ -184,3 +184,19 @@ export async function deleteMultiplePettyCashTransactions(ids: string[]): Promis
     throw error
   }
 }
+
+export const encashmentService = {
+  // Settings operations
+  createPettyCashSettings,
+  getPettyCashSettings,
+  updatePettyCashSettings,
+  deletePettyCashSettings,
+
+  // Transaction operations
+  createPettyCashTransaction,
+  getPettyCashTransactions,
+  updatePettyCashTransaction,
+  deletePettyCashTransaction,
+  createMultiplePettyCashTransactions,
+  deleteMultiplePettyCashTransactions,
+}
