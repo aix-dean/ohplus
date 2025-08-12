@@ -7,41 +7,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
-
-type PettyCashSettings = {
-  companyName: string
-  pettyCashFundReplenishment: string
-  cutOffPeriod: string
-  pettyCashFundName: string
-  pettyCashFundAmount: number
-}
-
-type PettyCashRow = {
-  id: string
-  category: string
-  month: string
-  date: string
-  pettyCashVoucherNo: string
-  supplierName: string
-  description: string
-  accountTitle: string
-  documentTypeNo: string
-  tinNo: string
-  companyAddress: string
-  grossAmount: number
-  // computed
-  netOfVat: number
-  inputVat: number
-  onePercent: number
-  twoPercent: number
-  netAmount: number
-}
+import {
+  createPettyCashSettings,
+  getPettyCashSettings,
+  updatePettyCashSettings,
+  createPettyCashTransaction,
+  getPettyCashTransactions,
+  updatePettyCashTransaction,
+  deletePettyCashTransaction,
+  deleteMultiplePettyCashTransactions,
+} from "@/lib/encashment-service"
 
 const STORAGE_KEY = "acc_encash_pcf_rows_v1"
 const STORAGE_KEY_SETTINGS = "acc_encash_pcf_settings_v1"
 
 // Assumptions: 1% = 0.01, 2% = 0.02
-function compute(row: PettyCashRow): PettyCashRow {
+function compute(row: any): any {
   const gross = parseNumber(row.grossAmount)
   const netOfVat = gross / 1.12
   const inputVat = gross - netOfVat
@@ -51,7 +32,7 @@ function compute(row: PettyCashRow): PettyCashRow {
   return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
 }
 
-const MOCK_SETTINGS: PettyCashSettings = {
+const MOCK_SETTINGS = {
   companyName: "OOH Plus Inc.",
   pettyCashFundReplenishment: "Dec 2024",
   cutOffPeriod: "Dec 1–31, 2024",
@@ -59,39 +40,20 @@ const MOCK_SETTINGS: PettyCashSettings = {
   pettyCashFundAmount: 200000,
 }
 
-const MOCK_ROWS: PettyCashRow[] = [
+const MOCK_ROWS = [
   compute({
     id: uid("pcf"),
-    category: "Supplies",
+    category: "Office Supplies",
     month: "Dec",
-    date: "05",
+    date: "15",
     pettyCashVoucherNo: "PCV-001",
-    supplierName: "Paper & Co",
-    description: "Bond papers and pens",
+    supplierName: "Office Depot",
+    description: "Printer paper and pens",
     accountTitle: "Office Supplies",
-    documentTypeNo: "SI-1001",
-    tinNo: "111-222-333-000",
+    documentTypeNo: "OR-1234",
+    tinNo: "123-456-789-000",
     companyAddress: "Makati City",
-    grossAmount: 5600,
-    netOfVat: 0,
-    inputVat: 0,
-    onePercent: 0,
-    twoPercent: 0,
-    netAmount: 0,
-  }),
-  compute({
-    id: uid("pcf"),
-    category: "Transportation",
-    month: "Dec",
-    date: "08",
-    pettyCashVoucherNo: "PCV-002",
-    supplierName: "RideShare",
-    description: "Team travel",
-    accountTitle: "Transportation",
-    documentTypeNo: "OR-2001",
-    tinNo: "222-333-444-000",
-    companyAddress: "Taguig City",
-    grossAmount: 2240,
+    grossAmount: 1120,
     netOfVat: 0,
     inputVat: 0,
     onePercent: 0,
@@ -102,26 +64,60 @@ const MOCK_ROWS: PettyCashRow[] = [
 
 export function PettyCashFundTable() {
   const { toast } = useToast()
-  const [rows, setRows] = useState<PettyCashRow[]>([])
-  const [settings, setSettings] = useState<PettyCashSettings>(MOCK_SETTINGS)
+  const [rows, setRows] = useState<any[]>([])
+  const [settings, setSettings] = useState<any>(MOCK_SETTINGS)
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<string[]>([])
+  const [settingsId, setSettingsId] = useState<string | null>(null)
 
   useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
     try {
-      const s = localStorage.getItem(STORAGE_KEY_SETTINGS)
-      if (s) setSettings(JSON.parse(s) as PettyCashSettings)
+      // Load settings
+      const settingsData = await getPettyCashSettings()
+      if (settingsData.length > 0) {
+        setSettings(settingsData[0])
+        setSettingsId(settingsData[0].id || null)
+      }
+
+      // Load transactions
+      const transactionsData = await getPettyCashTransactions()
+      setRows(transactionsData.map(compute))
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load data from database. Using local data.",
+        variant: "destructive",
+      })
+      // Fallback to localStorage
+      loadFromLocalStorage()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function loadFromLocalStorage() {
+    try {
+      const s = localStorage.getItem("acc_encash_pcf_settings_v1")
+      if (s) setSettings(JSON.parse(s))
     } catch {}
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
+      const saved = localStorage.getItem("acc_encash_pcf_rows_v1")
       if (saved) {
-        const parsed = JSON.parse(saved) as PettyCashRow[]
+        const parsed = JSON.parse(saved)
         setRows(parsed.map(compute))
         return
       }
     } catch {}
     setRows(MOCK_ROWS)
-  }, [])
+  }
 
   const filtered = useMemo(() => rows.filter((r) => includesAny(r, query)), [rows, query])
 
@@ -149,9 +145,8 @@ export function PettyCashFundTable() {
     }
   }, [filtered, rows, settings.pettyCashFundAmount])
 
-  function addRow() {
-    const row = compute({
-      id: uid("pcf"),
+  async function addRow() {
+    const newRow = compute({
       category: "",
       month: "",
       date: "",
@@ -169,30 +164,97 @@ export function PettyCashFundTable() {
       twoPercent: 0,
       netAmount: 0,
     })
-    setRows((r) => [row, ...r])
-    setDirty(true)
+
+    try {
+      const id = await createPettyCashTransaction(newRow)
+      const rowWithId = { ...newRow, id }
+      setRows((r) => [rowWithId, ...r])
+      toast({ title: "Success", description: "New transaction added successfully." })
+    } catch (error) {
+      console.error("Error adding transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add transaction. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  function updateRow(id: string, patch: Partial<PettyCashRow>) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r
-        return compute({ ...r, ...patch })
-      }),
-    )
-    setDirty(true)
+  async function updateRow(id: string, patch: any) {
+    const updatedRow = compute({ ...rows.find((r) => r.id === id)!, ...patch })
+
+    try {
+      await updatePettyCashTransaction(id, updatedRow)
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.id !== id) return r
+          return updatedRow
+        }),
+      )
+    } catch (error) {
+      console.error("Error updating transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update transaction. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  function deleteRow(id: string) {
-    setRows((prev) => prev.filter((r) => r.id !== id))
-    setDirty(true)
+  async function deleteRow(id: string) {
+    try {
+      await deletePettyCashTransaction(id)
+      setRows((prev) => prev.filter((r) => r.id !== id))
+      toast({ title: "Success", description: "Transaction deleted successfully." })
+    } catch (error) {
+      console.error("Error deleting transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  function saveAll() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
-    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings))
-    setDirty(false)
-    toast({ title: "Saved", description: "Petty Cash Fund saved to your browser." })
+  async function deleteSelectedRows() {
+    if (selectedRows.length === 0) return
+
+    try {
+      await deleteMultiplePettyCashTransactions(selectedRows)
+      setRows((prev) => prev.filter((r) => !selectedRows.includes(r.id!)))
+      setSelectedRows([])
+      toast({
+        title: "Success",
+        description: `${selectedRows.length} transaction(s) deleted successfully.`,
+      })
+    } catch (error) {
+      console.error("Error deleting transactions:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete transactions. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function saveSettings() {
+    try {
+      if (settingsId) {
+        await updatePettyCashSettings(settingsId, settings)
+      } else {
+        const id = await createPettyCashSettings(settings)
+        setSettingsId(id)
+      }
+      setDirty(false)
+      toast({ title: "Success", description: "Settings saved successfully." })
+    } catch (error) {
+      console.error("Error saving settings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   function resetMock() {
@@ -201,12 +263,24 @@ export function PettyCashFundTable() {
     setDirty(true)
   }
 
+  function toggleRowSelection(id: string) {
+    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]))
+  }
+
+  function toggleSelectAll() {
+    if (selectedRows.length === filtered.length) {
+      setSelectedRows([])
+    } else {
+      setSelectedRows(filtered.map((row) => row.id!))
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Petty Cash Fund</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage your petty cash transactions and balances</p>
+          <p className="text-sm text-gray-600 mt-1">Manage petty cash fund settings and transactions</p>
         </div>
 
         <div className="p-6 space-y-4">
@@ -223,7 +297,7 @@ export function PettyCashFundTable() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Replenishment Period</label>
+              <label className="text-sm font-medium text-gray-700">Fund Replenishment</label>
               <Input
                 className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 value={settings.pettyCashFundReplenishment}
@@ -269,23 +343,30 @@ export function PettyCashFundTable() {
               />
             </div>
           </div>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={saveSettings}
+              disabled={!dirty || loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Save className="mr-2 h-4 w-4" /> Save Settings
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div className="px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
-            <Button onClick={addRow} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+            <Button onClick={addRow} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
               <Plus className="mr-2 h-4 w-4" /> Add Transaction
             </Button>
-            <Button
-              variant="outline"
-              onClick={saveAll}
-              disabled={!dirty}
-              className="border-gray-300 hover:bg-gray-50 bg-transparent"
-            >
-              <Save className="mr-2 h-4 w-4" /> Save Changes
-            </Button>
+            {selectedRows.length > 0 && (
+              <Button variant="destructive" onClick={deleteSelectedRows} disabled={loading} className="shadow-sm">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Selected ({selectedRows.length})
+              </Button>
+            )}
             <Button variant="outline" onClick={resetMock} className="border-gray-300 hover:bg-gray-50 bg-transparent">
               <Undo2 className="mr-2 h-4 w-4" /> Load Sample Data
             </Button>
@@ -307,6 +388,14 @@ export function PettyCashFundTable() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 border-b border-gray-200">
+                <TableHead className="font-semibold text-gray-900 py-3 px-4 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.length === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Category</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Month</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Date</TableHead>
@@ -327,124 +416,142 @@ export function PettyCashFundTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((row, index) => (
-                <TableRow
-                  key={row.id}
-                  className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
-                >
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.category}
-                      onChange={(e) => updateRow(row.id, { category: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.month}
-                      onChange={(e) => updateRow(row.id, { month: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.date}
-                      onChange={(e) => updateRow(row.id, { date: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.pettyCashVoucherNo}
-                      onChange={(e) => updateRow(row.id, { pettyCashVoucherNo: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.supplierName}
-                      onChange={(e) => updateRow(row.id, { supplierName: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.description}
-                      onChange={(e) => updateRow(row.id, { description: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.accountTitle}
-                      onChange={(e) => updateRow(row.id, { accountTitle: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.documentTypeNo}
-                      onChange={(e) => updateRow(row.id, { documentTypeNo: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.tinNo}
-                      onChange={(e) => updateRow(row.id, { tinNo: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4">
-                    <Input
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.companyAddress}
-                      onChange={(e) => updateRow(row.id, { companyAddress: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right">
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-right"
-                      value={row.grossAmount}
-                      onChange={(e) => updateRow(row.id, { grossAmount: parseNumber(e.target.value) })}
-                    />
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
-                    {formatCurrency(row.netOfVat)}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
-                    {formatCurrency(row.inputVat)}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
-                    {formatCurrency(row.onePercent)}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
-                    {formatCurrency(row.twoPercent)}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-right text-sm font-bold text-gray-900">
-                    {formatCurrency(row.netAmount)}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteRow(row.id)}
-                      className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                      aria-label="Delete row"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
+              {loading ? (
                 <TableRow>
-                  <TableCell colSpan={17} className="text-center text-gray-500 py-8">
-                    No transactions found. Try adjusting your search or add a new transaction.
+                  <TableCell colSpan={18} className="text-center text-gray-500 py-8">
+                    Loading transactions...
                   </TableCell>
                 </TableRow>
+              ) : (
+                <>
+                  {filtered.map((row, index) => (
+                    <TableRow
+                      key={row.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+                    >
+                      <TableCell className="py-3 px-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(row.id!)}
+                          onChange={() => toggleRowSelection(row.id!)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.category}
+                          onChange={(e) => updateRow(row.id!, { category: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.month}
+                          onChange={(e) => updateRow(row.id!, { month: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.date}
+                          onChange={(e) => updateRow(row.id!, { date: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.pettyCashVoucherNo}
+                          onChange={(e) => updateRow(row.id!, { pettyCashVoucherNo: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.supplierName}
+                          onChange={(e) => updateRow(row.id!, { supplierName: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.description}
+                          onChange={(e) => updateRow(row.id!, { description: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.accountTitle}
+                          onChange={(e) => updateRow(row.id!, { accountTitle: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.documentTypeNo}
+                          onChange={(e) => updateRow(row.id!, { documentTypeNo: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.tinNo}
+                          onChange={(e) => updateRow(row.id!, { tinNo: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <Input
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                          value={row.companyAddress}
+                          onChange={(e) => updateRow(row.id!, { companyAddress: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right">
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-right"
+                          value={row.grossAmount}
+                          onChange={(e) => updateRow(row.id!, { grossAmount: parseNumber(e.target.value) })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(row.netOfVat)}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(row.inputVat)}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(row.onePercent)}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(row.twoPercent)}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-right text-sm font-bold text-gray-900">
+                        {formatCurrency(row.netAmount)}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteRow(row.id!)}
+                          className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                          aria-label="Delete row"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filtered.length === 0 && !loading && (
+                    <TableRow>
+                      <TableCell colSpan={18} className="text-center text-gray-500 py-8">
+                        No transactions found. Try adjusting your search or add a new transaction.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )}
               <TableRow className="bg-blue-50 border-t-2 border-blue-200">
                 <TableCell colSpan={10} className="font-bold text-gray-900 py-4 px-4">
