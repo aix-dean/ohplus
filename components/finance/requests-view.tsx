@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { db } from "@/lib/firebase"
@@ -48,7 +47,6 @@ import {
   Edit,
   Eye,
   MoreHorizontal,
-  Plus,
   Search,
   Trash2,
   User,
@@ -567,12 +565,6 @@ export default function RequestsView() {
           </CardTitle>
           <CardDescription>View and manage your finance requests</CardDescription>
         </div>
-        <Link href={addHref}>
-          <Button size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            {addLabel}
-          </Button>
-        </Link>
       </CardHeader>
       <CardContent>
         <div className="relative w-full overflow-auto">
@@ -852,12 +844,6 @@ export default function RequestsView() {
           <h1 className="text-2xl font-bold tracking-tight">Finance Requests</h1>
           <p className="text-muted-foreground">Manage your reimbursement, requisition, and replenish requests</p>
         </div>
-        <Link href="/finance/requests/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Request
-          </Button>
-        </Link>
       </div>
 
       {/* Search */}
