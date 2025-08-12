@@ -41,6 +41,8 @@ export interface PettyCashRow {
   onePercent: number
   twoPercent: number
   netAmount: number
+  type?: string
+  deleted?: boolean
   created?: Timestamp
   updated?: Timestamp
 }
@@ -123,7 +125,10 @@ export async function getPettyCashTransactions(): Promise<PettyCashRow[]> {
 
     const transactions: PettyCashRow[] = []
     querySnapshot.forEach((doc) => {
-      transactions.push({ id: doc.id, ...doc.data() } as PettyCashRow)
+      const data = doc.data() as PettyCashRow
+      if (data.type === "PETTYCASH" && data.deleted !== true) {
+        transactions.push({ id: doc.id, ...data })
+      }
     })
 
     return transactions
@@ -148,9 +153,29 @@ export async function updatePettyCashTransaction(id: string, transaction: Partia
 
 export async function deletePettyCashTransaction(id: string): Promise<void> {
   try {
-    await deleteDoc(doc(db, "encashment_transactions", id))
+    const transactionRef = doc(db, "encashment_transactions", id)
+    await updateDoc(transactionRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
   } catch (error) {
-    console.error("Error deleting petty cash transaction:", error)
+    console.error("Error soft deleting petty cash transaction:", error)
+    throw error
+  }
+}
+
+export async function deleteMultiplePettyCashTransactions(ids: string[]): Promise<void> {
+  try {
+    const promises = ids.map((id) => {
+      const transactionRef = doc(db, "encashment_transactions", id)
+      return updateDoc(transactionRef, {
+        deleted: true,
+        updated: serverTimestamp(),
+      })
+    })
+    await Promise.all(promises)
+  } catch (error) {
+    console.error("Error soft deleting multiple petty cash transactions:", error)
     throw error
   }
 }
@@ -171,16 +196,6 @@ export async function createMultiplePettyCashTransactions(
     return results.map((docRef) => docRef.id)
   } catch (error) {
     console.error("Error creating multiple petty cash transactions:", error)
-    throw error
-  }
-}
-
-export async function deleteMultiplePettyCashTransactions(ids: string[]): Promise<void> {
-  try {
-    const promises = ids.map((id) => deleteDoc(doc(db, "encashment_transactions", id)))
-    await Promise.all(promises)
-  } catch (error) {
-    console.error("Error deleting multiple petty cash transactions:", error)
     throw error
   }
 }

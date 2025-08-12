@@ -67,6 +67,7 @@ const MOCK_ROWS = [
     twoPercent: 0,
     netAmount: 0,
     deleted: false,
+    type: "PETTYCASH",
   }),
 ]
 
@@ -148,26 +149,18 @@ export function PettyCashFundTable() {
     setRemainingBalanceForDeposit(isNaN(balanceForDeposit) ? 0 : balanceForDeposit)
   }
 
-  async function addRow() {
-    const newRow = compute({
-      category: "",
-      month: "",
-      date: "",
-      pettyCashVoucherNo: "",
-      supplierName: "",
-      description: "",
-      accountTitle: "",
-      documentTypeNo: "",
-      tinNo: "",
-      companyAddress: "",
-      grossAmount: 0,
-      netOfVat: 0,
-      inputVat: 0,
-      onePercent: 0,
-      twoPercent: 0,
-      netAmount: 0,
+  async function addRow(formData: any) {
+    const newRow = {
+      ...formData,
+      grossAmount: parseNumber(formData.grossAmount),
+      netOfVat: parseNumber(formData.netOfVat),
+      inputVat: parseNumber(formData.inputVat),
+      onePercent: parseNumber(formData.onePercent),
+      twoPercent: parseNumber(formData.twoPercent),
+      netAmount: parseNumber(formData.netAmount),
+      type: "PETTYCASH",
       deleted: false,
-    })
+    }
 
     try {
       const id = await encashmentService.createPettyCashTransaction(newRow)
@@ -411,7 +404,7 @@ export function PettyCashFundTable() {
                 Delete Selected ({selectedRows.length})
               </Button>
             )}
-            <Button onClick={addRow} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={() => addRow({})} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
             </Button>
