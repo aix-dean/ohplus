@@ -21,13 +21,18 @@ export function includesAny<T extends Record<string, any>>(row: T, query: string
   for (const key of Object.keys(row)) {
     const val = row[key]
     if (val === null || val === undefined) continue
-    const s = typeof val === "number" ? String(val) : typeof val === "object" ? JSON.stringify(val) : String(val)
+    const s =
+      typeof val === "number"
+        ? String(val)
+        : typeof val === "object"
+          ? JSON.stringify(val)
+          : String(val)
     if (s.toLowerCase().includes(q)) return true
   }
   return false
 }
 
-export function formatCurrency(n: number, currency = "PHP", locale = "en-PH"): string {
+export function formatCurrency(n: number, currency: string = "PHP", locale: string = "en-PH"): string {
   try {
     return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 }).format(n || 0)
   } catch {

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "@/components/accounting/utils"
+import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
 
 type RevolvingSettings = {
   companyName: string

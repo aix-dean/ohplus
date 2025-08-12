@@ -6,22 +6,19 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "@/components/accounting/utils"
+import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
 
-type AdditionalEncashmentSettings = {
-  companyName: string
-  encashmentName: string
-  encashmentPeriod: string
-  cutOffPeriod: string
-  encashmentAmount: number
+type AdditionalSettings = {
+  fundLabel: string
+  fundAmount: number
 }
 
-type AdditionalEncashmentRow = {
+type AdditionalRow = {
   id: string
   category: string
   month: string
   date: string
-  voucherNo: string
+  pettyCashVoucherNo: string
   supplierName: string
   description: string
   accountTitle: string
@@ -37,10 +34,10 @@ type AdditionalEncashmentRow = {
   netAmount: number
 }
 
-const STORAGE_KEY = "acc_encash_ae_rows_v1"
-const STORAGE_KEY_SETTINGS = "acc_encash_ae_settings_v1"
+const STORAGE_KEY = "acc_encash_add_rows_v1"
+const STORAGE_KEY_SETTINGS = "acc_encash_add_settings_v1"
 
-function compute(row: AdditionalEncashmentRow): AdditionalEncashmentRow {
+function compute(row: AdditionalRow): AdditionalRow {
   const gross = parseNumber(row.grossAmount)
   const netOfVat = gross / 1.12
   const inputVat = gross - netOfVat
@@ -50,47 +47,25 @@ function compute(row: AdditionalEncashmentRow): AdditionalEncashmentRow {
   return { ...row, netOfVat, inputVat, onePercent, twoPercent, netAmount }
 }
 
-const MOCK_SETTINGS: AdditionalEncashmentSettings = {
-  companyName: "OOH Plus Inc.",
-  encashmentName: "Additional Encashment",
-  encashmentPeriod: "Dec 2024",
-  cutOffPeriod: "Dec 1–31, 2024",
-  encashmentAmount: 100000,
+const MOCK_SETTINGS: AdditionalSettings = {
+  fundLabel: "Additional Encashments Fund",
+  fundAmount: 100000,
 }
 
-const MOCK_ROWS: AdditionalEncashmentRow[] = [
+const MOCK_ROWS: AdditionalRow[] = [
   compute({
-    id: uid("ae"),
-    category: "Marketing",
+    id: uid("add"),
+    category: "Miscellaneous",
     month: "Dec",
-    date: "12",
-    voucherNo: "AE-001",
-    supplierName: "Digital Marketing Co",
-    description: "Social media advertising",
-    accountTitle: "Marketing Expense",
-    documentTypeNo: "SI-4001",
-    tinNo: "555-666-777-000",
-    companyAddress: "BGC, Taguig",
-    grossAmount: 22400,
-    netOfVat: 0,
-    inputVat: 0,
-    onePercent: 0,
-    twoPercent: 0,
-    netAmount: 0,
-  }),
-  compute({
-    id: uid("ae"),
-    category: "Equipment",
-    month: "Dec",
-    date: "15",
-    voucherNo: "AE-002",
-    supplierName: "Tech Solutions Inc",
-    description: "Computer hardware upgrade",
-    accountTitle: "Equipment",
-    documentTypeNo: "OR-5002",
-    tinNo: "888-999-111-000",
-    companyAddress: "Ortigas, Pasig",
-    grossAmount: 44800,
+    date: "10",
+    pettyCashVoucherNo: "ADD-001",
+    supplierName: "Misc Co",
+    description: "Unexpected expense",
+    accountTitle: "Misc Expense",
+    documentTypeNo: "OR-9901",
+    tinNo: "444-555-666-000",
+    companyAddress: "Pasig",
+    grossAmount: 5600,
     netOfVat: 0,
     inputVat: 0,
     onePercent: 0,
@@ -101,20 +76,20 @@ const MOCK_ROWS: AdditionalEncashmentRow[] = [
 
 export function AdditionalEncashmentsTable() {
   const { toast } = useToast()
-  const [rows, setRows] = useState<AdditionalEncashmentRow[]>([])
-  const [settings, setSettings] = useState<AdditionalEncashmentSettings>(MOCK_SETTINGS)
+  const [rows, setRows] = useState<AdditionalRow[]>([])
+  const [settings, setSettings] = useState<AdditionalSettings>(MOCK_SETTINGS)
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     try {
       const s = localStorage.getItem(STORAGE_KEY_SETTINGS)
-      if (s) setSettings(JSON.parse(s) as AdditionalEncashmentSettings)
+      if (s) setSettings(JSON.parse(s) as AdditionalSettings)
     } catch {}
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        const parsed = JSON.parse(saved) as AdditionalEncashmentRow[]
+        const parsed = JSON.parse(saved) as AdditionalRow[]
         setRows(parsed.map(compute))
         return
       }
@@ -132,9 +107,9 @@ export function AdditionalEncashmentsTable() {
     const oneP = sumBy(base, (r) => r.onePercent)
     const twoP = sumBy(base, (r) => r.twoPercent)
     const netAmount = sumBy(base, (r) => r.netAmount)
-    const balanceForDeposit = settings.encashmentAmount - netAmount
-    const totalEncashment = netAmount
-    const encashmentBalance = settings.encashmentAmount - totalEncashment
+    const balanceForDeposit = settings.fundAmount - netAmount
+    const totalAdditionalEncashments = netAmount
+    const additionalEncashmentsBalance = settings.fundAmount - totalAdditionalEncashments
     return {
       gross,
       netOfVat,
@@ -143,18 +118,18 @@ export function AdditionalEncashmentsTable() {
       twoP,
       netAmount,
       balanceForDeposit,
-      totalEncashment,
-      encashmentBalance,
+      totalAdditionalEncashments,
+      additionalEncashmentsBalance,
     }
-  }, [filtered, rows, settings.encashmentAmount])
+  }, [filtered, rows, settings.fundAmount])
 
   function addRow() {
     const row = compute({
-      id: uid("ae"),
+      id: uid("add"),
       category: "",
       month: "",
       date: "",
-      voucherNo: "",
+      pettyCashVoucherNo: "",
       supplierName: "",
       description: "",
       accountTitle: "",
@@ -172,7 +147,7 @@ export function AdditionalEncashmentsTable() {
     setDirty(true)
   }
 
-  function updateRow(id: string, patch: Partial<AdditionalEncashmentRow>) {
+  function updateRow(id: string, patch: Partial<AdditionalRow>) {
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r
@@ -209,60 +184,27 @@ export function AdditionalEncashmentsTable() {
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Company Name</label>
+              <label className="text-sm font-medium text-gray-700">Fund Label</label>
               <Input
                 className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.companyName}
+                value={settings.fundLabel}
                 onChange={(e) => {
-                  setSettings((s) => ({ ...s, companyName: e.target.value }))
+                  setSettings((s) => ({ ...s, fundLabel: e.target.value }))
                   setDirty(true)
                 }}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Encashment Name</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.encashmentName}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, encashmentName: e.target.value }))
-                  setDirty(true)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Encashment Period</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.encashmentPeriod}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, encashmentPeriod: e.target.value }))
-                  setDirty(true)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Cut-off Period</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.cutOffPeriod}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, cutOffPeriod: e.target.value }))
-                  setDirty(true)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Encashment Amount</label>
+              <label className="text-sm font-medium text-gray-700">Fund Amount</label>
               <Input
                 type="number"
                 inputMode="decimal"
                 className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.encashmentAmount}
+                value={settings.fundAmount}
                 onChange={(e) => {
-                  setSettings((s) => ({ ...s, encashmentAmount: parseNumber(e.target.value) }))
+                  setSettings((s) => ({ ...s, fundAmount: parseNumber(e.target.value) }))
                   setDirty(true)
                 }}
               />
@@ -309,7 +251,7 @@ export function AdditionalEncashmentsTable() {
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Category</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Month</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Date</TableHead>
-                <TableHead className="font-semibold text-gray-900 py-3 px-4">Voucher No.</TableHead>
+                <TableHead className="font-semibold text-gray-900 py-3 px-4">PCV No.</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Supplier</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Description</TableHead>
                 <TableHead className="font-semibold text-gray-900 py-3 px-4">Account</TableHead>
@@ -355,8 +297,8 @@ export function AdditionalEncashmentsTable() {
                   <TableCell className="py-3 px-4">
                     <Input
                       className="border-0 bg-transparent focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                      value={row.voucherNo}
-                      onChange={(e) => updateRow(row.id, { voucherNo: e.target.value })}
+                      value={row.pettyCashVoucherNo}
+                      onChange={(e) => updateRow(row.id, { pettyCashVoucherNo: e.target.value })}
                     />
                   </TableCell>
                   <TableCell className="py-3 px-4">
@@ -490,8 +432,10 @@ export function AdditionalEncashmentsTable() {
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-700">Total Encashment Usage</p>
-              <p className="text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totals.totalEncashment)}</p>
+              <p className="text-sm font-medium text-blue-700">Total Fund Usage</p>
+              <p className="text-2xl font-bold text-blue-900 mt-1">
+                {formatCurrency(totals.totalAdditionalEncashments)}
+              </p>
             </div>
             <div className="h-12 w-12 bg-blue-200 rounded-full flex items-center justify-center">
               <div className="h-6 w-6 bg-blue-600 rounded-full"></div>
@@ -503,7 +447,9 @@ export function AdditionalEncashmentsTable() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-purple-700">Remaining Balance</p>
-              <p className="text-2xl font-bold text-purple-900 mt-1">{formatCurrency(totals.encashmentBalance)}</p>
+              <p className="text-2xl font-bold text-purple-900 mt-1">
+                {formatCurrency(totals.additionalEncashmentsBalance)}
+              </p>
             </div>
             <div className="h-12 w-12 bg-purple-200 rounded-full flex items-center justify-center">
               <div className="h-6 w-6 bg-purple-600 rounded-full"></div>
