@@ -13,6 +13,9 @@ import { useRouter } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
+import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -45,6 +48,45 @@ interface CollectibleFormData {
   net_amount_collection?: number
 }
 
+interface Collectible {
+  id?: string
+  created?: any
+  company_id?: string
+  type: string
+  updated?: any
+  deleted: boolean
+  client_name: string
+  net_amount: number
+  total_amount: number
+  mode_of_payment: string
+  bank_name?: string
+  bi_no?: string
+  or_no?: string
+  invoice_no?: string
+  next_collection_date?: string
+  status: string
+  vendor_name: string
+  tin_no: string
+  business_address: string
+  // Sites specific fields
+  booking_no?: string
+  site?: string
+  covered_period?: string
+  bir_2307?: string
+  collection_date?: string
+  // Supplies specific fields
+  date?: string
+  product?: string
+  transfer_date?: string
+  bs_no?: string
+  due_for_collection?: string
+  date_paid?: string
+  net_amount_collection?: number
+  // Next collection fields
+  next_bir_2307?: string
+  next_status?: string
+}
+
 const initialFormData: CollectibleFormData = {
   type: "sites",
   client_name: "",
@@ -73,6 +115,9 @@ export default function CreateCollectiblePage() {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
   const clientSearchRef = useRef<HTMLDivElement>(null)
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -166,14 +211,50 @@ export default function CreateCollectiblePage() {
     setFormData((prev) => ({ ...prev, next_collection_bir_2307: null }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitError(null)
 
-    // TODO: Replace with actual API call to create collectible
-    console.log("Creating collectible:", formData)
+    try {
+      // Upload BIR 2307 file if present
+      let bir2307Url = ""
+      if (formData.bir_2307 && formData.bir_2307 instanceof File) {
+        bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "collectibles/bir_2307/")
+      }
 
-    // Navigate back to collectibles list
-    router.push("/finance/collectibles")
+      // Upload Next Collection BIR 2307 file if present
+      let nextBir2307Url = ""
+      if (formData.next_collection_bir_2307 && formData.next_collection_bir_2307 instanceof File) {
+        nextBir2307Url = await uploadFileToFirebaseStorage(
+          formData.next_collection_bir_2307,
+          "collectibles/next_bir_2307/",
+        )
+      }
+
+      // Prepare collectible data
+      const collectibleData: Partial<Collectible> = {
+        ...formData,
+        bir_2307: bir2307Url || formData.bir_2307,
+        next_bir_2307: nextBir2307Url || formData.next_collection_bir_2307,
+        deleted: false,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        company_id: "default_company", // Replace with actual company ID from auth context
+      }
+
+      // Save to Firebase
+      const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
+      console.log("Collectible created with ID:", docRef.id)
+
+      // Navigate back to collectibles list
+      router.push("/finance/collectibles")
+    } catch (error) {
+      console.error("Error creating collectible:", error)
+      setSubmitError("Failed to create collectible. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const renderFormFields = () => (
@@ -593,7 +674,7 @@ export default function CreateCollectiblePage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/finance/collectibles">
           <Button variant="outline" size="sm">
@@ -614,13 +695,21 @@ export default function CreateCollectiblePage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {renderFormFields()}
-            <div className="flex justify-end space-x-2 pt-4">
-              <Link href="/finance/collectibles">
-                <Button variant="outline" type="button">
-                  Cancel
-                </Button>
-              </Link>
-              <Button type="submit">Create Collectible</Button>
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{submitError}</div>
+            )}
+            <div className="flex justify-end gap-4 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/finance/collectibles")}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Creating..." : "Create Collectible"}
+              </Button>
             </div>
           </form>
         </CardContent>
