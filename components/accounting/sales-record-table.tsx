@@ -74,11 +74,7 @@ export function SalesRecordTable() {
       setHasPreviousPage(result.hasPreviousPage)
       setCurrentPage(result.currentPage)
       setLastDoc(result.lastDoc)
-
-      toast({
-        title: "✅ Data Loaded",
-        description: `Loaded ${result.data.length} of ${result.totalCount} sales records.`,
-      })
+      
     } catch (error) {
       console.error("Error loading sales records:", error)
       toast({
