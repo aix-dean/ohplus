@@ -280,7 +280,11 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
