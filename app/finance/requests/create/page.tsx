@@ -33,7 +33,6 @@ type CreateRequestFormData = {
   "Approved By": string
   Actions: string
 
-  // Vendor-related fields
   "Vendor Name": string
   "TIN No.": string
   "Business Address": string
@@ -217,6 +216,7 @@ export default function CreateRequestPage() {
     if (!formData["Approved By"].trim() || !onlyAlphabet(formData["Approved By"])) {
       return "Approved By is mandatory and must contain alphabets only."
     }
+
     if (!formData["Vendor Name"].trim() || !onlyAlphabet(formData["Vendor Name"])) {
       return "Vendor Name is mandatory and must contain alphabets only."
     }
@@ -267,6 +267,7 @@ export default function CreateRequestPage() {
       if (!formData["Voucher No."].trim() || !docNumberAllowed(formData["Voucher No."])) {
         return "Voucher No. is mandatory and may include letters, numbers, and # * + - . only."
       }
+      // File uploads for Send Report and Print Report are no longer required.
     }
 
     return null
@@ -339,6 +340,7 @@ export default function CreateRequestPage() {
         "Approved By": formData["Approved By"].trim(),
         Attachments: attachmentsUrl, // may be empty string when not provided
         Actions: formData.Actions,
+
         "Vendor Name": formData["Vendor Name"].trim(),
         "TIN No.": formData["TIN No."].trim(),
         "Business Address": formData["Business Address"].trim(),
@@ -513,7 +515,6 @@ export default function CreateRequestPage() {
               </div>
             </div>
 
-            {/* Vendor Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Vendor Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -800,6 +801,7 @@ export default function CreateRequestPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Send Report and Print Report uploads removed */}
               </>
             )}
 

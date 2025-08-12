@@ -399,7 +399,7 @@ export default function RequestDetailsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Basic Information */}
         <Card>
           <CardHeader>
@@ -473,7 +473,7 @@ export default function RequestDetailsPage() {
               <span className="font-medium">{(request as any)["TIN No."] || "Not specified"}</span>
             </div>
             <Separator />
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <span className="text-sm font-medium text-muted-foreground">Business Address</span>
               <span className="font-medium max-w-[60%] text-right">
                 {(request as any)["Business Address"] || "Not specified"}
