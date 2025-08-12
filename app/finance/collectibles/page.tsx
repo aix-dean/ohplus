@@ -250,7 +250,11 @@ export default function CollectiblesPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Invoice No</TableHead>
                     <TableHead>OR No</TableHead>
+                    <TableHead>BI No</TableHead>
+                    <TableHead>Net Amount</TableHead>
                     <TableHead>Total Amount</TableHead>
+                    <TableHead>Payment Mode</TableHead>
+                    <TableHead>Bank Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Next Collection</TableHead>
                     <TableHead>Actions</TableHead>
@@ -265,7 +269,11 @@ export default function CollectiblesPage() {
                       </TableCell>
                       <TableCell>{collectible.invoice_no}</TableCell>
                       <TableCell>{collectible.or_no}</TableCell>
+                      <TableCell>{collectible.bi_no}</TableCell>
+                      <TableCell>{formatCurrency(collectible.net_amount)}</TableCell>
                       <TableCell>{formatCurrency(collectible.total_amount)}</TableCell>
+                      <TableCell>{collectible.mode_of_payment}</TableCell>
+                      <TableCell>{collectible.bank_name}</TableCell>
                       <TableCell>{getStatusBadge(collectible.status)}</TableCell>
                       <TableCell>{collectible.next_collection_date}</TableCell>
                       <TableCell>
