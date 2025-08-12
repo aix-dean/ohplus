@@ -33,6 +33,11 @@ type CreateRequestFormData = {
   "Approved By": string
   Actions: string
 
+  // Vendor-related fields
+  "Vendor Name": string
+  "TIN No.": string
+  "Business Address": string
+
   // Shared concept of "item-like" for list compatibility
   "Requested Item": string
 
@@ -141,6 +146,10 @@ export default function CreateRequestPage() {
       Attachments: null,
       Actions: "Pending",
 
+      "Vendor Name": "",
+      "TIN No.": "",
+      "Business Address": "",
+
       "Date Released": "",
 
       Cashback: "",
@@ -208,6 +217,15 @@ export default function CreateRequestPage() {
     if (!formData["Approved By"].trim() || !onlyAlphabet(formData["Approved By"])) {
       return "Approved By is mandatory and must contain alphabets only."
     }
+    if (!formData["Vendor Name"].trim() || !onlyAlphabet(formData["Vendor Name"])) {
+      return "Vendor Name is mandatory and must contain alphabets only."
+    }
+    if (!formData["TIN No."].trim() || !lettersAndNumbers(formData["TIN No."])) {
+      return "TIN No. is mandatory and must include letters and numbers."
+    }
+    if (!formData["Business Address"].trim()) {
+      return "Business Address is mandatory."
+    }
 
     // Module specific
     if (formData.request_type === "reimbursement") {
@@ -249,7 +267,6 @@ export default function CreateRequestPage() {
       if (!formData["Voucher No."].trim() || !docNumberAllowed(formData["Voucher No."])) {
         return "Voucher No. is mandatory and may include letters, numbers, and # * + - . only."
       }
-      // File uploads for Send Report and Print Report are no longer required.
     }
 
     return null
@@ -322,6 +339,9 @@ export default function CreateRequestPage() {
         "Approved By": formData["Approved By"].trim(),
         Attachments: attachmentsUrl, // may be empty string when not provided
         Actions: formData.Actions,
+        "Vendor Name": formData["Vendor Name"].trim(),
+        "TIN No.": formData["TIN No."].trim(),
+        "Business Address": formData["Business Address"].trim(),
       }
 
       const documentData: any = { ...baseData }
@@ -490,6 +510,47 @@ export default function CreateRequestPage() {
                     <SelectItem value="Delete">Delete</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Vendor Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Vendor Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="vendor_name">Vendor Name *</Label>
+                  <Input
+                    id="vendor_name"
+                    required
+                    placeholder="Enter vendor name"
+                    value={formData["Vendor Name"]}
+                    onChange={handleText("Vendor Name")}
+                    pattern="[A-Za-z\s]+"
+                    title="Alphabets only"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tin_no">TIN No. *</Label>
+                  <Input
+                    id="tin_no"
+                    required
+                    placeholder="Enter TIN number"
+                    value={formData["TIN No."]}
+                    onChange={handleText("TIN No.")}
+                    title="Must include letters and numbers"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="business_address">Business Address *</Label>
+                <Textarea
+                  id="business_address"
+                  required
+                  placeholder="Enter complete business address"
+                  value={formData["Business Address"]}
+                  onChange={handleText("Business Address")}
+                  rows={3}
+                />
               </div>
             </div>
 
@@ -739,7 +800,6 @@ export default function CreateRequestPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Send Report and Print Report uploads removed */}
               </>
             )}
 

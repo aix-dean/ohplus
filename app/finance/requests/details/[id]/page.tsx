@@ -399,7 +399,7 @@ export default function RequestDetailsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Basic Information */}
         <Card>
           <CardHeader>
@@ -450,6 +450,34 @@ export default function RequestDetailsPage() {
                   {request.created ? format(request.created.toDate(), "MMM dd, yyyy HH:mm") : "N/A"}
                 </span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Vendor Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Vendor Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Vendor Name</span>
+              <span className="font-medium">{(request as any)["Vendor Name"] || "Not specified"}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">TIN No.</span>
+              <span className="font-medium">{(request as any)["TIN No."] || "Not specified"}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Business Address</span>
+              <span className="font-medium max-w-[60%] text-right">
+                {(request as any)["Business Address"] || "Not specified"}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -663,6 +691,7 @@ export default function RequestDetailsPage() {
                           src={
                             galleryItems[galleryIndex].url ||
                             "/placeholder.svg?height=300&width=600&query=image%20preview" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={galleryItems[galleryIndex].name}
