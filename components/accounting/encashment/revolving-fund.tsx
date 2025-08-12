@@ -207,7 +207,7 @@ export function RevolvingFundTable() {
         deleted: false,
       })
 
-      await encashmentService.saveTransaction(transaction)
+      await encashmentService.createTransaction(transaction)
       setRows((r) => [transaction, ...r])
       setShowTransactionModal(false)
 
@@ -237,7 +237,7 @@ export function RevolvingFundTable() {
 
   async function deleteRow(id: string) {
     try {
-      await encashmentService.softDeleteTransaction(id)
+      await encashmentService.deleteTransaction(id)
       setRows((prev) => prev.filter((r) => r.id !== id))
       toast({
         title: "Success",
@@ -256,11 +256,11 @@ export function RevolvingFundTable() {
   async function saveAll() {
     try {
       // Save settings
-      await encashmentService.saveSettings("REVOLVING_FUND", settings)
+      await encashmentService.createSettings({ ...settings, type: "REVOLVING_FUND" })
 
       // Save transactions
       for (const row of rows) {
-        await encashmentService.saveTransaction({
+        await encashmentService.createTransaction({
           ...row,
           type: "REVOLVING_FUND",
           deleted: false,
