@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Save, Undo2, Search, Trash2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Plus, Save, Undo2, Trash2, Settings } from "lucide-react"
+import { encashmentService } from "@/lib/encashment-service"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, includesAny, parseNumber, sumBy, uid } from "../utils"
-import { encashmentService } from "@/lib/encashment-service"
 
 type RevolvingSettings = {
   companyName: string
@@ -92,6 +94,21 @@ export function RevolvingFundTable() {
   const [query, setQuery] = useState("")
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [newTransaction, setNewTransaction] = useState({
+    category: "",
+    month: "",
+    date: "",
+    pettyCashVoucherNo: "",
+    supplierName: "",
+    description: "",
+    accountTitle: "",
+    documentTypeNo: "",
+    tinNo: "",
+    companyAddress: "",
+    grossAmount: 0,
+  })
 
   useEffect(() => {
     loadData()
@@ -164,9 +181,8 @@ export function RevolvingFundTable() {
     }
   }, [filtered, rows, settings.revolvingFundAmount])
 
-  function addRow() {
-    const row = compute({
-      id: uid("rvf"),
+  function openTransactionModal() {
+    setNewTransaction({
       category: "",
       month: "",
       date: "",
@@ -178,16 +194,35 @@ export function RevolvingFundTable() {
       tinNo: "",
       companyAddress: "",
       grossAmount: 0,
-      netOfVat: 0,
-      inputVat: 0,
-      onePercent: 0,
-      twoPercent: 0,
-      netAmount: 0,
-      type: "REVOLVING_FUND",
-      deleted: false,
     })
-    setRows((r) => [row, ...r])
-    setDirty(true)
+    setShowTransactionModal(true)
+  }
+
+  async function saveTransaction() {
+    try {
+      const transaction = compute({
+        id: uid("rvf"),
+        ...newTransaction,
+        type: "REVOLVING_FUND",
+        deleted: false,
+      })
+
+      await encashmentService.saveTransaction(transaction)
+      setRows((r) => [transaction, ...r])
+      setShowTransactionModal(false)
+
+      toast({
+        title: "Success",
+        description: "Transaction added successfully",
+      })
+    } catch (error) {
+      console.error("Error saving transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save transaction",
+        variant: "destructive",
+      })
+    }
   }
 
   function updateRow(id: string, patch: Partial<RevolvingRow>) {
@@ -263,81 +298,216 @@ export function RevolvingFundTable() {
 
   return (
     <div className="space-y-6">
+      {/* Fund Configuration Section */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Revolving Fund</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage your revolving fund transactions and balances</p>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Revolving Fund</h3>
+            <p className="text-sm text-gray-600">Manage revolving fund settings and transactions</p>
+          </div>
+          <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+                <Settings className="mr-2 h-4 w-4" />
+                Configure Fund
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Configure Revolving Fund</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fundAmount">Fund Amount</Label>
+                  <Input
+                    id="fundAmount"
+                    type="number"
+                    value={settings.revolvingFundAmount}
+                    onChange={(e) =>
+                      setSettings((prev) => ({ ...prev, revolvingFundAmount: parseNumber(e.target.value) }))
+                    }
+                    placeholder="Enter fund amount"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowConfigModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      saveAll()
+                      setShowConfigModal(false)
+                    }}
+                  >
+                    Save Configuration
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Company Name</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.companyName}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, companyName: e.target.value }))
-                  setDirty(true)
-                }}
-              />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+            <div className="p-4">
+              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Fund Amount</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                {formatCurrency(settings.revolvingFundAmount)}
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Fund Name</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.revolvingFundName}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, revolvingFundName: e.target.value }))
-                  setDirty(true)
-                }}
-              />
+          </div>
+          <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+            <div className="p-4">
+              <div className="text-sm font-medium text-green-700 dark:text-green-300">Total Fund Usage</div>
+              <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+                {formatCurrency(totals.netAmount)}
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Replenishment Period</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.revolvingFundReplenishment}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, revolvingFundReplenishment: e.target.value }))
-                  setDirty(true)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Cut-off Period</label>
-              <Input
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.cutOffPeriod}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, cutOffPeriod: e.target.value }))
-                  setDirty(true)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Fund Amount</label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                value={settings.revolvingFundAmount}
-                onChange={(e) => {
-                  setSettings((s) => ({ ...s, revolvingFundAmount: parseNumber(e.target.value) }))
-                  setDirty(true)
-                }}
-              />
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+            <div className="p-4">
+              <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Remaining Balance</div>
+              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                {formatCurrency(settings.revolvingFundAmount - totals.netAmount)}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Transactions Section */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div className="px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Transactions</h3>
+            <p className="text-sm text-gray-600">Manage revolving fund transactions</p>
+          </div>
           <div className="flex gap-3">
-            <Button onClick={addRow} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-              <Plus className="mr-2 h-4 w-4" /> Add Transaction
-            </Button>
+            <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700 text-white shadow-sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Transaction
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Transaction</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Input
+                      id="category"
+                      value={newTransaction.category}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, category: e.target.value }))}
+                      placeholder="Enter category"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="month">Month</Label>
+                    <Input
+                      id="month"
+                      value={newTransaction.month}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, month: e.target.value }))}
+                      placeholder="Enter month"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Date</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={newTransaction.date}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, date: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pettyCashVoucherNo">PCV No.</Label>
+                    <Input
+                      id="pettyCashVoucherNo"
+                      value={newTransaction.pettyCashVoucherNo}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, pettyCashVoucherNo: e.target.value }))}
+                      placeholder="Enter PCV number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplierName">Supplier</Label>
+                    <Input
+                      id="supplierName"
+                      value={newTransaction.supplierName}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, supplierName: e.target.value }))}
+                      placeholder="Enter supplier name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      value={newTransaction.description}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter description"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accountTitle">Account</Label>
+                    <Input
+                      id="accountTitle"
+                      value={newTransaction.accountTitle}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, accountTitle: e.target.value }))}
+                      placeholder="Enter account title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="documentTypeNo">Document</Label>
+                    <Input
+                      id="documentTypeNo"
+                      value={newTransaction.documentTypeNo}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, documentTypeNo: e.target.value }))}
+                      placeholder="Enter document number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tinNo">TIN</Label>
+                    <Input
+                      id="tinNo"
+                      value={newTransaction.tinNo}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, tinNo: e.target.value }))}
+                      placeholder="Enter TIN"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="companyAddress">Address</Label>
+                    <Input
+                      id="companyAddress"
+                      value={newTransaction.companyAddress}
+                      onChange={(e) => setNewTransaction((prev) => ({ ...prev, companyAddress: e.target.value }))}
+                      placeholder="Enter company address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grossAmount">Gross Amount</Label>
+                    <Input
+                      id="grossAmount"
+                      type="number"
+                      value={newTransaction.grossAmount}
+                      onChange={(e) =>
+                        setNewTransaction((prev) => ({ ...prev, grossAmount: parseNumber(e.target.value) }))
+                      }
+                      placeholder="Enter gross amount"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowTransactionModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveTransaction}>Add Transaction</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Button
               variant="outline"
               onClick={saveAll}
@@ -351,7 +521,7 @@ export function RevolvingFundTable() {
             </Button>
           </div>
           <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Plus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search transactions..."
               className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -532,44 +702,6 @@ export function RevolvingFundTable() {
               </TableRow>
             </TableBody>
           </Table>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-green-700">Balance for Deposit</p>
-              <p className="text-2xl font-bold text-green-900 mt-1">{formatCurrency(totals.balanceForDeposit)}</p>
-            </div>
-            <div className="h-12 w-12 bg-green-200 rounded-full flex items-center justify-center">
-              <div className="h-6 w-6 bg-green-600 rounded-full"></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-700">Total Fund Usage</p>
-              <p className="text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totals.totalRevolvingFund)}</p>
-            </div>
-            <div className="h-12 w-12 bg-blue-200 rounded-full flex items-center justify-center">
-              <div className="h-6 w-6 bg-blue-600 rounded-full"></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-purple-700">Remaining Balance</p>
-              <p className="text-2xl font-bold text-purple-900 mt-1">{formatCurrency(totals.rvfAmountBalance)}</p>
-            </div>
-            <div className="h-12 w-12 bg-purple-200 rounded-full flex items-center justify-center">
-              <div className="h-6 w-6 bg-purple-600 rounded-full"></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
