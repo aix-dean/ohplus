@@ -333,7 +333,11 @@ export default function CreateCollectiblePage() {
 
       <div className="space-y-2">
         <div className="flex items-center space-x-2">
-          <Checkbox id="proceed_next_collection" checked={showNextCollection} onCheckedChange={setShowNextCollection} />
+          <Checkbox
+            id="proceed_next_collection"
+            checked={showNextCollection}
+            onChange={(e) => setShowNextCollection(e.target.checked)}
+          />
           <Label htmlFor="proceed_next_collection">Proceed to set the next collection date?</Label>
         </div>
       </div>
