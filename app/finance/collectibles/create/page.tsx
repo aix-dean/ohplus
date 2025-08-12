@@ -46,6 +46,9 @@ interface CollectibleFormData {
   due_for_collection?: string
   date_paid?: string
   net_amount_collection?: number
+  vendor_name?: string
+  tin_no?: string
+  business_address?: string
 }
 
 interface Collectible {
@@ -223,24 +226,61 @@ export default function CreateCollectiblePage() {
         bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "collectibles/bir_2307/")
       }
 
-      // Upload Next Collection BIR 2307 file if present
+      // Upload Next Collection BIR 2307 file if present and proceed_next_collection is true
       let nextBir2307Url = ""
-      if (formData.next_collection_bir_2307 && formData.next_collection_bir_2307 instanceof File) {
+      if (
+        formData.proceed_next_collection &&
+        formData.next_collection_bir_2307 &&
+        formData.next_collection_bir_2307 instanceof File
+      ) {
         nextBir2307Url = await uploadFileToFirebaseStorage(
           formData.next_collection_bir_2307,
           "collectibles/next_bir_2307/",
         )
       }
 
-      // Prepare collectible data
       const collectibleData: Partial<Collectible> = {
-        ...formData,
-        bir_2307: bir2307Url || formData.bir_2307,
-        next_bir_2307: nextBir2307Url || formData.next_collection_bir_2307,
+        type: formData.type,
+        client_name: formData.client_name,
+        net_amount: formData.net_amount,
+        total_amount: formData.total_amount,
+        mode_of_payment: formData.mode_of_payment,
+        bank_name: formData.bank_name,
+        bi_no: formData.bi_no,
+        or_no: formData.or_no,
+        invoice_no: formData.invoice_no,
+        status: formData.status,
+        vendor_name: formData.vendor_name || "",
+        tin_no: formData.tin_no || "",
+        business_address: formData.business_address || "",
         deleted: false,
         created: serverTimestamp(),
         updated: serverTimestamp(),
         company_id: "default_company", // Replace with actual company ID from auth context
+      }
+
+      // Add type-specific fields
+      if (formData.type === "sites") {
+        if (formData.booking_no) collectibleData.booking_no = formData.booking_no
+        if (formData.site) collectibleData.site = formData.site
+        if (formData.covered_period) collectibleData.covered_period = formData.covered_period
+        if (bir2307Url) collectibleData.bir_2307 = bir2307Url
+        if (formData.collection_date) collectibleData.collection_date = formData.collection_date
+      } else if (formData.type === "supplies") {
+        if (formData.date) collectibleData.date = formData.date
+        if (formData.product) collectibleData.product = formData.product
+        if (formData.transfer_date) collectibleData.transfer_date = formData.transfer_date
+        if (formData.bs_no) collectibleData.bs_no = formData.bs_no
+        if (formData.due_for_collection) collectibleData.due_for_collection = formData.due_for_collection
+        if (formData.date_paid) collectibleData.date_paid = formData.date_paid
+        if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
+      }
+
+      // Add next collection fields only if proceed_next_collection is true
+      if (formData.proceed_next_collection) {
+        if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
+        if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
+        if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       }
 
       // Save to Firebase
