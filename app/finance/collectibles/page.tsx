@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Save, X, Check } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Save, X, Check, Eye } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, updateDoc, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "sonner"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { Loader2 } from "lucide-react"
 
 interface Collectible {
   id: string
@@ -35,6 +37,9 @@ interface Collectible {
   site?: string
   covered_period?: string
   bir_2307?: string
+  bir_2307_filename?: string
+  next_bir_2307?: string
+  next_bir_2307_filename?: string
   collection_date?: string
   // Supplies specific fields
   date?: string
@@ -53,7 +58,7 @@ export default function CollectiblesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [editingRows, setEditingRows] = useState<Set<string>>(new Set())
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, Partial<Collectible>>>({})
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newRowData, setNewRowData] = useState<Partial<Collectible>>({
@@ -63,6 +68,7 @@ export default function CollectiblesPage() {
     deleted: false,
   })
   const [loading, setLoading] = useState(false)
+  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({})
 
   const fetchCollectibles = async () => {
     if (!user?.company_id && !user?.uid) return
@@ -116,36 +122,32 @@ export default function CollectiblesPage() {
   const startEditing = (id: string) => {
     const collectible = collectibles.find((c) => c.id === id)
     if (collectible) {
-      setEditingRows((prev) => new Set([...prev, id]))
+      setEditingId(id)
       setEditData((prev) => ({ ...prev, [id]: { ...collectible } }))
     }
   }
 
-  const cancelEditing = (id: string) => {
-    setEditingRows((prev) => {
-      const newSet = new Set(prev)
-      newSet.delete(id)
-      return newSet
-    })
+  const cancelEditing = () => {
+    setEditingId(null)
     setEditData((prev) => {
       const newData = { ...prev }
-      delete newData[id]
+      delete newData[editingId || ""]
       return newData
     })
   }
 
-  const saveEdit = async (id: string) => {
-    const data = editData[id]
-    if (!data) return
+  const saveEdit = async () => {
+    const data = editData[editingId || ""]
+    if (!data || !editingId) return
 
     try {
-      await updateDoc(doc(db, "collectibles", id), {
+      await updateDoc(doc(db, "collectibles", editingId), {
         ...data,
         updated: serverTimestamp(),
       })
 
-      setCollectibles((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
-      cancelEditing(id)
+      setCollectibles((prev) => prev.map((c) => (c.id === editingId ? { ...c, ...data } : c)))
+      cancelEditing()
       toast.success("Collectible updated successfully")
     } catch (error) {
       console.error("Error updating collectible:", error)
@@ -248,7 +250,7 @@ export default function CollectiblesPage() {
     type: "text" | "number" | "date" | "select" = "text",
     options?: string[],
   ) => {
-    const isEditing = editingRows.has(collectible.id)
+    const isEditing = editingId === collectible.id
     const value = isEditing
       ? editData[collectible.id]?.[field as keyof Collectible]
       : collectible[field as keyof Collectible]
@@ -309,7 +311,7 @@ export default function CollectiblesPage() {
     if (type === "select" && options) {
       return (
         <Select value={value as string} onValueChange={(val) => updateNewRowData(field, val)}>
-          <SelectTrigger className="h-8">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -330,11 +332,126 @@ export default function CollectiblesPage() {
         onChange={(e) =>
           updateNewRowData(field, type === "number" ? Number.parseFloat(e.target.value) || 0 : e.target.value)
         }
-        className="h-8"
+        className="h-8 text-xs"
         placeholder={field === "client_name" ? "Required" : ""}
       />
     )
   }
+
+  const handleFileUpload = async (file: File, collectibleId: string, fieldName: string) => {
+    const uploadKey = `${collectibleId}-${fieldName}`
+    setUploadingFiles((prev) => ({ ...prev, [uploadKey]: true }))
+
+    try {
+      // Create a reference to Firebase Storage
+      const storage = getStorage()
+      const fileRef = ref(storage, `collectibles/${collectibleId}/${fieldName}/${file.name}`)
+
+      // Upload file
+      await uploadBytes(fileRef, file)
+      const downloadURL = await getDownloadURL(fileRef)
+
+      // Update the collectible record with the file URL
+      const collectibleRef = doc(db, "collectibles", collectibleId)
+      await updateDoc(collectibleRef, {
+        [fieldName]: downloadURL,
+        [`${fieldName}_filename`]: file.name,
+        updated: serverTimestamp(),
+      })
+
+      // Update local state
+      setCollectibles((prev) =>
+        prev.map((item) =>
+          item.id === collectibleId
+            ? { ...item, [fieldName]: downloadURL, [`${fieldName}_filename`]: file.name }
+            : item,
+        ),
+      )
+
+      toast({
+        title: "File uploaded successfully",
+        description: `${file.name} has been uploaded.`,
+      })
+    } catch (error) {
+      console.error("Error uploading file:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingFiles((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
+  const handleViewFile = (fileUrl: string, filename: string) => {
+    if (fileUrl) {
+      window.open(fileUrl, "_blank")
+    }
+  }
+
+  const FileUploadCell = ({
+    collectible,
+    fieldName,
+    isEditing,
+  }: {
+    collectible: Collectible
+    fieldName: string
+    isEditing: boolean
+  }) => {
+    const uploadKey = `${collectible.id}-${fieldName}`
+    const isUploading = uploadingFiles[uploadKey]
+    const fileUrl = collectible[fieldName as keyof Collectible] as string
+    const filename = collectible[`${fieldName}_filename` as keyof Collectible] as string
+
+    if (!isEditing) {
+      return (
+        <div className="flex items-center gap-2">
+          {fileUrl ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleViewFile(fileUrl, filename)}
+                className="h-8 px-2"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                View
+              </Button>
+              <span className="text-xs text-muted-foreground truncate max-w-[100px]">{filename || "File"}</span>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">No file</span>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Input
+          type="file"
+          accept=".pdf,.doc,.docx"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              handleFileUpload(file, collectible.id, fieldName)
+            }
+          }}
+          className="h-8 text-xs"
+          disabled={isUploading}
+        />
+        {isUploading && <Loader2 className="h-3 w-3 animate-spin" />}
+        {fileUrl && (
+          <Button variant="outline" size="sm" onClick={() => handleViewFile(fileUrl, filename)} className="h-8 px-2">
+            <Eye className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  const showNextCollectionFields = typeFilter === "all" || typeFilter === "sites"
 
   return (
     <div className="space-y-6">
@@ -416,6 +533,8 @@ export default function CollectiblesPage() {
                       <TableHead>Booking No</TableHead>
                       <TableHead>Site</TableHead>
                       <TableHead>Collection Date</TableHead>
+                      <TableHead>BIR 2307</TableHead>
+                      {showNextCollectionFields && <TableHead>Next Collection BIR 2307</TableHead>}
                     </>
                   )}
                   {(typeFilter === "all" || typeFilter === "supplies") && (
@@ -456,6 +575,10 @@ export default function CollectiblesPage() {
                         <TableCell>
                           {newRowData.type === "sites" ? renderNewRowCell("collection_date", "date") : ""}
                         </TableCell>
+                        <TableCell>{newRowData.type === "sites" ? renderNewRowCell("bir_2307") : ""}</TableCell>
+                        {showNextCollectionFields && (
+                          <TableCell>{newRowData.type === "sites" ? renderNewRowCell("next_bir_2307") : ""}</TableCell>
+                        )}
                       </>
                     )}
                     {(typeFilter === "all" || typeFilter === "supplies") && (
@@ -492,7 +615,7 @@ export default function CollectiblesPage() {
                   </TableRow>
                 ) : (
                   filteredCollectibles.map((collectible) => (
-                    <TableRow key={collectible.id} className={editingRows.has(collectible.id) ? "bg-yellow-50" : ""}>
+                    <TableRow key={collectible.id} className={editingId === collectible.id ? "bg-yellow-50" : ""}>
                       <TableCell>{renderEditableCell(collectible, "client_name")}</TableCell>
                       <TableCell>{renderEditableCell(collectible, "type", "select", ["sites", "supplies"])}</TableCell>
                       <TableCell>{renderEditableCell(collectible, "invoice_no")}</TableCell>
@@ -526,6 +649,30 @@ export default function CollectiblesPage() {
                               ? renderEditableCell(collectible, "collection_date", "date")
                               : ""}
                           </TableCell>
+                          <TableCell>
+                            {collectible.type === "sites" ? (
+                              <FileUploadCell
+                                collectible={collectible}
+                                fieldName="bir_2307"
+                                isEditing={editingId === collectible.id}
+                              />
+                            ) : (
+                              ""
+                            )}
+                          </TableCell>
+                          {showNextCollectionFields && (
+                            <TableCell>
+                              {collectible.type === "sites" ? (
+                                <FileUploadCell
+                                  collectible={collectible}
+                                  fieldName="next_bir_2307"
+                                  isEditing={editingId === collectible.id}
+                                />
+                              ) : (
+                                ""
+                              )}
+                            </TableCell>
+                          )}
                         </>
                       )}
                       {(typeFilter === "all" || typeFilter === "supplies") && (
@@ -545,12 +692,12 @@ export default function CollectiblesPage() {
                       )}
                       <TableCell>
                         <div className="flex space-x-1">
-                          {editingRows.has(collectible.id) ? (
+                          {editingId === collectible.id ? (
                             <>
-                              <Button size="sm" onClick={() => saveEdit(collectible.id)}>
+                              <Button size="sm" onClick={saveEdit}>
                                 <Save className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => cancelEditing(collectible.id)}>
+                              <Button variant="outline" size="sm" onClick={cancelEditing}>
                                 <X className="h-4 w-4" />
                               </Button>
                             </>
