@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -285,6 +285,11 @@ export default function CollectiblesPage() {
                       <TableCell>{displayValue(collectible.next_collection_date)}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
+                          <Link href={`/finance/collectibles/details/${collectible.id}`}>
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Link href={`/finance/collectibles/edit/${collectible.id}`}>
                             <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4" />
