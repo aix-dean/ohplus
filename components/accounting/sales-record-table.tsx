@@ -16,6 +16,7 @@ import {
 } from "@/lib/booking-service"
 import { useAuth } from "@/contexts/auth-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const BOOKING_TYPES = ["RENTAL", "MERCHANDISE", "SERVICES"] as const
 const BOOKING_STATUSES = ["COMPLETED", "CANCELLED", "FOR CONTRACT", "ONGOING", "PENDING", "PAID", "UPCOMING"] as const
@@ -119,21 +120,54 @@ export function SalesRecordTable() {
 
   const filtered = useMemo(() => records.filter((r) => includesAny(r, query)), [records, query])
 
+  // Calculate pagination for filtered results when searching
+  const paginatedFiltered = useMemo(() => {
+    if (!query) return filtered
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filtered.slice(startIndex, endIndex)
+  }, [filtered, currentPage, pageSize, query])
+
+  // Calculate total pages for search results
+  const searchTotalPages = useMemo(() => {
+    if (!query) return totalPages
+    return Math.ceil(filtered.length / pageSize)
+  }, [filtered.length, pageSize, query, totalPages])
+
+  // Calculate if there are next/previous pages for search
+  const searchHasNextPage = useMemo(() => {
+    if (!query) return hasNextPage
+    return currentPage < searchTotalPages
+  }, [currentPage, searchTotalPages, query, hasNextPage])
+
+  const searchHasPreviousPage = useMemo(() => {
+    if (!query) return hasPreviousPage
+    return currentPage > 1
+  }, [currentPage, query, hasPreviousPage])
+
   const handlePreviousPage = () => {
-    if (hasPreviousPage) {
+    if (query ? searchHasPreviousPage : hasPreviousPage) {
       const newPage = currentPage - 1
       setCurrentPage(newPage)
-      loadSalesRecords(newPage)
+      if (!query) {
+        loadSalesRecords(newPage)
+      }
     }
   }
 
   const handleNextPage = () => {
-    if (hasNextPage) {
+    if (query ? searchHasNextPage : hasNextPage) {
       const newPage = currentPage + 1
       setCurrentPage(newPage)
-      loadSalesRecords(newPage)
+      if (!query) {
+        loadSalesRecords(newPage)
+      }
     }
   }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [query])
 
   const handlePageRefresh = () => {
     loadSalesRecords(currentPage)
@@ -385,171 +419,229 @@ export function SalesRecordTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(query ? filtered : records).map((record) => {
-                    const isEditing = !!editing[record.id]
-                    return (
-                      <TableRow
-                        key={record.id}
-                        className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
-                      >
+                  {loading ? (
+                    Array.from({ length: pageSize }).map((_, index) => (
+                      <TableRow key={index}>
                         <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedRecords.has(record.id)}
-                            onChange={() => toggleRecordSelection(record.id)}
-                            className="rounded border-gray-300"
-                          />
+                          <Skeleton className="h-4 w-4" />
                         </TableCell>
                         <TableCell>
-                          {isEditing ? (
-                            <Input
-                              value={record.month}
-                              onChange={(e) => console.log(e.target.value)}
-                              className="w-20"
-                            />
-                          ) : (
-                            <span>{record.month || "-"}</span>
-                          )}
+                          <Skeleton className="h-4 w-20" />
                         </TableCell>
                         <TableCell>
-                          {isEditing ? (
-                            <Input value={record.date} onChange={(e) => console.log(e.target.value)} className="w-20" />
-                          ) : (
-                            <span>{record.date || "-"}</span>
-                          )}
+                          <Skeleton className="h-4 w-32" />
                         </TableCell>
                         <TableCell>
-                          <span className="font-mono text-sm">{record.serviceInvoice}</span>
+                          <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
-                          {isEditing ? (
-                            <Input
-                              value={record.bsNumber}
-                              onChange={(e) => console.log(e.target.value)}
-                              className="w-24"
-                            />
-                          ) : (
-                            <span className="font-mono text-sm">{record.bsNumber}</span>
-                          )}
+                          <Skeleton className="h-4 w-16" />
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-40">
-                            <span className="font-medium">{record.clients}</span>
-                          </div>
+                          <Skeleton className="h-4 w-20" />
                         </TableCell>
                         <TableCell>
-                          {isEditing ? (
-                            <Input value={record.tin} onChange={(e) => console.log(e.target.value)} className="w-36" />
-                          ) : (
-                            <span className="font-mono text-sm">{record.tin || "-"}</span>
-                          )}
+                          <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-48">
-                            <span className="text-sm">{record.description}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              className="text-right w-32"
-                              value={record.netSales}
-                              onChange={(e) => console.log(e.target.value)}
-                            />
-                          ) : (
-                            <span className="font-mono font-medium">{record.netSales}</span>
-                          )}
-                        </TableCell>
-                        {showComputed && (
-                          <>
-                            <TableCell className="text-right">
-                              <span className="font-mono text-green-700 dark:text-green-400">{record.outputVat}</span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className="font-mono font-medium">{record.total}</span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className="font-mono text-orange-700 dark:text-orange-400">
-                                {record.creditableTax}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className="font-mono text-blue-700 dark:text-blue-400">
-                                {record.amountCollected}
-                              </span>
-                            </TableCell>
-                          </>
-                        )}
-                        <TableCell>
-                          {isEditing ? (
-                            <Input value={record.orNo} onChange={(e) => console.log(e.target.value)} className="w-24" />
-                          ) : (
-                            <span className="font-mono text-sm">{record.orNo}</span>
-                          )}
+                          <Skeleton className="h-4 w-20" />
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{record.paymentMethod}</span>
+                          <Skeleton className="h-4 w-16" />
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{record.productType}</span>
+                          <Skeleton className="h-4 w-20" />
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              record.status === "COMPLETED"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                                : record.status === "CANCELLED"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-                                  : record.status === "ONGOING"
-                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                                    : record.status === "PENDING"
-                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
-                                      : record.status === "PAID"
-                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
-                                        : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
-                            }`}
-                          >
-                            {record.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {isEditing ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => console.log("Save")}
-                                >
-                                  <Save className="h-4 w-4 text-green-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => console.log("Cancel")}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => console.log("Edit")}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
+                          <Skeleton className="h-4 w-8" />
                         </TableCell>
                       </TableRow>
-                    )
-                  })}
+                    ))
+                  ) : (query ? paginatedFiltered : filtered).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        {query ? "No records found matching your search." : "No sales records found."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (query ? paginatedFiltered : filtered).map((record) => {
+                      const isEditing = !!editing[record.id]
+                      return (
+                        <TableRow
+                          key={record.id}
+                          className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+                        >
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedRecords.has(record.id)}
+                              onChange={() => toggleRecordSelection(record.id)}
+                              className="rounded border-gray-300"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                value={record.month}
+                                onChange={(e) => console.log(e.target.value)}
+                                className="w-20"
+                              />
+                            ) : (
+                              <span>{record.month || "-"}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                value={record.date}
+                                onChange={(e) => console.log(e.target.value)}
+                                className="w-20"
+                              />
+                            ) : (
+                              <span>{record.date || "-"}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-sm">{record.serviceInvoice}</span>
+                          </TableCell>
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                value={record.bsNumber}
+                                onChange={(e) => console.log(e.target.value)}
+                                className="w-24"
+                              />
+                            ) : (
+                              <span className="font-mono text-sm">{record.bsNumber}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-40">
+                              <span className="font-medium">{record.clients}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                value={record.tin}
+                                onChange={(e) => console.log(e.target.value)}
+                                className="w-36"
+                              />
+                            ) : (
+                              <span className="font-mono text-sm">{record.tin || "-"}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-48">
+                              <span className="text-sm">{record.description}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                className="text-right w-32"
+                                value={record.netSales}
+                                onChange={(e) => console.log(e.target.value)}
+                              />
+                            ) : (
+                              <span className="font-mono font-medium">{record.netSales}</span>
+                            )}
+                          </TableCell>
+                          {showComputed && (
+                            <>
+                              <TableCell className="text-right">
+                                <span className="font-mono text-green-700 dark:text-green-400">{record.outputVat}</span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-mono font-medium">{record.total}</span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-mono text-orange-700 dark:text-orange-400">
+                                  {record.creditableTax}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-mono text-blue-700 dark:text-blue-400">
+                                  {record.amountCollected}
+                                </span>
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                value={record.orNo}
+                                onChange={(e) => console.log(e.target.value)}
+                                className="w-24"
+                              />
+                            ) : (
+                              <span className="font-mono text-sm">{record.orNo}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{record.paymentMethod}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{record.productType}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                record.status === "COMPLETED"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                                  : record.status === "CANCELLED"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                                    : record.status === "ONGOING"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                                      : record.status === "PENDING"
+                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
+                                        : record.status === "PAID"
+                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                          : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                              }`}
+                            >
+                              {record.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {isEditing ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => console.log("Save")}
+                                  >
+                                    <Save className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => console.log("Cancel")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => console.log("Edit")}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -560,20 +652,39 @@ export function SalesRecordTable() {
       {/* Pagination Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="text-sm text-gray-600 dark:text-gray-400">
-          Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}{" "}
-          entries
+          {query ? (
+            <>
+              Showing {Math.min((currentPage - 1) * pageSize + 1, filtered.length)} to{" "}
+              {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} search results
+            </>
+          ) : (
+            <>
+              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalCount)} of{" "}
+              {totalCount} entries
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={!hasPreviousPage || loading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreviousPage}
+            disabled={!(query ? searchHasPreviousPage : hasPreviousPage) || loading}
+          >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous
           </Button>
           <div className="flex items-center gap-1">
             <span className="text-sm text-gray-600 dark:text-gray-400">
-              Page {currentPage} of {totalPages}
+              Page {currentPage} of {query ? searchTotalPages : totalPages}
             </span>
           </div>
-          <Button variant="outline" size="sm" onClick={handleNextPage} disabled={!hasNextPage || loading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={!(query ? searchHasNextPage : hasNextPage) || loading}
+          >
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
@@ -581,7 +692,7 @@ export function SalesRecordTable() {
       </div>
 
       {/* No Records Found */}
-      {records.length === 0 && !loading && (
+      {(query ? paginatedFiltered : filtered).length === 0 && !loading && (
         <Card className="bg-white dark:bg-slate-800">
           <CardContent className="p-12 text-center">
             <div className="text-muted-foreground">
