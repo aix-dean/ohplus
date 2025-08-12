@@ -2,6 +2,8 @@ import type { ProposalClient } from "./proposal"
 
 export type CostEstimateStatus = "draft" | "sent" | "accepted" | "declined" | "revised"
 
+export type CostEstimateClient = ProposalClient
+
 export interface CostEstimateLineItem {
   id: string
   description: string

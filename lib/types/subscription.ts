@@ -19,6 +19,8 @@ export interface Subscription {
   updatedAt: Date // Last updated timestamp
 }
 
+export type SubscriptionData = Subscription
+
 export interface SubscriptionPlan {
   id: string
   name: string

@@ -21,6 +21,8 @@ import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf
 import type { QuotationProduct, Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
 import { getProductById as getProductFromFirebase } from "@/lib/firebase-service" // Import the product fetching function
 
+export type { QuotationProduct, Quotation } from "@/lib/types/quotation"
+
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
   try {
@@ -517,8 +519,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     align: "right",
   })
   yPosition += headerRowHeight
-
-
 
   for (const item of quotation.items) {
     checkNewPage(dataRowHeight + 5) // Check for space for the next row
