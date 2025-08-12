@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from "@/components/ui/table"
 import { Trash2 } from "lucide-react" // Added trash icon
 import { encashmentService } from "@/lib/encashment-service" // Added service import
-import { toast } from "sonner" // Added toast for notifications
+import { useToast } from "@/hooks/use-toast" // Added toast for notifications
 
 interface Transaction {
   id: string
@@ -50,6 +50,7 @@ const sumBy = (array: Transaction[], key: keyof Transaction): number => {
 }
 
 function PettyCashFundTable() {
+  const { toast } = useToast()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [settings, setSettings] = useState<{ fundAmount: string }>({ fundAmount: "" })
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
@@ -80,7 +81,7 @@ function PettyCashFundTable() {
       )
     } catch (error) {
       console.error("Error loading transactions:", error)
-      toast.error("Failed to load transactions")
+      toast({ title: "Error", description: "Failed to load transactions" })
     } finally {
       setLoading(false)
     }
@@ -103,6 +104,7 @@ function PettyCashFundTable() {
     onePercent: 0,
     twoPercent: 0,
     netAmount: 0,
+    deleted: false,
   })
 
   const handleGrossAmountChange = (value: string) => {
@@ -150,7 +152,7 @@ function PettyCashFundTable() {
       }
 
       await encashmentService.createPettyCashTransaction(transactionData)
-      toast.success("Transaction added successfully")
+      toast({ title: "Success", description: "Transaction added successfully" })
       setShowTransactionModal(false)
       loadTransactions() // Reload transactions from database
 
@@ -172,10 +174,11 @@ function PettyCashFundTable() {
         onePercent: 0,
         twoPercent: 0,
         netAmount: 0,
+        deleted: false,
       })
     } catch (error) {
       console.error("Error adding transaction:", error)
-      toast.error("Failed to add transaction")
+      toast({ title: "Error", description: "Failed to add transaction" })
     } finally {
       setLoading(false)
     }
@@ -193,11 +196,11 @@ function PettyCashFundTable() {
     try {
       setLoading(true)
       await encashmentService.softDeletePettyCashTransaction(id)
-      toast.success("Transaction deleted successfully")
+      toast({ title: "Success", description: "Transaction deleted successfully" })
       loadTransactions() // Reload transactions
     } catch (error) {
       console.error("Error deleting transaction:", error)
-      toast.error("Failed to delete transaction")
+      toast({ title: "Error", description: "Failed to delete transaction" })
     } finally {
       setLoading(false)
     }
@@ -209,12 +212,12 @@ function PettyCashFundTable() {
     try {
       setLoading(true)
       await encashmentService.softDeleteMultiplePettyCashTransactions(selectedTransactions)
-      toast.success(`${selectedTransactions.length} transactions deleted successfully`)
+      toast({ title: "Success", description: `${selectedTransactions.length} transactions deleted successfully` })
       setSelectedTransactions([])
       loadTransactions() // Reload transactions
     } catch (error) {
       console.error("Error deleting transactions:", error)
-      toast.error("Failed to delete transactions")
+      toast({ title: "Error", description: "Failed to delete transactions" })
     } finally {
       setLoading(false)
     }
