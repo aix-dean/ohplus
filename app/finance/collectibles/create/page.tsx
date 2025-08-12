@@ -239,24 +239,23 @@ export default function CreateCollectiblePage() {
         )
       }
 
-      const collectibleData: Partial<Collectible> = {
-        type: formData.type,
-        client_name: formData.client_name,
-        net_amount: formData.net_amount,
-        total_amount: formData.total_amount,
-        mode_of_payment: formData.mode_of_payment,
-        bank_name: formData.bank_name,
-        bi_no: formData.bi_no,
-        or_no: formData.or_no,
-        invoice_no: formData.invoice_no,
-        status: formData.status,
+      const collectibleData: any = {
+        client_name: formData.client_name || "",
+        net_amount: Number.parseFloat(formData.net_amount) || 0,
+        total_amount: Number.parseFloat(formData.total_amount) || 0,
+        mode_of_payment: formData.mode_of_payment || "",
+        bank_name: formData.bank_name || "",
+        bi_no: formData.bi_no || "",
+        or_no: formData.or_no || "",
+        invoice_no: formData.invoice_no || "",
+        status: formData.status || "",
         vendor_name: formData.vendor_name || "",
         tin_no: formData.tin_no || "",
         business_address: formData.business_address || "",
         deleted: false,
         created: serverTimestamp(),
         updated: serverTimestamp(),
-        company_id: "default_company", // Replace with actual company ID from auth context
+        company_id: user?.company_id || user?.uid || "",
       }
 
       // Add type-specific fields
