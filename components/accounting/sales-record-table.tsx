@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
 import {
   bookingService,
   type SalesRecord,
@@ -42,6 +42,7 @@ export function SalesRecordTable() {
   const [query, setQuery] = useState("")
   const [editing, setEditing] = useState<Record<string, boolean>>({})
   const [showComputed, setShowComputed] = useState(true)
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set())
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
@@ -142,6 +143,49 @@ export function SalesRecordTable() {
     setStatusFilter("all")
   }
 
+  const handleAddRecord = () => {
+    toast({
+      title: "➕ Add New Record",
+      description: "Add new sales record functionality will be implemented here.",
+    })
+    // TODO: Implement add new record modal/form
+  }
+
+  const handleDeleteSelected = () => {
+    if (selectedRecords.size === 0) {
+      toast({
+        title: "⚠️ No Selection",
+        description: "Please select records to delete.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    toast({
+      title: "🗑️ Delete Records",
+      description: `Delete ${selectedRecords.size} selected record(s) functionality will be implemented here.`,
+    })
+    // TODO: Implement delete confirmation dialog and deletion logic
+  }
+
+  const toggleRecordSelection = (recordId: string) => {
+    const newSelection = new Set(selectedRecords)
+    if (newSelection.has(recordId)) {
+      newSelection.delete(recordId)
+    } else {
+      newSelection.add(recordId)
+    }
+    setSelectedRecords(newSelection)
+  }
+
+  const toggleAllRecords = () => {
+    if (selectedRecords.size === records.length) {
+      setSelectedRecords(new Set())
+    } else {
+      setSelectedRecords(new Set(records.map((r) => r.id)))
+    }
+  }
+
   const exportToCSV = () => {
     const headers = [
       "Month",
@@ -229,6 +273,14 @@ export function SalesRecordTable() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleAddRecord} className="bg-green-600 hover:bg-green-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Record
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteSelected} disabled={selectedRecords.size === 0}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete ({selectedRecords.size})
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowComputed(!showComputed)}>
             {showComputed ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
             {showComputed ? "Hide" : "Show"} Computed
@@ -251,6 +303,14 @@ export function SalesRecordTable() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50 dark:bg-slate-900/50">
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedRecords.size === records.length && records.length > 0}
+                        onChange={toggleAllRecords}
+                        className="rounded border-gray-300"
+                      />
+                    </TableHead>
                     <TableHead className="font-semibold">Month</TableHead>
                     <TableHead className="font-semibold">Date</TableHead>
                     <TableHead className="font-semibold">Invoice</TableHead>
@@ -282,6 +342,14 @@ export function SalesRecordTable() {
                         key={record.id}
                         className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
                       >
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedRecords.has(record.id)}
+                            onChange={() => toggleRecordSelection(record.id)}
+                            className="rounded border-gray-300"
+                          />
+                        </TableCell>
                         <TableCell>
                           {isEditing ? (
                             <Input
