@@ -357,6 +357,7 @@ export default function CreateCollectiblePage() {
             <Label htmlFor="covered_period">Covered Period</Label>
             <Input
               id="covered_period"
+              type="date"
               value={formData.covered_period || ""}
               onChange={(e) => handleInputChange("covered_period", e.target.value)}
             />
