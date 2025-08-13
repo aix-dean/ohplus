@@ -7,6 +7,7 @@ import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { LowStockAlertProvider } from "@/contexts/low-stock-alert-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,11 +30,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
-            <AuthLayout>
-              <div className="flex flex-col h-screen">{children}</div>
-              <AssistantProvider />
-              <Toaster />
-            </AuthLayout>
+            <LowStockAlertProvider>
+              <AuthLayout>
+                <div className="flex flex-col h-screen">{children}</div>
+                <AssistantProvider />
+                <Toaster />
+              </AuthLayout>
+            </LowStockAlertProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
