@@ -2,15 +2,15 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Package, HardDrive, Wrench, Package2 } from "lucide-react"
-import Link from "next/link"
+import { Progress } from "@/components/ui/progress"
+import { ArrowLeft, ArrowRight, Check, Package, HardDrive, Wrench, Package2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface FormData {
   name: string
@@ -22,6 +22,8 @@ interface FormData {
   location: string
   status: "available" | "in-use" | "maintenance" | "retired"
   serial_number: string
+  model: string
+  manufacturer: string
   purchase_date: string
   warranty_expiry: string
   cost: number
@@ -40,6 +42,8 @@ const initialFormData: FormData = {
   location: "",
   status: "available",
   serial_number: "",
+  model: "",
+  manufacturer: "",
   purchase_date: "",
   warranty_expiry: "",
   cost: 0,
@@ -47,6 +51,13 @@ const initialFormData: FormData = {
   assigned_to: "",
   notes: "",
 }
+
+const steps = [
+  { id: 1, title: "Basic Info", description: "Item details and type" },
+  { id: 2, title: "Specifications", description: "Technical details" },
+  { id: 3, title: "Purchase Info", description: "Cost and supplier" },
+  { id: 4, title: "Review", description: "Confirm details" },
+]
 
 const getInventoryTypeIcon = (type: string) => {
   switch (type) {
@@ -63,43 +74,53 @@ const getInventoryTypeIcon = (type: string) => {
 
 export default function NewInventoryItemPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (field: keyof FormData, value: string | number) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+  const updateFormData = (field: keyof FormData, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.name && formData.category && formData.inventory_type)
+        return !!(formData.name && formData.category && formData.inventory_type && formData.location)
       case 2:
-        return !!(formData.quantity && formData.unit && formData.location)
+        return true // Optional fields
       case 3:
         return true // Optional fields
-      default:
+      case 4:
         return true
+      default:
+        return false
     }
   }
 
-  const handleNext = () => {
+  const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4))
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length))
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields before proceeding.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handlePrevious = () => {
+  const prevStep = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1))
   }
 
   const handleSubmit = async () => {
-    if (!validateStep(1) || !validateStep(2)) {
-      alert("Please fill in all required fields")
+    if (!validateStep(1)) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
       return
     }
 
@@ -107,15 +128,20 @@ export default function NewInventoryItemPage() {
 
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Here you would typically make an API call to save the data
-      console.log("Saving inventory item:", formData)
+      toast({
+        title: "Success",
+        description: "Inventory item has been created successfully.",
+      })
 
       router.push("/it/inventory")
     } catch (error) {
-      console.error("Error saving inventory item:", error)
-      alert("Error saving inventory item. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to create inventory item. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -126,117 +152,100 @@ export default function NewInventoryItemPage() {
       case 1:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Basic Information</h3>
-            <div className="grid gap-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="name">Item Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  onChange={(e) => updateFormData("name", e.target.value)}
                   placeholder="Enter item name"
                 />
               </div>
-              <div>
-                <Label htmlFor="inventory_type">Inventory Type *</Label>
-                <Select
-                  value={formData.inventory_type}
-                  onValueChange={(value) => handleInputChange("inventory_type", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select inventory type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="assets">
-                      <div className="flex items-center gap-2">
-                        <HardDrive className="h-4 w-4" />
-                        Assets
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="tools">
-                      <div className="flex items-center gap-2">
-                        <Wrench className="h-4 w-4" />
-                        Tools
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="consumables">
-                      <div className="flex items-center gap-2">
-                        <Package2 className="h-4 w-4" />
-                        Consumables
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
                 <Input
                   id="category"
                   value={formData.category}
-                  onChange={(e) => handleInputChange("category", e.target.value)}
-                  placeholder="Enter category"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
-                  placeholder="Enter item description"
-                  rows={3}
+                  onChange={(e) => updateFormData("category", e.target.value)}
+                  placeholder="e.g., Desktop Computer, Network Equipment"
                 />
               </div>
             </div>
-          </div>
-        )
 
-      case 2:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Quantity & Location</h3>
-            <div className="grid gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="quantity">Quantity *</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    value={formData.quantity}
-                    onChange={(e) => handleInputChange("quantity", Number.parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="unit">Unit *</Label>
-                  <Select value={formData.unit} onValueChange={(value) => handleInputChange("unit", value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="units">Units</SelectItem>
-                      <SelectItem value="pieces">Pieces</SelectItem>
-                      <SelectItem value="sets">Sets</SelectItem>
-                      <SelectItem value="meters">Meters</SelectItem>
-                      <SelectItem value="kilograms">Kilograms</SelectItem>
-                      <SelectItem value="liters">Liters</SelectItem>
-                      <SelectItem value="boxes">Boxes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="location">Location *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="inventory_type">Inventory Type *</Label>
+              <Select
+                value={formData.inventory_type}
+                onValueChange={(value) => updateFormData("inventory_type", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select inventory type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assets">
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="h-4 w-4" />
+                      Assets
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="tools">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4" />
+                      Tools
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="consumables">
+                    <div className="flex items-center gap-2">
+                      <Package2 className="h-4 w-4" />
+                      Consumables
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => updateFormData("description", e.target.value)}
+                placeholder="Brief description of the item"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
                 <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange("location", e.target.value)}
-                  placeholder="Enter storage location"
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => updateFormData("quantity", Number.parseInt(e.target.value) || 0)}
+                  min="0"
                 />
               </div>
-              <div>
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <Select value={formData.unit} onValueChange={(value) => updateFormData("unit", value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="units">Units</SelectItem>
+                    <SelectItem value="pieces">Pieces</SelectItem>
+                    <SelectItem value="sets">Sets</SelectItem>
+                    <SelectItem value="meters">Meters</SelectItem>
+                    <SelectItem value="kilograms">Kilograms</SelectItem>
+                    <SelectItem value="liters">Liters</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                <Select value={formData.status} onValueChange={(value) => updateFormData("status", value as any)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -249,172 +258,207 @@ export default function NewInventoryItemPage() {
                 </Select>
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Location *</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) => updateFormData("location", e.target.value)}
+                placeholder="e.g., IT Storage Room A, Office Floor 2"
+              />
+            </div>
+          </div>
+        )
+
+      case 2:
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="serial_number">Serial Number</Label>
+                <Input
+                  id="serial_number"
+                  value={formData.serial_number}
+                  onChange={(e) => updateFormData("serial_number", e.target.value)}
+                  placeholder="Enter serial number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="model">Model</Label>
+                <Input
+                  id="model"
+                  value={formData.model}
+                  onChange={(e) => updateFormData("model", e.target.value)}
+                  placeholder="Enter model number"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Manufacturer</Label>
+              <Input
+                id="manufacturer"
+                value={formData.manufacturer}
+                onChange={(e) => updateFormData("manufacturer", e.target.value)}
+                placeholder="Enter manufacturer name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assigned_to">Assigned To</Label>
+              <Input
+                id="assigned_to"
+                value={formData.assigned_to}
+                onChange={(e) => updateFormData("assigned_to", e.target.value)}
+                placeholder="Person or department assigned to"
+              />
+            </div>
           </div>
         )
 
       case 3:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Additional Details</h3>
-            <div className="grid gap-4">
-              <div>
-                <Label htmlFor="serial_number">Serial Number</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="purchase_date">Purchase Date</Label>
                 <Input
-                  id="serial_number"
-                  value={formData.serial_number}
-                  onChange={(e) => handleInputChange("serial_number", e.target.value)}
-                  placeholder="Enter serial number"
+                  id="purchase_date"
+                  type="date"
+                  value={formData.purchase_date}
+                  onChange={(e) => updateFormData("purchase_date", e.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="purchase_date">Purchase Date</Label>
-                  <Input
-                    id="purchase_date"
-                    type="date"
-                    value={formData.purchase_date}
-                    onChange={(e) => handleInputChange("purchase_date", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="warranty_expiry">Warranty Expiry</Label>
-                  <Input
-                    id="warranty_expiry"
-                    type="date"
-                    value={formData.warranty_expiry}
-                    onChange={(e) => handleInputChange("warranty_expiry", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="cost">Cost (₱)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.cost}
-                    onChange={(e) => handleInputChange("cost", Number.parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="supplier">Supplier</Label>
-                  <Input
-                    id="supplier"
-                    value={formData.supplier}
-                    onChange={(e) => handleInputChange("supplier", e.target.value)}
-                    placeholder="Enter supplier name"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="assigned_to">Assigned To</Label>
+              <div className="space-y-2">
+                <Label htmlFor="warranty_expiry">Warranty Expiry</Label>
                 <Input
-                  id="assigned_to"
-                  value={formData.assigned_to}
-                  onChange={(e) => handleInputChange("assigned_to", e.target.value)}
-                  placeholder="Enter assignee name"
+                  id="warranty_expiry"
+                  type="date"
+                  value={formData.warranty_expiry}
+                  onChange={(e) => updateFormData("warranty_expiry", e.target.value)}
                 />
               </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange("notes", e.target.value)}
-                  placeholder="Additional notes"
-                  rows={3}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cost">Cost</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  step="0.01"
+                  value={formData.cost}
+                  onChange={(e) => updateFormData("cost", Number.parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplier">Supplier</Label>
+                <Input
+                  id="supplier"
+                  value={formData.supplier}
+                  onChange={(e) => updateFormData("supplier", e.target.value)}
+                  placeholder="Enter supplier name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => updateFormData("notes", e.target.value)}
+                placeholder="Additional notes or comments"
+                rows={4}
+              />
             </div>
           </div>
         )
 
       case 4:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Review & Submit</h3>
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Basic Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Name:</span>
-                    <span className="text-sm font-medium">{formData.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Type:</span>
-                    <div className="flex items-center gap-2">
-                      {getInventoryTypeIcon(formData.inventory_type)}
-                      <Badge variant="secondary">{formData.inventory_type}</Badge>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Category:</span>
-                    <span className="text-sm font-medium">{formData.category}</span>
-                  </div>
-                  {formData.description && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Description:</span>
-                      <span className="text-sm font-medium">{formData.description}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold">Review Item Details</h3>
+              <p className="text-muted-foreground">Please review the information before creating the item.</p>
+            </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Quantity & Location</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Quantity:</span>
-                    <span className="text-sm font-medium">
-                      {formData.quantity} {formData.unit}
-                    </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-medium">Basic Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Name:</strong> {formData.name}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Location:</span>
-                    <span className="text-sm font-medium">{formData.location}</span>
+                  <div>
+                    <strong>Category:</strong> {formData.category}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Status:</span>
-                    <Badge variant="secondary">{formData.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <strong>Type:</strong>
+                    {getInventoryTypeIcon(formData.inventory_type)}
+                    {formData.inventory_type.charAt(0).toUpperCase() + formData.inventory_type.slice(1)}
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <strong>Quantity:</strong> {formData.quantity} {formData.unit}
+                  </div>
+                  <div>
+                    <strong>Location:</strong> {formData.location}
+                  </div>
+                  <div>
+                    <strong>Status:</strong> {formData.status}
+                  </div>
+                </div>
+              </div>
 
-              {(formData.serial_number || formData.cost > 0 || formData.supplier) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Additional Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {formData.serial_number && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Serial Number:</span>
-                        <span className="text-sm font-medium">{formData.serial_number}</span>
-                      </div>
-                    )}
-                    {formData.cost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Cost:</span>
-                        <span className="text-sm font-medium">₱{formData.cost.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {formData.supplier && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Supplier:</span>
-                        <span className="text-sm font-medium">{formData.supplier}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+              <div className="space-y-4">
+                <h4 className="font-medium">Specifications</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Serial Number:</strong> {formData.serial_number || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Model:</strong> {formData.model || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Manufacturer:</strong> {formData.manufacturer || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Assigned To:</strong> {formData.assigned_to || "N/A"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Purchase Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Purchase Date:</strong> {formData.purchase_date || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Warranty Expiry:</strong> {formData.warranty_expiry || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Cost:</strong> {formData.cost ? `$${formData.cost.toFixed(2)}` : "N/A"}
+                  </div>
+                  <div>
+                    <strong>Supplier:</strong> {formData.supplier || "N/A"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Additional Details</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Description:</strong> {formData.description || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Notes:</strong> {formData.notes || "N/A"}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )
@@ -426,56 +470,94 @@ export default function NewInventoryItemPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/it/inventory">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Inventory
-          </Button>
-        </Link>
+        <Button variant="ghost" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
         <div>
-          <h1 className="text-3xl font-bold">Add New Inventory Item</h1>
-          <p className="text-muted-foreground">Step {currentStep} of 4</p>
+          <h1 className="text-3xl font-bold tracking-tight">Add New Inventory Item</h1>
+          <p className="text-muted-foreground">Create a new item in your IT inventory</p>
         </div>
       </div>
 
-      {/* Progress Indicator */}
-      <div className="flex items-center space-x-4">
-        {[1, 2, 3, 4].map((step) => (
-          <div key={step} className="flex items-center">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step <= currentStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {step}
-            </div>
-            {step < 4 && <div className={`w-12 h-0.5 ${step < currentStep ? "bg-primary" : "bg-muted"}`} />}
+      {/* Progress */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Step {currentStep} of {steps.length}
+            </CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {Math.round((currentStep / steps.length) * 100)}% Complete
+            </span>
           </div>
-        ))}
+          <Progress value={(currentStep / steps.length) * 100} className="w-full" />
+        </CardHeader>
+      </Card>
+
+      {/* Step Navigation */}
+      <div className="flex justify-center">
+        <div className="flex items-center space-x-4">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex items-center">
+              <div
+                className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                  currentStep >= step.id
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "border-muted-foreground text-muted-foreground"
+                }`}
+              >
+                {currentStep > step.id ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <span className="text-sm font-medium">{step.id}</span>
+                )}
+              </div>
+              <div className="ml-2 hidden sm:block">
+                <div
+                  className={`text-sm font-medium ${
+                    currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {step.title}
+                </div>
+                <div className="text-xs text-muted-foreground">{step.description}</div>
+              </div>
+              {index < steps.length - 1 && <div className="w-8 h-px bg-muted-foreground mx-4 hidden sm:block" />}
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Form Content */}
       <Card>
-        <CardContent className="p-6">{renderStepContent()}</CardContent>
+        <CardHeader>
+          <CardTitle>{steps[currentStep - 1].title}</CardTitle>
+          <CardDescription>{steps[currentStep - 1].description}</CardDescription>
+        </CardHeader>
+        <CardContent>{renderStepContent()}</CardContent>
       </Card>
 
       {/* Navigation Buttons */}
       <div className="flex justify-between">
-        <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
+        <Button variant="outline" onClick={prevStep} disabled={currentStep === 1}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Previous
         </Button>
-        <div className="flex gap-2">
-          {currentStep < 4 ? (
-            <Button onClick={handleNext} disabled={!validateStep(currentStep)}>
-              Next
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={isSubmitting || !validateStep(1) || !validateStep(2)}>
-              <Save className="mr-2 h-4 w-4" />
-              {isSubmitting ? "Saving..." : "Save Item"}
-            </Button>
-          )}
-        </div>
+
+        {currentStep < steps.length ? (
+          <Button onClick={nextStep}>
+            Next
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create Item"}
+            <Check className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   )
