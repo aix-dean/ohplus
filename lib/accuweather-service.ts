@@ -121,7 +121,7 @@ export const PHILIPPINES_LOCATIONS = [
 ]
 
 const ACCUWEATHER_API_KEY = "Q8kh0FSLbDrTBY9SHnr2m69v1mrFv4GR"
-const BASE_URL = "http://dataservice.accuweather.com"
+const BASE_URL = "https://dataservice.accuweather.com"
 
 // Map AccuWeather icons to our icon system
 function mapAccuWeatherIcon(iconNumber: number): string {
