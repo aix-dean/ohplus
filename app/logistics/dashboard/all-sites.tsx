@@ -72,17 +72,16 @@ export default function AllSitesTab({
     }
 
     try {
-      console.log("=== FETCHING JOB ORDERS ===")
-      console.log("Company ID:", userData.company_id)
+
 
       // Query job orders collection directly
       const jobOrdersRef = collection(db, "job_orders")
       const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
 
-      console.log("Executing Firestore query...")
+
       const querySnapshot = await getDocs(q)
 
-      console.log(`Found ${querySnapshot.size} job orders total`)
+ 
 
       const counts: Record<string, number> = {}
       const allJobOrders: any[] = []
@@ -91,25 +90,16 @@ export default function AllSitesTab({
         const jobOrder = { id: doc.id, ...doc.data() }
         allJobOrders.push(jobOrder)
 
-        console.log("Job Order:", {
-          id: doc.id,
-          product_id: jobOrder.product_id,
-          siteName: jobOrder.siteName,
-          status: jobOrder.status,
-          company_id: jobOrder.company_id,
-        })
 
         if (jobOrder.product_id) {
           counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
-          console.log(`Incremented count for product ${jobOrder.product_id} to ${counts[jobOrder.product_id]}`)
+         
         } else {
           console.log("Job order missing product_id:", jobOrder)
         }
       })
 
-      console.log("=== FINAL JO COUNTS ===")
-      console.log("Counts object:", counts)
-      console.log("All job orders:", allJobOrders)
+
 
       setJobOrderCounts(counts)
     } catch (error) {
@@ -165,10 +155,7 @@ export default function AllSitesTab({
           searchTerm: searchQuery,
         })
 
-        console.log("=== FETCHED PRODUCTS ===")
-        result.items.forEach((product) => {
-          console.log(`Product: ${product.name} (ID: ${product.id})`)
-        })
+
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -220,8 +207,6 @@ export default function AllSitesTab({
 
   // Debug effect to log JO counts when they change
   useEffect(() => {
-    console.log("=== JO COUNTS UPDATED ===")
-    console.log("Current jobOrderCounts state:", jobOrderCounts)
     Object.entries(jobOrderCounts).forEach(([productId, count]) => {
       console.log(`Product ${productId}: ${count} JOs`)
     })
@@ -339,10 +324,7 @@ export default function AllSitesTab({
     // Get JO count for this site using the product ID
     const joCount = jobOrderCounts[product.id || ""] || 0
 
-    console.log(`=== SITE CONVERSION ===`)
-    console.log(`Product: ${product.name} (ID: ${product.id})`)
-    console.log(`JO Count from state: ${joCount}`)
-    console.log(`Available counts:`, Object.keys(jobOrderCounts))
+
 
     return {
       id: product.id,
