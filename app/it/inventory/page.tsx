@@ -4,10 +4,32 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  Package,
+  HardDrive,
+  Monitor,
+  Loader2,
+  AlertCircle,
+  Download,
+  Upload,
+  RefreshCw,
+  Users,
+  Calendar,
+  MapPin,
+  DollarSign,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -18,6 +40,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -29,13 +53,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface InventoryItem {
   id: string
@@ -60,6 +80,11 @@ interface InventoryItem {
   created_by: string
   company_id: string
   deleted: boolean
+  productNumber: string
+  location?: string
+  supplier?: string
+  model?: string
+  notes?: string
 }
 
 interface User {
@@ -86,6 +111,13 @@ const conditionColors = {
   damaged: "bg-red-100 text-red-800 border-red-200",
 }
 
+const statusIcons = {
+  active: CheckCircle,
+  inactive: XCircle,
+  maintenance: Clock,
+  retired: AlertTriangle,
+}
+
 export default function ITInventoryPage() {
   const router = useRouter()
   const { userData } = useAuth()
@@ -96,9 +128,26 @@ export default function ITInventoryPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
+  const [conditionFilter, setConditionFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table")
+  const [sortBy, setSortBy] = useState<string>("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+
+  // Statistics
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    maintenance: 0,
+    retired: 0,
+    hardware: 0,
+    software: 0,
+    totalValue: 0,
+  })
 
   // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
@@ -108,10 +157,10 @@ export default function ITInventoryPage() {
       try {
         const itemsRef = collection(db, "itInventory")
         const q = query(
-          itemsRef, 
+          itemsRef,
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false), // Only fetch non-deleted items
-          orderBy("created_at", "desc")
+          where("deleted", "==", false),
+          orderBy("created_at", "desc"),
         )
         const querySnapshot = await getDocs(q)
 
@@ -141,10 +190,28 @@ export default function ITInventoryPage() {
             created_by: data.created_by || "",
             company_id: data.company_id || "",
             deleted: data.deleted || false,
+            productNumber: data.productNumber || "",
+            location: data.location || "",
+            supplier: data.supplier || "",
+            model: data.model || "",
+            notes: data.notes || "",
           })
         })
 
         setItems(fetchedItems)
+
+        // Calculate statistics
+        const newStats = {
+          total: fetchedItems.length,
+          active: fetchedItems.filter((item) => item.status === "active").length,
+          inactive: fetchedItems.filter((item) => item.status === "inactive").length,
+          maintenance: fetchedItems.filter((item) => item.status === "maintenance").length,
+          retired: fetchedItems.filter((item) => item.status === "retired").length,
+          hardware: fetchedItems.filter((item) => item.type === "hardware").length,
+          software: fetchedItems.filter((item) => item.type === "software").length,
+          totalValue: fetchedItems.reduce((sum, item) => sum + (item.cost || 0), 0),
+        }
+        setStats(newStats)
       } catch (error) {
         console.error("Error fetching items:", error)
         toast({
@@ -202,26 +269,35 @@ export default function ITInventoryPage() {
 
   // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.productNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesType = typeFilter === "all" || item.type === typeFilter
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
     const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter
+    const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter
 
-    return matchesSearch && matchesType && matchesStatus && matchesDepartment
+    return matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesCondition
   })
 
-  const handleEdit = useCallback((item: InventoryItem) => {
-    router.push(`/it/inventory/edit/${item.id}`)
-  }, [router])
+  const handleEdit = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/edit/${item.id}`)
+    },
+    [router],
+  )
 
-  const handleView = useCallback((item: InventoryItem) => {
-    router.push(`/it/inventory/details/${item.id}`)
-  }, [router])
+  const handleView = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/details/${item.id}`)
+    },
+    [router],
+  )
 
   const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
@@ -238,9 +314,8 @@ export default function ITInventoryPage() {
     if (!itemToDelete || isDeleting) return
 
     setIsDeleting(true)
-    
+
     try {
-      // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", itemToDelete.id)
       await updateDoc(itemRef, {
         deleted: true,
@@ -248,43 +323,69 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Update local state to remove the item
-      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
-      
-      // Store item name for toast before resetting state
+      setItems((prevItems) => prevItems.filter((item) => item.id !== itemToDelete.id))
+
       const deletedItemName = itemToDelete.name
-      
-      // Reset all delete-related state
       resetDeleteState()
-      
-      // Show success toast
+
       toast({
-        title: "Item Deleted",
+        title: "Asset Deleted",
         description: `${deletedItemName} has been deleted from inventory`,
       })
     } catch (error) {
       console.error("Error deleting item:", error)
-      
-      // Reset state on error
       resetDeleteState()
-      
+
       toast({
         title: "Error",
-        description: "Failed to delete item. Please try again.",
+        description: "Failed to delete asset. Please try again.",
         variant: "destructive",
       })
     }
   }, [itemToDelete, isDeleting, resetDeleteState])
 
-  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
-    if (!open && !isDeleting) {
-      resetDeleteState()
-    }
-  }, [isDeleting, resetDeleteState])
+  const handleDeleteDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && !isDeleting) {
+        resetDeleteState()
+      }
+    },
+    [isDeleting, resetDeleteState],
+  )
 
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
+
+  const handleSelectAll = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setSelectedItems(filteredItems.map((item) => item.id))
+      } else {
+        setSelectedItems([])
+      }
+    },
+    [filteredItems],
+  )
+
+  const handleSelectItem = useCallback((itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems((prev) => [...prev, itemId])
+    } else {
+      setSelectedItems((prev) => prev.filter((id) => id !== itemId))
+    }
+  }, [])
+
+  const handleBulkAction = useCallback(
+    (action: string) => {
+      // Implement bulk actions
+      toast({
+        title: "Bulk Action",
+        description: `${action} action will be implemented for ${selectedItems.length} items`,
+      })
+    },
+    [selectedItems],
+  )
 
   if (loading) {
     return (
@@ -293,7 +394,7 @@ export default function ITInventoryPage() {
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Loading inventory...</p>
+              <p className="text-muted-foreground">Loading asset inventory...</p>
             </div>
           </div>
         </div>
@@ -307,13 +408,122 @@ export default function ITInventoryPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
-            <p className="text-slate-600">Manage your IT assets and equipment</p>
+            <h1 className="text-3xl font-bold text-slate-900">Asset Management</h1>
+            <p className="text-slate-600">Manage your IT assets and equipment inventory</p>
           </div>
-          <Button onClick={handleAddNew} className="shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Item
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+            <Button onClick={handleAddNew} className="shadow-sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Asset
+            </Button>
+          </div>
+        </div>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Package className="h-4 w-4 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-xs text-muted-foreground">Total Assets</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.active}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-yellow-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.maintenance}</p>
+                  <p className="text-xs text-muted-foreground">Maintenance</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <XCircle className="h-4 w-4 text-gray-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.inactive}</p>
+                  <p className="text-xs text-muted-foreground">Inactive</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <HardDrive className="h-4 w-4 text-purple-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.hardware}</p>
+                  <p className="text-xs text-muted-foreground">Hardware</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Monitor className="h-4 w-4 text-indigo-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.software}</p>
+                  <p className="text-xs text-muted-foreground">Software</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">${stats.totalValue.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Value</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.retired}</p>
+                  <p className="text-xs text-muted-foreground">Retired</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters and Search */}
@@ -324,7 +534,7 @@ export default function ITInventoryPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search items by name, brand, category, or serial number..."
+                    placeholder="Search assets by name, brand, category, serial number, or asset tag..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -342,6 +552,7 @@ export default function ITInventoryPage() {
                     <SelectItem value="software">Software</SelectItem>
                   </SelectContent>
                 </Select>
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Status" />
@@ -354,6 +565,21 @@ export default function ITInventoryPage() {
                     <SelectItem value="retired">Retired</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Select value={conditionFilter} onValueChange={setConditionFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px]">
+                    <SelectValue placeholder="Condition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Conditions</SelectItem>
+                    <SelectItem value="excellent">Excellent</SelectItem>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="fair">Fair</SelectItem>
+                    <SelectItem value="poor">Poor</SelectItem>
+                    <SelectItem value="damaged">Damaged</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="w-full sm:w-[160px]">
                     <SelectValue placeholder="Department" />
@@ -374,28 +600,61 @@ export default function ITInventoryPage() {
           </CardContent>
         </Card>
 
-        {/* Results Summary */}
+        {/* Bulk Actions and View Controls */}
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredItems.length} of {items.length} items
-          </p>
-          {(searchTerm || typeFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm("")
-                setTypeFilter("all")
-                setStatusFilter("all")
-                setDepartmentFilter("all")
-              }}
-            >
-              Clear Filters
+          <div className="flex items-center space-x-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredItems.length} of {items.length} assets
+            </p>
+            {selectedItems.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">{selectedItems.length} selected</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Bulk Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleBulkAction("check-out")}>Check Out</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBulkAction("check-in")}>Check In</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBulkAction("update-status")}>Update Status</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleBulkAction("delete")} className="text-red-600">
+                      Delete Selected
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            {(searchTerm ||
+              typeFilter !== "all" ||
+              statusFilter !== "all" ||
+              departmentFilter !== "all" ||
+              conditionFilter !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("")
+                  setTypeFilter("all")
+                  setStatusFilter("all")
+                  setDepartmentFilter("all")
+                  setConditionFilter("all")
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+            <Button variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4" />
             </Button>
-          )}
+          </div>
         </div>
 
-        {/* Items Grid */}
+        {/* Assets Table */}
         {filteredItems.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -404,122 +663,154 @@ export default function ITInventoryPage() {
                   <Package className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">No items found</h3>
+                  <h3 className="text-lg font-semibold">No assets found</h3>
                   <p className="text-muted-foreground">
-                    {items.length === 0 
-                      ? "Get started by adding your first inventory item"
-                      : "Try adjusting your search or filter criteria"
-                    }
+                    {items.length === 0
+                      ? "Get started by adding your first asset to the inventory"
+                      : "Try adjusting your search or filter criteria"}
                   </p>
                 </div>
                 {items.length === 0 && (
                   <Button onClick={handleAddNew}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add First Item
+                    Create First Asset
                   </Button>
                 )}
               </div>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {item.type === "hardware" ? (
-                        <HardDrive className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <Monitor className="h-5 w-5 text-green-600" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                        <CardDescription className="truncate">
-                          {item.brand} • {item.category}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleView(item)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(item)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={cn(statusColors[item.status])}>
-                      {item.status}
-                    </Badge>
-                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                      {item.condition}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Department:</span>
-                      <span className="font-medium">{item.department}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Assigned to:</span>
-                      <span className="font-medium truncate ml-2">
-                        {getUserDisplayName(item.assignedTo)}
-                      </span>
-                    </div>
-                    {item.cost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost:</span>
-                        <span className="font-medium">
-                          {item.currency} {item.cost.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {item.serialNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="font-mono text-xs">{item.serialNumber}</span>
-                      </div>
-                    )}
-                    {item.version && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Version:</span>
-                        <span className="font-medium">{item.version}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {item.description && (
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {item.description}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedItems.length === filteredItems.length}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Asset Tag</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assigned To</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Purchase Date</TableHead>
+                    <TableHead>Purchase Cost</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((item) => {
+                    const StatusIcon = statusIcons[item.status]
+                    return (
+                      <TableRow key={item.id} className="hover:bg-muted/50">
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedItems.includes(item.id)}
+                            onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {item.type === "hardware" ? (
+                              <HardDrive className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <Monitor className="h-4 w-4 text-green-600" />
+                            )}
+                            <span className="font-mono text-sm">{item.productNumber}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-sm text-muted-foreground">{item.brand}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {item.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <StatusIcon className="h-4 w-4" />
+                            <Badge variant="outline" className={cn("text-xs", statusColors[item.status])}>
+                              {item.status}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{getUserDisplayName(item.assignedTo)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{item.location || item.department}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : "N/A"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {item.cost > 0 ? `${item.currency} ${item.cost.toLocaleString()}` : "N/A"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => handleView(item)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Asset
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem>
+                                <Users className="h-4 w-4 mr-2" />
+                                Check Out
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Check In
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Asset
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
 
         {/* Delete Confirmation Dialog */}
@@ -528,26 +819,23 @@ export default function ITInventoryPage() {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5 text-red-600" />
-                <span>Delete Inventory Item</span>
+                <span>Delete Asset</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
+                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the asset to trash and it
+                won't be visible in your inventory list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
+              <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Deleting...
                   </>
                 ) : (
-                  "Delete"
+                  "Delete Asset"
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>
