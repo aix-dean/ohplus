@@ -792,7 +792,7 @@ export default function CreateServiceAssignmentPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {loadingTeams ? (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="loading" disabled>
                       Loading teams...
                     </SelectItem>
                   ) : teams.length > 0 ? (
@@ -802,7 +802,7 @@ export default function CreateServiceAssignmentPage() {
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="no-teams" disabled>
                       No active teams available
                     </SelectItem>
                   )}
