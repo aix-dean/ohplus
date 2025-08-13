@@ -30,7 +30,7 @@ export function useLogisticsNotifications() {
       setLoading(false)
       return
     }
-
+    console.log(user.company_id)
     const notificationsQuery = query(
       collection(db, "notifications"),
       where("company_id", "==", user.company_id),
