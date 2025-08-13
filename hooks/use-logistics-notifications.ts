@@ -24,13 +24,13 @@ export function useLogisticsNotifications() {
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const { user } = useAuth()
-
+console.log(user.company_id)
   useEffect(() => {
     if (!user?.company_id) {
       setLoading(false)
       return
     }
-    console.log(user.company_id)
+    
     const notificationsQuery = query(
       collection(db, "notifications"),
       where("company_id", "==", user.company_id),
