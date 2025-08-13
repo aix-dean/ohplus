@@ -814,7 +814,7 @@ export default function CreateServiceAssignmentPage() {
                   ) : teams.length > 0 ? (
                     teams.map((team) => (
                       <SelectItem key={team.id} value={team.id}>
-                        {team.name} ({team.type}) - {team.members.length} members
+                        {team.name} ({team.type})
                       </SelectItem>
                     ))
                   ) : (
