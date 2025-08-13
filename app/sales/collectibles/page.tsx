@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Trash2, Eye } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Search, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -272,21 +273,32 @@ export default function SalesCollectiblesPage() {
                       <TableCell>{getStatusBadge(collectible.status)}</TableCell>
                       <TableCell>{displayValue(collectible.next_collection_date)}</TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Link href={`/sales/collectibles/details/${collectible.id}`}>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
-                          </Link>
-                          <Link href={`/sales/collectibles/edit/${collectible.id}`}>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button variant="outline" size="sm" onClick={() => handleSoftDelete(collectible.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/sales/collectibles/details/${collectible.id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/sales/collectibles/edit/${collectible.id}`}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSoftDelete(collectible.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
