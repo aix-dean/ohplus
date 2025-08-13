@@ -1255,8 +1255,21 @@ export default function CreateServiceAssignmentPage() {
         onOpenChange={setIsNewTeamDialogOpen}
         onSubmit={async (teamData) => {
           try {
-            // Create the new team using the teams service
-            const newTeam = await teamsService.createTeam(teamData)
+            const teamId = await teamsService.createTeam(teamData, "logistics-admin")
+
+            // Create team object for local state
+            const newTeam = {
+              id: teamId,
+              name: teamData.name,
+              teamType: teamData.teamType,
+              status: "active" as const,
+              members: [],
+              ...teamData,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: "logistics-admin",
+            }
+
             // Add the new team to the teams list
             setTeams((prev) => [...prev, newTeam])
             // Select the new team in the form
