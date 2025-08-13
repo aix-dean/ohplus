@@ -40,14 +40,29 @@ export async function GET(request: Request) {
     let statusCode = 500
 
     if (error instanceof Error) {
-      if (error.message.includes("AccuWeather API error")) {
+      console.error("Detailed error:", {
+        message: error.message,
+        stack: error.stack,
+      })
+
+      if (error.message.includes("Invalid API key")) {
+        errorMessage = "Weather service configuration error"
+        statusCode = 503
+      } else if (error.message.includes("rate limit")) {
+        errorMessage = "Weather service rate limit exceeded"
+        statusCode = 429
+      } else if (error.message.includes("AccuWeather API error")) {
         errorMessage = "Weather service temporarily unavailable"
         statusCode = 503
       }
     }
 
     return NextResponse.json(
-      { error: errorMessage, details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: errorMessage,
+        details: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
+      },
       { status: statusCode },
     )
   }

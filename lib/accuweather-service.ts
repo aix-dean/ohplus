@@ -171,34 +171,76 @@ function mapAccuWeatherIcon(iconNumber: number): string {
   return iconMap[iconNumber] || "cloud"
 }
 
+// Helper function to handle API responses
+async function handleAccuWeatherResponse(response: Response): Promise<any> {
+  const contentType = response.headers.get("content-type")
+
+  if (!response.ok) {
+    let errorMessage = `AccuWeather API error: ${response.status}`
+
+    try {
+      if (contentType?.includes("application/json")) {
+        const errorData = await response.json()
+        errorMessage = errorData.message || errorData.error || errorMessage
+      } else {
+        const textResponse = await response.text()
+        console.error("AccuWeather API non-JSON response:", textResponse)
+
+        // Check for common error messages
+        if (textResponse.includes("Invalid")) {
+          errorMessage = "Invalid API key or request parameters"
+        } else if (textResponse.includes("rate limit") || textResponse.includes("quota")) {
+          errorMessage = "API rate limit exceeded"
+        } else if (textResponse.includes("not found")) {
+          errorMessage = "Location not found"
+        }
+      }
+    } catch (parseError) {
+      console.error("Error parsing AccuWeather response:", parseError)
+    }
+
+    throw new Error(errorMessage)
+  }
+
+  if (!contentType?.includes("application/json")) {
+    const textResponse = await response.text()
+    console.error("AccuWeather API returned non-JSON:", textResponse)
+    throw new Error("AccuWeather API returned invalid response format")
+  }
+
+  return response.json()
+}
+
 // Get current weather conditions for a location
 export async function getCurrentWeather(locationKey: string): Promise<AccuWeatherCurrent[]> {
   const url = `${BASE_URL}/currentconditions/v1/${locationKey}?apikey=${ACCUWEATHER_API_KEY}&details=true`
 
-  const response = await fetch(url, {
-    next: { revalidate: 1800 }, // Cache for 30 minutes
-  })
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 1800 }, // Cache for 30 minutes
+    })
 
-  if (!response.ok) {
-    throw new Error(`AccuWeather API error: ${response.status}`)
+    return await handleAccuWeatherResponse(response)
+  } catch (error) {
+    console.error(`Error fetching current weather for ${locationKey}:`, error)
+    throw error
   }
-
-  return response.json()
 }
 
 // Get 5-day weather forecast for a location
 export async function getFiveDayForecast(locationKey: string): Promise<{ DailyForecasts: AccuWeatherForecast[] }> {
   const url = `${BASE_URL}/forecasts/v1/daily/5day/${locationKey}?apikey=${ACCUWEATHER_API_KEY}&details=true&metric=true`
 
-  const response = await fetch(url, {
-    next: { revalidate: 3600 }, // Cache for 1 hour
-  })
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    })
 
-  if (!response.ok) {
-    throw new Error(`AccuWeather API error: ${response.status}`)
+    return await handleAccuWeatherResponse(response)
+  } catch (error) {
+    console.error(`Error fetching forecast for ${locationKey}:`, error)
+    throw error
   }
-
-  return response.json()
 }
 
 // Get weather alerts for Philippines
@@ -216,7 +258,7 @@ export async function getWeatherAlerts(): Promise<AccuWeatherAlert[]> {
       return []
     }
 
-    return response.json()
+    return await handleAccuWeatherResponse(response)
   } catch (error) {
     console.warn("Failed to fetch weather alerts:", error)
     return []
@@ -229,72 +271,123 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
     // Get location info
     const location = PHILIPPINES_LOCATIONS.find((loc) => loc.key === locationKey) || PHILIPPINES_LOCATIONS[0]
 
-    // Fetch current weather and forecast in parallel
-    const [currentWeather, forecast, alerts] = await Promise.all([
-      getCurrentWeather(locationKey),
-      getFiveDayForecast(locationKey),
-      getWeatherAlerts(),
-    ])
-
-    const current = currentWeather[0]
-
-    // Process forecast data
-    const processedForecast = forecast.DailyForecasts.map((day) => {
-      const date = new Date(day.Date)
-      return {
-        date: day.Date,
-        dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
-        temperature: {
-          min: Math.round(day.Temperature.Minimum.Value),
-          max: Math.round(day.Temperature.Maximum.Value),
-        },
-        day: {
-          condition: day.Day.IconPhrase,
-          icon: mapAccuWeatherIcon(day.Day.Icon),
-          precipitation: day.Day.HasPrecipitation,
-        },
-        night: {
-          condition: day.Night.IconPhrase,
-          icon: mapAccuWeatherIcon(day.Night.Icon),
-          precipitation: day.Night.HasPrecipitation,
-        },
-      }
-    })
-
-    // Process alerts
-    const processedAlerts = alerts.map((alert) => ({
-      id: alert.AlertID,
-      type: alert.Type,
-      category: alert.Category,
-      level: alert.Level,
-      priority: alert.Priority,
-      description: alert.Description.Localized,
-      area: alert.Area.Name,
-    }))
-
-    return {
+    const fallbackData: PhilippinesWeatherData = {
       location: location.name,
       locationKey,
       current: {
-        temperature: Math.round(current.Temperature.Metric.Value),
-        feelsLike: Math.round(current.RealFeelTemperature.Metric.Value),
-        condition: current.WeatherText,
-        icon: mapAccuWeatherIcon(current.WeatherIcon),
-        humidity: current.RelativeHumidity,
-        windSpeed: Math.round(current.Wind.Speed.Metric.Value),
-        windDirection: current.Wind.Direction.Localized,
-        uvIndex: current.UVIndex,
-        visibility: current.Visibility.Metric.Value,
-        cloudCover: current.CloudCover,
-        isDayTime: current.IsDayTime,
-        lastUpdated: current.LocalObservationDateTime,
+        temperature: 28,
+        feelsLike: 32,
+        condition: "Weather data temporarily unavailable",
+        icon: "cloud",
+        humidity: 75,
+        windSpeed: 10,
+        windDirection: "E",
+        uvIndex: 6,
+        visibility: 10,
+        cloudCover: 50,
+        isDayTime: true,
+        lastUpdated: new Date().toISOString(),
       },
-      forecast: processedForecast,
-      alerts: processedAlerts,
+      forecast: Array.from({ length: 5 }, (_, i) => {
+        const date = new Date()
+        date.setDate(date.getDate() + i)
+        return {
+          date: date.toISOString(),
+          dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
+          temperature: { min: 24, max: 32 },
+          day: { condition: "Partly Cloudy", icon: "cloud-sun", precipitation: false },
+          night: { condition: "Clear", icon: "moon", precipitation: false },
+        }
+      }),
+      alerts: [],
       lastUpdated: new Date().toISOString(),
     }
+
+    try {
+      // Fetch current weather and forecast in parallel
+      const [currentWeather, forecast] = await Promise.all([
+        getCurrentWeather(locationKey),
+        getFiveDayForecast(locationKey),
+      ])
+
+      // Try to get alerts separately (non-blocking)
+      let alerts: AccuWeatherAlert[] = []
+      try {
+        alerts = await getWeatherAlerts()
+      } catch (alertError) {
+        console.warn("Failed to fetch alerts, continuing without them:", alertError)
+      }
+
+      const current = currentWeather[0]
+
+      // Process forecast data
+      const processedForecast = forecast.DailyForecasts.map((day) => {
+        const date = new Date(day.Date)
+        return {
+          date: day.Date,
+          dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
+          temperature: {
+            min: Math.round(day.Temperature.Minimum.Value),
+            max: Math.round(day.Temperature.Maximum.Value),
+          },
+          day: {
+            condition: day.Day.IconPhrase,
+            icon: mapAccuWeatherIcon(day.Day.Icon),
+            precipitation: day.Day.HasPrecipitation,
+          },
+          night: {
+            condition: day.Night.IconPhrase,
+            icon: mapAccuWeatherIcon(day.Night.Icon),
+            precipitation: day.Night.HasPrecipitation,
+          },
+        }
+      })
+
+      // Process alerts
+      const processedAlerts = alerts.map((alert) => ({
+        id: alert.AlertID,
+        type: alert.Type,
+        category: alert.Category,
+        level: alert.Level,
+        priority: alert.Priority,
+        description: alert.Description.Localized,
+        area: alert.Area.Name,
+      }))
+
+      return {
+        location: location.name,
+        locationKey,
+        current: {
+          temperature: Math.round(current.Temperature.Metric.Value),
+          feelsLike: Math.round(current.RealFeelTemperature.Metric.Value),
+          condition: current.WeatherText,
+          icon: mapAccuWeatherIcon(current.WeatherIcon),
+          humidity: current.RelativeHumidity,
+          windSpeed: Math.round(current.Wind.Speed.Metric.Value),
+          windDirection: current.Wind.Direction.Localized,
+          uvIndex: current.UVIndex,
+          visibility: current.Visibility.Metric.Value,
+          cloudCover: current.CloudCover,
+          isDayTime: current.IsDayTime,
+          lastUpdated: current.LocalObservationDateTime,
+        },
+        forecast: processedForecast,
+        alerts: processedAlerts,
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch (apiError) {
+      console.error("AccuWeather API failed, returning fallback data:", apiError)
+
+      return {
+        ...fallbackData,
+        current: {
+          ...fallbackData.current,
+          condition: `Weather service unavailable (${apiError instanceof Error ? apiError.message : "Unknown error"})`,
+        },
+      }
+    }
   } catch (error) {
-    console.error("Error fetching AccuWeather data:", error)
+    console.error("Error in getPhilippinesWeatherData:", error)
     throw error
   }
 }
