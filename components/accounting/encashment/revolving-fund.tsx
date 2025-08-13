@@ -208,7 +208,8 @@ export function RevolvingFundTable() {
 
   async function deleteRow(id: string) {
     try {
-      await encashmentService.deleteTransaction(id)
+      await encashmentService.softDeleteTransaction(id)
+      // Remove from local state after successful soft delete
       setRows((prev) => prev.filter((r) => r.id !== id))
       toast({
         title: "Success",
