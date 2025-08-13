@@ -26,6 +26,7 @@ import {
   CloudFog,
 } from "lucide-react"
 import { PHILIPPINES_LOCATIONS, type PhilippinesWeatherData } from "@/lib/accuweather-service"
+import { FloodMap } from "@/components/flood-map"
 
 export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { defaultLocation?: string }) {
   const [weather, setWeather] = useState<PhilippinesWeatherData | null>(null)
@@ -259,6 +260,9 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
               </div>
             </CardContent>
           </Card>
+
+          {/* Flood Map */}
+          <FloodMap locationKey={selectedLocation} />
 
           {/* 5-Day Forecast */}
           <Card>
