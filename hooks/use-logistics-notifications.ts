@@ -24,13 +24,19 @@ export function useLogisticsNotifications() {
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const { user } = useAuth()
-console.log(`user data: ${JSON.stringify(user)}`)
+
+  console.log("User data:", user)
+  console.log("Company ID:", user?.company_id)
+
   useEffect(() => {
     if (!user?.company_id) {
+      console.log("No company_id found, skipping notification fetch")
       setLoading(false)
       return
     }
-    
+
+    console.log("Setting up notifications query for company:", user.company_id)
+
     const notificationsQuery = query(
       collection(db, "notifications"),
       where("company_id", "==", user.company_id),
@@ -42,11 +48,15 @@ console.log(`user data: ${JSON.stringify(user)}`)
     const unsubscribe = onSnapshot(
       notificationsQuery,
       (snapshot) => {
+        console.log("Received snapshot with", snapshot.size, "documents")
+
         const notificationsList: LogisticsNotification[] = []
         let unreadCounter = 0
 
         snapshot.forEach((doc) => {
           const data = doc.data()
+          console.log("Document data:", doc.id, data)
+
           const notification: LogisticsNotification = {
             id: doc.id,
             type: data.type || "",
@@ -68,6 +78,7 @@ console.log(`user data: ${JSON.stringify(user)}`)
           }
         })
 
+        console.log("Final notifications list:", notificationsList)
         setNotifications(notificationsList)
         setUnreadCount(unreadCounter)
         setLoading(false)
