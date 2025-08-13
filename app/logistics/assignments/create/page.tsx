@@ -626,6 +626,14 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
+  const handleCrewChange = (value: string) => {
+    if (value === "add-new-team") {
+      setIsNewTeamDialogOpen(true)
+    } else {
+      handleInputChange("crew", value)
+    }
+  }
+
   if (fetchingProducts) {
     return (
       <div className="container mx-auto py-4">
@@ -788,18 +796,12 @@ export default function CreateServiceAssignmentPage() {
               <Label htmlFor="crew" className="text-sm font-medium">
                 Crew
               </Label>
-              <Select value={formData.crew} onValueChange={(value) => handleInputChange("crew", value)}>
+              <Select value={formData.crew} onValueChange={handleCrewChange}>
                 <SelectTrigger>
                   <SelectValue placeholder={loadingTeams ? "Loading teams..." : "Select crew"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem
-                    value="add-new-team"
-                    className="text-blue-600 font-medium"
-                    onSelect={() => {
-                      setIsNewTeamDialogOpen(true)
-                    }}
-                  >
+                  <SelectItem value="add-new-team" className="text-blue-600 font-medium">
                     <div className="flex items-center gap-2">
                       <PlusCircle className="h-4 w-4" />
                       Add New Team
