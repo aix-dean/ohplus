@@ -18,6 +18,7 @@ import {
   Monitor,
   Loader2,
   AlertCircle,
+  Users,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -50,6 +51,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StockLevelIndicator } from "@/components/stock-level-indicator"
 import { StockOverviewDashboard } from "@/components/stock-overview-dashboard"
 import { LowStockNotificationCenter } from "@/components/low-stock-notification-center"
+import { UserAssignmentDialog } from "@/components/user-assignment-dialog"
+
+interface Assignment {
+  userId: string
+  assignedDate: string
+  returnedDate?: string
+  status: "assigned" | "returned"
+}
 
 interface InventoryItem {
   id: string
@@ -70,6 +79,7 @@ interface InventoryItem {
   version?: string
   description: string
   stock: number
+  assignments?: Assignment[]
   created_at: any
   updated_at: any
   created_by: string
@@ -115,6 +125,8 @@ export default function ITInventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
+  const [selectedItemForAssignment, setSelectedItemForAssignment] = useState<InventoryItem | null>(null)
 
   useEffect(() => {
     if (!userData?.company_id) return
@@ -156,6 +168,7 @@ export default function ITInventoryPage() {
                 version: data.version || "",
                 description: data.description || "",
                 stock: data.stock || 0,
+                assignments: data.assignments || [],
                 created_at: data.created_at,
                 updated_at: data.updated_at,
                 created_by: data.created_by || "",
@@ -230,6 +243,15 @@ export default function ITInventoryPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
+  const getActiveAssignments = (item: InventoryItem) => {
+    if (!item.assignments) return { count: 0, users: [] }
+
+    const activeAssignments = item.assignments.filter((a) => a.status === "assigned")
+    const assignedUsers = activeAssignments.map((a) => getUserDisplayName(a.userId))
+
+    return { count: activeAssignments.length, users: assignedUsers }
+  }
+
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -268,6 +290,11 @@ export default function ITInventoryPage() {
   const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
     setDeleteDialogOpen(true)
+  }, [])
+
+  const handleManageAssignments = useCallback((item: InventoryItem) => {
+    setSelectedItemForAssignment(item)
+    setAssignmentDialogOpen(true)
   }, [])
 
   const resetDeleteState = useCallback(() => {
@@ -324,6 +351,11 @@ export default function ITInventoryPage() {
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
+
+  const handleAssignmentUpdate = useCallback(() => {
+    // The real-time listener will automatically update the data
+    // This function is called after successful assignment operations
+  }, [])
 
   if (loading) {
     return (
@@ -478,97 +510,121 @@ export default function ITInventoryPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {item.type === "hardware" ? (
-                        <HardDrive className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <Monitor className="h-5 w-5 text-green-600" />
+            {filteredItems.map((item) => {
+              const activeAssignments = getActiveAssignments(item)
+
+              return (
+                <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-2">
+                        {item.type === "hardware" ? (
+                          <HardDrive className="h-5 w-5 text-blue-600" />
+                        ) : (
+                          <Monitor className="h-5 w-5 text-green-600" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg truncate">{item.name}</CardTitle>
+                          <CardDescription className="truncate">
+                            {item.brand} • {item.category}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleView(item)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(item)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleManageAssignments(item)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Manage Assignments
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className={cn(statusColors[item.status])}>
+                        {item.status}
+                      </Badge>
+                      <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                        {item.condition}
+                      </Badge>
+                    </div>
+
+                    <StockLevelIndicator stock={item.stock} size="sm" />
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Department:</span>
+                        <span className="font-medium">{item.department}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Assigned to:</span>
+                        <div className="flex flex-col items-end">
+                          {activeAssignments.count === 0 ? (
+                            <span className="font-medium">Unassigned</span>
+                          ) : activeAssignments.count === 1 ? (
+                            <span className="font-medium truncate ml-2">{activeAssignments.users[0]}</span>
+                          ) : (
+                            <div className="text-right">
+                              <Badge variant="secondary" className="text-xs">
+                                {activeAssignments.count} users
+                              </Badge>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {activeAssignments.users.slice(0, 2).join(", ")}
+                                {activeAssignments.count > 2 && ` +${activeAssignments.count - 2} more`}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {item.cost > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cost:</span>
+                          <span className="font-medium">
+                            {item.currency} {item.cost.toLocaleString()}
+                          </span>
+                        </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                        <CardDescription className="truncate">
-                          {item.brand} • {item.category}
-                        </CardDescription>
-                      </div>
+                      {item.serialNumber && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Serial:</span>
+                          <span className="font-mono text-xs">{item.serialNumber}</span>
+                        </div>
+                      )}
+                      {item.version && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Version:</span>
+                          <span className="font-medium">{item.version}</span>
+                        </div>
+                      )}
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleView(item)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={cn(statusColors[item.status])}>
-                      {item.status}
-                    </Badge>
-                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                      {item.condition}
-                    </Badge>
-                  </div>
 
-                  <StockLevelIndicator stock={item.stock} size="sm" />
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Department:</span>
-                      <span className="font-medium">{item.department}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Assigned to:</span>
-                      <span className="font-medium truncate ml-2">{getUserDisplayName(item.assignedTo)}</span>
-                    </div>
-                    {item.cost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost:</span>
-                        <span className="font-medium">
-                          {item.currency} {item.cost.toLocaleString()}
-                        </span>
+                    {item.description && (
+                      <div className="pt-2 border-t">
+                        <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                       </div>
                     )}
-                    {item.serialNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="font-mono text-xs">{item.serialNumber}</span>
-                      </div>
-                    )}
-                    {item.version && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Version:</span>
-                        <span className="font-medium">{item.version}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {item.description && (
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
 
@@ -599,6 +655,14 @@ export default function ITInventoryPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <UserAssignmentDialog
+          open={assignmentDialogOpen}
+          onOpenChange={setAssignmentDialogOpen}
+          item={selectedItemForAssignment}
+          users={users}
+          onUpdate={handleAssignmentUpdate}
+        />
       </div>
     </div>
   )
