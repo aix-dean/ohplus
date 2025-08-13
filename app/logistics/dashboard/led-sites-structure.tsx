@@ -59,7 +59,7 @@ export default function LEDSitesStructure() {
     event.stopPropagation()
     setSelectedSiteId(siteId)
     setReportDialogOpen(true)
-    console.log("Creating report for LED structure site:", siteId)
+
   }
 
   const getStructureBadge = (health: string) => {
