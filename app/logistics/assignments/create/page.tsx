@@ -1253,13 +1253,20 @@ export default function CreateServiceAssignmentPage() {
       <TeamFormDialog
         open={isNewTeamDialogOpen}
         onOpenChange={setIsNewTeamDialogOpen}
-        onSuccess={(newTeam) => {
-          // Add the new team to the teams list
-          setTeams((prev) => [...prev, newTeam])
-          // Select the new team in the form
-          handleInputChange("crew", newTeam.id)
-          // Close the dialog
-          setIsNewTeamDialogOpen(false)
+        onSubmit={async (teamData) => {
+          try {
+            // Create the new team using the teams service
+            const newTeam = await teamsService.createTeam(teamData)
+            // Add the new team to the teams list
+            setTeams((prev) => [...prev, newTeam])
+            // Select the new team in the form
+            handleInputChange("crew", newTeam.id)
+            // Close the dialog
+            setIsNewTeamDialogOpen(false)
+          } catch (error) {
+            console.error("Failed to create team:", error)
+            // Handle error appropriately
+          }
         }}
       />
     </div>
