@@ -33,9 +33,7 @@ import {
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogisticsNotifications } from "@/components/logistics-notifications"
-
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -618,7 +616,7 @@ export function SideNavigation() {
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
                   { title: "Network Management", href: "/it/network", icon: Wifi },
                   { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-                  { title: "Hardwares", href: "/it/inventory", icon: Package },
+                  { title: "Assets", href: "/it/inventory", icon: Package },
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                   { title: "User Management", href: "/it/user-management", icon: Users },
