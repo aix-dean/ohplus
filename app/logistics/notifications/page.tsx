@@ -6,12 +6,31 @@ import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc } from "firebase/firestore"
 
 export default function LogisticsNotificationsPage() {
   const { notifications, loading } = useLogisticsNotifications()
   const router = useRouter()
 
-  const handleNotificationClick = (notification: any) => {
+  const markAsViewed = async (notificationId: string) => {
+    try {
+      const notificationRef = doc(db, "notifications", notificationId)
+      await updateDoc(notificationRef, {
+        viewed: true,
+      })
+    } catch (error) {
+      console.error("Error marking notification as viewed:", error)
+    }
+  }
+
+  const handleNotificationClick = async (notification: any) => {
+    // Mark as viewed if not already viewed
+    if (!notification.viewed) {
+      await markAsViewed(notification.id)
+    }
+
+    // Navigate to the specified URL
     if (notification.navigate_to) {
       router.push(notification.navigate_to)
     }
