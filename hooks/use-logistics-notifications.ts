@@ -23,20 +23,20 @@ export function useLogisticsNotifications() {
   const [notifications, setNotifications] = useState<LogisticsNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { user } = useAuth()
-
-  console.log("User data:", JSON.stringify(user))
-  console.log("Company ID:", user?.company_id)
+  const { user, userData } = useAuth()
 
   useEffect(() => {
-    if (!user?.company_id) {
+    if (!userData?.company_id) {
+      console.log("No company_id found in userData:", userData)
       setLoading(false)
       return
     }
 
+    console.log("Setting up notifications query for company_id:", userData.company_id)
+
     const notificationsQuery = query(
       collection(db, "notifications"),
-      where("company_id", "==", user.company_id),
+      where("company_id", "==", userData.company_id),
       where("department_to", "==", "Logistics"),
       orderBy("created", "desc"),
       limit(10),
@@ -45,11 +45,13 @@ export function useLogisticsNotifications() {
     const unsubscribe = onSnapshot(
       notificationsQuery,
       (snapshot) => {
+        console.log("Notifications snapshot received, docs count:", snapshot.docs.length)
         const notificationsList: LogisticsNotification[] = []
         let unreadCounter = 0
 
         snapshot.forEach((doc) => {
           const data = doc.data()
+          console.log("Notification document:", doc.id, data)
 
           const notification: LogisticsNotification = {
             id: doc.id,
@@ -67,11 +69,12 @@ export function useLogisticsNotifications() {
 
           notificationsList.push(notification)
 
-          if (!notification.viewed && (!notification.uid_to || notification.uid_to === user.uid)) {
+          if (!notification.viewed && (!notification.uid_to || notification.uid_to === user?.uid)) {
             unreadCounter++
           }
         })
 
+        console.log("Final notifications list:", notificationsList)
         setNotifications(notificationsList)
         setUnreadCount(unreadCounter)
         setLoading(false)
@@ -83,7 +86,7 @@ export function useLogisticsNotifications() {
     )
 
     return () => unsubscribe()
-  }, [user?.company_id, user?.uid])
+  }, [userData, user?.uid]) // Updated dependency array
 
   return {
     notifications,
