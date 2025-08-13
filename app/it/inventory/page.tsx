@@ -6,37 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-  Search,
-  Plus,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Eye,
-  Package,
-  HardDrive,
-  Monitor,
-  Loader2,
-  AlertCircle,
-  Users,
-} from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  updateDoc,
-  orderBy,
-  serverTimestamp,
-  type Unsubscribe,
-  getDocs,
-} from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc, orderBy, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,18 +29,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { StockLevelIndicator } from "@/components/stock-level-indicator"
-import { StockOverviewDashboard } from "@/components/stock-overview-dashboard"
-import { LowStockNotificationCenter } from "@/components/low-stock-notification-center"
-import { UserAssignmentDialog } from "@/components/user-assignment-dialog"
-
-interface Assignment {
-  userId: string
-  assignedDate: string
-  returnedDate?: string
-  status: "assigned" | "returned"
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface InventoryItem {
   id: string
@@ -78,8 +55,6 @@ interface InventoryItem {
   licenseKey?: string
   version?: string
   description: string
-  stock: number
-  assignments?: Assignment[]
   created_at: any
   updated_at: any
   created_by: string
@@ -121,90 +96,71 @@ export default function ITInventoryPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
-  const [stockFilter, setStockFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
-  const [selectedItemForAssignment, setSelectedItemForAssignment] = useState<InventoryItem | null>(null)
 
+  // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
-    if (!userData?.company_id) return
+    const fetchItems = async () => {
+      if (!userData?.company_id) return
 
-    let unsubscribe: Unsubscribe | null = null
-
-    const setupRealTimeListener = () => {
       try {
         const itemsRef = collection(db, "itInventory")
         const q = query(
-          itemsRef,
+          itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false),
-          orderBy("created_at", "desc"),
+          where("deleted", "==", false), // Only fetch non-deleted items
+          orderBy("created_at", "desc")
         )
+        const querySnapshot = await getDocs(q)
 
-        unsubscribe = onSnapshot(
-          q,
-          (querySnapshot) => {
-            const fetchedItems: InventoryItem[] = []
-            querySnapshot.forEach((doc) => {
-              const data = doc.data()
-              fetchedItems.push({
-                id: doc.id,
-                name: data.name || "",
-                type: data.type || "hardware",
-                category: data.category || "",
-                brand: data.brand || "",
-                department: data.department || "",
-                assignedTo: data.assignedTo || "unassigned",
-                condition: data.condition || "excellent",
-                status: data.status || "active",
-                cost: data.cost || 0,
-                currency: data.currency || "USD",
-                purchaseDate: data.purchaseDate || "",
-                warrantyExpiry: data.warrantyExpiry || "",
-                serialNumber: data.serialNumber || "",
-                licenseKey: data.licenseKey || "",
-                version: data.version || "",
-                description: data.description || "",
-                stock: data.stock || 0,
-                assignments: data.assignments || [],
-                created_at: data.created_at,
-                updated_at: data.updated_at,
-                created_by: data.created_by || "",
-                company_id: data.company_id || "",
-                deleted: data.deleted || false,
-              })
-            })
+        const fetchedItems: InventoryItem[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedItems.push({
+            id: doc.id,
+            name: data.name || "",
+            type: data.type || "hardware",
+            category: data.category || "",
+            brand: data.brand || "",
+            department: data.department || "",
+            assignedTo: data.assignedTo || "unassigned",
+            condition: data.condition || "excellent",
+            status: data.status || "active",
+            cost: data.cost || 0,
+            currency: data.currency || "USD",
+            purchaseDate: data.purchaseDate || "",
+            warrantyExpiry: data.warrantyExpiry || "",
+            serialNumber: data.serialNumber || "",
+            licenseKey: data.licenseKey || "",
+            version: data.version || "",
+            description: data.description || "",
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            created_by: data.created_by || "",
+            company_id: data.company_id || "",
+            deleted: data.deleted || false,
+          })
+        })
 
-            setItems(fetchedItems)
-            setLoading(false)
-          },
-          (error) => {
-            console.error("Error in real-time inventory listener:", error)
-            toast({
-              title: "Error",
-              description: "Failed to load inventory items",
-              variant: "destructive",
-            })
-            setLoading(false)
-          },
-        )
+        setItems(fetchedItems)
       } catch (error) {
-        console.error("Error setting up real-time listener:", error)
+        console.error("Error fetching items:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load inventory items",
+          variant: "destructive",
+        })
+      } finally {
         setLoading(false)
       }
     }
 
-    setupRealTimeListener()
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe()
-      }
-    }
+    fetchItems()
   }, [userData?.company_id])
 
+  // Fetch users for display names
   useEffect(() => {
     const fetchUsers = async () => {
       if (!userData?.company_id) return
@@ -236,6 +192,7 @@ export default function ITInventoryPage() {
     fetchUsers()
   }, [userData?.company_id])
 
+  // Helper function to get user display name
   const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
@@ -243,58 +200,32 @@ export default function ITInventoryPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  const getActiveAssignments = (item: InventoryItem) => {
-    if (!item.assignments) return { count: 0, users: [] }
-
-    const activeAssignments = item.assignments.filter((a) => a.status === "assigned")
-    const assignedUsers = activeAssignments.map((a) => getUserDisplayName(a.userId))
-
-    return { count: activeAssignments.length, users: assignedUsers }
-  }
-
+  // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesType = typeFilter === "all" || item.type === typeFilter
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
     const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter
 
-    const matchesStock =
-      stockFilter === "all" ||
-      (stockFilter === "low" && item.stock <= 3 && item.stock > 0) ||
-      (stockFilter === "out" && item.stock === 0) ||
-      (stockFilter === "normal" && item.stock > 3)
-
-    return matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesStock
+    return matchesSearch && matchesType && matchesStatus && matchesDepartment
   })
 
-  const handleEdit = useCallback(
-    (item: InventoryItem) => {
-      router.push(`/it/inventory/edit/${item.id}`)
-    },
-    [router],
-  )
+  const handleEdit = useCallback((item: InventoryItem) => {
+    router.push(`/it/inventory/edit/${item.id}`)
+  }, [router])
 
-  const handleView = useCallback(
-    (item: InventoryItem) => {
-      router.push(`/it/inventory/details/${item.id}`)
-    },
-    [router],
-  )
+  const handleView = useCallback((item: InventoryItem) => {
+    router.push(`/it/inventory/details/${item.id}`)
+  }, [router])
 
   const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
     setDeleteDialogOpen(true)
-  }, [])
-
-  const handleManageAssignments = useCallback((item: InventoryItem) => {
-    setSelectedItemForAssignment(item)
-    setAssignmentDialogOpen(true)
   }, [])
 
   const resetDeleteState = useCallback(() => {
@@ -307,8 +238,9 @@ export default function ITInventoryPage() {
     if (!itemToDelete || isDeleting) return
 
     setIsDeleting(true)
-
+    
     try {
+      // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", itemToDelete.id)
       await updateDoc(itemRef, {
         deleted: true,
@@ -316,21 +248,26 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      setItems((prevItems) => prevItems.filter((item) => item.id !== itemToDelete.id))
-
+      // Update local state to remove the item
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
+      
+      // Store item name for toast before resetting state
       const deletedItemName = itemToDelete.name
-
+      
+      // Reset all delete-related state
       resetDeleteState()
-
+      
+      // Show success toast
       toast({
         title: "Item Deleted",
         description: `${deletedItemName} has been deleted from inventory`,
       })
     } catch (error) {
       console.error("Error deleting item:", error)
-
+      
+      // Reset state on error
       resetDeleteState()
-
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
@@ -339,23 +276,15 @@ export default function ITInventoryPage() {
     }
   }, [itemToDelete, isDeleting, resetDeleteState])
 
-  const handleDeleteDialogOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open && !isDeleting) {
-        resetDeleteState()
-      }
-    },
-    [isDeleting, resetDeleteState],
-  )
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    if (!open && !isDeleting) {
+      resetDeleteState()
+    }
+  }, [isDeleting, resetDeleteState])
 
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
-
-  const handleAssignmentUpdate = useCallback(() => {
-    // The real-time listener will automatically update the data
-    // This function is called after successful assignment operations
-  }, [])
 
   if (loading) {
     return (
@@ -375,22 +304,19 @@ export default function ITInventoryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-6">
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
             <p className="text-slate-600">Manage your IT assets and equipment</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <LowStockNotificationCenter />
-            <Button onClick={handleAddNew} className="shadow-sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Item
-            </Button>
-          </div>
+          <Button onClick={handleAddNew} className="shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Item
+          </Button>
         </div>
 
-        <StockOverviewDashboard className="mb-8" />
-
+        {/* Filters and Search */}
         <Card className="mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4">
@@ -428,17 +354,6 @@ export default function ITInventoryPage() {
                     <SelectItem value="retired">Retired</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={stockFilter} onValueChange={setStockFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px]">
-                    <SelectValue placeholder="Stock Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Stock</SelectItem>
-                    <SelectItem value="normal">Normal Stock</SelectItem>
-                    <SelectItem value="low">Low Stock</SelectItem>
-                    <SelectItem value="out">Out of Stock</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="w-full sm:w-[160px]">
                     <SelectValue placeholder="Department" />
@@ -459,15 +374,12 @@ export default function ITInventoryPage() {
           </CardContent>
         </Card>
 
+        {/* Results Summary */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-muted-foreground">
             Showing {filteredItems.length} of {items.length} items
           </p>
-          {(searchTerm ||
-            typeFilter !== "all" ||
-            statusFilter !== "all" ||
-            departmentFilter !== "all" ||
-            stockFilter !== "all") && (
+          {(searchTerm || typeFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all") && (
             <Button
               variant="outline"
               size="sm"
@@ -476,7 +388,6 @@ export default function ITInventoryPage() {
                 setTypeFilter("all")
                 setStatusFilter("all")
                 setDepartmentFilter("all")
-                setStockFilter("all")
               }}
             >
               Clear Filters
@@ -484,6 +395,7 @@ export default function ITInventoryPage() {
           )}
         </div>
 
+        {/* Items Grid */}
         {filteredItems.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -494,9 +406,10 @@ export default function ITInventoryPage() {
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">No items found</h3>
                   <p className="text-muted-foreground">
-                    {items.length === 0
+                    {items.length === 0 
                       ? "Get started by adding your first inventory item"
-                      : "Try adjusting your search or filter criteria"}
+                      : "Try adjusting your search or filter criteria"
+                    }
                   </p>
                 </div>
                 {items.length === 0 && (
@@ -510,124 +423,106 @@ export default function ITInventoryPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => {
-              const activeAssignments = getActiveAssignments(item)
-
-              return (
-                <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-2">
-                        {item.type === "hardware" ? (
-                          <HardDrive className="h-5 w-5 text-blue-600" />
-                        ) : (
-                          <Monitor className="h-5 w-5 text-green-600" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                          <CardDescription className="truncate">
-                            {item.brand} • {item.category}
-                          </CardDescription>
-                        </div>
+            {filteredItems.map((item) => (
+              <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {item.type === "hardware" ? (
+                        <HardDrive className="h-5 w-5 text-blue-600" />
+                      ) : (
+                        <Monitor className="h-5 w-5 text-green-600" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
+                        <CardDescription className="truncate">
+                          {item.brand} • {item.category}
+                        </CardDescription>
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleView(item)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(item)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleManageAssignments(item)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Manage Assignments
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className={cn(statusColors[item.status])}>
-                        {item.status}
-                      </Badge>
-                      <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                        {item.condition}
-                      </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleView(item)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(item)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(item)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className={cn(statusColors[item.status])}>
+                      {item.status}
+                    </Badge>
+                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                      {item.condition}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Department:</span>
+                      <span className="font-medium">{item.department}</span>
                     </div>
-
-                    <StockLevelIndicator stock={item.stock} size="sm" />
-
-                    <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Assigned to:</span>
+                      <span className="font-medium truncate ml-2">
+                        {getUserDisplayName(item.assignedTo)}
+                      </span>
+                    </div>
+                    {item.cost > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Department:</span>
-                        <span className="font-medium">{item.department}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Assigned to:</span>
-                        <div className="flex flex-col items-end">
-                          {activeAssignments.count === 0 ? (
-                            <span className="font-medium">Unassigned</span>
-                          ) : activeAssignments.count === 1 ? (
-                            <span className="font-medium truncate ml-2">{activeAssignments.users[0]}</span>
-                          ) : (
-                            <div className="text-right">
-                              <Badge variant="secondary" className="text-xs">
-                                {activeAssignments.count} users
-                              </Badge>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {activeAssignments.users.slice(0, 2).join(", ")}
-                                {activeAssignments.count > 2 && ` +${activeAssignments.count - 2} more`}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {item.cost > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cost:</span>
-                          <span className="font-medium">
-                            {item.currency} {item.cost.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {item.serialNumber && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Serial:</span>
-                          <span className="font-mono text-xs">{item.serialNumber}</span>
-                        </div>
-                      )}
-                      {item.version && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Version:</span>
-                          <span className="font-medium">{item.version}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {item.description && (
-                      <div className="pt-2 border-t">
-                        <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                        <span className="text-muted-foreground">Cost:</span>
+                        <span className="font-medium">
+                          {item.currency} {item.cost.toLocaleString()}
+                        </span>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+                    {item.serialNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Serial:</span>
+                        <span className="font-mono text-xs">{item.serialNumber}</span>
+                      </div>
+                    )}
+                    {item.version && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Version:</span>
+                        <span className="font-medium">{item.version}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {item.description && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
+        {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -636,13 +531,16 @@ export default function ITInventoryPage() {
                 <span>Delete Inventory Item</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it
-                won't be visible in your inventory list.
+                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -655,14 +553,6 @@ export default function ITInventoryPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <UserAssignmentDialog
-          open={assignmentDialogOpen}
-          onOpenChange={setAssignmentDialogOpen}
-          item={selectedItemForAssignment}
-          users={users}
-          onUpdate={handleAssignmentUpdate}
-        />
       </div>
     </div>
   )
