@@ -9,9 +9,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
+import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download, PlusCircle } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
+import { teamsService } from "@/lib/teams-service"
+import type { Team } from "@/lib/types/team"
 import {
   addDoc,
   collection,
@@ -31,6 +33,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
+import { TeamFormDialog } from "@/components/team-form-dialog"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -50,6 +53,10 @@ export default function CreateServiceAssignmentPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [isEditingDraft, setIsEditingDraft] = useState(false)
   const [draftId, setDraftId] = useState<string | null>(null)
+
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(true)
+  const [isNewTeamDialogOpen, setIsNewTeamDialogOpen] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -118,6 +125,24 @@ export default function CreateServiceAssignmentPage() {
     }
 
     fetchProducts()
+  }, [])
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        setLoadingTeams(true)
+        const teamsData = await teamsService.getAllTeams()
+        // Filter only active teams
+        const activeTeams = teamsData.filter((team) => team.status === "active")
+        setTeams(activeTeams)
+      } catch (error) {
+        console.error("Error fetching teams:", error)
+      } finally {
+        setLoadingTeams(false)
+      }
+    }
+
+    fetchTeams()
   }, [])
 
   // Load draft data if editing
@@ -601,6 +626,14 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
+  const handleCrewChange = (value: string) => {
+    if (value === "add-new-team") {
+      setIsNewTeamDialogOpen(true)
+    } else {
+      handleInputChange("crew", value)
+    }
+  }
+
   if (fetchingProducts) {
     return (
       <div className="container mx-auto py-4">
@@ -763,17 +796,32 @@ export default function CreateServiceAssignmentPage() {
               <Label htmlFor="crew" className="text-sm font-medium">
                 Crew
               </Label>
-              <Select value={formData.crew} onValueChange={(value) => handleInputChange("crew", value)}>
+              <Select value={formData.crew} onValueChange={handleCrewChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select crew" />
+                  <SelectValue placeholder={loadingTeams ? "Loading teams..." : "Select crew"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="crew-a">Crew A</SelectItem>
-                  <SelectItem value="crew-b">Crew B</SelectItem>
-                  <SelectItem value="crew-c">Crew C</SelectItem>
-                  <SelectItem value="maintenance-crew">Maintenance Crew</SelectItem>
-                  <SelectItem value="installation-crew">Installation Crew</SelectItem>
-                  <SelectItem value="technical-crew">Technical Crew</SelectItem>
+                  <SelectItem value="add-new-team" className="text-blue-600 font-medium">
+                    <div className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Add New Team
+                    </div>
+                  </SelectItem>
+                  {loadingTeams ? (
+                    <SelectItem value="loading" disabled>
+                      Loading teams...
+                    </SelectItem>
+                  ) : teams.length > 0 ? (
+                    teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} ({team.type})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-teams" disabled>
+                      No active teams available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1200,6 +1248,39 @@ export default function CreateServiceAssignmentPage() {
         saNumber={createdSaNumber}
         onViewAssignments={handleViewAssignments}
         onCreateAnother={handleCreateAnother}
+      />
+
+      <TeamFormDialog
+        open={isNewTeamDialogOpen}
+        onOpenChange={setIsNewTeamDialogOpen}
+        onSubmit={async (teamData) => {
+          try {
+            const teamId = await teamsService.createTeam(teamData, "logistics-admin")
+
+            // Create team object for local state
+            const newTeam = {
+              id: teamId,
+              name: teamData.name,
+              teamType: teamData.teamType,
+              status: "active" as const,
+              members: [],
+              ...teamData,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: "logistics-admin",
+            }
+
+            // Add the new team to the teams list
+            setTeams((prev) => [...prev, newTeam])
+            // Select the new team in the form
+            handleInputChange("crew", newTeam.id)
+            // Close the dialog
+            setIsNewTeamDialogOpen(false)
+          } catch (error) {
+            console.error("Failed to create team:", error)
+            // Handle error appropriately
+          }
+        }}
       />
     </div>
   )

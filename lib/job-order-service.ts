@@ -182,6 +182,37 @@ export async function createMultipleJobOrders(
       })
       jobOrderIds.push(docRef.id)
       console.log("Job Order successfully added with ID:", docRef.id)
+
+      try {
+        // Get the current user's UID for comparison
+        const currentUserUid = createdBy
+
+        // Only create notification if assignTo is different from current user
+        const shouldCreateNotification = jobOrderData.assignTo && jobOrderData.assignTo !== currentUserUid
+
+        if (shouldCreateNotification) {
+          const notificationTitle = `New Job Order Assigned: ${jobOrderData.joNumber}`
+          const notificationDescription = `A new ${jobOrderData.joType} job order has been created`
+
+          // Create single notification per job order
+          await addDoc(collection(db, "notifications"), {
+            type: "Job Order",
+            title: notificationTitle,
+            description: notificationDescription,
+            department_to: "Logistics",
+            uid_to: jobOrderData.assignTo,
+            company_id: jobOrderData.company_id,
+            department_from: "Sales",
+            viewed: false,
+            navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/job-orders/${docRef.id}`,
+            created: serverTimestamp(),
+          })
+          console.log(`Single notification created for job order ${docRef.id}`)
+        }
+      } catch (notificationError) {
+        console.error("Error creating notification for job order:", docRef.id, notificationError)
+        // Don't throw here - we don't want notification failure to break job order creation
+      }
     }
 
     return jobOrderIds

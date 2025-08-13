@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight, Filter } from "lucide-react"
-import { sumBy } from "lodash"
+import { Search, Download, Edit, Save, X, Eye, EyeOff, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
 import {
   bookingService,
   type SalesRecord,
@@ -17,6 +15,7 @@ import {
   type FilterOptions,
 } from "@/lib/booking-service"
 import { useAuth } from "@/contexts/auth-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const BOOKING_TYPES = ["RENTAL", "MERCHANDISE", "SERVICES"] as const
 const BOOKING_STATUSES = ["COMPLETED", "CANCELLED", "FOR CONTRACT", "ONGOING", "PENDING", "PAID", "UPCOMING"] as const
@@ -44,6 +43,7 @@ export function SalesRecordTable() {
   const [query, setQuery] = useState("")
   const [editing, setEditing] = useState<Record<string, boolean>>({})
   const [showComputed, setShowComputed] = useState(true)
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set())
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
@@ -144,6 +144,49 @@ export function SalesRecordTable() {
     setStatusFilter("all")
   }
 
+  const handleAddRecord = () => {
+    toast({
+      title: "➕ Add New Record",
+      description: "Add new sales record functionality will be implemented here.",
+    })
+    // TODO: Implement add new record modal/form
+  }
+
+  const handleDeleteSelected = () => {
+    if (selectedRecords.size === 0) {
+      toast({
+        title: "⚠️ No Selection",
+        description: "Please select records to delete.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    toast({
+      title: "🗑️ Delete Records",
+      description: `Delete ${selectedRecords.size} selected record(s) functionality will be implemented here.`,
+    })
+    // TODO: Implement delete confirmation dialog and deletion logic
+  }
+
+  const toggleRecordSelection = (recordId: string) => {
+    const newSelection = new Set(selectedRecords)
+    if (newSelection.has(recordId)) {
+      newSelection.delete(recordId)
+    } else {
+      newSelection.add(recordId)
+    }
+    setSelectedRecords(newSelection)
+  }
+
+  const toggleAllRecords = () => {
+    if (selectedRecords.size === records.length) {
+      setSelectedRecords(new Set())
+    } else {
+      setSelectedRecords(new Set(records.map((r) => r.id)))
+    }
+  }
+
   const exportToCSV = () => {
     const headers = [
       "Month",
@@ -231,6 +274,14 @@ export function SalesRecordTable() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleAddRecord} className="bg-green-600 hover:bg-green-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Record
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteSelected} disabled={selectedRecords.size === 0}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete ({selectedRecords.size})
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowComputed(!showComputed)}>
             {showComputed ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
             {showComputed ? "Hide" : "Show"} Computed
@@ -245,70 +296,24 @@ export function SalesRecordTable() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Net Sales</div>
-            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-              {sumBy(records, (r) => r.netSales)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-green-700 dark:text-green-300">Output VAT</div>
-            <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-              {sumBy(records, (r) => r.outputVat)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Total</div>
-            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-              {sumBy(records, (r) => r.total)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-orange-700 dark:text-orange-300">Creditable Tax</div>
-            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-              {sumBy(records, (r) => r.creditableTax)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 border-teal-200 dark:border-teal-800">
-          <CardContent className="p-4">
-            <div className="text-sm font-medium text-teal-700 dark:text-teal-300">Amount Collected</div>
-            <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">
-              {sumBy(records, (r) => r.amountCollected)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search records..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-10"
-          />
+      {/* Search Bar and Filters Section */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex-1 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search records..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
+        <div className="flex gap-2 items-center">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Types" />
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
@@ -321,8 +326,8 @@ export function SalesRecordTable() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Statuses" />
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
@@ -334,196 +339,223 @@ export function SalesRecordTable() {
             </SelectContent>
           </Select>
 
-          {(typeFilter !== "all" || statusFilter !== "all") && (
-            <Button variant="outline" size="sm" onClick={handleClearFilters}>
-              Clear Filters
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={handleClearFilters}>
+            Clear Filters
+          </Button>
         </div>
       </div>
 
       {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50 dark:bg-slate-900/50">
-                  <TableHead className="font-semibold">Month</TableHead>
-                  <TableHead className="font-semibold">Date</TableHead>
-                  <TableHead className="font-semibold">Invoice</TableHead>
-                  <TableHead className="font-semibold">BS #</TableHead>
-                  <TableHead className="font-semibold">Client</TableHead>
-                  <TableHead className="font-semibold">TIN</TableHead>
-                  <TableHead className="font-semibold">Description</TableHead>
-                  <TableHead className="font-semibold text-right">Net Sales</TableHead>
-                  {showComputed && (
-                    <>
-                      <TableHead className="font-semibold text-right">Output VAT</TableHead>
-                      <TableHead className="font-semibold text-right">Total</TableHead>
-                      <TableHead className="font-semibold text-right">Creditable Tax</TableHead>
-                      <TableHead className="font-semibold text-right">Amount Collected</TableHead>
-                    </>
-                  )}
-                  <TableHead className="font-semibold">OR No.</TableHead>
-                  <TableHead className="font-semibold">Payment</TableHead>
-                  <TableHead className="font-semibold">Type</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(query ? filtered : records).map((record) => {
-                  const isEditing = !!editing[record.id]
-                  return (
-                    <TableRow
-                      key={record.id}
-                      className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
-                    >
-                      <TableCell>
-                        {isEditing ? (
-                          <Input value={record.month} onChange={(e) => console.log(e.target.value)} className="w-20" />
-                        ) : (
-                          <span>{record.month || "-"}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input value={record.date} onChange={(e) => console.log(e.target.value)} className="w-20" />
-                        ) : (
-                          <span>{record.date || "-"}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm">{record.serviceInvoice}</span>
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={record.bsNumber}
-                            onChange={(e) => console.log(e.target.value)}
-                            className="w-24"
+      <div className="border rounded-lg">
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50 dark:bg-slate-900/50">
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedRecords.size === records.length && records.length > 0}
+                        onChange={toggleAllRecords}
+                        className="rounded border-gray-300"
+                      />
+                    </TableHead>
+                    <TableHead className="font-semibold">Month</TableHead>
+                    <TableHead className="font-semibold">Date</TableHead>
+                    <TableHead className="font-semibold">Invoice</TableHead>
+                    <TableHead className="font-semibold">BS #</TableHead>
+                    <TableHead className="font-semibold">Client</TableHead>
+                    <TableHead className="font-semibold">TIN</TableHead>
+                    <TableHead className="font-semibold">Description</TableHead>
+                    <TableHead className="font-semibold text-right">Net Sales</TableHead>
+                    {showComputed && (
+                      <>
+                        <TableHead className="font-semibold text-right">Output VAT</TableHead>
+                        <TableHead className="font-semibold text-right">Total</TableHead>
+                        <TableHead className="font-semibold text-right">Creditable Tax</TableHead>
+                        <TableHead className="font-semibold text-right">Amount Collected</TableHead>
+                      </>
+                    )}
+                    <TableHead className="font-semibold">OR No.</TableHead>
+                    <TableHead className="font-semibold">Payment</TableHead>
+                    <TableHead className="font-semibold">Type</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(query ? filtered : records).map((record) => {
+                    const isEditing = !!editing[record.id]
+                    return (
+                      <TableRow
+                        key={record.id}
+                        className={`transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+                      >
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedRecords.has(record.id)}
+                            onChange={() => toggleRecordSelection(record.id)}
+                            className="rounded border-gray-300"
                           />
-                        ) : (
-                          <span className="font-mono text-sm">{record.bsNumber}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-40">
-                          <span className="font-medium">{record.clients}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input value={record.tin} onChange={(e) => console.log(e.target.value)} className="w-36" />
-                        ) : (
-                          <span className="font-mono text-sm">{record.tin || "-"}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-48">
-                          <span className="text-sm">{record.description}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            className="text-right w-32"
-                            value={record.netSales}
-                            onChange={(e) => console.log(e.target.value)}
-                          />
-                        ) : (
-                          <span className="font-mono font-medium">{record.netSales}</span>
-                        )}
-                      </TableCell>
-                      {showComputed && (
-                        <>
-                          <TableCell className="text-right">
-                            <span className="font-mono text-green-700 dark:text-green-400">{record.outputVat}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-mono font-medium">{record.total}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-mono text-orange-700 dark:text-orange-400">
-                              {record.creditableTax}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-mono text-blue-700 dark:text-blue-400">{record.amountCollected}</span>
-                          </TableCell>
-                        </>
-                      )}
-                      <TableCell>
-                        {isEditing ? (
-                          <Input value={record.orNo} onChange={(e) => console.log(e.target.value)} className="w-24" />
-                        ) : (
-                          <span className="font-mono text-sm">{record.orNo}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{record.paymentMethod}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{record.productType}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            record.status === "COMPLETED"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                              : record.status === "CANCELLED"
-                                ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-                                : record.status === "ONGOING"
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                                  : record.status === "PENDING"
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
-                                    : record.status === "PAID"
-                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
-                                      : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
-                          }`}
-                        >
-                          {record.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        </TableCell>
+                        <TableCell>
                           {isEditing ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => console.log("Save")}
-                              >
-                                <Save className="h-4 w-4 text-green-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => console.log("Cancel")}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
+                            <Input
+                              value={record.month}
+                              onChange={(e) => console.log(e.target.value)}
+                              className="w-20"
+                            />
                           ) : (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => console.log("Edit")}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <span>{record.month || "-"}</span>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input value={record.date} onChange={(e) => console.log(e.target.value)} className="w-20" />
+                          ) : (
+                            <span>{record.date || "-"}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm">{record.serviceInvoice}</span>
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              value={record.bsNumber}
+                              onChange={(e) => console.log(e.target.value)}
+                              className="w-24"
+                            />
+                          ) : (
+                            <span className="font-mono text-sm">{record.bsNumber}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-40">
+                            <span className="font-medium">{record.clients}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input value={record.tin} onChange={(e) => console.log(e.target.value)} className="w-36" />
+                          ) : (
+                            <span className="font-mono text-sm">{record.tin || "-"}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-48">
+                            <span className="text-sm">{record.description}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              className="text-right w-32"
+                              value={record.netSales}
+                              onChange={(e) => console.log(e.target.value)}
+                            />
+                          ) : (
+                            <span className="font-mono font-medium">{record.netSales}</span>
+                          )}
+                        </TableCell>
+                        {showComputed && (
+                          <>
+                            <TableCell className="text-right">
+                              <span className="font-mono text-green-700 dark:text-green-400">{record.outputVat}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-mono font-medium">{record.total}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-mono text-orange-700 dark:text-orange-400">
+                                {record.creditableTax}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-mono text-blue-700 dark:text-blue-400">
+                                {record.amountCollected}
+                              </span>
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell>
+                          {isEditing ? (
+                            <Input value={record.orNo} onChange={(e) => console.log(e.target.value)} className="w-24" />
+                          ) : (
+                            <span className="font-mono text-sm">{record.orNo}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{record.paymentMethod}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{record.productType}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              record.status === "COMPLETED"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                                : record.status === "CANCELLED"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                                  : record.status === "ONGOING"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                                    : record.status === "PENDING"
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
+                                      : record.status === "PAID"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                        : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                            }`}
+                          >
+                            {record.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {isEditing ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => console.log("Save")}
+                                >
+                                  <Save className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => console.log("Cancel")}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => console.log("Edit")}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Pagination Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
