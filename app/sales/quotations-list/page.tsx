@@ -434,7 +434,7 @@ export default function SalesQuotationsPage() {
                             ) : (
                               <span className="text-xs text-gray-400">
                                 {quotation.status === "draft"
-                                  ? "Send first"
+                                  ? "Quote Signed"
                                   : quotation.status === "accepted"
                                     ? "Already signed"
                                     : quotation.status === "rejected"
