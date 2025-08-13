@@ -11,7 +11,8 @@ import { ArrowLeft, Upload, X, FileText, PlusCircle, CheckCircle, Loader2, Eye }
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage" // Added Firebase Storage imports
+import { db, storage } from "@/lib/firebase" // Added storage import
 import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
@@ -210,6 +211,12 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
     }
   }
 
+  const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+    const storageRef = ref(storage, path)
+    const snapshot = await uploadBytes(storageRef, file)
+    return await getDownloadURL(snapshot.ref)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -234,13 +241,26 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         updated: serverTimestamp(),
       }
 
-      // Add type-specific fields
       if (formData.type === "sites") {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
         if (formData.covered_period) collectibleData.covered_period = formData.covered_period
         if (formData.collection_date) collectibleData.collection_date = formData.collection_date
-        if (formData.bir_2307) collectibleData.bir_2307 = formData.bir_2307
+
+        // Handle BIR 2307 file upload
+        if (formData.bir_2307) {
+          if (formData.bir_2307 instanceof File) {
+            // Upload new file
+            const fileUrl = await uploadFileToStorage(
+              formData.bir_2307,
+              `collectibles/${params.id}/bir_2307_${Date.now()}.${formData.bir_2307.name.split(".").pop()}`,
+            )
+            collectibleData.bir_2307 = fileUrl
+          } else {
+            // Keep existing file URL
+            collectibleData.bir_2307 = formData.bir_2307
+          }
+        }
       } else if (formData.type === "supplies") {
         if (formData.date) collectibleData.date = formData.date
         if (formData.product) collectibleData.product = formData.product
@@ -251,12 +271,23 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
         if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      // Add next collection fields only if checkbox is checked
       if (formData.proceed_next_collection) {
         collectibleData.next_collection_date = formData.next_collection_date
         collectibleData.next_collection_status = formData.next_collection_status
+
+        // Handle next collection BIR 2307 file upload
         if (formData.next_collection_bir_2307) {
-          collectibleData.next_collection_bir_2307 = formData.next_collection_bir_2307
+          if (formData.next_collection_bir_2307 instanceof File) {
+            // Upload new file
+            const fileUrl = await uploadFileToStorage(
+              formData.next_collection_bir_2307,
+              `collectibles/${params.id}/next_bir_2307_${Date.now()}.${formData.next_collection_bir_2307.name.split(".").pop()}`,
+            )
+            collectibleData.next_collection_bir_2307 = fileUrl
+          } else {
+            // Keep existing file URL
+            collectibleData.next_collection_bir_2307 = formData.next_collection_bir_2307
+          }
         }
       }
 
@@ -523,14 +554,10 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                   </label>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-3 bg-white border border-gray-300 rounded-lg">
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                  <div className="flex items-center space-x-3">
                     <FileText className="w-5 h-5 text-gray-500" />
-                    <span className="text-sm text-gray-700">
-                      {typeof formData.next_collection_bir_2307 === "string"
-                        ? "Existing file"
-                        : formData.next_collection_bir_2307?.name}
-                    </span>
+                    <span className="text-sm text-gray-700">Existing file</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     {typeof formData.next_collection_bir_2307 === "string" && (
@@ -538,10 +565,30 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(formData.next_collection_bir_2307 as string, "_blank")}
+                        onClick={() => {
+                          const fileInput = document.getElementById(
+                            "next_collection_bir_2307_replace",
+                          ) as HTMLInputElement
+                          if (fileInput) {
+                            fileInput.click()
+                          }
+                        }}
+                        className="flex items-center space-x-1"
                       >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
+                        <Upload className="w-4 h-4" />
+                        <span>Replace</span>
+                      </Button>
+                    )}
+                    {typeof formData.next_collection_bir_2307 === "string" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(formData.next_collection_bir_2307 as string, "_blank")}
+                        className="flex items-center space-x-1"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>View</span>
                       </Button>
                     )}
                     <Button
@@ -549,10 +596,23 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                       variant="outline"
                       size="sm"
                       onClick={() => handleInputChange("next_collection_bir_2307", null)}
+                      className="p-2"
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
+                  <input
+                    id="next_collection_bir_2307_replace"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        handleInputChange("next_collection_bir_2307", file)
+                      }
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -622,42 +682,37 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
                 </label>
               </div>
             ) : (
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                <div className="flex items-center space-x-2">
-                  {formData.bir_2307 instanceof File ? (
-                    <>
-                      <Upload className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">{formData.bir_2307.name}</span>
-                      <span className="text-xs text-gray-500">
-                        ({(formData.bir_2307.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">Existing file: {formData.bir_2307}</span>
-                    </>
-                  )}
+              <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-gray-500" />
+                  <span className="text-sm text-gray-700">Existing file</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   {typeof formData.bir_2307 === "string" && (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={triggerFileReplace}
-                      className="text-blue-500 hover:text-blue-700"
+                      className="flex items-center space-x-1 bg-transparent"
                     >
-                      Replace
+                      <Upload className="w-4 h-4" />
+                      <span>Replace</span>
                     </Button>
                   )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeFile}
-                    className="text-red-500 hover:text-red-700"
-                  >
+                  {typeof formData.bir_2307 === "string" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(formData.bir_2307 as string, "_blank")}
+                      className="flex items-center space-x-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View</span>
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={removeFile} className="p-2 bg-transparent">
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
