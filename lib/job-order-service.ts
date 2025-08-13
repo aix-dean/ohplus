@@ -191,27 +191,8 @@ export async function createMultipleJobOrders(
         const shouldCreateNotification = jobOrderData.assignTo && jobOrderData.assignTo !== currentUserUid
 
         if (shouldCreateNotification) {
-          let notificationTitle = `New Job Order Assigned: ${jobOrderData.joNumber}`
-          let notificationDescription = `A new ${jobOrderData.joType} job order has been assigned to you for ${jobOrderData.siteName}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`
-
-          // Get quotation details to enhance the notification with product info
-          if (jobOrderData.quotationId) {
-            const quotationDetails = await getQuotationDetailsForJobOrder(jobOrderData.quotationId)
-
-            if (quotationDetails && quotationDetails.products.length > 0) {
-              // Enhance notification with product information
-              if (quotationDetails.products.length === 1) {
-                const product = quotationDetails.products[0]
-                const item = quotationDetails.items?.[0]
-                notificationTitle = `New Job Order Assigned: ${jobOrderData.joNumber} - ${product.name}`
-                notificationDescription = `A new ${jobOrderData.joType} job order has been assigned to you for product "${product.name}" at ${jobOrderData.siteName}${item?.product_location ? ` (Location: ${item.product_location})` : ""}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`
-              } else {
-                // Multiple products - show count
-                notificationTitle = `New Job Order Assigned: ${jobOrderData.joNumber} (${quotationDetails.products.length} products)`
-                notificationDescription = `A new ${jobOrderData.joType} job order has been assigned to you with ${quotationDetails.products.length} products at ${jobOrderData.siteName}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`
-              }
-            }
-          }
+          const notificationTitle = `New Job Order Assigned: ${jobOrderData.joNumber}`
+          const notificationDescription = `A new ${jobOrderData.joType} job order has been created`
 
           // Create single notification per job order
           await addDoc(collection(db, "notifications"), {
