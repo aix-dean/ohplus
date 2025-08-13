@@ -24,7 +24,7 @@ export function useLogisticsNotifications() {
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const { user } = useAuth()
-console.log(user)
+console.log(`user data: ${user}`)
   useEffect(() => {
     if (!user?.company_id) {
       setLoading(false)
