@@ -425,43 +425,28 @@ export default function SalesQuotationsPage() {
                             {quotation.quotation_number || "N/A"}
                           </TableCell>
                           <TableCell className="py-3">
-                            {quotation.status?.toLowerCase() === "sent" ||
-                            quotation.status?.toLowerCase() === "viewed" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleQuoteSigned(quotation)
-                                }}
-                                disabled={signingQuotes.has(quotation.id)}
-                                className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                              >
-                                {signingQuotes.has(quotation.id) ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
-                                    Processing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Quote Signed
-                                  </>
-                                )}
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-gray-400">
-                                {quotation.status === "draft"
-                                  ? "Quote Signed"
-                                  : quotation.status === "accepted"
-                                    ? "Already signed"
-                                    : quotation.status === "rejected"
-                                      ? "Rejected"
-                                      : quotation.status === "expired"
-                                        ? "Expired"
-                                        : "-"}
-                              </span>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleQuoteSigned(quotation)
+                              }}
+                              disabled={signingQuotes.has(quotation.id)}
+                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                            >
+                              {signingQuotes.has(quotation.id) ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Quote Signed
+                                </>
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
