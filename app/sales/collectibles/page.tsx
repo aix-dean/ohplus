@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react"
+import { Search, Eye, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -47,7 +47,7 @@ interface Collectible {
   net_amount_collection?: number
 }
 
-export default function CollectiblesPage() {
+export default function SalesCollectiblesPage() {
   const [collectibles, setCollectibles] = useState<Collectible[]>([])
   const [filteredCollectibles, setFilteredCollectibles] = useState<Collectible[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -184,12 +184,6 @@ export default function CollectiblesPage() {
           <h1 className="text-3xl font-bold">Collectibles</h1>
           <p className="text-muted-foreground">Manage your collection records and track payments</p>
         </div>
-        <Link href="/finance/collectibles/create">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Collectible
-          </Button>
-        </Link>
       </div>
 
       <Card>
@@ -242,12 +236,6 @@ export default function CollectiblesPage() {
           {filteredCollectibles.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No collectibles found</p>
-              <Link href="/finance/collectibles/create">
-                <Button className="mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Collectible
-                </Button>
-              </Link>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -290,31 +278,16 @@ export default function CollectiblesPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link
-                                href={`/finance/collectibles/details/${collectible.id}`}
-                                className="flex items-center"
-                              >
+                              <Link href={`/sales/collectibles/details/${collectible.id}`}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                               </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/finance/collectibles/edit/${collectible.id}`} className="flex items-center">
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleSoftDelete(collectible.id)}
-                              className="flex items-center text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

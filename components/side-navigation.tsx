@@ -33,7 +33,6 @@ import {
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -64,6 +63,7 @@ const navigationItems = [
       { title: "Billings", href: "#", icon: FileText },
       { title: "Planner", href: "/sales/planner", icon: Calendar },
       { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
+      { title: "Collectibles", href: "/sales/collectibles", icon: Package },
     ],
   },
   {
@@ -1074,7 +1074,6 @@ export function SideNavigation() {
             </div>
           </>
         ) : currentSection === "sales" ? (
-          // Special grouped layout for sales
           <>
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
@@ -1083,26 +1082,20 @@ export function SideNavigation() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">JD</AvatarFallback>
-                  </Avatar>
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
                   </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">SM</AvatarFallback>
-                  </Avatar>
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
               </div>
               <div className="flex justify-end mt-3">
@@ -1110,6 +1103,7 @@ export function SideNavigation() {
               </div>
             </div>
 
+            {/* To Do Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
                 <h3 className="text-sm font-medium text-gray-700">To Do</h3>
@@ -1135,20 +1129,13 @@ export function SideNavigation() {
                     >
                       <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
                     </Link>
                   )
                 })}
               </div>
             </div>
 
+            {/* To Go Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
                 <h3 className="text-sm font-medium text-gray-700">To Go</h3>
@@ -1156,13 +1143,14 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
+                  { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
                   { title: "Billings", href: "#", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
+                  { title: "Collectibles", href: "/sales/collectibles", icon: Package },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1179,14 +1167,6 @@ export function SideNavigation() {
                     >
                       <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
                     </Link>
                   )
                 })}
