@@ -1,5 +1,7 @@
 "use client"
 
+import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -29,6 +31,8 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  Wrench,
+  Package2,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -39,7 +43,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
@@ -61,6 +64,7 @@ interface InventoryItem {
   id: string
   name: string
   type: "hardware" | "software"
+  inventory_type: "assets" | "tools" | "consumables"
   category: string
   brand: string
   department: string
@@ -136,6 +140,7 @@ export default function ITInventoryPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table")
   const [sortBy, setSortBy] = useState<string>("created_at")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<string>("all")
 
   // Statistics
   const [stats, setStats] = useState({
@@ -146,6 +151,9 @@ export default function ITInventoryPage() {
     retired: 0,
     hardware: 0,
     software: 0,
+    assets: 0,
+    tools: 0,
+    consumables: 0,
     totalValue: 0,
   })
 
@@ -171,6 +179,7 @@ export default function ITInventoryPage() {
             id: doc.id,
             name: data.name || "",
             type: data.type || "hardware",
+            inventory_type: data.inventory_type || "assets",
             category: data.category || "",
             brand: data.brand || "",
             department: data.department || "",
@@ -209,6 +218,9 @@ export default function ITInventoryPage() {
           retired: fetchedItems.filter((item) => item.status === "retired").length,
           hardware: fetchedItems.filter((item) => item.type === "hardware").length,
           software: fetchedItems.filter((item) => item.type === "software").length,
+          assets: fetchedItems.filter((item) => item.inventory_type === "assets").length,
+          tools: fetchedItems.filter((item) => item.inventory_type === "tools").length,
+          consumables: fetchedItems.filter((item) => item.inventory_type === "consumables").length,
           totalValue: fetchedItems.reduce((sum, item) => sum + (item.cost || 0), 0),
         }
         setStats(newStats)
@@ -281,8 +293,11 @@ export default function ITInventoryPage() {
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
     const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter
     const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter
+    const matchesInventoryType = inventoryTypeFilter === "all" || item.inventory_type === inventoryTypeFilter
 
-    return matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesCondition
+    return (
+      matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesCondition && matchesInventoryType
+    )
   })
 
   const handleEdit = useCallback(
@@ -524,6 +539,39 @@ export default function ITInventoryPage() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Package className="h-4 w-4 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.assets}</p>
+                  <p className="text-xs text-muted-foreground">Assets</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Wrench className="h-4 w-4 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.tools}</p>
+                  <p className="text-xs text-muted-foreground">Tools</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Package2 className="h-4 w-4 text-orange-600" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.consumables}</p>
+                  <p className="text-xs text-muted-foreground">Consumables</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters and Search */}
@@ -595,6 +643,17 @@ export default function ITInventoryPage() {
                     <SelectItem value="Administration">Administration</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={inventoryTypeFilter} onValueChange={setInventoryTypeFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px]">
+                    <SelectValue placeholder="Inventory Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="assets">Assets</SelectItem>
+                    <SelectItem value="tools">Tools</SelectItem>
+                    <SelectItem value="consumables">Consumables</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -633,7 +692,8 @@ export default function ITInventoryPage() {
               typeFilter !== "all" ||
               statusFilter !== "all" ||
               departmentFilter !== "all" ||
-              conditionFilter !== "all") && (
+              conditionFilter !== "all" ||
+              inventoryTypeFilter !== "all") && (
               <Button
                 variant="outline"
                 size="sm"
@@ -643,6 +703,7 @@ export default function ITInventoryPage() {
                   setStatusFilter("all")
                   setDepartmentFilter("all")
                   setConditionFilter("all")
+                  setInventoryTypeFilter("all")
                 }}
               >
                 Clear Filters
@@ -699,6 +760,7 @@ export default function ITInventoryPage() {
                     <TableHead>Location</TableHead>
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Purchase Cost</TableHead>
+                    <TableHead>Inventory Type</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -768,6 +830,16 @@ export default function ITInventoryPage() {
                             <span className="text-sm">
                               {item.cost > 0 ? `${item.currency} ${item.cost.toLocaleString()}` : "N/A"}
                             </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {item.inventory_type === "assets" && <Package className="h-4 w-4 text-blue-600" />}
+                            {item.inventory_type === "tools" && <Wrench className="h-4 w-4 text-green-600" />}
+                            {item.inventory_type === "consumables" && <Package2 className="h-4 w-4 text-orange-600" />}
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {item.inventory_type}
+                            </Badge>
                           </div>
                         </TableCell>
                         <TableCell>
