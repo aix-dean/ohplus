@@ -25,6 +25,9 @@ export function useLogisticsNotifications() {
   const [unreadCount, setUnreadCount] = useState(0)
   const { user } = useAuth()
 
+  console.log("User data:", JSON.stringify(user))
+  console.log("Company ID:", user?.company_id)
+
   useEffect(() => {
     if (!user?.company_id) {
       setLoading(false)
