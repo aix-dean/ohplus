@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
+import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download, PlusCircle } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
 import { teamsService } from "@/lib/teams-service"
@@ -33,6 +33,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
+import { TeamFormDialog } from "@/components/team-form-dialog"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -55,6 +56,7 @@ export default function CreateServiceAssignmentPage() {
 
   const [teams, setTeams] = useState<Team[]>([])
   const [loadingTeams, setLoadingTeams] = useState(true)
+  const [isNewTeamDialogOpen, setIsNewTeamDialogOpen] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -791,6 +793,18 @@ export default function CreateServiceAssignmentPage() {
                   <SelectValue placeholder={loadingTeams ? "Loading teams..." : "Select crew"} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem
+                    value="add-new-team"
+                    className="text-blue-600 font-medium"
+                    onSelect={() => {
+                      setIsNewTeamDialogOpen(true)
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Add New Team
+                    </div>
+                  </SelectItem>
                   {loadingTeams ? (
                     <SelectItem value="loading" disabled>
                       Loading teams...
@@ -1232,6 +1246,19 @@ export default function CreateServiceAssignmentPage() {
         saNumber={createdSaNumber}
         onViewAssignments={handleViewAssignments}
         onCreateAnother={handleCreateAnother}
+      />
+
+      <TeamFormDialog
+        open={isNewTeamDialogOpen}
+        onOpenChange={setIsNewTeamDialogOpen}
+        onSuccess={(newTeam) => {
+          // Add the new team to the teams list
+          setTeams((prev) => [...prev, newTeam])
+          // Select the new team in the form
+          handleInputChange("crew", newTeam.id)
+          // Close the dialog
+          setIsNewTeamDialogOpen(false)
+        }}
       />
     </div>
   )
