@@ -282,7 +282,9 @@ export default function CollectiblesPage() {
                       <TableCell>{collectible.total_amount ? formatCurrency(collectible.total_amount) : "-"}</TableCell>
                       <TableCell>{displayValue(collectible.mode_of_payment)}</TableCell>
                       <TableCell>{displayValue(collectible.bank_name)}</TableCell>
-                      <TableCell>{getStatusBadge(collectible.status)}</TableCell>
+                      <TableCell className="whitespace-nowrap min-w-[100px]">
+                        {getStatusBadge(collectible.status)}
+                      </TableCell>
                       <TableCell>{displayValue(collectible.next_collection_date)}</TableCell>
                       <TableCell>
                         <DropdownMenu>
