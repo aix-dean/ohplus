@@ -210,3 +210,15 @@ export async function updateTeamStatus(teamId: string, status: "active" | "inact
     throw new Error("Failed to update team status")
   }
 }
+
+export const teamsService = {
+  getAllTeams: getTeams,
+  getTeamById,
+  createTeam,
+  updateTeam,
+  deleteTeam,
+  getTeamMembers,
+  addTeamMember,
+  removeTeamMember,
+  updateTeamStatus,
+}

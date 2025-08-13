@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
+import { teamsService } from "@/lib/teams-service"
+import type { Team } from "@/lib/types/team"
 import {
   addDoc,
   collection,
@@ -50,6 +52,9 @@ export default function CreateServiceAssignmentPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [isEditingDraft, setIsEditingDraft] = useState(false)
   const [draftId, setDraftId] = useState<string | null>(null)
+
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(true)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -118,6 +123,24 @@ export default function CreateServiceAssignmentPage() {
     }
 
     fetchProducts()
+  }, [])
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        setLoadingTeams(true)
+        const teamsData = await teamsService.getAllTeams()
+        // Filter only active teams
+        const activeTeams = teamsData.filter((team) => team.status === "active")
+        setTeams(activeTeams)
+      } catch (error) {
+        console.error("Error fetching teams:", error)
+      } finally {
+        setLoadingTeams(false)
+      }
+    }
+
+    fetchTeams()
   }, [])
 
   // Load draft data if editing
@@ -765,15 +788,24 @@ export default function CreateServiceAssignmentPage() {
               </Label>
               <Select value={formData.crew} onValueChange={(value) => handleInputChange("crew", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select crew" />
+                  <SelectValue placeholder={loadingTeams ? "Loading teams..." : "Select crew"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="crew-a">Crew A</SelectItem>
-                  <SelectItem value="crew-b">Crew B</SelectItem>
-                  <SelectItem value="crew-c">Crew C</SelectItem>
-                  <SelectItem value="maintenance-crew">Maintenance Crew</SelectItem>
-                  <SelectItem value="installation-crew">Installation Crew</SelectItem>
-                  <SelectItem value="technical-crew">Technical Crew</SelectItem>
+                  {loadingTeams ? (
+                    <SelectItem value="" disabled>
+                      Loading teams...
+                    </SelectItem>
+                  ) : teams.length > 0 ? (
+                    teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} ({team.type}) - {team.members.length} members
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>
+                      No active teams available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
