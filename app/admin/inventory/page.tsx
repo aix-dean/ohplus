@@ -268,12 +268,8 @@ export default function AdminInventoryPage() {
   }
 
   const handleAddSiteClick = async () => {
-    console.log("handleAddSiteClick: Starting subscription check")
-    console.log("userData:", { company_id: userData?.company_id, license_key: userData?.license_key })
-
     // Check if user has company_id first
     if (!userData?.company_id) {
-      console.log("No company_id found, showing company registration dialog")
       setShowCompanyDialog(true)
       return
     }
@@ -281,9 +277,7 @@ export default function AdminInventoryPage() {
     // Query subscription by company ID
     let currentSubscription = null
     try {
-      console.log("Fetching subscription for company_id:", userData.company_id)
       currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
-      console.log("Current subscription:", currentSubscription)
     } catch (error) {
       console.error("Error fetching subscription:", error)
       setSubscriptionLimitMessage("Error fetching subscription data. Please try again or contact support.")
@@ -293,7 +287,6 @@ export default function AdminInventoryPage() {
 
     // Check if user has license key
     if (!userData?.license_key) {
-      console.log("No license key found")
       setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
       setShowSubscriptionLimitDialog(true)
       return
@@ -301,14 +294,12 @@ export default function AdminInventoryPage() {
 
     // Check if subscription exists and is active
     if (!currentSubscription) {
-      console.log("No subscription found")
       setSubscriptionLimitMessage("No active subscription found. Please choose a plan to start adding sites.")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (currentSubscription.status !== "active") {
-      console.log("Subscription not active, status:", currentSubscription.status)
       setSubscriptionLimitMessage(
         `Your subscription is ${currentSubscription.status}. Please activate your subscription to continue.`,
       )
@@ -317,9 +308,7 @@ export default function AdminInventoryPage() {
     }
 
     // Check product limit
-    console.log("Checking product limit:", { totalItems, maxProducts: currentSubscription.maxProducts })
     if (totalItems >= currentSubscription.maxProducts) {
-      console.log("Product limit reached")
       setSubscriptionLimitMessage(
         `You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
       )
@@ -327,12 +316,10 @@ export default function AdminInventoryPage() {
       return
     }
 
-    console.log("All checks passed, redirecting to create product")
     router.push("/admin/products/create")
   }
 
   const handleCompanyRegistrationSuccess = async () => {
-    console.log("Company registration successful, refreshing user data")
     await refreshUserData()
     setShowCompanyDialog(false)
 
@@ -342,9 +329,7 @@ export default function AdminInventoryPage() {
       let currentSubscription = null
       try {
         if (userData?.company_id) {
-          console.log("Fetching subscription after company registration for company_id:", userData.company_id)
           currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
-          console.log("Subscription after company registration:", currentSubscription)
         }
       } catch (error) {
         console.error("Error fetching subscription after company registration:", error)
@@ -352,7 +337,6 @@ export default function AdminInventoryPage() {
 
       // Check subscription after company registration
       if (!userData?.license_key) {
-        console.log("No license key after company registration")
         setSubscriptionLimitMessage(
           "Company registered successfully! Now choose a subscription plan to start adding sites.",
         )
@@ -361,7 +345,6 @@ export default function AdminInventoryPage() {
       }
 
       if (!currentSubscription) {
-        console.log("No subscription found after company registration")
         setSubscriptionLimitMessage(
           "Company registered successfully! Please choose a subscription plan to start adding sites.",
         )
@@ -370,7 +353,6 @@ export default function AdminInventoryPage() {
       }
 
       if (currentSubscription.status !== "active") {
-        console.log("Subscription not active after company registration, status:", currentSubscription.status)
         setSubscriptionLimitMessage(
           `Company registered successfully! Your subscription is ${currentSubscription.status}. Please activate it to continue.`,
         )
@@ -379,7 +361,6 @@ export default function AdminInventoryPage() {
       }
 
       if (totalItems >= currentSubscription.maxProducts) {
-        console.log("Product limit reached after company registration")
         setSubscriptionLimitMessage(
           `Company registered successfully! You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
         )
@@ -388,7 +369,6 @@ export default function AdminInventoryPage() {
       }
 
       // Only redirect if all subscription checks pass
-      console.log("All checks passed after company registration, redirecting to create product")
       router.push("/admin/products/create")
     }, 1000) // Wait 1 second for userData to refresh
   }

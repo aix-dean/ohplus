@@ -59,7 +59,6 @@ export default function LEDSitesCompliance() {
     event.stopPropagation()
     setSelectedSiteId(siteId)
     setReportDialogOpen(true)
-    console.log("Creating report for LED compliance site:", siteId)
   }
 
   const getComplianceBadge = (status: string) => {

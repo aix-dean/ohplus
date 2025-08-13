@@ -69,13 +69,13 @@ export default function LogisticsPlannerPage() {
   // Fetch service assignments with actual data
   const fetchAssignments = useCallback(async () => {
     if (!userData?.company_id) {
-      console.log("No company_id found in userData:", userData)
+      setAssignments([])
+      setLoading(false)
       return
     }
 
     try {
       setLoading(true)
-      console.log("Fetching service assignments for company_id:", userData.company_id)
 
       // Query service assignments from Firestore using company_id
       const assignmentsRef = collection(db, "service_assignments")
@@ -87,18 +87,14 @@ export default function LogisticsPlannerPage() {
       try {
         querySnapshot = await getDocs(q)
       } catch (orderByError) {
-        console.log("OrderBy failed, trying without orderBy:", orderByError)
-        // Fallback without orderBy
+        // If orderBy fails (likely due to missing index), try without orderBy
         q = query(assignmentsRef, where("company_id", "==", userData.company_id))
         querySnapshot = await getDocs(q)
       }
 
-      console.log("Found", querySnapshot.size, "service assignments")
-
       const fetchedAssignments: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
-        console.log("Processing assignment:", doc.id, data)
 
         // Convert Firestore timestamps to Date objects with better error handling
         let alarmDate: Date | null = null
@@ -174,41 +170,28 @@ export default function LogisticsPlannerPage() {
 
         const assignment: ServiceAssignment = {
           id: doc.id,
-          saNumber: data.saNumber || `SA-${doc.id.slice(-6)}`,
+          saNumber: data.saNumber || "",
           projectSiteId: data.projectSiteId || data.siteId || "",
-          projectSiteName: data.projectSiteName || data.siteName || data.location || "Unknown Site",
-          serviceType: data.serviceType || data.type || "General Service",
+          projectSiteName:
+            data.projectSiteName || data.project_site_name || data.siteName || data.location || "Unknown Site",
+          serviceType: data.serviceType || data.service_type || data.type || "General Service",
           alarmDate,
-          alarmTime: data.alarmTime || "08:00",
+          alarmTime: data.alarmTime || data.alarm_time || "08:00",
           coveredDateStart,
           coveredDateEnd,
           status: data.status || "Pending",
           location: data.projectSiteLocation || data.location || data.address || "",
           notes: data.message || data.notes || data.description || "",
           assignedTo: data.assignedTo || data.assignedToId || "",
-          assignedToName: data.assignedTo || "Unassigned",
+          assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
           jobDescription: data.jobDescription || data.description || "",
           createdAt,
           updatedAt,
         }
 
-        console.log("Processed assignment:", {
-          id: assignment.id,
-          saNumber: assignment.saNumber,
-          projectSiteName: assignment.projectSiteName,
-          serviceType: assignment.serviceType,
-          alarmDate: assignment.alarmDate,
-          alarmTime: assignment.alarmTime,
-          coveredDateStart: assignment.coveredDateStart,
-          coveredDateEnd: assignment.coveredDateEnd,
-          status: assignment.status,
-        })
-
         fetchedAssignments.push(assignment)
       })
 
-      console.log("Total processed assignments:", fetchedAssignments.length)
-      console.log("All assignments:", fetchedAssignments)
       setAssignments(fetchedAssignments)
     } catch (error) {
       console.error("Error fetching service assignments:", error)
@@ -317,27 +300,24 @@ export default function LogisticsPlannerPage() {
   // Filter assignments based on current view and search term
   const getFilteredAssignments = () => {
     if (!assignments || assignments.length === 0) {
-      console.log("No assignments to filter")
       return []
     }
 
     let filtered = [...assignments]
-    console.log("Starting with", filtered.length, "assignments")
 
     // Apply search filter if any
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (assignment) =>
-          assignment.projectSiteName.toLowerCase().includes(term) ||
-          assignment.saNumber.toLowerCase().includes(term) ||
-          assignment.serviceType.toLowerCase().includes(term) ||
+          assignment.saNumber?.toLowerCase().includes(term) ||
+          assignment.projectSiteName?.toLowerCase().includes(term) ||
+          assignment.serviceType?.toLowerCase().includes(term) ||
           assignment.location?.toLowerCase().includes(term) ||
           assignment.assignedToName?.toLowerCase().includes(term) ||
           assignment.notes?.toLowerCase().includes(term) ||
           assignment.jobDescription?.toLowerCase().includes(term),
       )
-      console.log("After search filter:", filtered.length, "assignments")
     }
 
     // Filter based on current view and date range - use alarmDate as primary filter
@@ -385,7 +365,6 @@ export default function LogisticsPlannerPage() {
 
           return false
         })
-        console.log("Month view filtered assignments:", monthFiltered.length)
         return monthFiltered
 
       case "week":
@@ -397,20 +376,16 @@ export default function LogisticsPlannerPage() {
         weekEnd.setDate(weekStart.getDate() + 6)
         weekEnd.setHours(23, 59, 59, 999)
 
-        console.log("Week range:", weekStart, "to", weekEnd)
-
         return filtered.filter((assignment) => {
           // Primary filter: alarmDate
           if (assignment.alarmDate) {
             const inWeek = assignment.alarmDate >= weekStart && assignment.alarmDate <= weekEnd
-            console.log("Assignment", assignment.saNumber, "alarmDate in week:", inWeek)
             return inWeek
           }
 
           // Fallback: check covered dates
           if (assignment.coveredDateStart && assignment.coveredDateEnd) {
             const overlaps = assignment.coveredDateStart <= weekEnd && assignment.coveredDateEnd >= weekStart
-            console.log("Assignment", assignment.saNumber, "overlaps week:", overlaps)
             return overlaps
           }
 
@@ -576,7 +551,6 @@ export default function LogisticsPlannerPage() {
   // Render calendar based on current view
   const renderCalendar = () => {
     const filteredAssignments = getFilteredAssignments()
-    console.log("Rendering calendar with", filteredAssignments.length, "filtered assignments")
 
     switch (view) {
       case "month":
@@ -632,8 +606,6 @@ export default function LogisticsPlannerPage() {
         }
       }
     })
-
-    console.log("Assignments by day:", assignmentsByDay)
 
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">

@@ -59,7 +59,6 @@ export default function LEDSitesDisplayHealth() {
     event.stopPropagation()
     setSelectedSiteId(siteId)
     setReportDialogOpen(true)
-    console.log("Creating report for LED display health site:", siteId)
   }
 
   const getHealthBadge = (health: string) => {
