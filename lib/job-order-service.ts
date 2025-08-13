@@ -191,19 +191,62 @@ export async function createMultipleJobOrders(
         const shouldCreateNotification = jobOrderData.assignTo && jobOrderData.assignTo !== currentUserUid
 
         if (shouldCreateNotification) {
-          await addDoc(collection(db, "notifications"), {
-            type: "Job Order",
-            title: `New Job Order Assigned: ${jobOrderData.joNumber}`,
-            description: `A new ${jobOrderData.joType} job order has been assigned to you for ${jobOrderData.siteName}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`,
-            department_to: "Logistics",
-            uid_to: jobOrderData.assignTo,
-            company_id: jobOrderData.company_id,
-            department_from: "Sales",
-            viewed: false,
-            navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/job-orders/${docRef.id}`,
-            created: serverTimestamp(),
-          })
-          console.log("Notification created for job order:", docRef.id)
+          // Get quotation details to access products
+          if (jobOrderData.quotationId) {
+            const quotationDetails = await getQuotationDetailsForJobOrder(jobOrderData.quotationId)
+
+            if (quotationDetails && quotationDetails.products.length > 0) {
+              // Create one notification per product
+              for (let i = 0; i < quotationDetails.products.length; i++) {
+                const product = quotationDetails.products[i]
+                const item = quotationDetails.items?.[i] // Get corresponding item if available
+
+                await addDoc(collection(db, "notifications"), {
+                  type: "Job Order",
+                  title: `New Job Order Assigned: ${jobOrderData.joNumber} - ${product.name}`,
+                  description: `A new ${jobOrderData.joType} job order has been assigned to you for product "${product.name}" at ${jobOrderData.siteName}${item?.product_location ? ` (Location: ${item.product_location})` : ""}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`,
+                  department_to: "Logistics",
+                  uid_to: jobOrderData.assignTo,
+                  company_id: jobOrderData.company_id,
+                  department_from: "Sales",
+                  viewed: false,
+                  navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/job-orders/${docRef.id}`,
+                  created: serverTimestamp(),
+                })
+                console.log(`Notification created for job order ${docRef.id}, product: ${product.name}`)
+              }
+            } else {
+              // Fallback: create single notification if no products found
+              await addDoc(collection(db, "notifications"), {
+                type: "Job Order",
+                title: `New Job Order Assigned: ${jobOrderData.joNumber}`,
+                description: `A new ${jobOrderData.joType} job order has been assigned to you for ${jobOrderData.siteName}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`,
+                department_to: "Logistics",
+                uid_to: jobOrderData.assignTo,
+                company_id: jobOrderData.company_id,
+                department_from: "Sales",
+                viewed: false,
+                navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/job-orders/${docRef.id}`,
+                created: serverTimestamp(),
+              })
+              console.log("Fallback notification created for job order:", docRef.id)
+            }
+          } else {
+            // Fallback: create single notification if no quotation ID
+            await addDoc(collection(db, "notifications"), {
+              type: "Job Order",
+              title: `New Job Order Assigned: ${jobOrderData.joNumber}`,
+              description: `A new ${jobOrderData.joType} job order has been assigned to you for ${jobOrderData.siteName}. Deadline: ${new Date(jobOrderData.deadline).toLocaleDateString()}`,
+              department_to: "Logistics",
+              uid_to: jobOrderData.assignTo,
+              company_id: jobOrderData.company_id,
+              department_from: "Sales",
+              viewed: false,
+              navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/job-orders/${docRef.id}`,
+              created: serverTimestamp(),
+            })
+            console.log("Fallback notification created for job order:", docRef.id)
+          }
         }
       } catch (notificationError) {
         console.error("Error creating notification for job order:", docRef.id, notificationError)
