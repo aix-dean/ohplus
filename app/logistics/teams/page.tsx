@@ -313,9 +313,7 @@ export default function TeamsPage() {
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t">
-                <div className="text-sm text-gray-500">
-                  {team.members.length} member{team.members.length !== 1 ? "s" : ""}
-                </div>
+                <div className="text-sm text-gray-500"></div>
                 <Button variant="outline" size="sm" onClick={() => handleStatusToggle(team)}>
                   {team.status === "active" ? "Deactivate" : "Activate"}
                 </Button>
