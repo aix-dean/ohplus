@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react"
+import { Search, Eye, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -288,16 +288,6 @@ export default function SalesCollectiblesPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                               </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/sales/collectibles/edit/${collectible.id}`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSoftDelete(collectible.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
