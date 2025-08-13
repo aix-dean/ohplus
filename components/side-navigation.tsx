@@ -616,13 +616,65 @@ export function SideNavigation() {
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
                   { title: "Network Management", href: "/it/network", icon: Wifi },
                   { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-                  { title: "Assets", href: "/it/inventory", icon: Package },
+                  {
+                    title: "Inventory",
+                    href: "/it/inventory",
+                    icon: Package,
+                    submenu: [
+                      { title: "Tools", href: "/it/inventory/tools", icon: Package },
+                      { title: "Consumables", href: "/it/inventory/consumables", icon: Package },
+                      { title: "Assets", href: "/it/inventory", icon: Package },
+                    ],
+                  },
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                   { title: "User Management", href: "/it/user-management", icon: Users },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
+
+                  if (item.submenu) {
+                    return (
+                      <div key={item.href} className="space-y-1">
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                            active
+                              ? "bg-gray-100 text-gray-900 font-medium"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                          )}
+                        >
+                          <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                          <span className="flex-1">{item.title}</span>
+                        </Link>
+                        <div className="ml-6 space-y-1">
+                          {item.submenu.map((subItem) => {
+                            const SubIcon = subItem.icon
+                            const subActive = isActive(pathname, subItem.href)
+                            return (
+                              <Link
+                                key={subItem.href}
+                                href={subItem.href}
+                                className={cn(
+                                  "flex items-center py-1.5 px-3 text-xs rounded-md transition-all duration-200 w-full",
+                                  subActive
+                                    ? "bg-gray-100 text-gray-900 font-medium"
+                                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-700",
+                                )}
+                              >
+                                <SubIcon
+                                  className={cn("h-3 w-3 mr-2", subActive ? "text-gray-700" : "text-gray-400")}
+                                />
+                                <span className="flex-1">{subItem.title}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <Link
                       key={item.href}
@@ -687,7 +739,7 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
