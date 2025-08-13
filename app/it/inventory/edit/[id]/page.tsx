@@ -186,6 +186,19 @@ const getVisibleSteps = (itemType: "hardware" | "software") => {
     .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
 }
 
+const getInventoryTypeIcon = (type: string) => {
+  switch (type) {
+    case "assets":
+      return <HardDrive className="h-4 w-4" />
+    case "tools":
+      return <Wrench className="h-4 w-4" />
+    case "consumables":
+      return <Package2 className="h-4 w-4" />
+    default:
+      return <Package className="h-4 w-4" />
+  }
+}
+
 export default function EditInventoryItemPage() {
   const router = useRouter()
   const params = useParams()
