@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Eye } from "lucide-react"
+import { Search, Edit, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -183,12 +183,6 @@ export default function SalesCollectiblesPage() {
           <h1 className="text-3xl font-bold">Collectibles</h1>
           <p className="text-muted-foreground">Manage your collection records and track payments</p>
         </div>
-        <Link href="/sales/collectibles/create">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Collectible
-          </Button>
-        </Link>
       </div>
 
       <Card>
@@ -241,12 +235,6 @@ export default function SalesCollectiblesPage() {
           {filteredCollectibles.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No collectibles found</p>
-              <Link href="/sales/collectibles/create">
-                <Button className="mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Collectible
-                </Button>
-              </Link>
             </div>
           ) : (
             <div className="overflow-x-auto">
