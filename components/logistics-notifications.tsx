@@ -46,7 +46,7 @@ export function LogisticsNotifications() {
       </div>
     )
   }
-  console.log(notifications)
+  console.log(`notifications: ${notifications}`)
   return (
     <div className="bg-gradient-to-br from-sky-300 to-sky-400 rounded-lg p-3 text-white">
       <div className="flex items-center justify-between mb-3">
