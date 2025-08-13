@@ -5,14 +5,31 @@ import { formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export function LogisticsNotifications() {
   const { notifications, loading, unreadCount } = useLogisticsNotifications()
   const router = useRouter()
 
-  const handleNotificationClick = (notification: any) => {
-    if (notification.navigate_to) {
-      router.push(notification.navigate_to)
+  const handleNotificationClick = async (notification: any) => {
+    try {
+      if (!notification.viewed) {
+        await updateDoc(doc(db, "notifications", notification.id), {
+          viewed: true,
+        })
+      }
+
+      // Navigate to the specified URL
+      if (notification.navigate_to) {
+        router.push(notification.navigate_to)
+      }
+    } catch (error) {
+      console.error("Error updating notification:", error)
+      // Still navigate even if update fails
+      if (notification.navigate_to) {
+        router.push(notification.navigate_to)
+      }
     }
   }
 
