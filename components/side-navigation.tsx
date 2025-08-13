@@ -34,7 +34,6 @@ import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { CrossDepartmentAlertBanner } from "@/components/cross-department-alert-banner"
 import { useLowStockAlertContext } from "@/contexts/low-stock-alert-context"
 
 // Navigation data structure with icons
@@ -159,6 +158,7 @@ export function SideNavigation() {
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const { hasAlerts } = useLowStockAlertContext()
+  const { alerts, lowStockItems } = useLowStockAlertContext()
 
   // Determine the current section from the pathname
   let currentSection = pathname?.split("/")[1] || "dashboard"
@@ -207,31 +207,35 @@ export function SideNavigation() {
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
       <nav className="p-3 space-y-4">
-        {currentSection !== "it" && hasAlerts && <CrossDepartmentAlertBanner compact={true} />}
         {currentSection === "cms" ? (
           <>
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -335,24 +339,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-sky-300 to-sky-400 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -457,24 +466,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -579,24 +593,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-purple-400 to-purple-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -702,40 +721,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -842,40 +850,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notifications for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -981,9 +978,29 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
+                {alerts.length > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    {alerts.length}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
-                <p className="text-xs text-white/90">No notification for now.</p>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-white/90">No notification for now.</p>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -1083,35 +1100,39 @@ export function SideNavigation() {
             <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
-                {unreadCount > 0 && (
+                {(unreadCount > 0 || alerts.length > 0) && (
                   <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-                    {unreadCount}
+                    {alerts.length > 0 ? alerts.length : unreadCount}
                   </Badge>
                 )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback className="bg-white/30 text-white text-xs">JD</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 2).map((alert, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-medium truncate">{alert.itemName}</p>
+                        <p className="text-xs text-white/80">Low stock: {alert.currentStock} units</p>
+                      </div>
+                      <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src="/placeholder.svg" />
+                      <AvatarFallback className="bg-white/30 text-white text-xs">JD</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                      <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                    </div>
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
                   </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback className="bg-white/30 text-white text-xs">SM</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                )}
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
