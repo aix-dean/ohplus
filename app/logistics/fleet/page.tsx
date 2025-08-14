@@ -48,7 +48,7 @@ export default function FleetPage() {
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null)
   const { userData } = useAuth()
 
-  const { vehicles, loading, error, stats, deleteVehicle, clearError } = useFleet()
+  const { vehicles, loading, error, stats, fetchVehicles, deleteVehicle, clearError } = useFleet()
 
   const { filteredVehicles } = useFleetFilters(vehicles, {
     search: searchQuery,
@@ -56,6 +56,10 @@ export default function FleetPage() {
     vehicleType: "all",
     location: "all",
   })
+
+  useEffect(() => {
+    fetchVehicles()
+  }, [fetchVehicles])
 
   useEffect(() => {
     if (error) {
@@ -151,182 +155,197 @@ export default function FleetPage() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Vehicles</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                    </div>
-                    <Truck className="h-8 w-8 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Active</p>
-                      <p className="text-2xl font-bold text-green-600">{stats.active}</p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">In Maintenance</p>
-                      <p className="text-2xl font-bold text-yellow-600">{stats.maintenance}</p>
-                    </div>
-                    <AlertTriangle className="h-8 w-8 text-yellow-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Inactive</p>
-                      <p className="text-2xl font-bold text-gray-600">{stats.inactive}</p>
-                    </div>
-                    <Settings className="h-8 w-8 text-gray-600" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search vehicles, drivers..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-white border-gray-200"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40 bg-white border-gray-200">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+            {loading && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-gray-600 mt-2">Loading vehicles...</p>
               </div>
-              <Button variant="outline" className="border-gray-200 bg-transparent">
-                <Filter className="h-4 w-4 mr-2" />
-                More Filters
-              </Button>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {filteredVehicles.map((vehicle) => (
-                <Card key={vehicle.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold">{vehicle.vehicleNumber}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(vehicle.status)}>
-                          <div className="flex items-center gap-1">
-                            {getStatusIcon(vehicle.status)}
-                            <span className="capitalize">{vehicle.status}</span>
-                          </div>
-                        </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewVehicle(vehicle.id)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditVehicle(vehicle.id)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Vehicle
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteVehicle(vehicle.id)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Vehicle
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {vehicle.vehicleType.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-gray-500" />
-                      <span className="text-gray-700">{vehicle.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Truck className="h-4 w-4 text-gray-500" />
-                      <span className="text-gray-700">Driver: {vehicle.driver}</span>
-                    </div>
-                    {vehicle.fuelLevel && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Fuel className="h-4 w-4 text-gray-500" />
-                        <span className="text-gray-700">Fuel: {vehicle.fuelLevel}%</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 ml-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${vehicle.fuelLevel}%` }}
-                          ></div>
+            {!loading && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">Total Vehicles</p>
+                          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
                         </div>
+                        <Truck className="h-8 w-8 text-blue-600" />
                       </div>
-                    )}
-                    {vehicle.nextMaintenance && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-gray-500" />
-                        <span className="text-gray-700">Next Maintenance: {vehicle.nextMaintenance}</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">Active</p>
+                          <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+                        </div>
+                        <CheckCircle className="h-8 w-8 text-green-600" />
                       </div>
-                    )}
-                    {vehicle.mileage && <div className="text-sm text-gray-600">Mileage: {vehicle.mileage}</div>}
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewVehicle(vehicle.id)}
-                        className="flex-1 bg-transparent"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleAssignTask(vehicle.id)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
-                      >
-                        Assign Task
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">In Maintenance</p>
+                          <p className="text-2xl font-bold text-yellow-600">{stats.maintenance}</p>
+                        </div>
+                        <AlertTriangle className="h-8 w-8 text-yellow-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">Inactive</p>
+                          <p className="text-2xl font-bold text-gray-600">{stats.inactive}</p>
+                        </div>
+                        <Settings className="h-8 w-8 text-gray-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-            {filteredVehicles.length === 0 && (
-              <div className="text-center py-12">
-                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles found</h3>
-                <p className="text-gray-600">Try adjusting your search or filter criteria.</p>
-              </div>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search vehicles, drivers..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-white border-gray-200"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-40 bg-white border-gray-200">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" className="border-gray-200 bg-transparent">
+                    <Filter className="h-4 w-4 mr-2" />
+                    More Filters
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {filteredVehicles.map((vehicle) => (
+                    <Card key={vehicle.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg font-semibold">{vehicle.vehicleNumber}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(vehicle.status)}>
+                              <div className="flex items-center gap-1">
+                                {getStatusIcon(vehicle.status)}
+                                <span className="capitalize">{vehicle.status}</span>
+                              </div>
+                            </Badge>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewVehicle(vehicle.id)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditVehicle(vehicle.id)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Vehicle
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteVehicle(vehicle.id)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Vehicle
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {vehicle.vehicleType.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-700">{vehicle.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Truck className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-700">Driver: {vehicle.driver}</span>
+                        </div>
+                        {vehicle.fuelLevel && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Fuel className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-700">Fuel: {vehicle.fuelLevel}%</span>
+                            <div className="flex-1 bg-gray-200 rounded-full h-2 ml-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{ width: `${vehicle.fuelLevel}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        )}
+                        {vehicle.nextMaintenance && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-700">Next Maintenance: {vehicle.nextMaintenance}</span>
+                          </div>
+                        )}
+                        {vehicle.mileage && <div className="text-sm text-gray-600">Mileage: {vehicle.mileage}</div>}
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewVehicle(vehicle.id)}
+                            className="flex-1 bg-transparent"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAssignTask(vehicle.id)}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700"
+                          >
+                            Assign Task
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {filteredVehicles.length === 0 && !loading && (
+                  <div className="text-center py-12">
+                    <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles found</h3>
+                    <p className="text-gray-600">
+                      {vehicles.length === 0
+                        ? "Get started by adding your first vehicle to the fleet."
+                        : "Try adjusting your search or filter criteria."}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
