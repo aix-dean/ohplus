@@ -3,7 +3,18 @@
 import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore"
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
@@ -165,7 +176,7 @@ export default function SalesQuotationsPage() {
       const startDate = fullQuotationData.start_date?.toDate?.() || new Date()
       const collectionDate = new Date(startDate)
       collectionDate.setDate(collectionDate.getDate() + 30)
-      const collectionDateString = collectionDate.toISOString().split("T")[0]
+      const collectionTimestamp = Timestamp.fromDate(collectionDate)
 
       // Generate collectibles for each item/product
       const collectiblesPromises = items.map(async (item: any, index: number) => {
@@ -194,7 +205,7 @@ export default function SalesQuotationsPage() {
 
           // Status and dates
           status: "pending",
-          collection_date: collectionDateString, // Now 30 days after start_date
+          collection_date: collectionTimestamp, // Now using Firebase Timestamp
           covered_period: `${fullQuotationData.start_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`,
 
           // Sites-specific fields
