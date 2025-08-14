@@ -174,70 +174,95 @@ export default function SalesQuotationsPage() {
       }
 
       const startDate = fullQuotationData.start_date ? new Date(fullQuotationData.start_date) : new Date()
-      const collectionDate = new Date(startDate)
-      collectionDate.setDate(collectionDate.getDate() + 30)
-      const collectionTimestamp = Timestamp.fromDate(collectionDate)
+      const durationDays = fullQuotationData.duration_days || 30
 
-      // Generate collectibles for each item/product
-      const collectiblesPromises = items.map(async (item: any, index: number) => {
-        const productId = item.product_id || item.id || `product-${index + 1}-${Date.now()}`
-        const itemAmount = item.item_total_amount || item.price * (fullQuotationData.duration_days || 30) || 0
-        const itemName = item.name || `Product ${index + 1}`
+      const collectionPeriods = []
+      let remainingDays = durationDays
+      const currentDate = new Date(startDate)
 
-        const collectibleData = {
-          // Basic information from quotation
-          client_name: quotation.client_name || fullQuotationData.client_name || "",
-          company_id: user.company_id || user.uid,
-          type: "sites", // Default to sites type based on the business model
+      while (remainingDays > 0) {
+        const periodDays = Math.min(30, remainingDays)
+        currentDate.setDate(currentDate.getDate() + (collectionPeriods.length === 0 ? 30 : periodDays))
+        collectionPeriods.push({
+          collectionDate: new Date(currentDate),
+          periodDays: periodDays,
+          periodNumber: collectionPeriods.length + 1,
+        })
+        remainingDays -= periodDays
+      }
 
-          // Financial data - distribute total amount across items proportionally
-          net_amount: itemAmount,
-          total_amount: itemAmount,
+      // Generate collectibles for each item and each collection period
+      const collectiblesPromises = []
 
-          // Document references
-          invoice_no: `INV-${quotation.quotation_number}-${productId.toString().slice(-4)}`,
-          or_no: `OR-${Date.now()}-${productId.toString().slice(-4)}`,
-          bi_no: `BI-${Date.now()}-${productId.toString().slice(-4)}`,
+      for (const item of items) {
+        const productId = item.product_id || item.id || `product-${Date.now()}`
+        const totalItemAmount = item.item_total_amount || item.price * durationDays || 0
+        const itemName = item.name || `Product ${items.indexOf(item) + 1}`
 
-          // Payment information
-          mode_of_payment: "Credit/Debit Card", // Default payment method
-          bank_name: "", // To be filled later
+        // Create collectibles for each collection period
+        for (const period of collectionPeriods) {
+          const periodAmount = (totalItemAmount / durationDays) * period.periodDays
 
-          // Status and dates
-          status: "pending",
-          collection_date: collectionTimestamp, // Now using Firebase Timestamp
-          covered_period: `${fullQuotationData.start_date?.split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.split("T")[0] || new Date().toISOString().split("T")[0]}`,
+          const collectibleData = {
+            // Basic information from quotation
+            client_name: quotation.client_name || fullQuotationData.client_name || "",
+            company_id: user.company_id || user.uid,
+            type: "sites", // Default to sites type based on the business model
 
-          // Sites-specific fields
-          site: item.location || item.site_code || "",
-          booking_no: `BK-${quotation.quotation_number}-${productId.toString().slice(-4)}`,
+            // Financial data - proportional amount for this period
+            net_amount: periodAmount,
+            total_amount: periodAmount,
 
-          // Additional fields from collectibles model
-          vendor_name: quotation.client_name || fullQuotationData.client_name || "",
-          business_address: quotation.client_address || fullQuotationData.client_address || "",
-          tin_no: "", // To be filled later
+            // Document references with period number
+            invoice_no: `INV-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            or_no: `OR-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            bi_no: `BI-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
 
-          // System fields
-          deleted: false,
-          created: serverTimestamp(),
-          updated: serverTimestamp(),
+            // Payment information
+            mode_of_payment: "Credit/Debit Card", // Default payment method
+            bank_name: "", // To be filled later
 
-          // Reference to original quotation
-          quotation_id: quotation.id,
-          quotation_number: quotation.quotation_number,
-          product_name: itemName,
-          product_id: productId, // Fixed to use validated product_id
+            // Status and dates
+            status: "pending",
+            collection_date: Timestamp.fromDate(period.collectionDate), // Use calculated collection date
+            covered_period: `${fullQuotationData.start_date?.split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.split("T")[0] || new Date().toISOString().split("T")[0]}`,
+
+            // Sites-specific fields
+            site: item.location || item.site_code || "",
+            booking_no: `BK-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+
+            // Additional fields from collectibles model
+            vendor_name: quotation.client_name || fullQuotationData.client_name || "",
+            business_address: quotation.client_address || fullQuotationData.client_address || "",
+            tin_no: "", // To be filled later
+
+            // System fields
+            deleted: false,
+            created: serverTimestamp(),
+            updated: serverTimestamp(),
+
+            // Reference to original quotation
+            quotation_id: quotation.id,
+            quotation_number: quotation.quotation_number,
+            product_name: itemName,
+            product_id: productId,
+
+            period_number: period.periodNumber,
+            period_days: period.periodDays,
+            total_periods: collectionPeriods.length,
+            duration_days: durationDays,
+          }
+
+          collectiblesPromises.push(addDoc(collection(db, "collectibles"), collectibleData))
         }
-
-        return addDoc(collection(db, "collectibles"), collectibleData)
-      })
+      }
 
       // Execute all collectibles creation
       const results = await Promise.all(collectiblesPromises)
 
       toast({
         title: "Success",
-        description: `Quote signed successfully! Generated ${results.length} collectible document${results.length > 1 ? "s" : ""}.`,
+        description: `Quote signed successfully! Generated ${results.length} collectible document${results.length > 1 ? "s" : ""} across ${collectionPeriods.length} collection period${collectionPeriods.length > 1 ? "s" : ""}.`,
       })
 
       // Optionally update quotation status to 'accepted'
