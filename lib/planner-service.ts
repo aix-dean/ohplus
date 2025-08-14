@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addDays, addMonths, addWeeks, addYears } from "date-fns"
+import { createDepartmentNotifications } from "@/lib/notification-service"
 
 // Define recurrence types
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "yearly"
@@ -259,6 +260,29 @@ export async function createSalesEvent(
     }
 
     const docRef = await addDoc(collection(db, "planner"), newEvent)
+
+    try {
+      // Get user's company_id - you may need to fetch this from user data
+      // For now, using a placeholder - you should fetch the actual company_id from user context
+      const companyId = "default_company" // Replace with actual company_id from user context
+
+      const eventStart = eventData.start instanceof Date ? eventData.start : eventData.start.toDate()
+
+      await createDepartmentNotifications(
+        eventData.title,
+        eventData.type,
+        eventStart,
+        companyId,
+        "Sales",
+        `/sales/planner`,
+      )
+
+      console.log("Department notifications created successfully for event:", docRef.id)
+    } catch (notificationError) {
+      console.error("Error creating department notifications:", notificationError)
+      // Don't throw here - we don't want notification failure to break event creation
+    }
+
     return docRef.id
   } catch (error) {
     console.error("Error creating sales event:", error)

@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { type SalesEvent, type RecurrenceType, createSalesEvent, updateSalesEvent } from "@/lib/planner-service"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
 
 interface SalesEventDialogProps {
   isOpen: boolean
@@ -26,6 +27,8 @@ interface SalesEventDialogProps {
 
 export function SalesEventDialog({ isOpen, onClose, event, userId, onEventSaved }: SalesEventDialogProps) {
   const isEditing = !!event?.id
+  const { userData } = useAuth()
+
   const [startDate, setStartDate] = useState<Date | undefined>(event?.start instanceof Date ? event.start : new Date())
   const [endDate, setEndDate] = useState<Date | undefined>(
     event?.end instanceof Date ? event.end : new Date(Date.now() + 60 * 60 * 1000), // Default to 1 hour later
@@ -120,6 +123,7 @@ export function SalesEventDialog({ isOpen, onClose, event, userId, onEventSaved 
         end: endDateTime,
         allDay: isAllDay,
         recurrence,
+        company_id: userData?.company_id || "default_company",
       }
 
       let eventId: string
@@ -129,7 +133,7 @@ export function SalesEventDialog({ isOpen, onClose, event, userId, onEventSaved 
         await updateSalesEvent(event.id, eventData, userId)
         eventId = event.id
       } else {
-        // Create new event
+        // Create new event - notifications will be created automatically in createSalesEvent
         eventId = await createSalesEvent(userId, eventData as any)
       }
 
