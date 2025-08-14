@@ -29,8 +29,8 @@ import {
   DollarSign,
   Receipt,
   CreditCard,
-  ChevronDown,
-  ChevronUp,
+  Wrench,
+  Archive,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -160,7 +160,7 @@ export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
-  const [isHardwareExpanded, setIsHardwareExpanded] = useState(false)
+  const [showHardwareFlyout, setShowHardwareFlyout] = useState(false)
 
   // Determine the current section from the pathname
   let currentSection = pathname?.split("/")[1] || "dashboard"
@@ -640,12 +640,16 @@ export function SideNavigation() {
                   )
                 })}
 
-                <div>
-                  <button
-                    onClick={() => setIsHardwareExpanded(!isHardwareExpanded)}
+                <div
+                  className="relative"
+                  onMouseEnter={() => setShowHardwareFlyout(true)}
+                  onMouseLeave={() => setShowHardwareFlyout(false)}
+                >
+                  <Link
+                    href="/it/inventory"
                     className={cn(
                       "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                      pathname?.startsWith("/it/inventory")
+                      isActive(pathname, "/it/inventory")
                         ? "bg-gray-100 text-gray-900 font-medium"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                     )}
@@ -653,38 +657,39 @@ export function SideNavigation() {
                     <Package
                       className={cn(
                         "h-4 w-4 mr-3",
-                        pathname?.startsWith("/it/inventory") ? "text-gray-700" : "text-gray-500",
+                        isActive(pathname, "/it/inventory") ? "text-gray-700" : "text-gray-500",
                       )}
                     />
                     <span className="flex-1">Hardwares</span>
-                    {isHardwareExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </button>
+                  </Link>
 
-                  {isHardwareExpanded && (
-                    <div className="ml-6 mt-1 space-y-1">
-                      {[
-                        { title: "Assets", href: "/it/inventory/assets", icon: Package },
-                        { title: "Tools", href: "/it/inventory/tools", icon: Cog },
-                        { title: "Consumables", href: "/it/inventory/consumables", icon: FileText },
-                      ].map((subItem) => {
-                        const SubIcon = subItem.icon
-                        const subActive = isActive(pathname, subItem.href)
-                        return (
-                          <Link
-                            key={subItem.href}
-                            href={subItem.href}
-                            className={cn(
-                              "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                              subActive
-                                ? "bg-gray-100 text-gray-900 font-medium"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                            )}
-                          >
-                            <SubIcon className={cn("h-3 w-3 mr-3", subActive ? "text-gray-700" : "text-gray-500")} />
-                            <span className="flex-1">{subItem.title}</span>
-                          </Link>
-                        )
-                      })}
+                  {showHardwareFlyout && (
+                    <div className="absolute left-full top-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                      <div className="p-1">
+                        {[
+                          { title: "Assets", href: "/it/inventory/assets", icon: Package },
+                          { title: "Tools", href: "/it/inventory/tools", icon: Wrench },
+                          { title: "Consumables", href: "/it/inventory/consumables", icon: Archive },
+                        ].map((subItem) => {
+                          const SubIcon = subItem.icon
+                          const subActive = isActive(pathname, subItem.href)
+                          return (
+                            <Link
+                              key={subItem.href}
+                              href={subItem.href}
+                              className={cn(
+                                "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                                subActive
+                                  ? "bg-gray-100 text-gray-900 font-medium"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                              )}
+                            >
+                              <SubIcon className={cn("h-4 w-4 mr-3", subActive ? "text-gray-700" : "text-gray-500")} />
+                              <span className="flex-1">{subItem.title}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -760,7 +765,7 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
