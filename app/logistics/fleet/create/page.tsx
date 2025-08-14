@@ -127,13 +127,14 @@ export default function CreateFleetPage() {
                         id="vehicleNumber"
                         value={formData.vehicleNumber}
                         onChange={(e) => handleInputChange("vehicleNumber", e.target.value)}
-                        placeholder="e.g., ABC-1234"
+                        placeholder="e.g., ABC-1234, FLEET001, VAN-A1"
                         required
                         className={validationErrors.vehicleNumber ? "border-red-500" : ""}
                       />
                       {validationErrors.vehicleNumber && (
                         <p className="text-sm text-red-600">{validationErrors.vehicleNumber}</p>
                       )}
+                      <p className="text-xs text-gray-500">3-20 characters, letters, numbers, and hyphens allowed</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="fleetName">Fleet Name *</Label>

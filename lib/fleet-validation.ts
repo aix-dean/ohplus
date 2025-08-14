@@ -26,11 +26,10 @@ export class FleetValidation {
       errors.push({ field: "registrationNumber", message: "Registration number is required" })
     }
 
-    // Format validations
-    if (data.vehicleNumber && !/^[A-Z]{3}-\d{4}$/.test(data.vehicleNumber)) {
+    if (data.vehicleNumber && !this.isValidVehicleNumber(data.vehicleNumber)) {
       errors.push({
         field: "vehicleNumber",
-        message: "Vehicle number must be in format ABC-1234",
+        message: "Vehicle number must be 3-20 characters with letters, numbers, and hyphens only",
       })
     }
 
@@ -59,13 +58,21 @@ export class FleetValidation {
     return errors
   }
 
+  static isValidVehicleNumber(vehicleNumber: string): boolean {
+    // Allow alphanumeric characters, hyphens, and spaces
+    // Length between 3-20 characters
+    // Must start and end with alphanumeric character
+    const pattern = /^[A-Za-z0-9][A-Za-z0-9\s-]*[A-Za-z0-9]$|^[A-Za-z0-9]$/
+    return pattern.test(vehicleNumber) && vehicleNumber.length >= 3 && vehicleNumber.length <= 20
+  }
+
   static validateVehicleNumber(vehicleNumber: string, existingVehicles: string[] = []): string | null {
     if (!vehicleNumber.trim()) {
       return "Vehicle number is required"
     }
 
-    if (!/^[A-Z]{3}-\d{4}$/.test(vehicleNumber)) {
-      return "Vehicle number must be in format ABC-1234"
+    if (!this.isValidVehicleNumber(vehicleNumber)) {
+      return "Vehicle number must be 3-20 characters with letters, numbers, and hyphens only"
     }
 
     if (existingVehicles.includes(vehicleNumber)) {
