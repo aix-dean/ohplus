@@ -192,23 +192,14 @@ export default function ITInventoryPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">IT Inventory</h1>
-          <p className="text-muted-foreground">
-            Manage your IT assets, tools, and consumables
-            {typeFilter && ` - Filtered by ${typeFilter}`}
-          </p>
+          <p className="text-muted-foreground">Manage your IT assets, tools, and consumables</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Search className="mr-2 h-4 w-4" />
-            Advanced Search
+        <Link href="/it/inventory/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add New Item
           </Button>
-          <Link href="/it/inventory/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Item
-            </Button>
-          </Link>
-        </div>
+        </Link>
       </div>
 
       {/* Statistics Cards */}

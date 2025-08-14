@@ -3,7 +3,6 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
 import {
   Package,
   HardDrive,
@@ -12,313 +11,236 @@ import {
   ChevronDown,
   ChevronRight,
   Monitor,
-  Server,
-  Wifi,
-  Shield,
-  Users,
+  Database,
   Settings,
-  BarChart3,
-  Home,
-  Building2,
-  Truck,
-  DollarSign,
-  MessageSquare,
-  Search,
   Plus,
+  Search,
+  Filter,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 
-interface NavigationItem {
-  title: string
-  icon: any
-  href?: string
-  badge?: string
-  submenu?: NavigationItem[]
-  isCollapsible?: boolean
-}
-
-export const SideNavigation = () => {
+const SideNavigation = () => {
   const pathname = usePathname()
-  const [expandedSections, setExpandedSections] = useState<string[]>(["it-inventory"])
+  const [expandedSections, setExpandedSections] = useState<string[]>(["it", "inventory"])
+  const [searchQuery, setSearchQuery] = useState("")
 
-  const toggleSection = (sectionKey: string) => {
+  const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) =>
-      prev.includes(sectionKey) ? prev.filter((key) => key !== sectionKey) : [...prev, sectionKey],
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
     )
   }
 
-  const navigationItems: NavigationItem[] = [
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
+  const isExpanded = (sectionId: string) => expandedSections.includes(sectionId)
+
+  const inventoryItems = [
     {
-      title: "Dashboard",
-      icon: Home,
-      href: "/dashboard",
+      title: "Assets",
+      icon: HardDrive,
+      href: "/it/inventory?type=assets",
+      count: 45,
+      color: "bg-blue-500",
     },
     {
-      title: "IT Department",
-      icon: Monitor,
-      submenu: [
-        {
-          title: "Overview",
-          icon: BarChart3,
-          href: "/it",
-        },
-        {
-          title: "Inventory",
-          icon: Package,
-          isCollapsible: true,
-          submenu: [
-            {
-              title: "All Items",
-              icon: Package,
-              href: "/it/inventory",
-              badge: "125",
-            },
-            {
-              title: "Assets",
-              icon: HardDrive,
-              href: "/it/inventory?type=assets",
-              badge: "45",
-            },
-            {
-              title: "Tools",
-              icon: Wrench,
-              href: "/it/inventory?type=tools",
-              badge: "28",
-            },
-            {
-              title: "Consumables",
-              icon: Package2,
-              href: "/it/inventory?type=consumables",
-              badge: "52",
-            },
-          ],
-        },
-        {
-          title: "User Management",
-          icon: Users,
-          href: "/it/user-management",
-        },
-        {
-          title: "System Status",
-          icon: Server,
-          href: "/it/system-status",
-        },
-        {
-          title: "Network",
-          icon: Wifi,
-          href: "/it/network",
-        },
-        {
-          title: "Security",
-          icon: Shield,
-          href: "/it/security",
-        },
-      ],
+      title: "Tools",
+      icon: Wrench,
+      href: "/it/inventory?type=tools",
+      count: 23,
+      color: "bg-green-500",
     },
     {
-      title: "Sales",
-      icon: DollarSign,
-      href: "/sales",
-    },
-    {
-      title: "Logistics",
-      icon: Truck,
-      href: "/logistics",
-    },
-    {
-      title: "Finance",
-      icon: Building2,
-      href: "/finance",
-    },
-    {
-      title: "Messages",
-      icon: MessageSquare,
-      href: "/messages",
-      badge: "3",
+      title: "Consumables",
+      icon: Package2,
+      href: "/it/inventory?type=consumables",
+      count: 67,
+      color: "bg-orange-500",
     },
   ]
 
-  const isActive = (href: string) => {
-    if (href === "/dashboard") {
-      return pathname === "/" || pathname === "/dashboard"
-    }
-    return pathname.startsWith(href)
-  }
+  const navigationItems = [
+    {
+      title: "Dashboard",
+      icon: Monitor,
+      href: "/dashboard",
+    },
+    {
+      title: "IT",
+      icon: Database,
+      href: "/it",
+      id: "it",
+      submenu: [
+        {
+          title: "Inventory",
+          icon: Package,
+          href: "/it/inventory",
+          id: "inventory",
+          submenu: inventoryItems,
+        },
+        {
+          title: "User Management",
+          icon: Settings,
+          href: "/it/user-management",
+        },
+      ],
+    },
+  ]
 
-  const isParentActive = (submenu?: NavigationItem[]) => {
-    if (!submenu) return false
-    return submenu.some((item) => (item.href ? isActive(item.href) : isParentActive(item.submenu)))
-  }
-
-  const renderNavigationItem = (item: NavigationItem, level = 0, parentKey?: string) => {
-    const itemKey = parentKey
-      ? `${parentKey}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
-      : item.title.toLowerCase().replace(/\s+/g, "-")
-    const hasSubmenu = item.submenu && item.submenu.length > 0
-    const isExpanded = expandedSections.includes(itemKey)
-    const isItemActive = item.href ? isActive(item.href) : isParentActive(item.submenu)
-
-    const paddingLeft = level === 0 ? "pl-3" : level === 1 ? "pl-6" : "pl-9"
-    const textSize = level === 0 ? "text-sm" : "text-xs"
-    const iconSize = level === 0 ? "h-4 w-4" : "h-3 w-3"
-
-    if (hasSubmenu && item.isCollapsible) {
-      return (
-        <div key={itemKey} className="space-y-1">
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-2 h-8",
-              paddingLeft,
-              textSize,
-              isItemActive && "bg-accent text-accent-foreground font-medium",
-              "hover:bg-accent/50 transition-colors duration-200",
-            )}
-            onClick={() => toggleSection(itemKey)}
-          >
-            <item.icon className={iconSize} />
-            <span className="flex-1 text-left">{item.title}</span>
-            {item.badge && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-xs">
-                {item.badge}
-              </Badge>
-            )}
-            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          </Button>
-
-          {isExpanded && (
-            <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-              {item.submenu?.map((subItem) => renderNavigationItem(subItem, level + 1, itemKey))}
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    if (hasSubmenu) {
-      return (
-        <div key={itemKey} className="space-y-1">
-          <div
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground",
-              level > 0 && paddingLeft,
-            )}
-          >
-            <item.icon className={iconSize} />
-            {item.title}
-          </div>
-          <div className="space-y-1">
-            {item.submenu?.map((subItem) => renderNavigationItem(subItem, level + 1, itemKey))}
-          </div>
-        </div>
-      )
-    }
-
-    if (item.href) {
-      return (
-        <Link key={itemKey} href={item.href}>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-2 h-8",
-              paddingLeft,
-              textSize,
-              isItemActive && "bg-accent text-accent-foreground font-medium",
-              "hover:bg-accent/50 transition-colors duration-200",
-            )}
-          >
-            <item.icon className={iconSize} />
-            <span className="flex-1 text-left">{item.title}</span>
-            {item.badge && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-xs">
-                {item.badge}
-              </Badge>
-            )}
-          </Button>
-        </Link>
-      )
-    }
-
-    return null
-  }
+  const filteredInventoryItems = inventoryItems.filter((item) =>
+    item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
 
   return (
-    <nav className="flex flex-col h-full bg-background border-r">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Building2 className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-sm">ERP System</h2>
-            <p className="text-xs text-muted-foreground">IT Management</p>
-          </div>
-        </div>
-      </div>
+    <nav className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto">
+      <div className="p-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Navigation</h2>
 
-      {/* Quick Actions for IT */}
-      {pathname.startsWith("/it") && (
-        <div className="p-3 border-b bg-muted/20">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground">Quick Actions</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Link href="/it/inventory/new">
-              <Button size="sm" variant="outline" className="w-full h-7 text-xs bg-transparent">
-                <Plus className="h-3 w-3 mr-1" />
-                Add Item
-              </Button>
-            </Link>
-            <Button size="sm" variant="outline" className="w-full h-7 text-xs bg-transparent">
-              <Search className="h-3 w-3 mr-1" />
-              Search
-            </Button>
-          </div>
-        </div>
-      )}
+        {navigationItems.map((item) => (
+          <div key={item.title} className="mb-2">
+            <div className="flex items-center justify-between">
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-1",
+                  isActive(item.href)
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.title}
+              </Link>
 
-      {/* Navigation Items */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-2">{navigationItems.map((item) => renderNavigationItem(item))}</div>
-      </div>
+              {item.submenu && (
+                <Button variant="ghost" size="sm" onClick={() => toggleSection(item.id!)} className="p-1 h-8 w-8">
+                  {isExpanded(item.id!) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </Button>
+              )}
+            </div>
 
-      {/* IT Status Footer */}
-      {pathname.startsWith("/it") && (
-        <div className="p-3 border-t bg-muted/20">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">System Status</span>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-green-600 font-medium">Online</span>
+            {/* IT Submenu */}
+            {item.submenu && isExpanded(item.id!) && (
+              <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-100 pl-4">
+                {item.submenu.map((subItem) => (
+                  <div key={subItem.title}>
+                    <div className="flex items-center justify-between">
+                      <Link
+                        href={subItem.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-1",
+                          isActive(subItem.href)
+                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                        )}
+                      >
+                        <subItem.icon className="h-4 w-4" />
+                        {subItem.title}
+                      </Link>
+
+                      {subItem.submenu && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSection(subItem.id!)}
+                          className="p-1 h-8 w-8"
+                        >
+                          {isExpanded(subItem.id!) ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Inventory Categories - Enhanced Section */}
+                    {subItem.submenu && isExpanded(subItem.id!) && (
+                      <div className="ml-4 mt-3 space-y-2">
+                        {/* Search and Actions */}
+                        <div className="space-y-2 mb-3">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                            <Input
+                              placeholder="Search inventory..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-9 h-8 text-xs"
+                            />
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1 bg-transparent">
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Item
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 bg-transparent">
+                              <Filter className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Inventory Categories */}
+                        <div className="space-y-1">
+                          {filteredInventoryItems.map((invItem) => (
+                            <Link
+                              key={invItem.title}
+                              href={invItem.href}
+                              className={cn(
+                                "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
+                                isActive(invItem.href)
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={cn("w-2 h-2 rounded-full", invItem.color)} />
+                                <invItem.icon className="h-4 w-4" />
+                                <span className="font-medium">{invItem.title}</span>
+                              </div>
+
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "text-xs px-2 py-0.5 transition-colors",
+                                  isActive(invItem.href)
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
+                                )}
+                              >
+                                {invItem.count}
+                              </Badge>
+                            </Link>
+                          ))}
+                        </div>
+
+                        {/* Quick Stats */}
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="text-xs font-medium text-gray-700 mb-2">Quick Stats</div>
+                          <div className="space-y-1 text-xs text-gray-600">
+                            <div className="flex justify-between">
+                              <span>Total Items:</span>
+                              <span className="font-medium">135</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Low Stock:</span>
+                              <span className="font-medium text-orange-600">8</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Maintenance Due:</span>
+                              <span className="font-medium text-red-600">3</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Active Alerts</span>
-              <Badge variant="destructive" className="h-4 px-1.5 text-xs">
-                2
-              </Badge>
-            </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* User Section */}
-      <div className="p-3 border-t">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-xs text-primary-foreground font-medium">IT</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate">IT Administrator</p>
-            <p className="text-xs text-muted-foreground truncate">admin@company.com</p>
-          </div>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-            <Settings className="h-3 w-3" />
-          </Button>
-        </div>
+        ))}
       </div>
     </nav>
   )
