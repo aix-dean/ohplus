@@ -16,7 +16,6 @@ import {
   Plus,
   Search,
   Filter,
-  Cpu,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 
 function SideNavigation() {
   const pathname = usePathname()
-  const [expandedSections, setExpandedSections] = useState<string[]>(["it", "inventory", "hardware"])
+  const [expandedSections, setExpandedSections] = useState<string[]>(["it", "inventory"])
   const [searchQuery, setSearchQuery] = useState("")
 
   const toggleSection = (sectionId: string) => {
@@ -61,33 +60,6 @@ function SideNavigation() {
     },
   ]
 
-  const hardwareItems = [
-    {
-      title: "Assets",
-      icon: HardDrive,
-      href: "/it/hardware/assets",
-      count: 45,
-      color: "bg-blue-500",
-      description: "Computers, servers, and equipment",
-    },
-    {
-      title: "Tools",
-      icon: Wrench,
-      href: "/it/hardware/tools",
-      count: 23,
-      color: "bg-green-500",
-      description: "Maintenance and diagnostic tools",
-    },
-    {
-      title: "Consumables",
-      icon: Package2,
-      href: "/it/hardware/consumables",
-      count: 67,
-      color: "bg-orange-500",
-      description: "Cables, parts, and supplies",
-    },
-  ]
-
   const navigationItems = [
     {
       title: "Dashboard",
@@ -100,13 +72,6 @@ function SideNavigation() {
       href: "/it",
       id: "it",
       submenu: [
-        {
-          title: "Hardware",
-          icon: Cpu,
-          href: "/it/hardware",
-          id: "hardware",
-          submenu: hardwareItems,
-        },
         {
           title: "Inventory",
           icon: Package,
@@ -124,10 +89,6 @@ function SideNavigation() {
   ]
 
   const filteredInventoryItems = inventoryItems.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  const filteredHardwareItems = hardwareItems.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
@@ -194,7 +155,7 @@ function SideNavigation() {
                       )}
                     </div>
 
-                    {/* Hardware/Inventory Categories - Enhanced Section */}
+                    {/* Inventory Categories - Enhanced Section */}
                     {subItem.submenu && isExpanded(subItem.id!) && (
                       <div className="ml-4 mt-3 space-y-2">
                         {/* Search and Actions */}
@@ -202,7 +163,7 @@ function SideNavigation() {
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                             <Input
-                              placeholder={`Search ${subItem.title.toLowerCase()}...`}
+                              placeholder="Search inventory..."
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="pl-9 h-8 text-xs"
@@ -220,45 +181,38 @@ function SideNavigation() {
                           </div>
                         </div>
 
-                        {/* Categories */}
+                        {/* Inventory Categories */}
                         <div className="space-y-1">
-                          {(subItem.id === "hardware" ? filteredHardwareItems : filteredInventoryItems).map(
-                            (categoryItem) => (
-                              <Link
-                                key={categoryItem.title}
-                                href={categoryItem.href}
+                          {filteredInventoryItems.map((invItem) => (
+                            <Link
+                              key={invItem.title}
+                              href={invItem.href}
+                              className={cn(
+                                "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
+                                isActive(invItem.href)
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={cn("w-2 h-2 rounded-full", invItem.color)} />
+                                <invItem.icon className="h-4 w-4" />
+                                <span className="font-medium">{invItem.title}</span>
+                              </div>
+
+                              <Badge
+                                variant="secondary"
                                 className={cn(
-                                  "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
-                                  isActive(categoryItem.href)
-                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                                  "text-xs px-2 py-0.5 transition-colors",
+                                  isActive(invItem.href)
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
                                 )}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className={cn("w-2 h-2 rounded-full", categoryItem.color)} />
-                                  <categoryItem.icon className="h-4 w-4" />
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{categoryItem.title}</span>
-                                    {categoryItem.description && (
-                                      <span className="text-xs text-gray-500">{categoryItem.description}</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <Badge
-                                  variant="secondary"
-                                  className={cn(
-                                    "text-xs px-2 py-0.5 transition-colors",
-                                    isActive(categoryItem.href)
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
-                                  )}
-                                >
-                                  {categoryItem.count}
-                                </Badge>
-                              </Link>
-                            ),
-                          )}
+                                {invItem.count}
+                              </Badge>
+                            </Link>
+                          ))}
                         </div>
 
                         {/* Quick Stats */}

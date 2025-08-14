@@ -14,7 +14,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  Wrench,
+  Package2,
+  ArrowRight,
 } from "lucide-react"
+import Link from "next/link"
 
 export default function ITPage() {
   return (
@@ -81,6 +85,85 @@ export default function ITPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Hardware Inventory</CardTitle>
+          <CardDescription>Manage your IT assets, tools, and consumables</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Link href="/it/inventory?type=assets" className="group">
+              <Card className="transition-all duration-200 hover:shadow-md hover:border-blue-200 cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <HardDrive className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <h3 className="font-semibold text-lg">Assets</h3>
+                        <p className="text-sm text-muted-foreground">Hardware & equipment</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        45
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-600 transition-colors" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/it/inventory?type=tools" className="group">
+              <Card className="transition-all duration-200 hover:shadow-md hover:border-green-200 cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <Wrench className="h-5 w-5 text-green-600" />
+                      <div>
+                        <h3 className="font-semibold text-lg">Tools</h3>
+                        <p className="text-sm text-muted-foreground">Maintenance tools</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        23
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-green-600 transition-colors" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/it/inventory?type=consumables" className="group">
+              <Card className="transition-all duration-200 hover:shadow-md hover:border-orange-200 cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                      <Package2 className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <h3 className="font-semibold text-lg">Consumables</h3>
+                        <p className="text-sm text-muted-foreground">Supplies & materials</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                        67
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-orange-600 transition-colors" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Tickets */}
       <div className="grid gap-4 md:grid-cols-2">
