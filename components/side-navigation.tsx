@@ -60,6 +60,30 @@ function SideNavigation() {
     },
   ]
 
+  const hardwareItems = [
+    {
+      title: "Assets",
+      icon: HardDrive,
+      href: "/hardware/assets",
+      count: 45,
+      color: "bg-blue-500",
+    },
+    {
+      title: "Tools",
+      icon: Wrench,
+      href: "/hardware/tools",
+      count: 23,
+      color: "bg-green-500",
+    },
+    {
+      title: "Consumables",
+      icon: Package2,
+      href: "/hardware/consumables",
+      count: 67,
+      color: "bg-orange-500",
+    },
+  ]
+
   const navigationItems = [
     {
       title: "Dashboard",
@@ -86,9 +110,20 @@ function SideNavigation() {
         },
       ],
     },
+    {
+      title: "Hardware",
+      icon: HardDrive,
+      href: "/hardware",
+      id: "hardware",
+      submenu: hardwareItems,
+    },
   ]
 
   const filteredInventoryItems = inventoryItems.filter((item) =>
+    item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  const filteredHardwareItems = hardwareItems.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
@@ -120,123 +155,160 @@ function SideNavigation() {
               )}
             </div>
 
-            {/* IT Submenu */}
             {item.submenu && isExpanded(item.id!) && (
               <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-100 pl-4">
-                {item.submenu.map((subItem) => (
-                  <div key={subItem.title}>
-                    <div className="flex items-center justify-between">
+                {/* Hardware direct submenu (no nested inventory section) */}
+                {item.id === "hardware" && (
+                  <div className="space-y-1">
+                    {filteredHardwareItems.map((hardwareItem) => (
                       <Link
-                        href={subItem.href}
+                        key={hardwareItem.title}
+                        href={hardwareItem.href}
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-1",
-                          isActive(subItem.href)
+                          "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
+                          isActive(hardwareItem.href)
                             ? "bg-blue-50 text-blue-700 border border-blue-200"
                             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                         )}
                       >
-                        <subItem.icon className="h-4 w-4" />
-                        {subItem.title}
-                      </Link>
-
-                      {subItem.submenu && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleSection(subItem.id!)}
-                          className="p-1 h-8 w-8"
-                        >
-                          {isExpanded(subItem.id!) ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Inventory Categories - Enhanced Section */}
-                    {subItem.submenu && isExpanded(subItem.id!) && (
-                      <div className="ml-4 mt-3 space-y-2">
-                        {/* Search and Actions */}
-                        <div className="space-y-2 mb-3">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                            <Input
-                              placeholder="Search inventory..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 h-8 text-xs"
-                            />
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1 bg-transparent">
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add Item
-                            </Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 bg-transparent">
-                              <Filter className="h-3 w-3" />
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-2 h-2 rounded-full", hardwareItem.color)} />
+                          <hardwareItem.icon className="h-4 w-4" />
+                          <span className="font-medium">{hardwareItem.title}</span>
                         </div>
 
-                        {/* Inventory Categories */}
-                        <div className="space-y-1">
-                          {filteredInventoryItems.map((invItem) => (
-                            <Link
-                              key={invItem.title}
-                              href={invItem.href}
-                              className={cn(
-                                "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
-                                isActive(invItem.href)
-                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={cn("w-2 h-2 rounded-full", invItem.color)} />
-                                <invItem.icon className="h-4 w-4" />
-                                <span className="font-medium">{invItem.title}</span>
-                              </div>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-xs px-2 py-0.5 transition-colors",
+                            isActive(hardwareItem.href)
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
+                          )}
+                        >
+                          {hardwareItem.count}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
-                              <Badge
-                                variant="secondary"
+                {/* IT submenu (existing structure) */}
+                {item.id === "it" &&
+                  item.submenu.map((subItem) => (
+                    <div key={subItem.title}>
+                      <div className="flex items-center justify-between">
+                        <Link
+                          href={subItem.href}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-1",
+                            isActive(subItem.href)
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                          )}
+                        >
+                          <subItem.icon className="h-4 w-4" />
+                          {subItem.title}
+                        </Link>
+
+                        {subItem.submenu && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleSection(subItem.id!)}
+                            className="p-1 h-8 w-8"
+                          >
+                            {isExpanded(subItem.id!) ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Inventory Categories - Enhanced Section */}
+                      {subItem.submenu && isExpanded(subItem.id!) && (
+                        <div className="ml-4 mt-3 space-y-2">
+                          {/* Search and Actions */}
+                          <div className="space-y-2 mb-3">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                              <Input
+                                placeholder="Search inventory..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-8 text-xs"
+                              />
+                            </div>
+
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" className="h-7 text-xs flex-1 bg-transparent">
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Item
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 px-2 bg-transparent">
+                                <Filter className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Inventory Categories */}
+                          <div className="space-y-1">
+                            {filteredInventoryItems.map((invItem) => (
+                              <Link
+                                key={invItem.title}
+                                href={invItem.href}
                                 className={cn(
-                                  "text-xs px-2 py-0.5 transition-colors",
+                                  "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
                                   isActive(invItem.href)
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                                 )}
                               >
-                                {invItem.count}
-                              </Badge>
-                            </Link>
-                          ))}
-                        </div>
+                                <div className="flex items-center gap-3">
+                                  <div className={cn("w-2 h-2 rounded-full", invItem.color)} />
+                                  <invItem.icon className="h-4 w-4" />
+                                  <span className="font-medium">{invItem.title}</span>
+                                </div>
 
-                        {/* Quick Stats */}
-                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xs font-medium text-gray-700 mb-2">Quick Stats</div>
-                          <div className="space-y-1 text-xs text-gray-600">
-                            <div className="flex justify-between">
-                              <span>Total Items:</span>
-                              <span className="font-medium">135</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Low Stock:</span>
-                              <span className="font-medium text-orange-600">8</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Maintenance Due:</span>
-                              <span className="font-medium text-red-600">3</span>
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "text-xs px-2 py-0.5 transition-colors",
+                                    isActive(invItem.href)
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-gray-100 text-gray-600 group-hover:bg-gray-200",
+                                  )}
+                                >
+                                  {invItem.count}
+                                </Badge>
+                              </Link>
+                            ))}
+                          </div>
+
+                          {/* Quick Stats */}
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                            <div className="text-xs font-medium text-gray-700 mb-2">Quick Stats</div>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div className="flex justify-between">
+                                <span>Total Items:</span>
+                                <span className="font-medium">135</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Low Stock:</span>
+                                <span className="font-medium text-orange-600">8</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Maintenance Due:</span>
+                                <span className="font-medium text-red-600">3</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  ))}
               </div>
             )}
           </div>
