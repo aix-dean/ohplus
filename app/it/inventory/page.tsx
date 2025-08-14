@@ -20,6 +20,13 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  UserPlus,
+  Wrench,
+  QrCode,
+  Download,
+  History,
+  Copy,
+  Printer,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -342,6 +349,148 @@ export default function ITInventoryPage() {
     setCurrentPage(page)
   }
 
+  const handleAssign = useCallback(
+    (item: InventoryItem) => {
+      // Navigate to assignment page or open assignment modal
+      router.push(`/it/inventory/assign/${item.id}`)
+    },
+    [router],
+  )
+
+  const handleMaintenance = useCallback(async (item: InventoryItem) => {
+    try {
+      const itemRef = doc(db, "itInventory", item.id)
+      const newStatus = item.status === "maintenance" ? "active" : "maintenance"
+
+      await updateDoc(itemRef, {
+        status: newStatus,
+        updated_at: serverTimestamp(),
+      })
+
+      setItems((prevItems) =>
+        prevItems.map((prevItem) => (prevItem.id === item.id ? { ...prevItem, status: newStatus } : prevItem)),
+      )
+
+      toast({
+        title: "Status Updated",
+        description: `Item marked as ${newStatus}`,
+      })
+    } catch (error) {
+      console.error("Error updating status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update item status",
+        variant: "destructive",
+      })
+    }
+  }, [])
+
+  const handleGenerateQR = useCallback((item: InventoryItem) => {
+    // Generate QR code for the item
+    const qrData = JSON.stringify({
+      id: item.id,
+      name: item.name,
+      serialNumber: item.serialNumber,
+      category: item.category,
+    })
+
+    // Open QR code in new window or modal
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`
+    window.open(qrUrl, "_blank")
+
+    toast({
+      title: "QR Code Generated",
+      description: "QR code opened in new tab",
+    })
+  }, [])
+
+  const handleExport = useCallback(
+    (item: InventoryItem) => {
+      const exportData = {
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        brand: item.brand,
+        department: item.department,
+        assignedTo: getUserDisplayName(item.assignedTo),
+        condition: item.condition,
+        status: item.status,
+        cost: `${item.currency} ${item.cost}`,
+        serialNumber: item.serialNumber,
+        purchaseDate: item.purchaseDate,
+        warrantyExpiry: item.warrantyExpiry,
+        description: item.description,
+      }
+
+      const dataStr = JSON.stringify(exportData, null, 2)
+      const dataBlob = new Blob([dataStr], { type: "application/json" })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${item.name.replace(/\s+/g, "_")}_details.json`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: "Item details exported successfully",
+      })
+    },
+    [users],
+  ) // Removed getUserDisplayName from dependencies
+
+  const handleViewHistory = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/history/${item.id}`)
+    },
+    [router],
+  )
+
+  const handleDuplicate = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/new?duplicate=${item.id}`)
+    },
+    [router],
+  )
+
+  const handlePrintLabel = useCallback((item: InventoryItem) => {
+    // Create a simple print-friendly label
+    const printWindow = window.open("", "_blank")
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Asset Label - ${item.name}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .label { border: 2px solid #000; padding: 15px; width: 300px; }
+              .title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+              .info { margin: 5px 0; }
+              .serial { font-family: monospace; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="label">
+              <div class="title">${item.name}</div>
+              <div class="info">Category: ${item.category}</div>
+              <div class="info">Brand: ${item.brand}</div>
+              <div class="info">Department: ${item.department}</div>
+              <div class="info">Serial: <span class="serial">${item.serialNumber || "N/A"}</span></div>
+              <div class="info">Status: ${item.status}</div>
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+    }
+
+    toast({
+      title: "Label Ready",
+      description: "Asset label opened for printing",
+    })
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -555,7 +704,7 @@ export default function ITInventoryPage() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem onClick={() => handleView(item)}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
@@ -563,6 +712,34 @@ export default function ITInventoryPage() {
                                 <DropdownMenuItem onClick={() => handleEdit(item)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleAssign(item)}>
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Assign/Reassign
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleMaintenance(item)}>
+                                  <Wrench className="h-4 w-4 mr-2" />
+                                  {item.status === "maintenance" ? "Mark Active" : "Mark Maintenance"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleGenerateQR(item)}>
+                                  <QrCode className="h-4 w-4 mr-2" />
+                                  Generate QR Code
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport(item)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Export Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewHistory(item)}>
+                                  <History className="h-4 w-4 mr-2" />
+                                  View History
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(item)}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate Item
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePrintLabel(item)}>
+                                  <Printer className="h-4 w-4 mr-2" />
+                                  Print Label
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
                                   <Trash2 className="h-4 w-4 mr-2" />
