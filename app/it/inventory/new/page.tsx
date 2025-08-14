@@ -29,6 +29,7 @@ import {
   X,
   ImageIcon,
   Wrench,
+  Key,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -44,7 +45,7 @@ const storage = getStorage()
 interface FormData {
   productNumber: string
   name: string
-  type: "assets" | "consumables" | "tools"
+  type: "assets" | "consumables" | "tools" | "license"
   category: string
   brand: string
   department: string
@@ -540,7 +541,7 @@ export default function NewInventoryItemPage() {
                     </Label>
                     <Select
                       value={formData.type}
-                      onValueChange={(value: "assets" | "consumables" | "tools") =>
+                      onValueChange={(value: "assets" | "consumables" | "tools" | "license") =>
                         setFormData({ ...formData, type: value, category: "", categorySpecs: {} })
                       }
                     >
@@ -564,6 +565,12 @@ export default function NewInventoryItemPage() {
                           <div className="flex items-center space-x-2">
                             <Wrench className="h-4 w-4" />
                             <span>Tools</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="license">
+                          <div className="flex items-center space-x-2">
+                            <Key className="h-4 w-4" />
+                            <span>License</span>
                           </div>
                         </SelectItem>
                       </SelectContent>
