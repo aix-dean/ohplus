@@ -207,7 +207,7 @@ export function SideNavigation() {
   const SectionIcon = currentNavItem?.icon
 
   return (
-    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
+    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto overflow-x-visible shadow-sm">
       <nav className="p-3 space-y-4">
         {currentSection === "cms" ? (
           <>
@@ -641,7 +641,7 @@ export function SideNavigation() {
                 })}
 
                 <div
-                  className="relative"
+                  className="relative overflow-visible"
                   onMouseEnter={() => setShowHardwareFlyout(true)}
                   onMouseLeave={() => setShowHardwareFlyout(false)}
                 >
