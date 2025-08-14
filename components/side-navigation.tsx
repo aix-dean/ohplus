@@ -4,7 +4,6 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Package,
   HardDrive,
   Wrench,
   Package2,
@@ -24,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 
 function SideNavigation() {
   const pathname = usePathname()
-  const [expandedSections, setExpandedSections] = useState<string[]>(["it", "inventory"])
+  const [expandedSections, setExpandedSections] = useState<string[]>(["it", "hardwares"])
   const [searchQuery, setSearchQuery] = useState("")
 
   const toggleSection = (sectionId: string) => {
@@ -73,10 +72,10 @@ function SideNavigation() {
       id: "it",
       submenu: [
         {
-          title: "Inventory",
-          icon: Package,
+          title: "Hardwares",
+          icon: HardDrive,
           href: "/it/inventory",
-          id: "inventory",
+          id: "hardwares",
           submenu: inventoryItems,
         },
         {
@@ -155,7 +154,7 @@ function SideNavigation() {
                       )}
                     </div>
 
-                    {/* Inventory Categories - Enhanced Section */}
+                    {/* Hardwares Categories - Enhanced Section */}
                     {subItem.submenu && isExpanded(subItem.id!) && (
                       <div className="ml-4 mt-3 space-y-2">
                         {/* Search and Actions */}
@@ -163,7 +162,7 @@ function SideNavigation() {
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                             <Input
-                              placeholder="Search inventory..."
+                              placeholder="Search hardware..."
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="pl-9 h-8 text-xs"
@@ -181,7 +180,7 @@ function SideNavigation() {
                           </div>
                         </div>
 
-                        {/* Inventory Categories */}
+                        {/* Hardware Categories */}
                         <div className="space-y-1">
                           {filteredInventoryItems.map((invItem) => (
                             <Link
