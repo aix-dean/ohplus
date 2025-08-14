@@ -4,21 +4,36 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  Package,
+  HardDrive,
+  Monitor,
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  UserPlus,
+  Wrench,
+  QrCode,
+  Download,
+  History,
+  Copy,
+  Printer,
+} from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, doc, updateDoc, orderBy, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,13 +44,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface InventoryItem {
   id: string
@@ -86,6 +97,8 @@ const conditionColors = {
   damaged: "bg-red-100 text-red-800 border-red-200",
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function ITInventoryPage() {
   const router = useRouter()
   const { userData } = useAuth()
@@ -96,11 +109,12 @@ export default function ITInventoryPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
+  const [activeTab, setActiveTab] = useState<string>("assets")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
     const fetchItems = async () => {
       if (!userData?.company_id) return
@@ -108,10 +122,10 @@ export default function ITInventoryPage() {
       try {
         const itemsRef = collection(db, "itInventory")
         const q = query(
-          itemsRef, 
+          itemsRef,
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false), // Only fetch non-deleted items
-          orderBy("created_at", "desc")
+          where("deleted", "==", false),
+          orderBy("created_at", "desc"),
         )
         const querySnapshot = await getDocs(q)
 
@@ -160,7 +174,6 @@ export default function ITInventoryPage() {
     fetchItems()
   }, [userData?.company_id])
 
-  // Fetch users for display names
   useEffect(() => {
     const fetchUsers = async () => {
       if (!userData?.company_id) return
@@ -192,7 +205,6 @@ export default function ITInventoryPage() {
     fetchUsers()
   }, [userData?.company_id])
 
-  // Helper function to get user display name
   const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
@@ -200,28 +212,70 @@ export default function ITInventoryPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesType = typeFilter === "all" || item.type === typeFilter
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
     const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter
 
-    return matchesSearch && matchesType && matchesStatus && matchesDepartment
+    let matchesCategory = true
+    if (activeTab === "assets") {
+      matchesCategory =
+        item.category.toLowerCase().includes("asset") ||
+        item.category.toLowerCase().includes("computer") ||
+        item.category.toLowerCase().includes("laptop") ||
+        item.category.toLowerCase().includes("desktop") ||
+        item.category.toLowerCase().includes("server") ||
+        item.category.toLowerCase().includes("monitor") ||
+        item.category.toLowerCase().includes("printer")
+    } else if (activeTab === "consumables") {
+      matchesCategory =
+        item.category.toLowerCase().includes("consumable") ||
+        item.category.toLowerCase().includes("cartridge") ||
+        item.category.toLowerCase().includes("toner") ||
+        item.category.toLowerCase().includes("paper") ||
+        item.category.toLowerCase().includes("cable") ||
+        item.category.toLowerCase().includes("battery")
+    } else if (activeTab === "tools") {
+      matchesCategory =
+        item.category.toLowerCase().includes("tool") ||
+        item.category.toLowerCase().includes("software") ||
+        item.category.toLowerCase().includes("license") ||
+        item.category.toLowerCase().includes("utility") ||
+        item.category.toLowerCase().includes("application")
+    }
+
+    return matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesCategory
   })
 
-  const handleEdit = useCallback((item: InventoryItem) => {
-    router.push(`/it/inventory/edit/${item.id}`)
-  }, [router])
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedItems = filteredItems.slice(startIndex, endIndex)
 
-  const handleView = useCallback((item: InventoryItem) => {
-    router.push(`/it/inventory/details/${item.id}`)
-  }, [router])
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, typeFilter, statusFilter, departmentFilter, activeTab])
+
+  const handleEdit = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/edit/${item.id}`)
+    },
+    [router],
+  )
+
+  const handleView = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/details/${item.id}`)
+    },
+    [router],
+  )
 
   const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
@@ -238,9 +292,8 @@ export default function ITInventoryPage() {
     if (!itemToDelete || isDeleting) return
 
     setIsDeleting(true)
-    
+
     try {
-      // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", itemToDelete.id)
       await updateDoc(itemRef, {
         deleted: true,
@@ -248,26 +301,21 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Update local state to remove the item
-      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
-      
-      // Store item name for toast before resetting state
+      setItems((prevItems) => prevItems.filter((item) => item.id !== itemToDelete.id))
+
       const deletedItemName = itemToDelete.name
-      
-      // Reset all delete-related state
+
       resetDeleteState()
-      
-      // Show success toast
+
       toast({
         title: "Item Deleted",
         description: `${deletedItemName} has been deleted from inventory`,
       })
     } catch (error) {
       console.error("Error deleting item:", error)
-      
-      // Reset state on error
+
       resetDeleteState()
-      
+
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
@@ -276,15 +324,172 @@ export default function ITInventoryPage() {
     }
   }, [itemToDelete, isDeleting, resetDeleteState])
 
-  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
-    if (!open && !isDeleting) {
-      resetDeleteState()
-    }
-  }, [isDeleting, resetDeleteState])
+  const handleDeleteDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && !isDeleting) {
+        resetDeleteState()
+      }
+    },
+    [isDeleting, resetDeleteState],
+  )
 
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  }
+
+  const handlePageClick = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleAssign = useCallback(
+    (item: InventoryItem) => {
+      // Navigate to assignment page or open assignment modal
+      router.push(`/it/inventory/assign/${item.id}`)
+    },
+    [router],
+  )
+
+  const handleMaintenance = useCallback(async (item: InventoryItem) => {
+    try {
+      const itemRef = doc(db, "itInventory", item.id)
+      const newStatus = item.status === "maintenance" ? "active" : "maintenance"
+
+      await updateDoc(itemRef, {
+        status: newStatus,
+        updated_at: serverTimestamp(),
+      })
+
+      setItems((prevItems) =>
+        prevItems.map((prevItem) => (prevItem.id === item.id ? { ...prevItem, status: newStatus } : prevItem)),
+      )
+
+      toast({
+        title: "Status Updated",
+        description: `Item marked as ${newStatus}`,
+      })
+    } catch (error) {
+      console.error("Error updating status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update item status",
+        variant: "destructive",
+      })
+    }
+  }, [])
+
+  const handleGenerateQR = useCallback((item: InventoryItem) => {
+    // Generate QR code for the item
+    const qrData = JSON.stringify({
+      id: item.id,
+      name: item.name,
+      serialNumber: item.serialNumber,
+      category: item.category,
+    })
+
+    // Open QR code in new window or modal
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`
+    window.open(qrUrl, "_blank")
+
+    toast({
+      title: "QR Code Generated",
+      description: "QR code opened in new tab",
+    })
+  }, [])
+
+  const handleExport = useCallback(
+    (item: InventoryItem) => {
+      const exportData = {
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        brand: item.brand,
+        department: item.department,
+        assignedTo: getUserDisplayName(item.assignedTo),
+        condition: item.condition,
+        status: item.status,
+        cost: `${item.currency} ${item.cost}`,
+        serialNumber: item.serialNumber,
+        purchaseDate: item.purchaseDate,
+        warrantyExpiry: item.warrantyExpiry,
+        description: item.description,
+      }
+
+      const dataStr = JSON.stringify(exportData, null, 2)
+      const dataBlob = new Blob([dataStr], { type: "application/json" })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${item.name.replace(/\s+/g, "_")}_details.json`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: "Item details exported successfully",
+      })
+    },
+    [users],
+  ) // Removed getUserDisplayName from dependencies
+
+  const handleViewHistory = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/history/${item.id}`)
+    },
+    [router],
+  )
+
+  const handleDuplicate = useCallback(
+    (item: InventoryItem) => {
+      router.push(`/it/inventory/new?duplicate=${item.id}`)
+    },
+    [router],
+  )
+
+  const handlePrintLabel = useCallback((item: InventoryItem) => {
+    // Create a simple print-friendly label
+    const printWindow = window.open("", "_blank")
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Asset Label - ${item.name}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .label { border: 2px solid #000; padding: 15px; width: 300px; }
+              .title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+              .info { margin: 5px 0; }
+              .serial { font-family: monospace; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="label">
+              <div class="title">${item.name}</div>
+              <div class="info">Category: ${item.category}</div>
+              <div class="info">Brand: ${item.brand}</div>
+              <div class="info">Department: ${item.department}</div>
+              <div class="info">Serial: <span class="serial">${item.serialNumber || "N/A"}</span></div>
+              <div class="info">Status: ${item.status}</div>
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+    }
+
+    toast({
+      title: "Label Ready",
+      description: "Asset label opened for printing",
+    })
+  }, [])
 
   if (loading) {
     return (
@@ -304,7 +509,6 @@ export default function ITInventoryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-6">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
@@ -316,7 +520,6 @@ export default function ITInventoryPage() {
           </Button>
         </div>
 
-        {/* Filters and Search */}
         <Card className="mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4">
@@ -374,10 +577,9 @@ export default function ITInventoryPage() {
           </CardContent>
         </Card>
 
-        {/* Results Summary */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredItems.length} of {items.length} items
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredItems.length)} of {filteredItems.length} items
           </p>
           {(searchTerm || typeFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all") && (
             <Button
@@ -395,134 +597,213 @@ export default function ITInventoryPage() {
           )}
         </div>
 
-        {/* Items Grid */}
-        {filteredItems.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                  <Package className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">No items found</h3>
-                  <p className="text-muted-foreground">
-                    {items.length === 0 
-                      ? "Get started by adding your first inventory item"
-                      : "Try adjusting your search or filter criteria"
-                    }
-                  </p>
-                </div>
-                {items.length === 0 && (
-                  <Button onClick={handleAddNew}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Item
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {item.type === "hardware" ? (
-                        <HardDrive className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <Monitor className="h-5 w-5 text-green-600" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                        <CardDescription className="truncate">
-                          {item.brand} • {item.category}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleView(item)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(item)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={cn(statusColors[item.status])}>
-                      {item.status}
-                    </Badge>
-                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                      {item.condition}
-                    </Badge>
-                  </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="assets">Assets</TabsTrigger>
+            <TabsTrigger value="consumables">Consumables</TabsTrigger>
+            <TabsTrigger value="tools">Tools</TabsTrigger>
+          </TabsList>
 
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Department:</span>
-                      <span className="font-medium">{item.department}</span>
+          <TabsContent value={activeTab} className="space-y-4">
+            {filteredItems.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                      <Package className="h-8 w-8 text-muted-foreground" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Assigned to:</span>
-                      <span className="font-medium truncate ml-2">
-                        {getUserDisplayName(item.assignedTo)}
-                      </span>
-                    </div>
-                    {item.cost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost:</span>
-                        <span className="font-medium">
-                          {item.currency} {item.cost.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {item.serialNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="font-mono text-xs">{item.serialNumber}</span>
-                      </div>
-                    )}
-                    {item.version && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Version:</span>
-                        <span className="font-medium">{item.version}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {item.description && (
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {item.description}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">No items found</h3>
+                      <p className="text-muted-foreground">
+                        {items.length === 0
+                          ? "Get started by adding your first inventory item"
+                          : "Try adjusting your search or filter criteria"}
                       </p>
                     </div>
-                  )}
+                    {items.length === 0 && (
+                      <Button onClick={handleAddNew}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add First Item
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Condition</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Cost</TableHead>
+                        <TableHead>Serial Number</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              {item.type === "hardware" ? (
+                                <HardDrive className="h-4 w-4 text-blue-600" />
+                              ) : (
+                                <Monitor className="h-4 w-4 text-green-600" />
+                              )}
+                              <div>
+                                <div className="font-medium">{item.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {item.brand} • {item.category}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(statusColors[item.status])}>
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                              {item.condition}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{item.department}</TableCell>
+                          <TableCell>
+                            <div className="max-w-[150px] truncate">{getUserDisplayName(item.assignedTo)}</div>
+                          </TableCell>
+                          <TableCell>
+                            {item.cost > 0 ? (
+                              <span>
+                                {item.currency} {item.cost.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {item.serialNumber ? (
+                              <span className="font-mono text-xs">{item.serialNumber}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleView(item)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleAssign(item)}>
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Assign/Reassign
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleMaintenance(item)}>
+                                  <Wrench className="h-4 w-4 mr-2" />
+                                  {item.status === "maintenance" ? "Mark Active" : "Mark Maintenance"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleGenerateQR(item)}>
+                                  <QrCode className="h-4 w-4 mr-2" />
+                                  Generate QR Code
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport(item)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Export Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewHistory(item)}>
+                                  <History className="h-4 w-4 mr-2" />
+                                  View History
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(item)}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate Item
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePrintLabel(item)}>
+                                  <Printer className="h-4 w-4 mr-2" />
+                                  Print Label
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Delete Confirmation Dialog */}
+            {filteredItems.length > 0 && totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 1}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i
+                      } else {
+                        pageNumber = currentPage - 2 + i
+                      }
+
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={currentPage === pageNumber ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageClick(pageNumber)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNumber}
+                        </Button>
+                      )
+                    })}
+                  </div>
+
+                  <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
         <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -531,16 +812,13 @@ export default function ITInventoryPage() {
                 <span>Delete Inventory Item</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
+                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it
+                won't be visible in your inventory list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
+              <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
