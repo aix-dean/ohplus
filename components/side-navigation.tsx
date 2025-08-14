@@ -664,7 +664,12 @@ export function SideNavigation() {
                   </Link>
 
                   {showHardwareFlyout && (
-                    <div className="absolute left-full top-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div
+                      className="fixed left-64 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999]"
+                      style={{
+                        top: `${document.querySelector('[href="/it/inventory"]')?.getBoundingClientRect().top || 0}px`,
+                      }}
+                    >
                       <div className="p-1">
                         {[
                           { title: "Assets", href: "/it/inventory/assets", icon: Package },
