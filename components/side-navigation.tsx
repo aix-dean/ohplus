@@ -666,7 +666,7 @@ export function SideNavigation() {
                           : "text-gray-500",
                       )}
                     />
-                    <span className="flex-1">Hardwares</span>
+                    <span className="flex-1 text-left">Hardwares</span>
                     {hardwaresExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
 
