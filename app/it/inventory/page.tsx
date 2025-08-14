@@ -18,6 +18,8 @@ import {
   Monitor,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -88,6 +90,8 @@ const conditionColors = {
   damaged: "bg-red-100 text-red-800 border-red-200",
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function ITInventoryPage() {
   const router = useRouter()
   const { userData } = useAuth()
@@ -102,6 +106,7 @@ export default function ITInventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -242,6 +247,15 @@ export default function ITInventoryPage() {
     return matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesCategory
   })
 
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedItems = filteredItems.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, typeFilter, statusFilter, departmentFilter, activeTab])
+
   const handleEdit = useCallback(
     (item: InventoryItem) => {
       router.push(`/it/inventory/edit/${item.id}`)
@@ -315,6 +329,18 @@ export default function ITInventoryPage() {
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  }
+
+  const handlePageClick = (page: number) => {
+    setCurrentPage(page)
+  }
 
   if (loading) {
     return (
@@ -404,7 +430,7 @@ export default function ITInventoryPage() {
 
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredItems.length} of {items.length} items
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredItems.length)} of {filteredItems.length} items
           </p>
           {(searchTerm || typeFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all") && (
             <Button
@@ -472,7 +498,7 @@ export default function ITInventoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => (
+                      {paginatedItems.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>
                             <div className="flex items-center space-x-3">
@@ -551,6 +577,52 @@ export default function ITInventoryPage() {
                   </Table>
                 </CardContent>
               </Card>
+            )}
+
+            {filteredItems.length > 0 && totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 1}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i
+                      } else {
+                        pageNumber = currentPage - 2 + i
+                      }
+
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={currentPage === pageNumber ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageClick(pageNumber)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNumber}
+                        </Button>
+                      )
+                    })}
+                  </div>
+
+                  <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </TabsContent>
         </Tabs>
