@@ -234,6 +234,7 @@ export async function getSalesEventById(eventId: string, userId: string): Promis
 export async function createSalesEvent(
   userId: string,
   eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt">,
+  companyId?: string, // Added companyId parameter
 ): Promise<string> {
   try {
     // Convert Date objects to Firestore Timestamps
@@ -261,26 +262,26 @@ export async function createSalesEvent(
 
     const docRef = await addDoc(collection(db, "planner"), newEvent)
 
-    try {
-      // Get user's company_id - you may need to fetch this from user data
-      // For now, using a placeholder - you should fetch the actual company_id from user context
-      const companyId = "default_company" // Replace with actual company_id from user context
+    if (companyId) {
+      try {
+        const eventStart = eventData.start instanceof Date ? eventData.start : eventData.start.toDate()
 
-      const eventStart = eventData.start instanceof Date ? eventData.start : eventData.start.toDate()
+        await createDepartmentNotifications(
+          eventData.title,
+          eventData.type,
+          eventStart,
+          companyId, // Use the provided companyId instead of hardcoded value
+          "Sales",
+          `/sales/planner`,
+        )
 
-      await createDepartmentNotifications(
-        eventData.title,
-        eventData.type,
-        eventStart,
-        companyId,
-        "Sales",
-        `/sales/planner`,
-      )
-
-      console.log("Department notifications created successfully for event:", docRef.id)
-    } catch (notificationError) {
-      console.error("Error creating department notifications:", notificationError)
-      // Don't throw here - we don't want notification failure to break event creation
+        console.log("Department notifications created successfully for event:", docRef.id)
+      } catch (notificationError) {
+        console.error("Error creating department notifications:", notificationError)
+        // Don't throw here - we don't want notification failure to break event creation
+      }
+    } else {
+      console.warn("No company_id provided, skipping notification creation")
     }
 
     return docRef.id

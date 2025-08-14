@@ -123,7 +123,6 @@ export function SalesEventDialog({ isOpen, onClose, event, userId, onEventSaved 
         end: endDateTime,
         allDay: isAllDay,
         recurrence,
-        company_id: userData?.company_id || "default_company",
       }
 
       let eventId: string
@@ -133,8 +132,7 @@ export function SalesEventDialog({ isOpen, onClose, event, userId, onEventSaved 
         await updateSalesEvent(event.id, eventData, userId)
         eventId = event.id
       } else {
-        // Create new event - notifications will be created automatically in createSalesEvent
-        eventId = await createSalesEvent(userId, eventData as any)
+        eventId = await createSalesEvent(userId, eventData as any, userData?.company_id || undefined)
       }
 
       onEventSaved(eventId)
