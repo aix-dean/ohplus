@@ -12,10 +12,10 @@ import { useParams, useRouter } from "next/navigation"
 
 interface Collectible {
   id: string
-  created: any
+  created: string
   company_id: string
   type: "sites" | "supplies"
-  updated: any
+  updated: string
   deleted: boolean
   client_name: string
   net_amount: number
@@ -25,21 +25,21 @@ interface Collectible {
   bi_no: string
   or_no: string
   invoice_no: string
-  next_collection_date: any
+  next_collection_date: string
   status: "pending" | "collected" | "overdue"
   // Sites specific fields
   booking_no?: string
   site?: string
   covered_period?: string
   bir_2307?: string
-  collection_date?: any
+  collection_date?: string
   // Supplies specific fields
-  date?: any
+  date?: string
   product?: string
-  transfer_date?: any
+  transfer_date?: string
   bs_no?: string
   due_for_collection?: string
-  date_paid?: any
+  date_paid?: string
   net_amount_collection?: number
   // Next collection fields
   next_collection_status?: string
@@ -91,49 +91,6 @@ export default function CollectibleDetailsPage() {
       return "-"
     }
     return String(value)
-  }
-
-  const formatDate = (timestamp: any): string => {
-    if (!timestamp) return "-"
-
-    try {
-      let date: Date
-
-      // Handle Firebase Timestamp object
-      if (timestamp && typeof timestamp === "object" && timestamp.seconds) {
-        date = new Date(timestamp.seconds * 1000)
-      }
-      // Handle string timestamps
-      else if (typeof timestamp === "string") {
-        date = new Date(timestamp)
-      }
-      // Handle Date objects
-      else if (timestamp instanceof Date) {
-        date = timestamp
-      }
-      // Handle numeric timestamps
-      else if (typeof timestamp === "number") {
-        date = new Date(timestamp)
-      } else {
-        return displayValue(timestamp)
-      }
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return displayValue(timestamp)
-      }
-
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    } catch (error) {
-      console.error("Error formatting date:", error)
-      return displayValue(timestamp)
-    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -237,7 +194,7 @@ export default function CollectibleDetailsPage() {
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Created</label>
-              <p className="text-sm">{formatDate(collectible.created)}</p>
+              <p className="text-sm">{displayValue(collectible.created)}</p>
             </div>
           </CardContent>
         </Card>
@@ -313,7 +270,7 @@ export default function CollectibleDetailsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Collection Date</label>
-                <p className="text-sm">{formatDate(collectible.collection_date)}</p>
+                <p className="text-sm">{displayValue(collectible.collection_date)}</p>
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-muted-foreground">BIR 2307</label>
@@ -340,7 +297,7 @@ export default function CollectibleDetailsPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Date</label>
-                <p className="text-sm">{formatDate(collectible.date)}</p>
+                <p className="text-sm">{displayValue(collectible.date)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Product</label>
@@ -348,7 +305,7 @@ export default function CollectibleDetailsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Transfer Date</label>
-                <p className="text-sm">{formatDate(collectible.transfer_date)}</p>
+                <p className="text-sm">{displayValue(collectible.transfer_date)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">BS No</label>
@@ -360,7 +317,7 @@ export default function CollectibleDetailsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Date Paid</label>
-                <p className="text-sm">{formatDate(collectible.date_paid)}</p>
+                <p className="text-sm">{displayValue(collectible.date_paid)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Net Amount Collection</label>
@@ -381,7 +338,7 @@ export default function CollectibleDetailsPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Next Collection Date</label>
-                <p className="text-sm">{formatDate(collectible.next_collection_date)}</p>
+                <p className="text-sm">{displayValue(collectible.next_collection_date)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Next Collection Status</label>
