@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 
-export const SideNavigation = () => {
+function SideNavigation() {
   const pathname = usePathname()
   const [expandedSections, setExpandedSections] = useState<string[]>(["it", "inventory"])
   const [searchQuery, setSearchQuery] = useState("")
@@ -246,5 +246,5 @@ export const SideNavigation = () => {
   )
 }
 
-// Also provide a default export for compatibility
+export { SideNavigation }
 export default SideNavigation
