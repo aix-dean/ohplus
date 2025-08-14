@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import type { FleetVehicle, FleetFormData, FleetStats, FleetFilters } from "@/types/fleet"
+import { FleetAPI } from "@/lib/fleet-api"
 
 interface FleetContextType {
   vehicles: FleetVehicle[]
@@ -158,9 +159,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      // setVehicles(response.data)
+      const fetchedVehicles = await FleetAPI.getVehicles()
+      setVehicles(fetchedVehicles)
     } catch (err) {
       setError("Failed to fetch vehicles")
       console.error("Error fetching vehicles:", err)
@@ -169,48 +169,28 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const createVehicle = useCallback(
-    async (data: FleetFormData): Promise<string> => {
-      setLoading(true)
-      setError(null)
-      try {
-        // TODO: Replace with actual API call
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        const newVehicle: FleetVehicle = {
-          ...data,
-          id: `FL${String(vehicles.length + 1).padStart(3, "0")}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          fuelLevel: 100,
-          mileage: "0 km",
-        }
-
-        setVehicles((prev) => [...prev, newVehicle])
-        return newVehicle.id
-      } catch (err) {
-        setError("Failed to create vehicle")
-        console.error("Error creating vehicle:", err)
-        throw err
-      } finally {
-        setLoading(false)
-      }
-    },
-    [vehicles.length],
-  )
+  const createVehicle = useCallback(async (data: FleetFormData): Promise<string> => {
+    setLoading(true)
+    setError(null)
+    try {
+      const newVehicle = await FleetAPI.createVehicle(data)
+      setVehicles((prev) => [...prev, newVehicle])
+      return newVehicle.id
+    } catch (err) {
+      setError("Failed to create vehicle")
+      console.error("Error creating vehicle:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   const updateVehicle = useCallback(async (id: string, data: FleetFormData) => {
     setLoading(true)
     setError(null)
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      setVehicles((prev) =>
-        prev.map((vehicle) =>
-          vehicle.id === id ? { ...vehicle, ...data, updatedAt: new Date().toISOString() } : vehicle,
-        ),
-      )
+      const updatedVehicle = await FleetAPI.updateVehicle(id, data)
+      setVehicles((prev) => prev.map((vehicle) => (vehicle.id === id ? updatedVehicle : vehicle)))
     } catch (err) {
       setError("Failed to update vehicle")
       console.error("Error updating vehicle:", err)
@@ -224,9 +204,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
+      await FleetAPI.deleteVehicle(id)
       setVehicles((prev) => prev.filter((vehicle) => vehicle.id !== id))
     } catch (err) {
       setError("Failed to delete vehicle")
