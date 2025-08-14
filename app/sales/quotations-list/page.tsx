@@ -163,7 +163,11 @@ export default function SalesQuotationsPage() {
       }
 
       // Generate collectibles for each item/product
-      const collectiblesPromises = items.map(async (item: any) => {
+      const collectiblesPromises = items.map(async (item: any, index: number) => {
+        const productId = item.product_id || item.id || `product-${index + 1}-${Date.now()}`
+        const itemAmount = item.item_total_amount || item.price * (fullQuotationData.duration_days || 30) || 0
+        const itemName = item.name || `Product ${index + 1}`
+
         const collectibleData = {
           // Basic information from quotation
           client_name: quotation.client_name || fullQuotationData.client_name || "",
@@ -171,13 +175,13 @@ export default function SalesQuotationsPage() {
           type: "sites", // Default to sites type based on the business model
 
           // Financial data - distribute total amount across items proportionally
-          net_amount: item.item_total_amount || item.price * (fullQuotationData.duration_days || 30),
-          total_amount: item.item_total_amount || item.price * (fullQuotationData.duration_days || 30),
+          net_amount: itemAmount,
+          total_amount: itemAmount,
 
           // Document references
-          invoice_no: `INV-${quotation.quotation_number}-${item.id?.slice(-4) || Math.random().toString(36).substr(2, 4)}`,
-          or_no: `OR-${Date.now()}-${item.id?.slice(-4) || Math.random().toString(36).substr(2, 4)}`,
-          bi_no: `BI-${Date.now()}-${item.id?.slice(-4) || Math.random().toString(36).substr(2, 4)}`,
+          invoice_no: `INV-${quotation.quotation_number}-${productId.toString().slice(-4)}`,
+          or_no: `OR-${Date.now()}-${productId.toString().slice(-4)}`,
+          bi_no: `BI-${Date.now()}-${productId.toString().slice(-4)}`,
 
           // Payment information
           mode_of_payment: "Credit/Debit Card", // Default payment method
@@ -189,8 +193,8 @@ export default function SalesQuotationsPage() {
           covered_period: `${fullQuotationData.start_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`,
 
           // Sites-specific fields
-          site: item.location || "",
-          booking_no: `BK-${quotation.quotation_number}-${item.id?.slice(-4) || Math.random().toString(36).substr(2, 4)}`,
+          site: item.location || item.site_code || "",
+          booking_no: `BK-${quotation.quotation_number}-${productId.toString().slice(-4)}`,
 
           // Additional fields from collectibles model
           vendor_name: quotation.client_name || fullQuotationData.client_name || "",
@@ -205,8 +209,8 @@ export default function SalesQuotationsPage() {
           // Reference to original quotation
           quotation_id: quotation.id,
           quotation_number: quotation.quotation_number,
-          product_name: item.name,
-          product_id: item.id,
+          product_name: itemName,
+          product_id: productId, // Fixed to use validated product_id
         }
 
         return addDoc(collection(db, "collectibles"), collectibleData)
