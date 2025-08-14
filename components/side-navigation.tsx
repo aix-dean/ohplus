@@ -29,16 +29,13 @@ import {
   DollarSign,
   Receipt,
   CreditCard,
-  ChevronDown,
-  ChevronUp,
-  Wrench,
-  Box,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogisticsNotifications } from "@/components/logistics-notifications"
-import { useState } from "react"
+
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -162,7 +159,6 @@ export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
-  const [hardwaresExpanded, setHardwaresExpanded] = useState(false)
 
   // Determine the current section from the pathname
   let currentSection = pathname?.split("/")[1] || "dashboard"
@@ -622,84 +618,7 @@ export function SideNavigation() {
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
                   { title: "Network Management", href: "/it/network", icon: Wifi },
                   { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-
-                <div>
-                  <button
-                    onClick={() => setHardwaresExpanded(!hardwaresExpanded)}
-                    className={cn(
-                      "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                      pathname?.startsWith("/it/inventory") ||
-                        pathname?.startsWith("/it/assets") ||
-                        pathname?.startsWith("/it/tools") ||
-                        pathname?.startsWith("/it/consumables")
-                        ? "bg-gray-100 text-gray-900 font-medium"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                    )}
-                  >
-                    <Package
-                      className={cn(
-                        "h-4 w-4 mr-3",
-                        pathname?.startsWith("/it/inventory") ||
-                          pathname?.startsWith("/it/assets") ||
-                          pathname?.startsWith("/it/tools") ||
-                          pathname?.startsWith("/it/consumables")
-                          ? "text-gray-700"
-                          : "text-gray-500",
-                      )}
-                    />
-                    <span className="flex-1 text-left">Hardwares</span>
-                    {hardwaresExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </button>
-
-                  {hardwaresExpanded && (
-                    <div className="ml-6 mt-1 space-y-1">
-                      {[
-                        { title: "Assets", href: "/it/inventory/assets", icon: HardDrive },
-                        { title: "Tools", href: "/it/inventory/tools", icon: Wrench },
-                        { title: "Consumables", href: "/it/inventory/consumables", icon: Box },
-                      ].map((subItem) => {
-                        const SubIcon = subItem.icon
-                        const active = isActive(pathname, subItem.href)
-                        return (
-                          <Link
-                            key={subItem.href}
-                            href={subItem.href}
-                            className={cn(
-                              "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                              active
-                                ? "bg-gray-100 text-gray-900 font-medium"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                            )}
-                          >
-                            <SubIcon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                            <span className="flex-1">{subItem.title}</span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {[
+                  { title: "Hardwares", href: "/it/inventory", icon: Package },
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                   { title: "User Management", href: "/it/user-management", icon: Users },
