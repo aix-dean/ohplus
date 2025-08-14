@@ -162,6 +162,11 @@ export default function SalesQuotationsPage() {
         throw new Error("No items found in quotation")
       }
 
+      const startDate = fullQuotationData.start_date?.toDate?.() || new Date()
+      const collectionDate = new Date(startDate)
+      collectionDate.setDate(collectionDate.getDate() + 30)
+      const collectionDateString = collectionDate.toISOString().split("T")[0]
+
       // Generate collectibles for each item/product
       const collectiblesPromises = items.map(async (item: any, index: number) => {
         const productId = item.product_id || item.id || `product-${index + 1}-${Date.now()}`
@@ -189,7 +194,7 @@ export default function SalesQuotationsPage() {
 
           // Status and dates
           status: "pending",
-          collection_date: new Date().toISOString().split("T")[0],
+          collection_date: collectionDateString, // Now 30 days after start_date
           covered_period: `${fullQuotationData.start_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`,
 
           // Sites-specific fields
