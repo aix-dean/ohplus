@@ -38,7 +38,7 @@ interface NavigationItem {
   isCollapsible?: boolean
 }
 
-const SideNavigation = () => {
+export const SideNavigation = () => {
   const pathname = usePathname()
   const [expandedSections, setExpandedSections] = useState<string[]>(["it-inventory"])
 
