@@ -173,7 +173,7 @@ export default function SalesQuotationsPage() {
         throw new Error("No items found in quotation")
       }
 
-      const startDate = fullQuotationData.start_date?.toDate?.() || new Date()
+      const startDate = fullQuotationData.start_date ? new Date(fullQuotationData.start_date) : new Date()
       const collectionDate = new Date(startDate)
       collectionDate.setDate(collectionDate.getDate() + 30)
       const collectionTimestamp = Timestamp.fromDate(collectionDate)
@@ -206,7 +206,7 @@ export default function SalesQuotationsPage() {
           // Status and dates
           status: "pending",
           collection_date: collectionTimestamp, // Now using Firebase Timestamp
-          covered_period: `${fullQuotationData.start_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.toDate?.()?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`,
+          covered_period: `${fullQuotationData.start_date?.split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.split("T")[0] || new Date().toISOString().split("T")[0]}`,
 
           // Sites-specific fields
           site: item.location || item.site_code || "",
