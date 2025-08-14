@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import {
@@ -8,11 +8,12 @@ import {
   query,
   where,
   orderBy,
-  limit,
-  startAfter,
   getDocs,
-  type DocumentData,
-  type QueryDocumentSnapshot,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
@@ -21,22 +22,56 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ChevronLeft, ChevronRight, CheckCircle, Search, X, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
+  const [allQuotations, setAllQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageHistory, setPageHistory] = useState<QueryDocumentSnapshot<DocumentData>[]>([])
-
+  const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
-  console.log(user.uid)
-  const fetchQuotations = async (direction: "first" | "next" | "prev" = "first") => {
+  const { toast } = useToast()
+
+  const filteredQuotations = useMemo(() => {
+    let filtered = allQuotations
+
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      filtered = filtered.filter(
+        (quotation) =>
+          quotation.client_name?.toLowerCase().includes(searchLower) ||
+          quotation.client_phone?.toLowerCase().includes(searchLower) ||
+          quotation.quotation_number?.toLowerCase().includes(searchLower) ||
+          quotation.client_address?.toLowerCase().includes(searchLower),
+      )
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((quotation) => quotation.status?.toLowerCase() === statusFilter)
+    }
+
+    return filtered
+  }, [allQuotations, searchTerm, statusFilter])
+
+  const paginatedQuotations = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredQuotations.slice(startIndex, endIndex)
+  }, [filteredQuotations, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredQuotations.length / pageSize)
+
+  const fetchAllQuotations = async () => {
     if (!user?.uid) {
       setLoading(false)
       return
@@ -46,31 +81,7 @@ export default function SalesQuotationsPage() {
 
     try {
       const quotationsRef = collection(db, "quotations")
-      let q
-
-      if (direction === "first") {
-        q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"), limit(pageSize + 1))
-      } else if (direction === "next" && lastVisible) {
-        q = query(
-          quotationsRef,
-          where("created_by", "==", user.uid),
-          orderBy("created", "desc"),
-          startAfter(lastVisible),
-          limit(pageSize + 1),
-        )
-      } else if (direction === "prev" && pageHistory.length > 0) {
-        const prevDoc = pageHistory[pageHistory.length - 1]
-        q = query(
-          quotationsRef,
-          where("created_by", "==", user.uid),
-          orderBy("created", "desc"),
-          startAfter(prevDoc),
-          limit(pageSize + 1),
-        )
-      } else {
-        setLoading(false)
-        return
-      }
+      const q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"))
 
       const querySnapshot = await getDocs(q)
       const fetchedQuotations: any[] = []
@@ -79,36 +90,7 @@ export default function SalesQuotationsPage() {
         fetchedQuotations.push({ id: doc.id, ...doc.data() })
       })
 
-      // Check if there are more items than pageSize
-      const newHasMore = fetchedQuotations.length > pageSize
-
-      // If we have more than pageSize, remove the extra item
-      if (newHasMore) {
-        fetchedQuotations.pop()
-      }
-
-      const docs = querySnapshot.docs.slice(0, pageSize) // Only take pageSize documents
-      const newLastVisible = docs[docs.length - 1] || null
-      const newFirstVisible = docs[0] || null
-
-      setQuotations(fetchedQuotations)
-      setLastVisible(newLastVisible)
-      setFirstVisible(newFirstVisible)
-      setHasMore(newHasMore)
-
-      // Update page history and current page
-      if (direction === "first") {
-        setCurrentPage(1)
-        setPageHistory([])
-      } else if (direction === "next") {
-        setCurrentPage((prev) => prev + 1)
-        if (firstVisible) {
-          setPageHistory((prev) => [...prev, firstVisible])
-        }
-      } else if (direction === "prev") {
-        setCurrentPage((prev) => prev - 1)
-        setPageHistory((prev) => prev.slice(0, -1))
-      }
+      setAllQuotations(fetchedQuotations)
     } catch (error) {
       console.error("Error fetching quotations:", error)
     } finally {
@@ -118,20 +100,22 @@ export default function SalesQuotationsPage() {
 
   useEffect(() => {
     if (user?.uid) {
-      fetchQuotations("first")
+      fetchAllQuotations()
     }
   }, [user?.uid])
 
-  const handleNextPage = () => {
-    if (hasMore && !loading) {
-      fetchQuotations("next")
-    }
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
-  const handlePrevPage = () => {
-    if (currentPage > 1 && !loading) {
-      fetchQuotations("prev")
-    }
+  const clearFilters = () => {
+    setSearchTerm("")
+    setStatusFilter("all")
+    setCurrentPage(1)
   }
 
   const formatDate = (date: any) => {
@@ -168,15 +152,197 @@ export default function SalesQuotationsPage() {
     }
   }
 
+  const handleQuoteSigned = async (quotation: any) => {
+    if (!quotation.id || !user?.uid) return
+
+    setSigningQuotes((prev) => new Set(prev).add(quotation.id))
+
+    try {
+      // First, get the full quotation details including items
+      const quotationRef = doc(db, "quotations", quotation.id)
+      const quotationDoc = await getDoc(quotationRef)
+
+      if (!quotationDoc.exists()) {
+        throw new Error("Quotation not found")
+      }
+
+      const fullQuotationData = quotationDoc.data()
+      const items = fullQuotationData.items || []
+
+      if (items.length === 0) {
+        throw new Error("No items found in quotation")
+      }
+
+      const startDate = fullQuotationData.start_date ? new Date(fullQuotationData.start_date) : new Date()
+      const durationDays = fullQuotationData.duration_days || 30
+
+      const collectionPeriods = []
+      let remainingDays = durationDays
+      const currentDate = new Date(startDate)
+
+      while (remainingDays > 0) {
+        const periodDays = Math.min(30, remainingDays)
+        currentDate.setDate(currentDate.getDate() + (collectionPeriods.length === 0 ? 30 : periodDays))
+        collectionPeriods.push({
+          collectionDate: new Date(currentDate),
+          periodDays: periodDays,
+          periodNumber: collectionPeriods.length + 1,
+        })
+        remainingDays -= periodDays
+      }
+
+      // Generate collectibles for each item and each collection period
+      const collectiblesPromises = []
+
+      for (const item of items) {
+        const productId = item.product_id || item.id || `product-${Date.now()}`
+        const totalItemAmount = item.item_total_amount || item.price * durationDays || 0
+        const itemName = item.name || `Product ${items.indexOf(item) + 1}`
+
+        // Create collectibles for each collection period
+        for (const period of collectionPeriods) {
+          const periodAmount = (totalItemAmount / durationDays) * period.periodDays
+
+          const collectibleData = {
+            // Basic information from quotation
+            client_name: quotation.client_name || fullQuotationData.client_name || "",
+            company_id: user.company_id || user.uid,
+            type: "sites", // Default to sites type based on the business model
+
+            // Financial data - proportional amount for this period
+            net_amount: periodAmount,
+            total_amount: periodAmount,
+
+            // Document references with period number
+            invoice_no: `INV-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            or_no: `OR-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            bi_no: `BI-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+
+            // Payment information
+            mode_of_payment: "Credit/Debit Card", // Default payment method
+            bank_name: "", // To be filled later
+
+            // Status and dates
+            status: "pending",
+            collection_date: Timestamp.fromDate(period.collectionDate), // Use calculated collection date
+            covered_period: `${fullQuotationData.start_date?.split("T")[0] || new Date().toISOString().split("T")[0]} - ${fullQuotationData.end_date?.split("T")[0] || new Date().toISOString().split("T")[0]}`,
+
+            // Sites-specific fields
+            site: item.location || item.site_code || "",
+            booking_no: `BK-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+
+            // Additional fields from collectibles model
+            vendor_name: quotation.client_name || fullQuotationData.client_name || "",
+            business_address: quotation.client_address || fullQuotationData.client_address || "",
+            tin_no: "", // To be filled later
+
+            // System fields
+            deleted: false,
+            created: serverTimestamp(),
+            updated: serverTimestamp(),
+
+            // Reference to original quotation
+            quotation_id: quotation.id,
+            quotation_number: quotation.quotation_number,
+            product_name: itemName,
+            product_id: productId,
+
+            period_number: period.periodNumber,
+            period_days: period.periodDays,
+            total_periods: collectionPeriods.length,
+            duration_days: durationDays,
+          }
+
+          collectiblesPromises.push(addDoc(collection(db, "collectibles"), collectibleData))
+        }
+      }
+
+      // Execute all collectibles creation
+      const results = await Promise.all(collectiblesPromises)
+
+      toast({
+        title: "Success",
+        description: `Quote signed successfully! Generated ${results.length} collectible document${results.length > 1 ? "s" : ""} across ${collectionPeriods.length} collection period${collectionPeriods.length > 1 ? "s" : ""}.`,
+      })
+
+      // Optionally update quotation status to 'accepted'
+      // await updateDoc(quotationRef, { status: 'accepted', updated: serverTimestamp() })
+    } catch (error) {
+      console.error("Error generating collectibles:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate collectibles documents. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSigningQuotes((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotation.id)
+        return newSet
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        
         {user?.uid ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardHeader className="px-6 py-4 border-b border-gray-200">
-              <CardTitle className="text-xl font-semibold text-gray-900">Quotations List</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle className="text-xl font-semibold text-gray-900">Quotations List</CardTitle>
+
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search by client, phone, or quotation number..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-10 w-full sm:w-80"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="sent">Sent</SelectItem>
+                      <SelectItem value="viewed">Viewed</SelectItem>
+                      <SelectItem value="accepted">Accepted</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {(searchTerm || statusFilter !== "all") && (
+                    <Button variant="outline" onClick={clearFilters} size="sm">
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {!loading && (
+                <div className="text-sm text-gray-600 mt-2">
+                  Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
+                  {filteredQuotations.length !== allQuotations.length &&
+                    ` (filtered from ${allQuotations.length} total)`}
+                </div>
+              )}
             </CardHeader>
+
             {loading ? (
               <Table>
                 <TableHeader>
@@ -189,6 +355,7 @@ export default function SalesQuotationsPage() {
                     <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -220,11 +387,14 @@ export default function SalesQuotationsPage() {
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-28" />
                         </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
               </Table>
-            ) : quotations.length > 0 ? (
+            ) : paginatedQuotations.length > 0 ? (
               <>
                 <CardContent className="p-0">
                   <Table>
@@ -238,27 +408,46 @@ export default function SalesQuotationsPage() {
                         <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {quotations.map((quotation) => (
-                        <TableRow
-                          key={quotation.id}
-                          className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                        >
-                          <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">
+                      {paginatedQuotations.map((quotation) => (
+                        <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
+                            {formatDate(quotation.created)}
+                          </TableCell>
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
+                            {quotation.client_name || "N/A"}
+                          </TableCell>
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             {quotation.client_address || "N/A"}
                           </TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             {quotation.client_phone || "N/A"}
                           </TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             {quotation.client_designation || "N/A"}
                           </TableCell>
-                          <TableCell className="py-3">
+                          <TableCell
+                            className="py-3 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             <Badge
                               variant="outline"
                               className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
@@ -268,40 +457,138 @@ export default function SalesQuotationsPage() {
                               {quotation.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             ₱{quotation.total_amount?.toLocaleString() || "0.00"}
                           </TableCell>
-                          <TableCell className="py-3 text-sm text-gray-700">
+                          <TableCell
+                            className="py-3 text-sm text-gray-700 cursor-pointer"
+                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                          >
                             {quotation.quotation_number || "N/A"}
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleQuoteSigned(quotation)
+                              }}
+                              disabled={signingQuotes.has(quotation.id)}
+                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                            >
+                              {signingQuotes.has(quotation.id) ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Quote Signed
+                                </>
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </CardContent>
-                <div className="flex justify-between items-center p-4 border-t border-gray-200">
-                  <Button
-                    variant="outline"
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 1 || loading}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
-                  >
-                    <ChevronLeft className="h-4 w-4" /> Previous
-                  </Button>
-                  <span className="text-sm text-gray-700">Page {currentPage}</span>
-                  <Button
-                    variant="outline"
-                    onClick={handleNextPage}
-                    disabled={!hasMore || loading}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
-                  >
-                    Next <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(1)}
+                        disabled={currentPage === 1}
+                        className="hidden sm:flex"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="hidden sm:inline ml-1">Previous</span>
+                      </Button>
+
+                      {/* Page numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum
+                          if (totalPages <= 5) {
+                            pageNum = i + 1
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i
+                          } else {
+                            pageNum = currentPage - 2 + i
+                          }
+
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(pageNum)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {pageNum}
+                            </Button>
+                          )
+                        })}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        <span className="hidden sm:inline mr-1">Next</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="hidden sm:flex"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <CardContent className="p-6 text-center text-gray-600">
-                <p>No quotations found for your account.</p>
+                {searchTerm || statusFilter !== "all" ? (
+                  <div>
+                    <p className="mb-2">No quotations found matching your filters.</p>
+                    <Button variant="outline" onClick={clearFilters} size="sm">
+                      Clear Filters
+                    </Button>
+                  </div>
+                ) : (
+                  <p>No quotations found for your account.</p>
+                )}
               </CardContent>
             )}
           </Card>
@@ -313,13 +600,6 @@ export default function SalesQuotationsPage() {
           </Card>
         )}
       </div>
-      {loading && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p>Loading quotations...</p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
