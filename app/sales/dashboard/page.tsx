@@ -53,7 +53,7 @@ import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
+import { createDirectCostEstimate, createMultipleCostEstimates } from "@/lib/cost-estimate-service" // Import both functions for CE creation
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
@@ -709,16 +709,30 @@ function SalesDashboardContent() {
           type: site.type || "Unknown",
         }))
 
-        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
-          startDate,
-          endDate,
-        })
+        if (sitesData.length > 1) {
+          const newCostEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
+            startDate: undefined,
+            endDate: undefined,
+          })
 
-        toast({
-          title: "Cost Estimate Created",
-          description: "Your cost estimate has been created successfully.",
-        })
-        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+          toast({
+            title: "Cost Estimates Created",
+            description: `${newCostEstimateIds.length} separate cost estimates have been created successfully without dates.`,
+          })
+          // Navigate to the first cost estimate or cost estimates list
+          router.push(`/sales/cost-estimates/${newCostEstimateIds[0]}`)
+        } else {
+          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+            startDate: undefined,
+            endDate: undefined,
+          })
+
+          toast({
+            title: "Cost Estimate Created",
+            description: "Your cost estimate has been created successfully without dates.",
+          })
+          router.push(`/sales/cost-estimates/${newCostEstimateId}`)
+        }
       } else if (actionAfterDateSelection === "quotation") {
         // Prepare products for quotation
         const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
