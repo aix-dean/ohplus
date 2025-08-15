@@ -477,6 +477,11 @@ export default function CostEstimateDetailsPage() {
       ? `Cost Estimate for ${costEstimate?.client?.company || costEstimate?.client?.name} – ${siteName}`
       : costEstimate?.title
 
+    const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
+    const uniqueCENumber = hasMultipleSites
+      ? `${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.
+      : baseCENumber
+
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
         {/* Document Header */}
@@ -485,7 +490,7 @@ export default function CostEstimateDetailsPage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
               <p className="text-sm text-gray-500 flex items-center gap-2">
-                {costEstimate?.costEstimateNumber || costEstimate?.id}
+                {uniqueCENumber}
                 {isEditing && (
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
                     <Pencil className="h-3 w-3 mr-1" /> Editing
