@@ -54,7 +54,6 @@ import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-s
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Check } from "lucide-react"
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -1338,15 +1337,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                           className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
                         />
                       </div>
-
-                      {/* Selection Indicator */}
-                      {isSelected && (
-                        <div className="absolute top-3 right-3">
-                          <div className="bg-green-600 rounded-full p-1">
-                            <Check className="h-3 w-3 text-white" />
-                          </div>
-                        </div>
-                      )}
 
                       {/* Page Preview */}
                       <div className="mt-6 space-y-3">
