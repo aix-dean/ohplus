@@ -837,49 +837,234 @@ export default function CostEstimateDetailsPage() {
                 Cost Breakdown
               </h2>
 
-              <div className="border border-gray-300 rounded-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                        Description
-                      </th>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                        Quantity
-                      </th>
-                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                        Unit Price
-                      </th>
-                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {costEstimate.lineItems.map((item, index) => (
-                      <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="py-3 px-4 border-b border-gray-200">
-                          <div className="font-medium text-gray-900">{item.description}</div>
-                          {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
-                        </td>
-                        <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
-                        <td className="py-3 px-4 text-right border-b border-gray-200">
-                          ₱{item.unitPrice.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-right border-b border-gray-200">
-                          <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="bg-gray-50">
-                      <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                        Total Estimated Cost:
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold text-blue-600">
-                        ₱{costEstimate.totalAmount.toLocaleString()}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                // Group line items by site (billboard rentals)
+                const siteItems = costEstimate.lineItems.filter(
+                  (item) => item.category === "LED Billboard Rental" || item.category === "Static Billboard Rental",
+                )
+                const otherItems = costEstimate.lineItems.filter(
+                  (item) => item.category !== "LED Billboard Rental" && item.category !== "Static Billboard Rental",
+                )
+
+                // If 2 or more sites, create separate pages for each site
+                if (siteItems.length >= 2) {
+                  return (
+                    <>
+                      {siteItems.map((siteItem, siteIndex) => (
+                        <div key={siteItem.id} className="mb-12">
+                          {/* Page header for each site */}
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              Site {siteIndex + 1}: {siteItem.description}
+                            </h3>
+                            <span className="text-sm text-gray-500">
+                              Page {siteIndex + 1} of {siteItems.length}
+                            </span>
+                          </div>
+
+                          {/* Site-specific cost breakdown */}
+                          <div className="border border-gray-300 rounded-sm overflow-hidden mb-8">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                                    Description
+                                  </th>
+                                  <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                                    Quantity
+                                  </th>
+                                  <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                                    Unit Price
+                                  </th>
+                                  <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                                    Total
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {/* Site rental cost */}
+                                <tr className="bg-white">
+                                  <td className="py-3 px-4 border-b border-gray-200">
+                                    <div className="font-medium text-gray-900">{siteItem.description}</div>
+                                    {siteItem.notes && <div className="text-xs text-gray-500">{siteItem.notes}</div>}
+                                  </td>
+                                  <td className="py-3 px-4 border-b border-gray-200">{siteItem.quantity}</td>
+                                  <td className="py-3 px-4 text-right border-b border-gray-200">
+                                    ₱{siteItem.unitPrice.toLocaleString()}
+                                  </td>
+                                  <td className="py-3 px-4 text-right border-b border-gray-200">
+                                    <div className="font-medium text-gray-900">₱{siteItem.total.toLocaleString()}</div>
+                                  </td>
+                                </tr>
+
+                                {/* Add proportional other costs for this site */}
+                                {otherItems.map((item, index) => {
+                                  const proportionalCost = Math.round(item.total / siteItems.length)
+                                  return (
+                                    <tr
+                                      key={`${siteItem.id}-${item.id}`}
+                                      className={index % 2 === 1 ? "bg-white" : "bg-gray-50"}
+                                    >
+                                      <td className="py-3 px-4 border-b border-gray-200">
+                                        <div className="font-medium text-gray-900">{item.description}</div>
+                                        {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
+                                        <div className="text-xs text-blue-600">Allocated for this site</div>
+                                      </td>
+                                      <td className="py-3 px-4 border-b border-gray-200">1</td>
+                                      <td className="py-3 px-4 text-right border-b border-gray-200">
+                                        ₱{proportionalCost.toLocaleString()}
+                                      </td>
+                                      <td className="py-3 px-4 text-right border-b border-gray-200">
+                                        <div className="font-medium text-gray-900">
+                                          ₱{proportionalCost.toLocaleString()}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+
+                                {/* Site subtotal */}
+                                <tr className="bg-blue-50">
+                                  <td colSpan={3} className="py-3 px-4 text-right font-medium text-blue-900">
+                                    Site {siteIndex + 1} Subtotal:
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-bold text-blue-600">
+                                    ₱
+                                    {(
+                                      siteItem.total +
+                                      otherItems.reduce(
+                                        (sum, item) => sum + Math.round(item.total / siteItems.length),
+                                        0,
+                                      )
+                                    ).toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Page break indicator (except for last site) */}
+                          {siteIndex < siteItems.length - 1 && (
+                            <div className="border-t-2 border-dashed border-gray-300 my-8 pt-4">
+                              <div className="text-center text-sm text-gray-500">— Page Break —</div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Summary page with total */}
+                      <div className="mt-12 pt-8 border-t-2 border-gray-400">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Summary - All Sites</h3>
+                        <div className="border border-gray-300 rounded-sm overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                                  Site
+                                </th>
+                                <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                                  Rental Cost
+                                </th>
+                                <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                                  Other Costs
+                                </th>
+                                <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                                  Site Total
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {siteItems.map((siteItem, index) => {
+                                const otherCostsForSite = otherItems.reduce(
+                                  (sum, item) => sum + Math.round(item.total / siteItems.length),
+                                  0,
+                                )
+                                return (
+                                  <tr key={siteItem.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                    <td className="py-3 px-4 border-b border-gray-200">
+                                      <div className="font-medium text-gray-900">
+                                        Site {index + 1}: {siteItem.description}
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 text-right border-b border-gray-200">
+                                      ₱{siteItem.total.toLocaleString()}
+                                    </td>
+                                    <td className="py-3 px-4 text-right border-b border-gray-200">
+                                      ₱{otherCostsForSite.toLocaleString()}
+                                    </td>
+                                    <td className="py-3 px-4 text-right border-b border-gray-200">
+                                      <div className="font-medium text-gray-900">
+                                        ₱{(siteItem.total + otherCostsForSite).toLocaleString()}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                              <tr className="bg-gray-50">
+                                <td colSpan={3} className="py-3 px-4 text-right font-medium">
+                                  Total Estimated Cost:
+                                </td>
+                                <td className="py-3 px-4 text-right font-bold text-blue-600">
+                                  ₱{costEstimate.totalAmount.toLocaleString()}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )
+                } else {
+                  // Original single-page layout for 1 site or no sites
+                  return (
+                    <div className="border border-gray-300 rounded-sm overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                              Description
+                            </th>
+                            <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                              Quantity
+                            </th>
+                            <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                              Unit Price
+                            </th>
+                            <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                              Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {costEstimate.lineItems.map((item, index) => (
+                            <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                              <td className="py-3 px-4 border-b border-gray-200">
+                                <div className="font-medium text-gray-900">{item.description}</div>
+                                {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
+                              </td>
+                              <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
+                              <td className="py-3 px-4 text-right border-b border-gray-200">
+                                ₱{item.unitPrice.toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 text-right border-b border-gray-200">
+                                <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-gray-50">
+                            <td colSpan={3} className="py-3 px-4 text-right font-medium">
+                              Total Estimated Cost:
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-blue-600">
+                              ₱{costEstimate.totalAmount.toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                }
+              })()}
             </div>
 
             {/* Additional Information */}
