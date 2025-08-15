@@ -1393,8 +1393,9 @@ export async function generateCostEstimatePDF(
       const siteLineItems = siteGroups[siteName] || []
       const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
 
+      const originalSiteIndex = sites.indexOf(siteName)
       const ceNumber = isMultipleSites
-        ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + siteIndex)}`
+        ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
         : costEstimate.costEstimateNumber || costEstimate.id
 
       const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
