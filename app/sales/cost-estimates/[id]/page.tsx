@@ -1325,7 +1325,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   return (
                     <div
                       key={siteName}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
                         isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
                       }`}
                       onClick={() => handlePageToggle(index)}
