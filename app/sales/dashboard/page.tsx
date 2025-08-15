@@ -1554,6 +1554,7 @@ function SalesDashboardContent() {
         onSkipDates={handleSkipDates}
         selectedSiteIds={selectedSites.map((site) => site.id)}
         selectedClientId={selectedClientForProposal?.id}
+        showSkipButton={actionAfterDateSelection === "cost_estimate"}
       />
 
       {/* Delete Confirmation Dialog */}
