@@ -710,11 +710,17 @@ function SalesDashboardContent() {
         }))
 
         if (selectedSites.length > 1) {
+          console.log("[v0] Creating multiple cost estimates for sites:", selectedSites.length)
+          console.log("[v0] Sites data:", sitesData)
+
           // Create separate cost estimates for each site
           const costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
             startDate,
             endDate,
           })
+
+          console.log("[v0] Created cost estimate IDs:", costEstimateIds)
+          console.log("[v0] Redirecting to:", `/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`)
 
           toast({
             title: "Multiple Cost Estimates Created",
@@ -837,11 +843,19 @@ function SalesDashboardContent() {
         }))
 
         if (selectedSites.length > 1) {
+          console.log("[v0] Creating multiple cost estimates (skip dates) for sites:", selectedSites.length)
+
           // Create separate cost estimates for each site
           const costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
             startDate: undefined,
             endDate: undefined,
           })
+
+          console.log("[v0] Created cost estimate IDs (skip dates):", costEstimateIds)
+          console.log(
+            "[v0] Redirecting to (skip dates):",
+            `/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`,
+          )
 
           toast({
             title: "Multiple Cost Estimates Created",
