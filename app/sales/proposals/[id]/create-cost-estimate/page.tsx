@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Plus, Trash2, Send, Save } from "lucide-react"
 import { getProposalById, updateProposalStatus } from "@/lib/proposal-service"
-import { createCostEstimateFromProposal, createMultipleCostEstimates } from "@/lib/cost-estimate-service"
+import { createCostEstimateFromProposal } from "@/lib/cost-estimate-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import { useToast } from "@/hooks/use-toast"
@@ -162,65 +162,22 @@ export default function CreateCostEstimatePage() {
 
     setSaving(true)
     try {
-      const uniqueLocations = [...new Set(proposal.products.map((product) => product.location))]
-      const hasMultipleSites = uniqueLocations.length > 1
-
-      if (hasMultipleSites) {
-        const sitesData = uniqueLocations.map((location) => {
-          const productsForLocation = proposal.products.filter((p) => p.location === location)
-          const totalPriceForLocation = productsForLocation.reduce((sum, p) => sum + p.price, 0)
-
-          return {
-            id: `site_${location.replace(/\s+/g, "_").toLowerCase()}`,
-            name: productsForLocation[0]?.name || `Site at ${location}`,
-            location: location,
-            price: totalPriceForLocation,
-            type: productsForLocation[0]?.type || "Static",
-          }
-        })
-
-        const clientData = {
-          id: proposal.client.id,
-          name: proposal.client.name,
-          email: proposal.client.email,
-          company: proposal.client.company,
-          phone: proposal.client.phone,
-          address: proposal.client.address,
-          designation: proposal.client.designation,
-          industry: proposal.client.industry,
-        }
-
-        await createMultipleCostEstimates(clientData, sitesData, "current_user", {
-          notes,
-          sendEmail: sendToClient,
-          startDate: startDate,
-          endDate: endDate,
-        })
-
-        toast({
-          title: "Success",
-          description: sendToClient
-            ? `${sitesData.length} cost estimates created and sent to client`
-            : `${sitesData.length} cost estimates saved as draft`,
-        })
-      } else {
-        await createCostEstimateFromProposal(proposal, "current_user", {
-          notes,
-          customLineItems: lineItems,
-          sendEmail: sendToClient,
-          startDate: startDate,
-          endDate: endDate,
-        })
-
-        toast({
-          title: "Success",
-          description: sendToClient ? "Cost estimate created and sent to client" : "Cost estimate saved as draft",
-        })
-      }
+      await createCostEstimateFromProposal(proposal, "current_user", {
+        notes,
+        customLineItems: lineItems,
+        sendEmail: sendToClient,
+        startDate: startDate,
+        endDate: endDate,
+      })
 
       // Update proposal status
       const newStatus = sendToClient ? "cost_estimate_pending" : "cost_estimate_pending"
       await updateProposalStatus(proposal.id, newStatus)
+
+      toast({
+        title: "Success",
+        description: sendToClient ? "Cost estimate created and sent to client" : "Cost estimate saved as draft",
+      })
 
       router.push(`/sales/proposals/${params.id}`)
     } catch (error) {
@@ -278,14 +235,6 @@ export default function CreateCostEstimatePage() {
               </Button>
               <h1 className="text-2xl font-bold text-gray-900">Create Cost Estimate</h1>
               <p className="text-gray-600">For proposal: {proposal.title}</p>
-              {proposal && [...new Set(proposal.products.map((p) => p.location))].length > 1 && (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Multiple Sites Detected:</strong> This will create separate cost estimate documents for each
-                    location ({[...new Set(proposal.products.map((p) => p.location))].join(", ")}).
-                  </p>
-                </div>
-              )}
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => handleSave(false)} disabled={saving}>

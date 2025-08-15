@@ -352,7 +352,6 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       id: docSnap.id,
       proposalId: data.proposalId || null,
       costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
-      batchId: data.batchId || null, // Added batchId
       title: data.title,
       client: data.client,
       lineItems: data.lineItems,
@@ -367,7 +366,6 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       endDate: data.endDate?.toDate() || null, // Retrieve new dates
       durationDays: data.durationDays || null, // Retrieve duration in days
       validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
-      siteInfo: data.siteInfo || null, // Added siteInfo
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -414,7 +412,6 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         id: docSnap.id,
         proposalId: data.proposalId || null,
         costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
-        batchId: data.batchId || null, // Added batchId
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -429,7 +426,6 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
-        siteInfo: data.siteInfo || null, // Added siteInfo
       } as CostEstimate
     })
   } catch (error) {
@@ -475,7 +471,6 @@ export async function getPaginatedCostEstimates(
         id: docSnap.id,
         proposalId: data.proposalId || null,
         costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
-        batchId: data.batchId || null, // Added batchId
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -490,7 +485,6 @@ export async function getPaginatedCostEstimates(
         endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null,
-        siteInfo: data.siteInfo || null, // Added siteInfo
       } as CostEstimate
     })
 
@@ -529,7 +523,6 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         id: docSnap.id,
         proposalId: data.proposalId || null,
         costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
-        batchId: data.batchId || null, // Added batchId
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -543,8 +536,7 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
-        validUntil: data.validUntil?.toDate() || null,
-        siteInfo: data.siteInfo || null, // Added siteInfo
+        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
       } as CostEstimate
     })
   } catch (error) {
@@ -562,7 +554,6 @@ export async function createMultipleCostEstimates(
 ): Promise<string[]> {
   try {
     const costEstimateIds: string[] = []
-    const batchId = `BATCH${Date.now()}`
 
     // Create a separate cost estimate for each site
     for (const site of sitesData) {
@@ -620,7 +611,6 @@ export async function createMultipleCostEstimates(
       const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
         proposalId: null, // No associated proposal
         costEstimateNumber: costEstimateNumber,
-        batchId: batchId,
         title: `Cost Estimate for ${site.name} - ${clientData.company || clientData.name}`,
         client: {
           id: clientData.id,
@@ -644,11 +634,6 @@ export async function createMultipleCostEstimates(
         endDate: options?.endDate || null,
         durationDays: durationDays,
         validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
-        siteInfo: {
-          id: site.id,
-          name: site.name,
-          location: site.location,
-        },
       })
 
       costEstimateIds.push(newCostEstimateRef.id)
@@ -658,43 +643,5 @@ export async function createMultipleCostEstimates(
   } catch (error) {
     console.error("Error creating multiple cost estimates:", error)
     throw new Error("Failed to create multiple cost estimates.")
-  }
-}
-
-export async function getCostEstimatesByBatchId(batchId: string): Promise<CostEstimate[]> {
-  try {
-    const q = query(
-      collection(db, COST_ESTIMATES_COLLECTION),
-      where("batchId", "==", batchId),
-      orderBy("createdAt", "asc"),
-    )
-    const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((docSnap) => {
-      const data = docSnap.data()
-      return {
-        id: docSnap.id,
-        proposalId: data.proposalId || null,
-        costEstimateNumber: data.costEstimateNumber || null,
-        batchId: data.batchId || null,
-        title: data.title,
-        client: data.client,
-        lineItems: data.lineItems,
-        totalAmount: data.totalAmount,
-        status: data.status,
-        notes: data.notes || "",
-        customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-        createdBy: data.createdBy,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
-        durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
-        siteInfo: data.siteInfo || null,
-      } as CostEstimate
-    })
-  } catch (error) {
-    console.error("Error fetching cost estimates by batch ID:", error)
-    return []
   }
 }

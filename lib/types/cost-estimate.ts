@@ -18,7 +18,6 @@ export interface CostEstimate {
   id: string
   proposalId: string | null // Nullable if it's a direct cost estimate
   costEstimateNumber: string // New field for CE + currentmillis
-  batchId?: string | null // Groups related cost estimates created together
   title: string
   client: ProposalClient // Reusing ProposalClient type for consistency
   lineItems: CostEstimateLineItem[]
@@ -33,9 +32,4 @@ export interface CostEstimate {
   endDate?: Date | null // New field
   durationDays?: number | null // New field for duration in days
   validUntil?: Date | null // Add this new field
-  siteInfo?: {
-    id: string
-    name: string
-    location: string
-  } | null
 }
