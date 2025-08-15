@@ -1194,7 +1194,7 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
               finalImageHeight = (finalImageWidth / uniformImageWidth) * uniformImageHeight
             }
 
-            let currentRow = 0
+            const currentRow = 0
             let currentCol = 0
             let rowStartY = yPosition
 
@@ -1211,14 +1211,14 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
               const imageX = margin + currentCol * (finalImageWidth + imageSpacing)
               const imageY = rowStartY
               if (media.url) {
-                    try {
-                      const base64 = await loadImageAsBase64(media.url)
-                      if (base64) {
-                        pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
-                      }
-                    } catch (error) {
-                      console.error("Error adding product image:", error)
-                    }
+                try {
+                  const base64 = await loadImageAsBase64(media.url)
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
+                  }
+                } catch (error) {
+                  console.error("Error adding product image:", error)
+                }
               }
 
               // Move to next column
@@ -1325,13 +1325,14 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 
 export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
+  selectedPages?: string[],
   returnBase64 = false,
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 20 // Increased margin
+    const margin = 20
     const contentWidth = pageWidth - margin * 2
     let yPosition = margin
 
@@ -1343,207 +1344,142 @@ export async function generateCostEstimatePDF(
     const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
     const qrCodeUrl = await generateQRCode(costEstimateViewUrl)
 
-    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
-      pdf.setFontSize(fontSize)
-      const lines = pdf.splitTextToSize(text, maxWidth)
-      pdf.text(lines, x, y)
-      return y + lines.length * fontSize * 0.3
+    const groupLineItemsBySite = (lineItems: any[]) => {
+      const siteGroups: { [key: string]: any[] } = {}
+
+      lineItems.forEach((item) => {
+        if (item.category.includes("Billboard Rental")) {
+          // Use the full description as the site name to match frontend
+          const siteName = item.description
+          if (!siteGroups[siteName]) {
+            siteGroups[siteName] = []
+          }
+          siteGroups[siteName].push(item)
+
+          // Find related production, installation, and maintenance items for this site
+          const siteId = item.id
+          const relatedItems = lineItems.filter(
+            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+          )
+          siteGroups[siteName].push(...relatedItems)
+        }
+      })
+
+      // If no site groups found, treat as single site
+      if (Object.keys(siteGroups).length === 0) {
+        siteGroups["Single Site"] = lineItems
+      }
+
+      return siteGroups
     }
 
-    const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - margin) {
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
+    const isMultipleSites = sites.length > 1
+
+    const sitesToProcess =
+      selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
+
+    if (sitesToProcess.length === 0) {
+      throw new Error("No sites selected for PDF generation")
+    }
+
+    sitesToProcess.forEach((siteName, siteIndex) => {
+      if (siteIndex > 0) {
         pdf.addPage()
         yPosition = margin
-        addQRCodeToPage()
       }
-    }
 
-    const addQRCodeToPage = async () => {
-      try {
-        const qrSize = 20
-        const qrX = pageWidth - margin - qrSize
-        const qrY = margin
+      const siteLineItems = siteGroups[siteName] || []
+      const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
 
-        const qrBase64 = await loadImageAsBase64(qrCodeUrl)
-        if (qrBase64) {
-          pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
-          pdf.setFontSize(6)
-          pdf.setTextColor(100, 100, 100)
-          const textWidth = pdf.getTextWidth("Scan to view online")
-          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
-          pdf.setTextColor(0, 0, 0)
+      const ceNumber = isMultipleSites
+        ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + siteIndex)}`
+        : costEstimate.costEstimateNumber || costEstimate.id
+
+      const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+        pdf.setFontSize(fontSize)
+        const lines = pdf.splitTextToSize(text, maxWidth)
+        pdf.text(lines, x, y)
+        return y + lines.length * fontSize * 0.3
+      }
+
+      const checkNewPage = (requiredHeight: number) => {
+        if (yPosition + requiredHeight > pageHeight - margin) {
+          pdf.addPage()
+          yPosition = margin
+          addQRCodeToPage()
         }
-      } catch (error) {
-        console.error("Error adding QR code to PDF:", error)
       }
-    }
 
-    await addQRCodeToPage()
+      const addQRCodeToPage = async () => {
+        try {
+          const qrSize = 20
+          const qrX = pageWidth - margin - qrSize
+          const qrY = margin
 
-    // Header
-    const headerContentWidth = contentWidth - 25
-    pdf.setFontSize(24)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("COST ESTIMATE", margin, yPosition)
-    yPosition += 12
+          const qrBase64 = await loadImageAsBase64(qrCodeUrl)
+          if (qrBase64) {
+            pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
+            pdf.setFontSize(6)
+            pdf.setTextColor(100, 100, 100)
+            const textWidth = pdf.getTextWidth("Scan to view online")
+            pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
+            pdf.setTextColor(0, 0, 0)
+          }
+        } catch (error) {
+          console.error("Error adding QR code to PDF:", error)
+        }
+      }
 
-    pdf.setFontSize(16)
-    pdf.setFont("helvetica", "normal")
-    const titleLines = pdf.splitTextToSize(costEstimate.title || "Untitled Cost Estimate", headerContentWidth)
-    pdf.text(titleLines, margin, yPosition)
-    yPosition += titleLines.length * 6 + 3
+      addQRCodeToPage()
 
-    // Date and validity
-    pdf.setFontSize(10)
-    pdf.setTextColor(100, 100, 100)
-    pdf.text(`Created: ${createdAt.toLocaleDateString()}`, margin, yPosition)
-    pdf.text(`Valid Until: ${validUntil.toLocaleDateString()}`, margin, yPosition + 5)
-    yPosition += 15
-
-    // Reset text color
-    pdf.setTextColor(0, 0, 0)
-
-    // Client Information Section
-    checkNewPage(40)
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("CLIENT INFORMATION", margin, yPosition)
-    yPosition += 6
-
-    pdf.setLineWidth(0.5)
-    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 8
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-
-    const leftColumn = margin
-    const rightColumn = margin + contentWidth / 2
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Company:", leftColumn, yPosition)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.company || "N/A", leftColumn + 25, yPosition)
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Contact Person:", rightColumn, yPosition)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.contactPerson || "N/A", rightColumn + 35, yPosition)
-    yPosition += 6
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Email:", leftColumn, yPosition)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.email || "N/A", leftColumn + 25, yPosition)
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Phone:", rightColumn, yPosition)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.phone || "N/A", rightColumn + 35, yPosition)
-    yPosition += 6
-
-    // Add designation for cost estimate too
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Industry:", leftColumn, yPosition)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.industry || "N/A", leftColumn + 25, yPosition)
-
-    if (costEstimate.client?.designation) {
+      // Header with site-specific title
+      const headerContentWidth = contentWidth - 25
+      pdf.setFontSize(24)
       pdf.setFont("helvetica", "bold")
-      pdf.text("Designation:", rightColumn, yPosition)
+      pdf.text("COST ESTIMATE", margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(12)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text(ceNumber, margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(16)
       pdf.setFont("helvetica", "normal")
-      pdf.text(costEstimate.client.designation, rightColumn + 35, yPosition)
-    }
-    yPosition += 6
+      pdf.setTextColor(0, 0, 0)
+      const siteTitle = isMultipleSites
+        ? `${costEstimate.title || "Cost Estimate"} - ${siteName}`
+        : costEstimate.title || "Untitled Cost Estimate"
+      const titleLines = pdf.splitTextToSize(siteTitle, headerContentWidth)
+      pdf.text(titleLines, margin, yPosition)
+      yPosition += titleLines.length * 6 + 3
 
-    if (costEstimate.client?.address) {
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Address:", leftColumn, yPosition)
-      pdf.setFont("helvetica", "normal")
-      yPosition = addText(costEstimate.client.address, leftColumn + 25, yPosition, contentWidth - 25)
-      yPosition += 3
-    }
-
-    if (startDate) {
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Start Date:", leftColumn, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(startDate.toLocaleDateString(), leftColumn + 25, yPosition)
-    }
-
-    if (endDate) {
-      pdf.setFont("helvetica", "bold")
-      pdf.text("End Date:", rightColumn, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(endDate.toLocaleDateString(), rightColumn + 35, yPosition)
-      yPosition += 6
-    }
-
-    yPosition += 8
-
-    // Cost Breakdown Section
-    checkNewPage(40)
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("COST BREAKDOWN", margin, yPosition)
-    yPosition += 6
-
-    pdf.setLineWidth(0.5)
-    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 8
-
-    // Table Headers
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Description", margin, yPosition)
-    pdf.text("Qty", margin + contentWidth * 0.5, yPosition, { align: "right" })
-    pdf.text("Unit Price", margin + contentWidth * 0.75, yPosition, { align: "right" })
-    pdf.text("Total", pageWidth - margin, yPosition, { align: "right" })
-    yPosition += 6
-    pdf.setLineWidth(0.2)
-    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 5
-
-    // Line Items
-    pdf.setFont("helvetica", "normal")
-    costEstimate.lineItems.forEach((item) => {
-      checkNewPage(12)
+      // Date and validity
       pdf.setFontSize(10)
-      pdf.text(item.description, margin, yPosition)
-      pdf.text(item.quantity.toString(), margin + contentWidth * 0.5, yPosition, { align: "right" })
-      pdf.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.75, yPosition, { align: "right" })
-      pdf.text(formatCurrency(item.total), pageWidth - margin, yPosition, { align: "right" })
-      yPosition += 6
-      if (item.notes) {
-        pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text(`Created: ${createdAt.toLocaleDateString()}`, margin, yPosition)
+      pdf.text(`Valid Until: ${validUntil.toLocaleDateString()}`, margin, yPosition + 5)
+      yPosition += 15
+
+      // Page numbering for multiple sites
+      if (isMultipleSites && sitesToProcess.length > 1) {
+        pdf.setFontSize(10)
         pdf.setTextColor(100, 100, 100)
-        yPosition = addText(item.notes, margin + 3, yPosition, contentWidth - 3, 8)
-        pdf.setTextColor(0, 0, 0)
+        const pageText = `Page ${siteIndex + 1} of ${sitesToProcess.length}`
+        const pageTextWidth = pdf.getTextWidth(pageText)
+        pdf.text(pageText, pageWidth - margin - pageTextWidth, pageHeight - 10)
       }
-      yPosition += 4
-    })
 
-    // Total Amount
-    checkNewPage(20)
-    yPosition += 5
-    pdf.setLineWidth(0.5)
-    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 8
+      // Reset text color
+      pdf.setTextColor(0, 0, 0)
 
-    pdf.setFontSize(16)
-    pdf.setFont("helvetica", "bold")
-    const totalText = `TOTAL ESTIMATED COST: ${formatCurrency(costEstimate.totalAmount)}`
-    pdf.setFillColor(245, 245, 245)
-    pdf.rect(margin, yPosition - 4, contentWidth, 12, "F")
-    pdf.text(totalText, margin + 5, yPosition + 3)
-    yPosition += 15
-
-    // Notes and Custom Message
-    if (costEstimate.notes || costEstimate.customMessage) {
-      checkNewPage(25)
+      // Client Information Section
+      checkNewPage(40)
       pdf.setFontSize(14)
       pdf.setFont("helvetica", "bold")
-      pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
+      pdf.text("CLIENT INFORMATION", margin, yPosition)
       yPosition += 6
 
       pdf.setLineWidth(0.5)
@@ -1553,36 +1489,182 @@ export async function generateCostEstimatePDF(
       pdf.setFontSize(10)
       pdf.setFont("helvetica", "normal")
 
-      if (costEstimate.notes) {
+      const leftColumn = margin
+      const rightColumn = margin + contentWidth / 2
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Company:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client?.company || "N/A", leftColumn + 25, yPosition)
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Contact Person:", rightColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client?.contactPerson || "N/A", rightColumn + 35, yPosition)
+      yPosition += 6
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Email:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client?.email || "N/A", leftColumn + 25, yPosition)
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Phone:", rightColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client?.phone || "N/A", rightColumn + 35, yPosition)
+      yPosition += 6
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Industry:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client?.industry || "N/A", leftColumn + 25, yPosition)
+
+      if (costEstimate.client?.designation) {
         pdf.setFont("helvetica", "bold")
-        pdf.text("Internal Notes:", margin, yPosition)
+        pdf.text("Designation:", rightColumn, yPosition)
         pdf.setFont("helvetica", "normal")
-        yPosition += 4
-        yPosition = addText(costEstimate.notes, margin, yPosition, contentWidth)
-        yPosition += 5
+        pdf.text(costEstimate.client.designation, rightColumn + 35, yPosition)
+      }
+      yPosition += 6
+
+      if (costEstimate.client?.address) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Address:", leftColumn, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition = addText(costEstimate.client.address, leftColumn + 25, yPosition, contentWidth - 25)
+        yPosition += 3
       }
 
-      if (costEstimate.customMessage) {
+      if (startDate) {
         pdf.setFont("helvetica", "bold")
-        pdf.text("Custom Message:", margin, yPosition)
+        pdf.text("Start Date:", leftColumn, yPosition)
         pdf.setFont("helvetica", "normal")
-        yPosition += 4
-        yPosition = addText(costEstimate.customMessage, margin, yPosition, contentWidth)
+        pdf.text(startDate.toLocaleDateString(), leftColumn + 25, yPosition)
       }
-    }
 
-    // Footer
-    const footerY = pageHeight - 15
-    pdf.setFontSize(8)
-    pdf.setTextColor(100, 100, 100)
-    pdf.text("Generated by OH Plus Platform", margin, footerY)
-    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, footerY)
+      if (endDate) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("End Date:", rightColumn, yPosition)
+        pdf.setFont("helvetica", "normal")
+        pdf.text(endDate.toLocaleDateString(), rightColumn + 35, yPosition)
+        yPosition += 6
+      }
+
+      yPosition += 8
+
+      // Cost Breakdown Section
+      checkNewPage(40)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("COST BREAKDOWN", margin, yPosition)
+      yPosition += 6
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      // Table Headers
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Description", margin, yPosition)
+      pdf.text("Qty", margin + contentWidth * 0.5, yPosition, { align: "right" })
+      pdf.text("Unit Price", margin + contentWidth * 0.75, yPosition, { align: "right" })
+      pdf.text("Total", pageWidth - margin, yPosition, { align: "right" })
+      yPosition += 6
+      pdf.setLineWidth(0.2)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 5
+
+      // Line Items for this site
+      pdf.setFont("helvetica", "normal")
+      siteLineItems.forEach((item) => {
+        checkNewPage(12)
+        pdf.setFontSize(10)
+        pdf.text(item.description, margin, yPosition)
+        pdf.text(item.quantity.toString(), margin + contentWidth * 0.5, yPosition, { align: "right" })
+        pdf.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.75, yPosition, { align: "right" })
+        pdf.text(formatCurrency(item.total), pageWidth - margin, yPosition, { align: "right" })
+        yPosition += 6
+        if (item.notes) {
+          pdf.setFontSize(8)
+          pdf.setTextColor(100, 100, 100)
+          yPosition = addText(item.notes, margin + 3, yPosition, contentWidth - 3, 8)
+          pdf.setTextColor(0, 0, 0)
+        }
+        yPosition += 4
+      })
+
+      // Total Amount for this site
+      checkNewPage(20)
+      yPosition += 5
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      const totalText = `TOTAL ESTIMATED COST: ${formatCurrency(siteTotal)}`
+      pdf.setFillColor(245, 245, 245)
+      pdf.rect(margin, yPosition - 4, contentWidth, 12, "F")
+      pdf.text(totalText, margin + 5, yPosition + 3)
+      yPosition += 15
+
+      // Notes and Custom Message (only on last page)
+      if (siteIndex === sitesToProcess.length - 1 && (costEstimate.notes || costEstimate.customMessage)) {
+        checkNewPage(25)
+        pdf.setFontSize(14)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
+        yPosition += 6
+
+        pdf.setLineWidth(0.5)
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+        yPosition += 8
+
+        pdf.setFontSize(10)
+        pdf.setFont("helvetica", "normal")
+
+        if (costEstimate.notes) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Internal Notes:", margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          yPosition += 4
+          yPosition = addText(costEstimate.notes, margin, yPosition, contentWidth)
+          yPosition += 5
+        }
+
+        if (costEstimate.customMessage) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Custom Message:", margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          yPosition += 4
+          yPosition = addText(costEstimate.customMessage, margin, yPosition, contentWidth)
+        }
+      }
+
+      // Footer
+      const footerY = pageHeight - 15
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text("Generated by OH Plus Platform", margin, footerY)
+      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, footerY)
+    })
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `cost-estimate-${(costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
+      const sitesSuffix =
+        selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
+          ? `_selected-${selectedPages.length}-sites`
+          : isMultipleSites
+            ? `_all-${sites.length}-sites`
+            : ""
+      const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
+
+      console.log("[v0] Attempting to download PDF:", fileName)
       pdf.save(fileName)
+      console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
