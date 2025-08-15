@@ -14,6 +14,7 @@ interface DateRangeCalendarDialogProps {
   isOpen: boolean
   onClose: () => void
   onSelectDates: (startDate: Date, endDate: Date) => void
+  onSkipDates?: () => void
   selectedSiteIds: string[] // To potentially fetch reserved dates for these sites
   selectedClientId?: string // To potentially fetch reserved dates for this client
 }
@@ -95,6 +96,7 @@ export function DateRangeCalendarDialog({
   isOpen,
   onClose,
   onSelectDates,
+  onSkipDates,
   selectedSiteIds,
   selectedClientId,
 }: DateRangeCalendarDialogProps) {
@@ -258,6 +260,13 @@ export function DateRangeCalendarDialog({
     }
   }
 
+  const handleSkip = () => {
+    if (onSkipDates) {
+      onSkipDates()
+      onClose()
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl p-6">
@@ -325,7 +334,10 @@ export function DateRangeCalendarDialog({
           </div>
         </div>
 
-        <div className="flex justify-end pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t">
+          <Button variant="outline" onClick={handleSkip} className="px-6 py-2 rounded-md bg-transparent">
+            Skip
+          </Button>
           <Button onClick={handleConfirm} className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-md">
             OK
           </Button>

@@ -23,8 +23,8 @@ interface CreateCostEstimateOptions {
   notes?: string
   customMessage?: string
   sendEmail?: boolean
-  startDate?: Date // New field
-  endDate?: Date // New field
+  startDate?: Date | undefined // Made startDate and endDate optional and allow undefined
+  endDate?: Date | undefined
   customLineItems?: CostEstimateLineItem[] // Allow passing custom line items
 }
 
@@ -64,7 +64,7 @@ function generateCostEstimatePassword(): string {
 }
 
 // Calculate duration in days
-function calculateDurationDays(startDate: Date | null, endDate: Date | null): number | null {
+function calculateDurationDays(startDate: Date | null | undefined, endDate: Date | null | undefined): number | null {
   if (startDate && endDate) {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -176,7 +176,7 @@ export async function createDirectCostEstimate(
     if (!options?.customLineItems || options.customLineItems.length === 0) {
       sitesData.forEach((site) => {
         const pricePerDay = site.price / 30
-        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price // Use original price if no duration
+        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price
         lineItems.push({
           id: site.id,
           description: site.name,
@@ -245,8 +245,8 @@ export async function createDirectCostEstimate(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
-      startDate: options?.startDate || null, // Store new dates
-      endDate: options?.endDate || null, // Store new dates
+      startDate: options?.startDate || null,
+      endDate: options?.endDate || null,
       durationDays: durationDays, // Store duration in days
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
