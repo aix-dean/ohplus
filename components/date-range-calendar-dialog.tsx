@@ -334,7 +334,7 @@ export function DateRangeCalendarDialog({
           </div>
         </div>
 
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={handleSkip} className="px-6 py-2 rounded-md bg-transparent">
             Skip
           </Button>
