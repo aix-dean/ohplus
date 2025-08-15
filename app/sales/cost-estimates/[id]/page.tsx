@@ -8,14 +8,9 @@ import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, updateCostEstimateStatus, updateCostEstimate } from "@/lib/cost-estimate-service"
 import type { CostEstimate, CostEstimateClient, CostEstimateStatus } from "@/lib/types/cost-estimate"
 import { format } from "date-fns"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
@@ -26,7 +21,6 @@ import {
   FileText,
   Loader2,
   Pencil,
-  CalendarIcon,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
@@ -71,6 +65,29 @@ export default function CostEstimateDetailsPage() {
 
   const currentEstimate = batchCostEstimates[currentPageIndex] || costEstimate
   const isMultiPage = batchCostEstimates.length > 1
+
+  const getCurrentSiteLineItems = () => {
+    if (!currentEstimate || !isMultiPage) {
+      return currentEstimate?.lineItems || []
+    }
+
+    // If this is a multi-page cost estimate, filter line items by site
+    if (currentEstimate.siteInfo?.name) {
+      return currentEstimate.lineItems.filter(
+        (item) =>
+          item.description.includes(currentEstimate.siteInfo.name) ||
+          item.siteLocation === currentEstimate.siteInfo.name ||
+          item.siteName === currentEstimate.siteInfo.name,
+      )
+    }
+
+    return currentEstimate.lineItems || []
+  }
+
+  const getCurrentSiteTotal = () => {
+    const siteLineItems = getCurrentSiteLineItems()
+    return siteLineItems.reduce((sum, item) => sum + item.total, 0)
+  }
 
   const handlePageChange = (pageIndex: number) => {
     if (pageIndex >= 0 && pageIndex < batchCostEstimates.length) {
@@ -434,9 +451,9 @@ export default function CostEstimateDetailsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-          <div className="flex items-center space-x-4">
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="container py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <Button variant="ghost" size="sm" onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
@@ -479,6 +496,12 @@ export default function CostEstimateDetailsPage() {
               </div>
             )}
 
+            {isMultiPage && currentEstimate.siteInfo && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {currentEstimate.siteInfo.name}
+              </Badge>
+            )}
+
             <Badge
               variant={
                 currentEstimate.status === "approved"
@@ -499,9 +522,36 @@ export default function CostEstimateDetailsPage() {
 
       {/* Main Content */}
       <div className="container py-6 lg:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Sidebar */}
-          <div className="hidden lg:block">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Page Navigation for Multi-page */}
+          {isMultiPage && (
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Document Pages</h3>
+                <div className="space-y-2">
+                  {batchCostEstimates.map((estimate, index) => (
+                    <button
+                      key={estimate.id}
+                      onClick={() => handlePageChange(index)}
+                      className={cn(
+                        "w-full text-left p-3 rounded-md border transition-colors",
+                        index === currentPageIndex
+                          ? "bg-blue-50 border-blue-200 text-blue-900"
+                          : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100",
+                      )}
+                    >
+                      <div className="text-sm font-medium">Page {index + 1}</div>
+                      {estimate.siteInfo && <div className="text-xs text-gray-500 mt-1">{estimate.siteInfo.name}</div>}
+                      <div className="text-xs text-gray-500 mt-1">₱{getCurrentSiteTotal().toLocaleString()}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions Sidebar */}
+          <div className={cn("hidden lg:block", isMultiPage ? "lg:col-span-1" : "lg:col-span-1")}>
             <div className="bg-white rounded-lg shadow-md p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-2">Actions</h3>
               <div className="space-y-2">
@@ -522,7 +572,7 @@ export default function CostEstimateDetailsPage() {
           </div>
 
           {/* Document */}
-          <div className="lg:col-span-2">
+          <div className={cn(isMultiPage ? "lg:col-span-2" : "lg:col-span-2")}>
             <div className="bg-white shadow-md rounded-lg overflow-hidden">
               {/* Document Header */}
               <div className="border-b border-gray-200 px-6 sm:px-8 py-4 bg-gray-50">
@@ -530,6 +580,9 @@ export default function CostEstimateDetailsPage() {
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">Cost Estimate Details</h2>
                     <p className="text-sm text-gray-500">Last updated on {format(new Date(), "PPP")}</p>
+                    {isMultiPage && currentEstimate.siteInfo && (
+                      <p className="text-sm font-medium text-blue-600 mt-1">Site: {currentEstimate.siteInfo.name}</p>
+                    )}
                   </div>
                   <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8" />
                 </div>
@@ -548,147 +601,43 @@ export default function CostEstimateDetailsPage() {
                       <Label htmlFor="title" className="text-sm font-medium text-gray-500 mb-2">
                         Title
                       </Label>
-                      {isEditing ? (
-                        <Input
-                          id="title"
-                          name="title"
-                          value={editableCostEstimate.title}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base font-medium text-gray-900">{currentEstimate.title}</p>
-                      )}
+                      <p className="text-base font-medium text-gray-900">
+                        {currentEstimate.title}
+                        {isMultiPage && currentEstimate.siteInfo && (
+                          <span className="text-sm font-normal text-gray-600 ml-2">
+                            - {currentEstimate.siteInfo.name}
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
                       <p className="text-base text-gray-900">{format(currentEstimate.createdAt, "PPP")}</p>
                     </div>
                     <div>
-                      <Label htmlFor="startDate" className="text-sm font-medium text-gray-500 mb-2">
-                        Start Date
-                      </Label>
-                      {isEditing ? (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full justify-start text-left font-normal mt-1",
-                                !editableCostEstimate.startDate && "text-muted-foreground",
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {editableCostEstimate.startDate ? (
-                                format(editableCostEstimate.startDate, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={editableCostEstimate.startDate}
-                              onSelect={(date) => handleDateChange(date, "startDate")}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
-                        <p className="text-base text-gray-900">
-                          {currentEstimate.startDate ? format(currentEstimate.startDate, "PPP") : "N/A"}
-                        </p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Start Date</h3>
+                      <p className="text-base text-gray-900">
+                        {currentEstimate.startDate ? format(currentEstimate.startDate, "PPP") : "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <Label htmlFor="endDate" className="text-sm font-medium text-gray-500 mb-2">
-                        End Date
-                      </Label>
-                      {isEditing ? (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full justify-start text-left font-normal mt-1",
-                                !editableCostEstimate.endDate && "text-muted-foreground",
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {editableCostEstimate.endDate ? (
-                                format(editableCostEstimate.endDate, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={editableCostEstimate.endDate}
-                              onSelect={(date) => handleDateChange(date, "endDate")}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
-                        <p className="text-base text-gray-900">
-                          {currentEstimate.endDate ? format(currentEstimate.endDate, "PPP") : "N/A"}
-                        </p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">End Date</h3>
+                      <p className="text-base text-gray-900">
+                        {currentEstimate.endDate ? format(currentEstimate.endDate, "PPP") : "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <Label htmlFor="validUntil" className="text-sm font-medium text-gray-500 mb-2">
-                        Valid Until
-                      </Label>
-                      {isEditing ? (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full justify-start text-left font-normal mt-1",
-                                !editableCostEstimate.validUntil && "text-muted-foreground",
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {editableCostEstimate.validUntil ? (
-                                format(editableCostEstimate.validUntil, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={editableCostEstimate.validUntil}
-                              onSelect={(date) => handleDateChange(date, "validUntil")}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
-                        <p className="text-base text-gray-900">
-                          {currentEstimate.validUntil ? format(currentEstimate.validUntil, "PPP") : "N/A"}
-                        </p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
+                      <p className="text-base text-gray-900">
+                        {currentEstimate.validUntil
+                          ? format(currentEstimate.validUntil, "PPP")
+                          : "September 14th, 2025"}
+                      </p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                      <p className="text-base font-semibold text-gray-900">
-                        ₱{currentEstimate.totalAmount.toLocaleString()}
-                      </p>
+                      <p className="text-base font-bold text-blue-600">₱{getCurrentSiteTotal().toLocaleString()}</p>
                     </div>
-                    {currentEstimate.durationDays !== null && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Duration</h3>
-                        <p className="text-base text-gray-900">
-                          {currentEstimate.durationDays} day{currentEstimate.durationDays !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -700,141 +649,30 @@ export default function CostEstimateDetailsPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="client.company" className="text-sm font-medium text-gray-500 mb-2">
-                        Company
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.company"
-                          name="client.company"
-                          value={editableCostEstimate.client.company}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base font-medium text-gray-900">{currentEstimate.client.company}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Company</h3>
+                      <p className="text-base font-medium text-gray-900">{currentEstimate.client.company}</p>
                     </div>
                     <div>
-                      <Label htmlFor="client.contactPerson" className="text-sm font-medium text-gray-500 mb-2">
-                        Contact Person
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.contactPerson"
-                          name="client.contactPerson"
-                          value={editableCostEstimate.client.name}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.name}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Person</h3>
+                      <p className="text-base text-blue-600">{currentEstimate.client.contactPerson}</p>
                     </div>
                     <div>
-                      <Label htmlFor="client.designation" className="text-sm font-medium text-gray-500 mb-2">
-                        Designation
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.designation"
-                          name="client.designation"
-                          value={editableCostEstimate.client.designation || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.designation || "N/A"}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Designation</h3>
+                      <p className="text-base text-gray-900">{currentEstimate.client.designation}</p>
                     </div>
                     <div>
-                      <Label htmlFor="client.email" className="text-sm font-medium text-gray-500 mb-2">
-                        Email
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.email"
-                          name="client.email"
-                          type="email"
-                          value={editableCostEstimate.client.email}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.email}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Email</h3>
+                      <p className="text-base text-blue-600">{currentEstimate.client.email}</p>
                     </div>
                     <div>
-                      <Label htmlFor="client.phone" className="text-sm font-medium text-gray-500 mb-2">
-                        Phone
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.phone"
-                          name="client.phone"
-                          value={editableCostEstimate.client.phone}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.phone}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Phone</h3>
+                      <p className="text-base text-gray-900">{currentEstimate.client.phone}</p>
                     </div>
                     <div>
-                      <Label htmlFor="client.industry" className="text-sm font-medium text-gray-500 mb-2">
-                        Industry
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="client.industry"
-                          name="client.industry"
-                          value={editableCostEstimate.client.industry || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.industry || "N/A"}</p>
-                      )}
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Industry</h3>
+                      <p className="text-base text-gray-900">{currentEstimate.client.industry}</p>
                     </div>
                   </div>
-
-                  {(currentEstimate.client.address || isEditing) && (
-                    <div className="mt-4">
-                      <Label htmlFor="client.address" className="text-sm font-medium text-gray-500 mb-2">
-                        Address
-                      </Label>
-                      {isEditing ? (
-                        <Textarea
-                          id="client.address"
-                          name="client.address"
-                          value={editableCostEstimate.client.address || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.address}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {(currentEstimate.client.campaignObjective || isEditing) && (
-                    <div className="mt-4">
-                      <Label htmlFor="client.campaignObjective" className="text-sm font-medium text-gray-500 mb-2">
-                        Campaign Objective
-                      </Label>
-                      {isEditing ? (
-                        <Textarea
-                          id="client.campaignObjective"
-                          name="client.campaignObjective"
-                          value={editableCostEstimate.client.campaignObjective || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="text-base text-gray-900">{currentEstimate.client.campaignObjective}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Cost Breakdown */}
@@ -862,7 +700,7 @@ export default function CostEstimateDetailsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {currentEstimate.lineItems.map((item, index) => (
+                        {getCurrentSiteLineItems().map((item, index) => (
                           <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                             <td className="py-3 px-4 border-b border-gray-200">
                               <div className="font-medium text-gray-900">{item.description}</div>
@@ -882,7 +720,7 @@ export default function CostEstimateDetailsPage() {
                             Total Estimated Cost:
                           </td>
                           <td className="py-3 px-4 text-right font-bold text-blue-600">
-                            ₱{currentEstimate.totalAmount.toLocaleString()}
+                            ₱{getCurrentSiteTotal().toLocaleString()}
                           </td>
                         </tr>
                       </tbody>
@@ -896,77 +734,15 @@ export default function CostEstimateDetailsPage() {
                     Additional Information
                   </h2>
 
-                  {(currentEstimate.customMessage || isEditing) && (
+                  {currentEstimate.customMessage && (
                     <div className="mb-4">
-                      <Label htmlFor="customMessage" className="text-sm font-medium text-gray-500 mb-2">
-                        Custom Message
-                      </Label>
-                      {isEditing ? (
-                        <Textarea
-                          id="customMessage"
-                          name="customMessage"
-                          value={editableCostEstimate.customMessage || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
-                          <p className="text-sm text-gray-700 leading-relaxed">{currentEstimate.customMessage}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {(currentEstimate.notes || isEditing) && (
-                    <div>
-                      <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
-                        Internal Notes
-                      </Label>
-                      {isEditing ? (
-                        <Textarea
-                          id="notes"
-                          name="notes"
-                          value={editableCostEstimate.notes || ""}
-                          onChange={handleChange}
-                          className="mt-1"
-                        />
-                      ) : (
-                        <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                          <p className="text-sm text-gray-700 leading-relaxed">{currentEstimate.notes}</p>
-                        </div>
-                      )}
+                      <p className="text-gray-700">{currentEstimate.customMessage}</p>
                     </div>
                   )}
                 </div>
 
-                {/* Linked Proposal (if exists) */}
-                {proposal && (
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Linked Proposal
-                    </h2>
-                    <Card>
-                      <CardContent className="p-4">
-                        <p className="text-lg font-semibold">{proposal.title}</p>
-                        <p className="text-gray-600">
-                          Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                        </p>
-                        <Button
-                          variant="link"
-                          className="p-0 mt-2"
-                          onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                        >
-                          View Proposal
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </div>
-
-              {/* Document Footer */}
-              <div className="border-t border-gray-200 px-6 sm:px-8 py-4 bg-gray-50">
-                <div className="flex flex-col sm:flex-row justify-between items-center text-xs text-gray-500">
+                {/* Footer */}
+                <div className="text-xs text-gray-500 border-t border-gray-200 pt-4 flex flex-col sm:flex-row sm:justify-between">
                   <div>
                     <p>
                       This cost estimate is valid until{" "}
@@ -983,21 +759,6 @@ export default function CostEstimateDetailsPage() {
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="hidden lg:block">
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Additional Details</h3>
-              <div className="space-y-2">
-                <p className="text-gray-600 text-sm">
-                  Created by: <span className="font-medium">John Doe</span>
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Last modified: <span className="font-medium">Yesterday</span>
-                </p>
               </div>
             </div>
           </div>
