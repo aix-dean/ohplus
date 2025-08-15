@@ -368,6 +368,8 @@ export default function ReportPreviewPage() {
 
   // Helper function to calculate installation duration
   const calculateInstallationDuration = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return 0
+
     const start = new Date(startDate)
     const end = new Date(endDate)
     const diffTime = Math.abs(end.getTime() - start.getTime())
@@ -599,16 +601,22 @@ export default function ReportPreviewPage() {
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
-                      <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
+                      <span className="text-gray-900">
+                        {report.bookingDates?.start ? formatDate(report.bookingDates.start) : "N/A"}
+                      </span>
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
-                      <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
+                      <span className="text-gray-900">
+                        {report.bookingDates?.end ? formatDate(report.bookingDates.end) : "N/A"}
+                      </span>
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Installation Duration:</span>
                       <span className="text-gray-900">
-                        {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
+                        {report.bookingDates?.start && report.bookingDates?.end
+                          ? `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days`
+                          : "N/A"}
                       </span>
                     </div>
                   </div>
