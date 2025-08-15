@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
+import type { Product } from "@/lib/firebase-service"
 import { format } from "date-fns"
 import { FileText } from "lucide-react"
 import { ProposalSitesModal } from "./proposal-sites-modal"
@@ -17,9 +18,10 @@ interface ProposalHistoryProps {
     company: string
     contactPerson: string
   } | null
+  onCopySites?: (sites: Product[]) => void
 }
 
-export function ProposalHistory({ selectedClient }: ProposalHistoryProps) {
+export function ProposalHistory({ selectedClient, onCopySites }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
@@ -116,7 +118,12 @@ export function ProposalHistory({ selectedClient }: ProposalHistoryProps) {
         </CardContent>
       </Card>
 
-      <ProposalSitesModal proposal={selectedProposal} isOpen={isModalOpen} onClose={handleCloseModal} />
+      <ProposalSitesModal
+        proposal={selectedProposal}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onCopySites={onCopySites}
+      />
     </>
   )
 }

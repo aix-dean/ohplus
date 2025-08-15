@@ -9,15 +9,17 @@ import { Badge } from "@/components/ui/badge"
 import { X, Copy, Check } from "lucide-react"
 import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
+import type { Product } from "@/lib/firebase-service"
 import { toast } from "sonner"
 
 interface ProposalSitesModalProps {
   proposal: Proposal | null
   isOpen: boolean
   onClose: () => void
+  onCopySites?: (sites: Product[]) => void
 }
 
-export function ProposalSitesModal({ proposal, isOpen, onClose }: ProposalSitesModalProps) {
+export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: ProposalSitesModalProps) {
   const [selectedSites, setSelectedSites] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
 
@@ -42,6 +44,34 @@ export function ProposalSitesModal({ proposal, isOpen, onClose }: ProposalSitesM
     }
 
     const selectedProducts = proposal.products.filter((product) => selectedSites.includes(product.id))
+
+    if (onCopySites) {
+      // Convert proposal products to Product format for dashboard
+      const dashboardProducts: Product[] = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        type: product.type || "rental",
+        price: product.price || 0,
+        media: product.media || [],
+        specs_rental: {
+          location: product.location || "",
+          site_code: product.site_code || "",
+          audience_type: product.specs_rental?.audience_type || "",
+        },
+        light: product.light || {},
+        site_code: product.site_code,
+        // Add other required Product fields with defaults
+        created_at: new Date(),
+        updated_at: new Date(),
+        uploaded_by: "",
+        company_id: "",
+        active: true,
+      }))
+
+      onCopySites(dashboardProducts)
+      handleClose()
+      return
+    }
 
     const siteData = selectedProducts.map((product) => ({
       id: product.id,

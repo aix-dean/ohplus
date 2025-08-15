@@ -136,6 +136,19 @@ function SalesDashboardContent() {
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
+  const handleCopySitesFromProposal = (sites: Product[]) => {
+    // Switch to CE/Quote mode and select the copied sites
+    setCeQuoteMode(true)
+    setProposalCreationMode(false)
+    setSelectedSites(sites)
+
+    // Show success message
+    toast({
+      title: "Sites Copied",
+      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and selected.`,
+    })
+  }
+
   // On mobile, default to grid view
   useEffect(() => {
     if (isMobile) {
@@ -1406,7 +1419,7 @@ function SalesDashboardContent() {
           {/* Right Column: Proposal History - Conditionally rendered */}
           {proposalCreationMode && (
             <div className="flex flex-col gap-4">
-              <ProposalHistory selectedClient={selectedClientForProposal} />
+              <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
             </div>
           )}
         </div>
