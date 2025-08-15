@@ -498,6 +498,8 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
+    console.log("[v0] All line items:", lineItems)
+
     const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
 
     // Group line items by site based on the site rental items
@@ -519,11 +521,26 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       }
     })
 
-    // If no site groups found, treat as single site
     if (Object.keys(siteGroups).length === 0) {
+      console.log("[v0] No billboard rental items found, treating as single site with all items")
       siteGroups["Single Site"] = lineItems
+    } else {
+      // Check for orphaned items (items not associated with any site)
+      const groupedItemIds = new Set()
+      Object.values(siteGroups).forEach((items) => {
+        items.forEach((item) => groupedItemIds.add(item.id))
+      })
+
+      const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
+      if (orphanedItems.length > 0) {
+        console.log("[v0] Found orphaned items:", orphanedItems)
+        // Add orphaned items to the first site group or create a separate group
+        const firstSite = Object.keys(siteGroups)[0]
+        siteGroups[firstSite].push(...orphanedItems)
+      }
     }
 
+    console.log("[v0] Final site groups:", siteGroups)
     return siteGroups
   }
 
