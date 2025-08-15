@@ -59,7 +59,6 @@ export default function ReportPreviewPage() {
     try {
       console.log("Fetching user data for uid:", user.uid)
 
-      // First, get the user document from iboard_users collection to access company_id
       const userDocRef = doc(db, "iboard_users", user.uid)
       const userDoc = await getDoc(userDocRef)
 
@@ -67,7 +66,6 @@ export default function ReportPreviewPage() {
         const userData = userDoc.data()
         console.log("User data found:", userData)
 
-        // Try to get company using user's company_id as the document ID
         if (userData.company_id) {
           console.log("Fetching company data for company_id:", userData.company_id)
 
@@ -78,7 +76,6 @@ export default function ReportPreviewPage() {
             const companyData = companyDoc.data()
             console.log("Company data found:", companyData)
 
-            // Use company name or fallback to user data
             const name =
               companyData.name ||
               companyData.company_name ||
@@ -91,7 +88,6 @@ export default function ReportPreviewPage() {
             setPreparedByName(name)
             console.log("Set prepared by name to:", name)
 
-            // Set company logo - fallback to OH+ logo if photo_url is empty or unset
             if (companyData.photo_url && companyData.photo_url.trim() !== "") {
               console.log("Setting company logo to:", companyData.photo_url)
               setCompanyLogo(companyData.photo_url)
@@ -107,7 +103,6 @@ export default function ReportPreviewPage() {
           console.log("No company_id found in user data")
         }
 
-        // If no company_id or company not found, use user data as fallback
         const fallbackName =
           userData.display_name ||
           userData.first_name + " " + userData.last_name ||
@@ -119,13 +114,11 @@ export default function ReportPreviewPage() {
         setCompanyLogo("/ohplus-new-logo.png")
       } else {
         console.log("User document not found for uid:", user.uid)
-        // Final fallback to user display name or email
         setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
         setCompanyLogo("/ohplus-new-logo.png")
       }
     } catch (error) {
       console.error("Error fetching prepared by name:", error)
-      // Fallback to user display name or email
       setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
       setCompanyLogo("/ohplus-new-logo.png")
     }
@@ -181,17 +174,14 @@ export default function ReportPreviewPage() {
     try {
       console.log("Posting report with attachments:", report.attachments)
 
-      // Remove the isPreview flag and set proper timestamps
       const finalReportData: ReportData = {
         ...report,
         status: "posted",
-        // Remove preview-specific fields
         id: undefined,
         created: undefined,
         updated: undefined,
       }
 
-      // Ensure attachments are properly formatted
       if (finalReportData.attachments) {
         finalReportData.attachments = finalReportData.attachments
           .filter((attachment: any) => attachment && attachment.fileUrl && attachment.fileName)
@@ -208,10 +198,8 @@ export default function ReportPreviewPage() {
 
       const reportId = await postReport(finalReportData)
 
-      // Store the posted report ID for success dialog
       sessionStorage.setItem("lastPostedReportId", reportId)
 
-      // Clear preview data
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
@@ -220,7 +208,6 @@ export default function ReportPreviewPage() {
         description: "Report posted successfully!",
       })
 
-      // Navigate to service reports page
       router.push("/logistics/service-reports")
     } catch (error) {
       console.error("Error posting report:", error)
@@ -329,9 +316,25 @@ export default function ReportPreviewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      await generateReportPDF(report, product, false)
+      console.log("[v0] Starting PDF generation with report:", {
+        id: report.id,
+        bookingDates: report.bookingDates,
+        hasBookingDates: !!report.bookingDates,
+        startDate: report.bookingDates?.start,
+        endDate: report.bookingDates?.end,
+      })
+
+      const reportWithSafeDates = {
+        ...report,
+        bookingDates: report.bookingDates || {
+          start: new Date().toISOString().split("T")[0],
+          end: new Date().toISOString().split("T")[0],
+        },
+      }
+
+      await generateReportPDF(reportWithSafeDates, product, false)
     } catch (error) {
-      console.error("Error generating PDF:", error)
+      console.error("Error generating report PDF:", error)
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -350,7 +353,6 @@ export default function ReportPreviewPage() {
     setIsSendDialogOpen(false)
 
     if (option === "email") {
-      // Handle email sending logic here
       console.log("Send via email")
     } else {
       console.log(`Send via ${option}`)
@@ -362,11 +364,9 @@ export default function ReportPreviewPage() {
   }
 
   const handleEdit = () => {
-    // Navigate back to the report creation/editing page
     router.back()
   }
 
-  // Helper function to calculate installation duration
   const calculateInstallationDuration = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return 0
 
@@ -377,19 +377,16 @@ export default function ReportPreviewPage() {
     return diffDays
   }
 
-  // Helper function to get site location (for Site ID field)
   const getSiteLocation = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.location || product.light?.location || "N/A"
   }
 
-  // Helper function to get site name (for top navigation and Site field)
   const getSiteName = (report: ReportData | null) => {
     if (!report) return "N/A"
     return report.siteName || "N/A"
   }
 
-  // Helper function to get site size
   const getSiteSize = (product: Product | null) => {
     if (!product) return "N/A"
 
@@ -402,46 +399,38 @@ export default function ReportPreviewPage() {
     return product.specs_rental?.size || product.light?.size || "N/A"
   }
 
-  // Helper function to get material specs
   const getMaterialSpecs = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.material || "Stickers"
   }
 
-  // Helper function to get illumination info
   const getIllumination = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.illumination || "LR 2097 (200 Watts x 40)"
   }
 
-  // Helper function to get gondola info
   const getGondola = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.gondola ? "YES" : "NO"
   }
 
-  // Helper function to get technology info
   const getTechnology = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.technology || "Clear Tapes"
   }
 
-  // Helper function to get completion percentage from report data
   const getCompletionPercentage = (report: ReportData | null) => {
     if (!report) return 100
 
-    // Check for installationStatus first (this is the actual field name in the database)
     if (report.installationStatus !== undefined) {
       const percentage = Number.parseInt(report.installationStatus.toString(), 10)
       return isNaN(percentage) ? 0 : percentage
     }
 
-    // Fallback to completionPercentage if it exists
     if (report.completionPercentage !== undefined) {
       return report.completionPercentage
     }
 
-    // Default based on report type
     return report.reportType === "installation-report" ? 0 : 100
   }
 
@@ -463,7 +452,6 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar */}
       <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -477,16 +465,12 @@ export default function ReportPreviewPage() {
           <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">{getSiteName(report)}</div>
         </div>
 
-        {/* Action Buttons */}
         <div className="ml-auto"></div>
       </div>
 
-      {/* Main Content Container */}
       <div className="relative">
-        {/* Left Action Buttons Container - Positioned outside report area */}
         <div className="absolute left-4 top-6 z-10">
           <div className="flex flex-col gap-4">
-            {/* Edit Button */}
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleEdit}
@@ -498,7 +482,6 @@ export default function ReportPreviewPage() {
               <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
             </div>
 
-            {/* Download Button */}
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleDownloadPDF}
@@ -511,7 +494,6 @@ export default function ReportPreviewPage() {
               <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
             </div>
 
-            {/* Send Button */}
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleSendReport}
@@ -525,9 +507,7 @@ export default function ReportPreviewPage() {
           </div>
         </div>
 
-        {/* Report Container - Contains Header, Content, and Footer with side margins */}
         <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
-          {/* Angular Blue Header */}
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
@@ -544,9 +524,7 @@ export default function ReportPreviewPage() {
             </div>
           </div>
 
-          {/* Report Content */}
           <div className="max-w-6xl mx-auto p-6 space-y-6">
-            {/* Report Header */}
             <div className="flex justify-between items-center">
               <div className="flex flex-col">
                 <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
@@ -572,12 +550,10 @@ export default function ReportPreviewPage() {
               </div>
             </div>
 
-            {/* Project Information */}
             <Card className="shadow-sm">
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
@@ -621,7 +597,6 @@ export default function ReportPreviewPage() {
                     </div>
                   </div>
 
-                  {/* Right Column */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Content:</span>
@@ -656,7 +631,6 @@ export default function ReportPreviewPage() {
               </CardContent>
             </Card>
 
-            {/* Project Status */}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
@@ -674,7 +648,6 @@ export default function ReportPreviewPage() {
                 </div>
               </div>
 
-              {/* Attachments/Photos */}
               {report.attachments && report.attachments.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {report.attachments.slice(0, 2).map((attachment, index) => (
@@ -723,7 +696,6 @@ export default function ReportPreviewPage() {
                 </div>
               )}
 
-              {/* Debug info for attachments */}
               {process.env.NODE_ENV === "development" && report.attachments && (
                 <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
                   <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
@@ -732,7 +704,6 @@ export default function ReportPreviewPage() {
               )}
             </div>
 
-            {/* Footer */}
             <div className="flex justify-between items-end pt-8 border-t">
               <div>
                 <h3 className="font-semibold mb-2">Prepared by:</h3>
@@ -749,7 +720,6 @@ export default function ReportPreviewPage() {
             </div>
           </div>
 
-          {/* Angular Footer */}
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-cyan-400"></div>
@@ -781,7 +751,6 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Floating Post Report Button - Bottom Right */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           onClick={handlePostReport}
@@ -792,7 +761,6 @@ export default function ReportPreviewPage() {
         </Button>
       </div>
 
-      {/* Send Report Dialog */}
       {report && (
         <SendReportDialog
           isOpen={isSendDialogOpen}
@@ -802,7 +770,6 @@ export default function ReportPreviewPage() {
         />
       )}
 
-      {/* Full Screen Preview Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] w-full h-full p-0 bg-black border-2 border-gray-800">
           <div className="relative w-full h-full flex flex-col">
@@ -875,7 +842,7 @@ export default function ReportPreviewPage() {
 
             {fullScreenAttachment?.note && (
               <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
-                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
+                <p className="text-white text-sm italic text-center">{fullScreenAttachment.note}</p>
               </div>
             )}
           </div>
