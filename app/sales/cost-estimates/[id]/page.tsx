@@ -87,7 +87,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
   const [showPageSelection, setShowPageSelection] = useState(false)
-  const [selectedPages, setSelectedPages] = useState<number[]>([])
+  const [selectedPages, setSelectedPages] = useState<string[]>([])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -299,7 +299,11 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }
 
   const handlePageToggle = (pageIndex: number) => {
-    setSelectedPages((prev) => (prev.includes(pageIndex) ? prev.filter((p) => p !== pageIndex) : [...prev, pageIndex]))
+    const siteGroups = groupLineItemsBySite(costEstimate?.lineItems || [])
+    const sites = Object.keys(siteGroups)
+    const siteName = sites[pageIndex]
+
+    setSelectedPages((prev) => (prev.includes(siteName) ? prev.filter((p) => p !== siteName) : [...prev, siteName]))
   }
 
   const handleSelectAllPages = () => {
@@ -311,7 +315,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     if (selectedPages.length === sites.length) {
       setSelectedPages([])
     } else {
-      setSelectedPages(sites.map((_, index) => index))
+      setSelectedPages([...sites])
     }
   }
 
@@ -1311,14 +1315,17 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {costEstimate &&
-                Object.entries(groupLineItemsBySite(costEstimate.lineItems || [])).map(([siteName, items], index) => {
-                  const isSelected = selectedPages.includes(index)
-                  const ceNumber = `${costEstimate.costEstimateNumber || costEstimate.id}${Object.keys(groupLineItemsBySite(costEstimate.lineItems || [])).length > 1 ? `-${String.fromCharCode(65 + index)}` : ""}`
+                // Updated page selection logic to use site names
+                Object.keys(siteGroups).map((siteName, index) => {
+                  const siteItems = siteGroups[siteName]
+                  const isSelected = selectedPages.includes(siteName)
+                  const totalCost = siteItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+                  const items = siteGroups[siteName]
 
                   return (
                     <div
                       key={siteName}
-                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
+                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
                         isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
                       }`}
                       onClick={() => handlePageToggle(index)}
@@ -1344,7 +1351,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                       {/* Page Preview */}
                       <div className="mt-6 space-y-3">
                         <div className="text-sm font-semibold text-gray-900">Page {index + 1}</div>
-                        <div className="text-xs text-gray-600 font-medium">{ceNumber}</div>
+                        <div className="text-xs text-gray-600 font-medium">
+                          {costEstimate.costEstimateNumber || costEstimate.id}
+                          {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
+                            ? `-${String.fromCharCode(65 + index)}`
+                            : ""}
+                        </div>
                         <div className="text-sm font-medium text-gray-800 line-clamp-2">
                           Cost Estimate for {siteName}
                         </div>
@@ -1352,7 +1364,8 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                           {items.length} line item{items.length !== 1 ? "s" : ""}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Total: ₱{items.reduce((sum, item) => sum + (item.total || 0), 0).toLocaleString()}
+                          Total: ₱
+                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
                         </div>
                       </div>
                     </div>
