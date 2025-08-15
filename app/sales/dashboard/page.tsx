@@ -1405,8 +1405,8 @@ function SalesDashboardContent() {
 
           {/* Right Column: Proposal History - Conditionally rendered */}
           {proposalCreationMode && (
-            <div className="hidden lg:block">
-              <ProposalHistory />
+            <div className="flex flex-col gap-4">
+              <ProposalHistory selectedClient={selectedClientForProposal} />
             </div>
           )}
         </div>

@@ -9,9 +9,17 @@ import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { format } from "date-fns"
 import { FileText } from "lucide-react"
-import Link from "next/link" // Import Link for navigation
+import Link from "next/link"
 
-export function ProposalHistory() {
+interface ProposalHistoryProps {
+  selectedClient?: {
+    id: string
+    company: string
+    contactPerson: string
+  } | null
+}
+
+export function ProposalHistory({ selectedClient }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
@@ -36,10 +44,23 @@ export function ProposalHistory() {
     }
   }
 
+  const filteredProposals = selectedClient
+    ? proposals.filter(
+        (proposal) =>
+          proposal.client.company.toLowerCase().includes(selectedClient.company.toLowerCase()) ||
+          proposal.client.contactPerson.toLowerCase().includes(selectedClient.contactPerson.toLowerCase()),
+      )
+    : proposals
+
   return (
     <Card className="w-full h-[500px] flex flex-col">
       <CardHeader>
-        <CardTitle>Proposal History</CardTitle>
+        <CardTitle>
+          Proposal History
+          {selectedClient && (
+            <span className="text-sm font-normal text-gray-500 block">for {selectedClient.company}</span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden">
         <ScrollArea className="h-full pr-4">
@@ -55,14 +76,16 @@ export function ProposalHistory() {
                 </div>
               ))}
             </div>
-          ) : proposals.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">No proposals found.</div>
+          ) : filteredProposals.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              {selectedClient ? `No proposals found for ${selectedClient.company}.` : "No proposals found."}
+            </div>
           ) : (
             <div className="space-y-3">
-              {proposals.map((proposal) => (
+              {filteredProposals.map((proposal) => (
                 <Link
                   key={proposal.id}
-                  href={`/sales/proposals/${proposal.id}`} // Navigate to the proposal page
+                  href={`/sales/proposals/${proposal.id}`}
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
