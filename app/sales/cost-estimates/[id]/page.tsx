@@ -534,9 +534,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
       if (orphanedItems.length > 0) {
         console.log("[v0] Found orphaned items:", orphanedItems)
-        // Add orphaned items to the first site group or create a separate group
-        const firstSite = Object.keys(siteGroups)[0]
-        siteGroups[firstSite].push(...orphanedItems)
+        const siteNames = Object.keys(siteGroups)
+        siteNames.forEach((siteName) => {
+          // Create copies of orphaned items for each site to avoid reference issues
+          const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
+          siteGroups[siteName].push(...orphanedCopies)
+        })
       }
     }
 
