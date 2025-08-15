@@ -17,6 +17,7 @@ interface DateRangeCalendarDialogProps {
   onSkipDates?: () => void
   selectedSiteIds: string[] // To potentially fetch reserved dates for these sites
   selectedClientId?: string // To potentially fetch reserved dates for this client
+  showSkipButton?: boolean // Controls whether Skip button is shown (default: true)
 }
 
 // Mock reserved dates for demonstration purposes
@@ -99,6 +100,7 @@ export function DateRangeCalendarDialog({
   onSkipDates,
   selectedSiteIds,
   selectedClientId,
+  showSkipButton = true,
 }: DateRangeCalendarDialogProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
@@ -335,9 +337,11 @@ export function DateRangeCalendarDialog({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={handleSkip} className="px-6 py-2 rounded-md bg-transparent">
-            Skip
-          </Button>
+          {showSkipButton && (
+            <Button variant="outline" onClick={handleSkip} className="px-6 py-2 rounded-md bg-transparent">
+              Skip
+            </Button>
+          )}
           <Button onClick={handleConfirm} className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-md">
             OK
           </Button>
