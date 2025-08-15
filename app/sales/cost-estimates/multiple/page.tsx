@@ -7,8 +7,6 @@ import { getCostEstimate } from "@/lib/cost-estimate-service"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   DownloadIcon,
@@ -20,18 +18,11 @@ import {
   LayoutGrid,
   Pencil,
   Plus,
-  MapPin,
   Building2,
 } from "lucide-react"
 import { generateCostEstimatePDF } from "@/lib/pdf-service"
 import { CostEstimateDocument } from "@/components/cost-estimate-document"
 import { AddSiteDialog } from "@/components/add-site-dialog"
-
-// Helper function to generate QR code URL
-const generateQRCodeUrl = (costEstimateId: string) => {
-  const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimateId}`
-  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(costEstimateViewUrl)}`
-}
 
 interface SiteEstimate {
   id: string
@@ -48,7 +39,6 @@ export default function MultipleCostEstimatesPage() {
 
   const [siteEstimates, setSiteEstimates] = useState<SiteEstimate[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<string>("")
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
 
@@ -79,9 +69,6 @@ export default function MultipleCostEstimatesPage() {
         }
 
         setSiteEstimates(estimates)
-        if (estimates.length > 0) {
-          setActiveTab(estimates[0].id)
-        }
       } catch (error) {
         console.error("Error fetching cost estimates:", error)
         toast({
@@ -281,53 +268,88 @@ export default function MultipleCostEstimatesPage() {
           </Button>
         </div>
 
-        {/* Main Content Container */}
-        <div className="max-w-[1200px] w-full">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* Site Tabs */}
-            <div className="bg-white rounded-t-lg border-b border-gray-200 px-4 py-2">
-              <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 bg-transparent h-auto p-0">
-                {siteEstimates.map((siteEstimate) => {
-                  const statusConfig = getStatusConfig(siteEstimate.costEstimate.status)
-                  return (
-                    <TabsTrigger
-                      key={siteEstimate.id}
-                      value={siteEstimate.id}
-                      className={cn(
-                        "flex flex-col items-start p-4 h-auto text-left border rounded-lg transition-all",
-                        "data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200 data-[state=active]:text-blue-900",
-                        "data-[state=inactive]:bg-gray-50 data-[state=inactive]:border-gray-200 data-[state=inactive]:text-gray-700",
-                        "hover:bg-gray-100",
-                      )}
-                    >
+        {/* Main Content Container - Removed tabs, showing all documents in single scrollable view */}
+        <div className="max-w-[1200px] w-full space-y-8">
+          {/* Sites Overview Header */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Sites Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {siteEstimates.map((siteEstimate, index) => {
+                const statusConfig = getStatusConfig(siteEstimate.costEstimate.status)
+                return (
+                  <div
+                    key={siteEstimate.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
-                        <MapPin className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium text-sm truncate max-w-[120px]">{siteEstimate.siteName}</span>
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          Site {index + 1}: {siteEstimate.siteName}
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-500 truncate max-w-[140px] mb-2">{siteEstimate.location}</div>
-                      <Badge className={`${statusConfig.color} border font-medium text-xs`}>
-                        {statusConfig.icon}
-                        <span className="ml-1">{statusConfig.label}</span>
-                      </Badge>
-                    </TabsTrigger>
-                  )
-                })}
-              </TabsList>
+                      <div className="text-xs text-gray-500 truncate">{siteEstimate.location}</div>
+                    </div>
+                    <Badge className={`${statusConfig.color} border font-medium text-xs ml-2`}>
+                      {statusConfig.icon}
+                      <span className="ml-1">{statusConfig.label}</span>
+                    </Badge>
+                  </div>
+                )
+              })}
             </div>
+          </div>
 
-            {/* Site Content */}
-            {siteEstimates.map((siteEstimate) => (
-              <TabsContent key={siteEstimate.id} value={siteEstimate.id} className="mt-0">
-                <div className="bg-white shadow-md rounded-b-lg overflow-hidden">
-                  <CostEstimateDocument
-                    costEstimate={siteEstimate.costEstimate}
-                    siteName={siteEstimate.siteName}
-                    showSiteHeader={true}
-                  />
+          {/* Individual Cost Estimate Documents - Each site now shows as complete document */}
+          {siteEstimates.map((siteEstimate, index) => (
+            <div key={siteEstimate.id} className="bg-white shadow-md rounded-lg overflow-hidden">
+              {/* Site Number Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Site {index + 1} Cost Estimate</h3>
+                    <p className="text-blue-100 text-sm">{siteEstimate.siteName}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">₱{siteEstimate.costEstimate.totalAmount.toLocaleString()}</div>
+                    <div className="text-blue-100 text-sm">Total Amount</div>
+                  </div>
                 </div>
-              </TabsContent>
-            ))}
-          </Tabs>
+              </div>
+
+              {/* Complete Cost Estimate Document */}
+              <CostEstimateDocument
+                costEstimate={siteEstimate.costEstimate}
+                siteName={siteEstimate.siteName}
+                showSiteHeader={false}
+              />
+            </div>
+          ))}
+
+          {/* Summary Section */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Total Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{siteEstimates.length}</div>
+                <div className="text-sm text-blue-700">Total Sites</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  ₱{siteEstimates.reduce((sum, site) => sum + site.costEstimate.totalAmount, 0).toLocaleString()}
+                </div>
+                <div className="text-sm text-green-700">Combined Total</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  ₱
+                  {Math.round(
+                    siteEstimates.reduce((sum, site) => sum + site.costEstimate.totalAmount, 0) / siteEstimates.length,
+                  ).toLocaleString()}
+                </div>
+                <div className="text-sm text-purple-700">Average per Site</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
