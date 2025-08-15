@@ -1348,27 +1348,27 @@ export async function generateCostEstimatePDF(
       const siteGroups: { [key: string]: any[] } = {}
 
       lineItems.forEach((item) => {
-        if (item.category === "Billboard Rental") {
-          const siteName = item.description.replace(/Billboard Rental - /, "")
+        if (item.category.includes("Billboard Rental")) {
+          // Use the full description as the site name to match frontend
+          const siteName = item.description
           if (!siteGroups[siteName]) {
             siteGroups[siteName] = []
           }
           siteGroups[siteName].push(item)
+
+          // Find related production, installation, and maintenance items for this site
+          const siteId = item.id
+          const relatedItems = lineItems.filter(
+            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+          )
+          siteGroups[siteName].push(...relatedItems)
         }
       })
 
-      lineItems.forEach((item) => {
-        if (item.category !== "Billboard Rental") {
-          Object.keys(siteGroups).forEach((siteName) => {
-            if (
-              item.description.toLowerCase().includes(siteName.toLowerCase()) ||
-              item.notes?.toLowerCase().includes(siteName.toLowerCase())
-            ) {
-              siteGroups[siteName].push(item)
-            }
-          })
-        }
-      })
+      // If no site groups found, treat as single site
+      if (Object.keys(siteGroups).length === 0) {
+        siteGroups["Single Site"] = lineItems
+      }
 
       return siteGroups
     }
