@@ -6,7 +6,12 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, updateCostEstimateStatus, updateCostEstimate } from "@/lib/cost-estimate-service"
-import type { CostEstimate, CostEstimateClient, CostEstimateStatus } from "@/lib/types/cost-estimate"
+import type {
+  CostEstimate,
+  CostEstimateClient,
+  CostEstimateStatus,
+  CostEstimateLineItem,
+} from "@/lib/types/cost-estimate"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -30,6 +35,8 @@ import {
   CalendarIcon,
   Save,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -54,6 +61,61 @@ const generateQRCodeUrl = (costEstimateId: string) => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(costEstimateViewUrl)}`
 }
 
+const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
+  const siteItems: { [key: string]: CostEstimateLineItem[] } = {}
+  const nonSiteItems: CostEstimateLineItem[] = []
+
+  lineItems.forEach((item) => {
+    // Check if this is a site-specific item (has location in notes or is a billboard rental)
+    if (item.notes?.includes("Location:") || item.category?.includes("Billboard")) {
+      const siteKey = item.description || "Unknown Site"
+      if (!siteItems[siteKey]) {
+        siteItems[siteKey] = []
+      }
+      siteItems[siteKey].push(item)
+    } else {
+      nonSiteItems.push(item)
+    }
+  })
+
+  return { siteItems, nonSiteItems }
+}
+
+const createSiteCostEstimates = (originalCostEstimate: CostEstimate): CostEstimate[] => {
+  const { siteItems, nonSiteItems } = groupLineItemsBySite(originalCostEstimate.lineItems)
+  const siteKeys = Object.keys(siteItems)
+
+  // If only one site or no sites, return original
+  if (siteKeys.length <= 1) {
+    return [originalCostEstimate]
+  }
+
+  // Create separate cost estimates for each site
+  return siteKeys.map((siteKey, index) => {
+    const siteLineItems = siteItems[siteKey]
+    const siteSpecificItems = [...siteLineItems]
+
+    // Add proportional share of non-site items (production, installation, maintenance)
+    const proportionalNonSiteItems = nonSiteItems.map((item) => ({
+      ...item,
+      id: `${item.id}-site-${index}`,
+      total: item.total / siteKeys.length, // Divide equally among sites
+    }))
+
+    const allLineItems = [...siteSpecificItems, ...proportionalNonSiteItems]
+    const totalAmount = allLineItems.reduce((sum, item) => sum + item.total, 0)
+
+    return {
+      ...originalCostEstimate,
+      id: `${originalCostEstimate.id}-site-${index}`,
+      title: `${siteKey} - ${originalCostEstimate.client.company || originalCostEstimate.client.name}`,
+      lineItems: allLineItems,
+      totalAmount,
+      costEstimateNumber: `${originalCostEstimate.costEstimateNumber}-${index + 1}`,
+    }
+  })
+}
+
 export default function CostEstimateDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -62,7 +124,9 @@ export default function CostEstimateDetailsPage() {
   const { toast } = useToast()
 
   const costEstimateId = params.id as string
-  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [originalCostEstimate, setOriginalCostEstimate] = useState<CostEstimate | null>(null)
+  const [siteCostEstimates, setSiteCostEstimates] = useState<CostEstimate[]>([])
+  const [currentSiteIndex, setCurrentSiteIndex] = useState(0)
   const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
@@ -79,6 +143,9 @@ export default function CostEstimateDetailsPage() {
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+
+  const isMultipleSites = siteCostEstimates.length > 1
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -88,8 +155,12 @@ export default function CostEstimateDetailsPage() {
       try {
         const ce = await getCostEstimate(costEstimateId)
         if (ce) {
+          setOriginalCostEstimate(ce)
+          const siteEstimates = createSiteCostEstimates(ce)
+          setSiteCostEstimates(siteEstimates)
+          setEditableCostEstimate(siteEstimates[0]) // Initialize editable state with first site
           setCostEstimate(ce)
-          setEditableCostEstimate(ce) // Initialize editable state
+
           if (ce.proposalId) {
             const linkedProposal = await getProposal(ce.proposalId)
             setProposal(linkedProposal)
@@ -118,6 +189,22 @@ export default function CostEstimateDetailsPage() {
 
     fetchCostEstimateData()
   }, [costEstimateId, router, toast])
+
+  const nextSite = () => {
+    if (siteCostEstimates.length > 1) {
+      const newIndex = (currentSiteIndex + 1) % siteCostEstimates.length
+      setCurrentSiteIndex(newIndex)
+      setEditableCostEstimate(siteCostEstimates[newIndex])
+    }
+  }
+
+  const prevSite = () => {
+    if (siteCostEstimates.length > 1) {
+      const newIndex = (currentSiteIndex - 1 + siteCostEstimates.length) % siteCostEstimates.length
+      setCurrentSiteIndex(newIndex)
+      setEditableCostEstimate(siteCostEstimates[newIndex])
+    }
+  }
 
   useEffect(() => {
     if (isSendEmailDialogOpen && costEstimate) {
@@ -452,11 +539,61 @@ export default function CostEstimateDetailsPage() {
               {statusConfig.icon}
               <span className="ml-1.5">{statusConfig.label}</span>
             </Badge>
+            {isMultipleSites && (
+              <div className="text-sm text-gray-600">
+                Site {currentSiteIndex + 1} of {siteCostEstimates.length}
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center space-x-2"></div>
+          {isMultipleSites && (
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={prevSite}
+                className="px-2 bg-transparent"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={nextSite}
+                className="px-2 bg-transparent"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
+
+      {isMultipleSites && (
+        <div className="max-w-[850px] mx-auto mb-6">
+          <div className="flex space-x-2 overflow-x-auto pb-2">
+            {siteCostEstimates.map((estimate, index) => (
+              <Button
+                key={`site-${index}`}
+                variant={index === currentSiteIndex ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setCurrentSiteIndex(index)
+                  setEditableCostEstimate(estimate)
+                }}
+                className={cn("flex-shrink-0 min-w-[120px]", index === currentSiteIndex && "bg-blue-600 text-white")}
+              >
+                <div className="text-left">
+                  <div className="font-medium truncate max-w-[100px]">
+                    {estimate.title.split(' - ')[0] || `Site ${index + 1}`}
+                  </div>
+                  <div className="text-xs opacity-75">₱{estimate.totalAmount.toLocaleString()}</div>
+                </div>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
@@ -512,6 +649,11 @@ export default function CostEstimateDetailsPage() {
                       <Pencil className="h-3 w-3 mr-1" /> Editing
                     </Badge>
                   )}
+                  {isMultipleSites && (
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                      Site {currentSiteIndex + 1} of {siteCostEstimates.length}
+                    </Badge>
+                  )}
                 </p>
               </div>
               <div className="mt-4 sm:mt-0 flex items-center space-x-4">
@@ -519,7 +661,7 @@ export default function CostEstimateDetailsPage() {
                 <div className="flex flex-col items-center">
                   <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                     <img
-                      src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                      src={generateQRCodeUrl(originalCostEstimate?.id || costEstimate.id) || "/placeholder.svg"}
                       alt="QR Code for cost estimate view"
                       className="w-20 h-20"
                     />
@@ -828,7 +970,7 @@ export default function CostEstimateDetailsPage() {
                     <p className="text-base text-gray-900">{costEstimate.client.campaignObjective}</p>
                   )}
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Cost Breakdown */}
@@ -854,7 +996,7 @@ export default function CostEstimateDetailsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {costEstimate.lineItems.map((item, index) => (
+                    {siteCostEstimates[currentSiteIndex]?.lineItems.map((item, index) => (
                       <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                         <td className="py-3 px-4 border-b border-gray-200">
                           <div className="font-medium text-gray-900">{item.description}</div>
@@ -874,7 +1016,7 @@ export default function CostEstimateDetailsPage() {
                         Total Estimated Cost:
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-blue-600">
-                        ₱{costEstimate.totalAmount.toLocaleString()}
+                        ₱{siteCostEstimates[currentSiteIndex]?.totalAmount.toLocaleString()}
                       </td>
                     </tr>
                   </tbody>
@@ -965,192 +1107,179 @@ export default function CostEstimateDetailsPage() {
           </div>
         </div>
       </div>
-
-      {/* Floating Action Buttons */}
-      {isEditing ? (
-        <div className="fixed bottom-6 right-6 flex space-x-4">
-          <Button
-            onClick={handleCancelEdit}
-            variant="outline"
-            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-          >
-            <X className="h-5 w-5 mr-2" />
+  \
+  isEditing ? (
+    <div className="fixed bottom-6 right-6 flex space-x-4">
+      <Button
+        onClick={handleCancelEdit}
+        variant="outline"
+        className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+      >
+        <X className="h-5 w-5 mr-2" />
+        Cancel
+      </Button>
+      <Button
+        onClick={handleSaveEdit}
+        disabled={isSaving}
+        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
+      >
+        {isSaving ? (
+          <>
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+          </>
+        ) : (
+          <>
+            <Save className="h-5 w-5 mr-2" /> Save Changes
+          </>
+        )}
+      </Button>
+    </div>
+  ) : (
+    costEstimate.status === "draft" && (
+      <div className="fixed bottom-6 right-6 flex space-x-4">
+        <Button
+          onClick={() => handleUpdatePublicStatus("draft")}
+          variant="outline"
+          className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+        >
+          <FileText className="h-5 w-5 mr-2" />
+          Save as Draft
+        </Button>
+        <Button
+          onClick={() => setIsSendOptionsDialogOpen(true)}
+          className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+        >
+          <Send className="h-5 w-5 mr-2" />
+          Send
+        </Button>
+      </div>
+    )
+  )
+  costEstimate && (
+    <SendCostEstimateOptionsDialog
+      isOpen={isSendOptionsDialogOpen}
+      onOpenChange={setIsSendOptionsDialogOpen}
+      costEstimate={costEstimate}
+      onEmailClick={() => {
+        setIsSendOptionsDialogOpen(false)
+        setIsSendEmailDialogOpen(true)
+      }}
+    />
+  )
+  ;(
+    <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Send Cost Estimate</DialogTitle>
+          <DialogDescription>
+            Review the email details before sending the cost estimate to{" "}
+            <span className="font-semibold text-gray-900">{costEstimate?.client?.email}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="to" className="text-right">
+              To
+            </Label>
+            <Input id="to" value={costEstimate?.client?.email || ""} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="cc" className="text-right">
+              CC
+            </Label>
+            <Input
+              id="cc"
+              value={ccEmail}
+              onChange={(e) => setCcEmail(e.target.value)}
+              placeholder="Optional: comma-separated emails"
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="from" className="text-right">
+              From
+            </Label>
+            <Input id="from" value="OH Plus &lt;noreply@resend.dev&gt;" readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="replyTo" className="text-right">
+              Reply-To
+            </Label>
+            <Input id="replyTo" value={user?.email || ""} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="subject" className="text-right">
+              Subject
+            </Label>
+            <Input
+              id="subject"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              className="col-span-3"
+              placeholder="e.g., Cost Estimate for Your Advertising Campaign"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="body" className="text-right pt-2">
+              Body
+            </Label>
+            <Textarea
+              id="body"
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              className="col-span-3 min-h-[150px]"
+              placeholder="e.g., Dear [Client Name],\n\nPlease find our cost estimate attached...\n\nBest regards,\nThe OH Plus Team"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSaveEdit}
-            disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
-          >
-            {isSaving ? (
+          <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
+            {sendingEmail ? (
               <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sending...
               </>
             ) : (
-              <>
-                <Save className="h-5 w-5 mr-2" /> Save Changes
-              </>
+              "Send Email"
             )}
           </Button>
-        </div>
-      ) : (
-        costEstimate.status === "draft" && (
-          <div className="fixed bottom-6 right-6 flex space-x-4">
-            <Button
-              onClick={() => handleUpdatePublicStatus("draft")} // Explicitly save as draft
-              variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-            >
-              <FileText className="h-5 w-5 mr-2" />
-              Save as Draft
-            </Button>
-            <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the new options dialog
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-            >
-              <Send className="h-5 w-5 mr-2" />
-              Send
-            </Button>
-          </div>
-        )
-      )}
-
-      {/* Send Cost Estimate Options Dialog */}
-      {costEstimate && (
-        <SendCostEstimateOptionsDialog
-          isOpen={isSendOptionsDialogOpen}
-          onOpenChange={setIsSendOptionsDialogOpen}
-          costEstimate={costEstimate}
-          onEmailClick={() => {
-            setIsSendOptionsDialogOpen(false) // Close options dialog
-            setIsSendEmailDialogOpen(true) // Open email dialog
-          }}
-        />
-      )}
-
-      {/* Send Email Dialog (existing) */}
-      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Send Cost Estimate</DialogTitle>
-            <DialogDescription>
-              Review the email details before sending the cost estimate to{" "}
-              <span className="font-semibold text-gray-900">{costEstimate?.client?.email}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="to" className="text-right">
-                To
-              </Label>
-              <Input id="to" value={costEstimate?.client?.email || ""} readOnly className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cc" className="text-right">
-                CC
-              </Label>
-              <Input
-                id="cc"
-                value={ccEmail}
-                onChange={(e) => setCcEmail(e.target.value)}
-                placeholder="Optional: comma-separated emails"
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="from" className="text-right">
-                From
-              </Label>
-              <Input id="from" value="OH Plus &lt;noreply@resend.dev&gt;" readOnly className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="replyTo" className="text-right">
-                Reply-To
-              </Label>
-              <Input
-                id="replyTo"
-                value={user?.email || ""} // Use current user's email as default reply-to
-                readOnly // Make it read-only as it's derived from user data
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="subject" className="text-right">
-                Subject
-              </Label>
-              <Input
-                id="subject"
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., Cost Estimate for Your Advertising Campaign"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="body" className="text-right pt-2">
-                Body
-              </Label>
-              <Textarea
-                id="body"
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                className="col-span-3 min-h-[150px]"
-                placeholder="e.g., Dear [Client Name],\n\nPlease find our cost estimate attached...\n\nBest regards,\nThe OH Plus Team"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
-              Cancel
-            </Button>
-            <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
-              {sendingEmail ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Email"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <CostEstimateSentSuccessDialog
-        isOpen={showSuccessDialog}
-        onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) < CostEstimateSentSuccessDialog
+  isOpen = { showSuccessDialog }
+  onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
       />
+
       {/* Timeline Sidebar */}
-      {timelineOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setTimelineOpen(false)} />
-
-          {/* Sidebar */}
-          <div className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTimelineOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <XCircle className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-              <ProposalActivityTimeline
-                proposalId={costEstimate.id}
-                currentUserId={user?.uid || "unknown_user"}
-                currentUserName={user?.displayName || "Unknown User"}
-              />
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+  timelineOpen && (
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setTimelineOpen(false)} />
+      <div className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTimelineOpen(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <XCircle className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+          <ProposalActivityTimeline
+            proposalId={costEstimate.id}
+            currentUserId={user?.uid || "unknown_user"}
+            currentUserName={user?.displayName || "Unknown User"}
+          />
+        </div>
+      </div>
+    </>
+  )
+  </div>
   )
 }
