@@ -84,6 +84,9 @@ export default function CostEstimateDetailsPage() {
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
+  const [showSiteSelectionModal, setShowSiteSelectionModal] = useState(false)
+  const [selectedSitesForPDF, setSelectedSitesForPDF] = useState<string[]>([])
+  const [availableSites, setAvailableSites] = useState<Array<{ id: string; name: string; location: string }>>([])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -263,13 +266,76 @@ export default function CostEstimateDetailsPage() {
   const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
+    // Group line items by site to detect multiple sites
+    const siteGroups = new Map<string, any[]>()
+
+    costEstimate.lineItems.forEach((item) => {
+      if (item.category === "Billboard Rental") {
+        const siteKey = `${item.description}-${item.notes || ""}`
+        if (!siteGroups.has(siteKey)) {
+          siteGroups.set(siteKey, [])
+        }
+        siteGroups.get(siteKey)!.push(item)
+      }
+    })
+
+    const sites = Array.from(siteGroups.keys()).map((siteKey, index) => ({
+      id: `site-${index}`,
+      name: siteKey.split("-")[0] || `Site ${index + 1}`,
+      location: siteKey.split("-")[1] || "Location not specified",
+    }))
+
+    // If multiple sites, show selection modal
+    if (sites.length > 1) {
+      setAvailableSites(sites)
+      setSelectedSitesForPDF([]) // Reset selection
+      setShowSiteSelectionModal(true)
+      return
+    }
+
+    // If single site or no sites detected, download directly
+    await downloadPDFForSites([])
+  }
+
+  const downloadPDFForSites = async (selectedSiteIds: string[]) => {
+    if (!costEstimate) return
+
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate)
-      toast({
-        title: "PDF Generated",
-        description: "Cost estimate PDF has been downloaded.",
-      })
+      // If no sites selected or all sites selected, download full PDF
+      if (selectedSiteIds.length === 0 || selectedSiteIds.length === availableSites.length) {
+        await generateCostEstimatePDF(costEstimate)
+        toast({
+          title: "PDF Generated",
+          description: "Complete cost estimate PDF has been downloaded.",
+        })
+      } else {
+        // Create filtered cost estimate for selected sites
+        const filteredCostEstimate = {
+          ...costEstimate,
+          lineItems: costEstimate.lineItems.filter((item) => {
+            if (item.category !== "Billboard Rental") {
+              // Include non-rental items for selected sites
+              const associatedSiteIndex = selectedSiteIds.findIndex((id) => id.includes(item.description))
+              return associatedSiteIndex !== -1
+            }
+
+            // For rental items, check if they belong to selected sites
+            const siteKey = `${item.description}-${item.notes || ""}`
+            const siteIndex = availableSites.findIndex((site) => site.name === siteKey.split("-")[0])
+            return selectedSiteIds.includes(`site-${siteIndex}`)
+          }),
+        }
+
+        // Recalculate total for filtered items
+        filteredCostEstimate.totalAmount = filteredCostEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
+
+        await generateCostEstimatePDF(filteredCostEstimate)
+        toast({
+          title: "PDF Generated",
+          description: `PDF for ${selectedSiteIds.length} selected site${selectedSiteIds.length === 1 ? "" : "s"} has been downloaded.`,
+        })
+      }
     } catch (error) {
       console.error("Error downloading PDF:", error)
       toast({
@@ -279,6 +345,19 @@ export default function CostEstimateDetailsPage() {
       })
     } finally {
       setDownloadingPDF(false)
+      setShowSiteSelectionModal(false)
+    }
+  }
+
+  const handleSiteToggleForPDF = (siteId: string) => {
+    setSelectedSitesForPDF((prev) => (prev.includes(siteId) ? prev.filter((id) => id !== siteId) : [...prev, siteId]))
+  }
+
+  const handleSelectAllSitesForPDF = () => {
+    if (selectedSitesForPDF.length === availableSites.length) {
+      setSelectedSitesForPDF([])
+    } else {
+      setSelectedSitesForPDF(availableSites.map((site) => site.id))
     }
   }
 
@@ -1195,6 +1274,91 @@ export default function CostEstimateDetailsPage() {
         isOpen={showSuccessDialog}
         onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
       />
+      {showSiteSelectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Select Sites for PDF Download</h3>
+              <button onClick={() => setShowSiteSelectionModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-gray-600">Choose which sites to include in the PDF download</p>
+              <button onClick={handleSelectAllSitesForPDF} className="text-sm text-blue-600 hover:text-blue-800">
+                {selectedSitesForPDF.length === availableSites.length ? "Deselect All" : "Select All"}
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto mb-4">
+              <div className="space-y-2">
+                {availableSites.map((site) => (
+                  <div
+                    key={site.id}
+                    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                      selectedSitesForPDF.includes(site.id)
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => handleSiteToggleForPDF(site.id)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedSitesForPDF.includes(site.id)}
+                        onChange={() => handleSiteToggleForPDF(site.id)}
+                        className="h-4 w-4 text-green-600 rounded border-gray-300"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{site.name}</div>
+                        <div className="text-xs text-gray-600">{site.location}</div>
+                      </div>
+                      {selectedSitesForPDF.includes(site.id) && <CheckCircle className="h-5 w-5 text-green-600" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-4 border-t">
+              <div className="text-sm text-gray-500">
+                {selectedSitesForPDF.length} of {availableSites.length} sites selected
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowSiteSelectionModal(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => downloadPDFForSites(selectedSitesForPDF)}
+                  disabled={downloadingPDF}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {downloadingPDF ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      <span>
+                        Download PDF
+                        {selectedSitesForPDF.length > 0 && selectedSitesForPDF.length < availableSites.length
+                          ? ` (${selectedSitesForPDF.length} sites)`
+                          : ""}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Timeline Sidebar */}
       {timelineOpen && (
         <>
