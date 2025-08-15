@@ -54,34 +54,6 @@ const generateQRCodeUrl = (costEstimateId: string) => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(costEstimateViewUrl)}`
 }
 
-const groupLineItemsBySite = (lineItems: any[]) => {
-  const siteGroups: { [key: string]: any[] } = {}
-  const nonSiteItems: any[] = []
-
-  lineItems.forEach((item) => {
-    // Check if item has location info in notes (format: "Location: ...")
-    const locationMatch = item.notes?.match(/Location:\s*(.+)/)
-    if (locationMatch && item.category.includes("Billboard Rental")) {
-      const location = locationMatch[1].trim()
-      if (!siteGroups[location]) {
-        siteGroups[location] = []
-      }
-      siteGroups[location].push(item)
-    } else {
-      // Group non-site items (Production, Installation, Maintenance) with the last site
-      const siteKeys = Object.keys(siteGroups)
-      if (siteKeys.length > 0) {
-        const lastSite = siteKeys[siteKeys.length - 1]
-        siteGroups[lastSite].push(item)
-      } else {
-        nonSiteItems.push(item)
-      }
-    }
-  })
-
-  return { siteGroups, nonSiteItems }
-}
-
 export default function CostEstimateDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -419,19 +391,38 @@ export default function CostEstimateDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen bg-gray-50/50">
+        <div className="container mx-auto p-6 max-w-7xl">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="h-64 bg-gray-200 rounded-lg"></div>
+                <div className="h-48 bg-gray-200 rounded-lg"></div>
+              </div>
+              <div className="space-y-6">
+                <div className="h-32 bg-gray-200 rounded-lg"></div>
+                <div className="h-48 bg-gray-200 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
-  if (!costEstimate) {
+  if (!costEstimate || !editableCostEstimate) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Cost Estimate Not Found</h2>
-          <p className="text-gray-600 mb-4">The cost estimate you're looking for doesn't exist.</p>
-          <Button onClick={() => router.push("/sales/cost-estimates")}>
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <FileText className="h-8 w-8 text-gray-400" />
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Cost Estimate Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The cost estimate you're looking for doesn't exist or may have been removed.
+          </p>
+          <Button onClick={() => router.push("/sales/cost-estimates")} className="bg-blue-600 hover:bg-blue-700">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Cost Estimates
           </Button>
@@ -442,51 +433,107 @@ export default function CostEstimateDetailsPage() {
 
   const statusConfig = getStatusConfig(costEstimate.status)
 
-  const { siteGroups, nonSiteItems } = groupLineItemsBySite(costEstimate.lineItems)
-  const siteKeys = Object.keys(siteGroups)
-  const hasMultipleSites = siteKeys.length > 1
-
-  const renderSiteDocument = (siteLocation: string, siteItems: any[], siteIndex: number) => {
-    const siteTotal = siteItems.reduce((sum, item) => sum + item.total, 0)
-    const siteName = siteItems.find(item => item.category.includes('Billboard Rental'))?.description || `Site ${siteIndex + 1}`
-    
-    return (
-      <div key={siteLocation} className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden mb-8">
-        {/* Document Header */}
-        <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
-              <p className="text-sm text-gray-500 flex items-center gap-2">
-                {costEstimate.costEstimateNumber || costEstimate.id} - {siteName}
-                {isEditing && (
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                    <Pencil className="h-3 w-3 mr-1" /> Editing
-                  </Badge>
-                )}
-              </p>
-            </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-              {/* QR Code */}
-              <div className="flex flex-col items-center">
-                <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                  <img
-                    src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
-                    alt="QR Code for cost estimate view"
-                    className="w-20 h-20"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
-              </div>
-              <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
-            </div>
+  return (
+    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 relative">
+      {/* Word-style Toolbar */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
+        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()} // Changed from router.push("/sales/cost-estimates")
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Back</span>
+            </Button>
+            <Badge className={`${statusConfig.color} border font-medium px-3 py-1`}>
+              {statusConfig.icon}
+              <span className="ml-1.5">{statusConfig.label}</span>
+            </Badge>
           </div>
+
+          <div className="flex items-center space-x-2"></div>
+        </div>
+      </div>
+
+      {/* New Wrapper for Sidebar + Document */}
+      <div className="flex justify-center items-start gap-6 mt-6">
+        {/* Left Panel (now part of flow) */}
+        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+          <Button
+            variant="ghost"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+          >
+            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
+            <span className="text-[10px] text-gray-700">Templates</span>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleEditClick}
+            disabled={isEditing}
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+          >
+            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
+            <span className="text-[10px] text-gray-700">Edit</span>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleDownloadPDF}
+            disabled={downloadingPDF} // Re-enable when PDF generation is implemented
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+          >
+            {downloadingPDF ? (
+              <>
+                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                <span className="text-[10px] text-gray-700">Generating...</span>
+              </>
+            ) : (
+              <>
+                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                <span className="text-[10px] text-gray-700">Download</span>
+              </>
+            )}
+          </Button>
         </div>
 
-        {/* Document Content */}
-        <div className="p-6 sm:p-8">
-          {/* Cost Estimate Information - Only show on first document */}
-          {siteIndex === 0 && (
+        {/* Document Container */}
+        <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
+          {/* Document Header */}
+          <div className="border-b-2 border-blue-600 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
+                <p className="text-sm text-gray-500 flex items-center gap-2">
+                  {costEstimate.costEstimateNumber || costEstimate.id} {/* Display costEstimateNumber */}
+                  {isEditing && (
+                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                      <Pencil className="h-3 w-3 mr-1" /> Editing
+                    </Badge>
+                  )}
+                </p>
+              </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                {/* QR Code */}
+                <div className="flex flex-col items-center">
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+                    <img
+                      src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                      alt="QR Code for cost estimate view"
+                      className="w-20 h-20"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
+                </div>
+                <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
+              </div>
+            </div>
+          </div>
+
+          {/* Document Content */}
+          <div className="p-6 sm:p-8">
+            {/* Cost Estimate Information */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
                 Cost Estimate Information
@@ -638,10 +685,8 @@ export default function CostEstimateDetailsPage() {
                 )}
               </div>
             </div>
-          )}
 
-          {/* Client Information - Only show on first document */}
-          {siteIndex === 0 && (
+            {/* Client Information */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
                 Client Information
@@ -785,61 +830,59 @@ export default function CostEstimateDetailsPage() {
                 </div>
               )}
             </div>
-          )}
 
-          {/* Cost Breakdown for this specific site */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Cost Breakdown
-            </h2>
+            {/* Cost Breakdown */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Cost Breakdown
+              </h2>
 
-            <div className="border border-gray-300 rounded-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                      Description
-                    </th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                      Quantity
-                    </th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                      Unit Price
-                    </th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {siteItems.map((item, index) => (
-                    <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <div className="font-medium text-gray-900">{item.description}</div>
-                        {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
+              <div className="border border-gray-300 rounded-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Description
+                      </th>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Quantity
+                      </th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                        Unit Price
+                      </th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costEstimate.lineItems.map((item, index) => (
+                      <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="py-3 px-4 border-b border-gray-200">
+                          <div className="font-medium text-gray-900">{item.description}</div>
+                          {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
+                        </td>
+                        <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          ₱{item.unitPrice.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50">
+                      <td colSpan={3} className="py-3 px-4 text-right font-medium">
+                        Total Estimated Cost:
                       </td>
-                      <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        ₱{item.unitPrice.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
+                      <td className="py-3 px-4 text-right font-bold text-blue-600">
+                        ₱{costEstimate.totalAmount.toLocaleString()}
                       </td>
                     </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                      Total Estimated Cost:
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-blue-600">
-                      ₱{siteTotal.toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
-          {/* Additional Information - Only show on last document */}
-          {siteIndex === siteKeys.length - 1 && (
+            {/* Additional Information */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
                 Additional Information
@@ -859,15 +902,17 @@ export default function CostEstimateDetailsPage() {
                       className="mt-1"
                     />
                   ) : (
-                    <p className="text-base text-gray-900">{costEstimate.customMessage}</p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
+                      <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.customMessage}</p>
+                    </div>
                   )}
                 </div>
               )}
 
               {(costEstimate.notes || isEditing) && (
-                <div className="mb-4">
+                <div>
                   <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
-                    Notes
+                    Internal Notes
                   </Label>
                   {isEditing ? (
                     <Textarea
@@ -878,564 +923,47 @@ export default function CostEstimateDetailsPage() {
                       className="mt-1"
                     />
                   ) : (
-                    <p className="text-base text-gray-900">{costEstimate.notes}</p>
-                  )}
-                </div>
-              )}
-
-              <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
-                <p>This cost estimate is valid until {costEstimate.validUntil ? format(costEstimate.validUntil, "PPP") : "N/A"}.</p>
-                <p className="mt-1">© 2024 OH+ Outdoor Advertising. All rights reserved.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Word-style Toolbar */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()} // Changed from router.push("/sales/cost-estimates")
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
-            <Badge className={`${statusConfig.color} border font-medium px-3 py-1`}>
-              {statusConfig.icon}
-              <span className="ml-1.5">{statusConfig.label}</span>
-            </Badge>
-          </div>
-
-          <div className="flex items-center space-x-2"></div>
-        </div>
-      </div>
-
-      {/* New Wrapper for Sidebar + Document */}
-      <div className="flex justify-center items-start gap-6 mt-6">
-        {/* Left Panel (now part of flow) */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
-          <Button
-            variant="ghost"
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Templates</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleDownloadPDF}
-            disabled={downloadingPDF} // Re-enable when PDF generation is implemented
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-        </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Document Container */}
-
-        {hasMultipleSites ? (
-          <div className="space-y-8">
-            {siteKeys.map((siteLocation, index) => 
-              renderSiteDocument(siteLocation, siteGroups[siteLocation], index)
-            )}
-          </div>
-        ) : (
-          // Original single document layout for single site or no sites
-          <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-            {/* Document Header */}
-            <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
-                  <p className="text-sm text-gray-500 flex items-center gap-2">
-                    {costEstimate.costEstimateNumber || costEstimate.id} {/* Display costEstimateNumber */}
-                    {isEditing && (
-                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                        <Pencil className="h-3 w-3 mr-1" /> Editing
-                      </Badge>
-                    )}
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                  {/* QR Code */}
-                  <div className="flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                      <img
-                        src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
-                        alt="QR Code for cost estimate view"
-                        className="w-20 h-20"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
-                  </div>
-                  <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
-                </div>
-              </div>
-            </div>
-
-            {/* Document Content */}
-            <div className="p-6 sm:p-8">
-              {/* Cost Estimate Information */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Cost Estimate Information
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="title" className="text-sm font-medium text-gray-500 mb-2">
-                      Title
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="title"
-                        name="title"
-                        value={editableCostEstimate.title}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base font-medium text-gray-900">{costEstimate.title}</p>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                    <p className="text-base text-gray-900">{format(costEstimate.createdAt, "PPP")}</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="startDate" className="text-sm font-medium text-gray-500 mb-2">
-                      Start Date
-                    </Label>
-                    {isEditing ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal mt-1",
-                              !editableCostEstimate.startDate && "text-muted-foreground",
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {editableCostEstimate.startDate ? (
-                              format(editableCostEstimate.startDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={editableCostEstimate.startDate}
-                            onSelect={(date) => handleDateChange(date, "startDate")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    ) : (
-                      <p className="text-base text-gray-900">
-                        {costEstimate.startDate ? format(costEstimate.startDate, "PPP") : "N/A"}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="endDate" className="text-sm font-medium text-gray-500 mb-2">
-                      End Date
-                    </Label>
-                    {isEditing ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal mt-1",
-                              !editableCostEstimate.endDate && "text-muted-foreground",
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {editableCostEstimate.endDate ? (
-                              format(editableCostEstimate.endDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={editableCostEstimate.endDate}
-                            onSelect={(date) => handleDateChange(date, "endDate")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    ) : (
-                      <p className="text-base text-gray-900">
-                        {costEstimate.endDate ? format(costEstimate.endDate, "PPP") : "N/A"}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="validUntil" className="text-sm font-medium text-gray-500 mb-2">
-                      Valid Until
-                    </Label>
-                    {isEditing ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal mt-1",
-                              !editableCostEstimate.validUntil && "text-muted-foreground",
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {editableCostEstimate.validUntil ? (
-                              format(editableCostEstimate.validUntil, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={editableCostEstimate.validUntil}
-                            onSelect={(date) => handleDateChange(date, "validUntil")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    ) : (
-                      <p className="text-base text-gray-900">
-                        {costEstimate.validUntil ? format(costEstimate.validUntil, "PPP") : "N/A"}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                    <p className="text-base font-semibold text-gray-900">₱{costEstimate.totalAmount.toLocaleString()}</p>
-                  </div>
-                  {costEstimate.durationDays !== null && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2">Duration</h3>
-                      <p className="text-base text-gray-900">
-                        {costEstimate.durationDays} day{costEstimate.durationDays !== 1 ? "s" : ""}
-                      </p>
+                    <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                      <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.notes}</p>
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Client Information */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Client Information
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="client.company" className="text-sm font-medium text-gray-500 mb-2">
-                      Company
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.company"
-                        name="client.company"
-                        value={editableCostEstimate.client.company}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base font-medium text-gray-900">{costEstimate.client.company}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="client.contactPerson" className="text-sm font-medium text-gray-500 mb-2">
-                      Contact Person
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.contactPerson"
-                        name="client.contactPerson"
-                        value={editableCostEstimate.client.name}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.name}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="client.designation" className="text-sm font-medium text-gray-500 mb-2">
-                      Designation
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.designation"
-                        name="client.designation"
-                        value={editableCostEstimate.client.designation || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.designation || "N/A"}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="client.email" className="text-sm font-medium text-gray-500 mb-2">
-                      Email
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.email"
-                        name="client.email"
-                        type="email"
-                        value={editableCostEstimate.client.email}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.email}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="client.phone" className="text-sm font-medium text-gray-500 mb-2">
-                      Phone
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.phone"
-                        name="client.phone"
-                        value={editableCostEstimate.client.phone}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.phone}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="client.industry" className="text-sm font-medium text-gray-500 mb-2">
-                      Industry
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="client.industry"
-                        name="client.industry"
-                        value={editableCostEstimate.client.industry || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.industry || "N/A"}</p>
-                    )}
-                  </div>
-                </div>
-
-                {(costEstimate.client.address || isEditing) && (
-                  <div className="mt-4">
-                    <Label htmlFor="client.address" className="text-sm font-medium text-gray-500 mb-2">
-                      Address
-                    </Label>
-                    {isEditing ? (
-                      <Textarea
-                        id="client.address"
-                        name="client.address"
-                        value={editableCostEstimate.client.address || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.address}</p>
-                    )}
-                  </div>
-                )}
-
-                {(costEstimate.client.campaignObjective || isEditing) && (
-                  <div className="mt-4">
-                    <Label htmlFor="client.campaignObjective" className="text-sm font-medium text-gray-500 mb-2">
-                      Campaign Objective
-                    </Label>
-                    {isEditing ? (
-                      <Textarea
-                        id="client.campaignObjective"
-                        name="client.campaignObjective"
-                        value={editableCostEstimate.client.campaignObjective || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base text-gray-900">{costEstimate.client.campaignObjective}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Cost Breakdown */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Cost Breakdown
-                </h2>
-
-                <div className="border border-gray-300 rounded-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                          Description
-                        </th>
-                        <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                          Quantity
-                        </th>
-                        <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                          Unit Price
-                        </th>
-                        <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {costEstimate.lineItems.map((item, index) => (
-                        <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="py-3 px-4 border-b border-gray-200">
-                            <div className="font-medium text-gray-900">{item.description}</div>
-                            {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
-                          </td>
-                          <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
-                          <td className="py-3 px-4 text-right border-b border-gray-200">
-                            ₱{item.unitPrice.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 text-right border-b border-gray-200">
-                            <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="bg-gray-50">
-                        <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                          Total Estimated Cost:
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-blue-600">
-                          ₱{costEstimate.totalAmount.toLocaleString()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Additional Information */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Additional Information
-                </h2>
-
-                {(costEstimate.customMessage || isEditing) && (
-                  <div className="mb-4">
-                    <Label htmlFor="customMessage" className="text-sm font-medium text-gray-500 mb-2">
-                      Custom Message
-                    </Label>
-                    {isEditing ? (
-                      <Textarea
-                        id="customMessage"
-                        name="customMessage"
-                        value={editableCostEstimate.customMessage || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
-                        <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.customMessage}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(costEstimate.notes || isEditing) && (
-                  <div>
-                    <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
-                      Internal Notes
-                    </Label>
-                    {isEditing ? (
-                      <Textarea
-                        id="notes"
-                        name="notes"
-                        value={editableCostEstimate.notes || ""}
-                        onChange={handleChange}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                        <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Linked Proposal (if exists) */}
-              {proposal && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                    Linked Proposal
-                  </h2>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-lg font-semibold">{proposal.title}</p>
-                      <p className="text-gray-600">
-                        Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                      </p>
-                      <Button
-                        variant="link"
-                        className="p-0 mt-2"
-                        onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                      >
-                        View Proposal
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
               )}
+            </div>
 
-              {/* Document Footer */}
-              <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-                {costEstimate.validUntil && (
-                  <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
-                )}
-                <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
+            {/* Linked Proposal (if exists) */}
+            {proposal && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Linked Proposal
+                </h2>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-lg font-semibold">{proposal.title}</p>
+                    <p className="text-gray-600">
+                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                    </p>
+                    <Button
+                      variant="link"
+                      className="p-0 mt-2"
+                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
+                    >
+                      View Proposal
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
+            )}
+
+            {/* Document Footer */}
+            <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+              {costEstimate.validUntil && (
+                <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+              )}
+              <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Floating Action Buttons */}
@@ -1624,5 +1152,5 @@ export default function CostEstimateDetailsPage() {
         </>
       )}
     </div>
-  )\
+  )
 }
