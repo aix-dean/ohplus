@@ -53,7 +53,7 @@ import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectCostEstimate, createMultipleCostEstimates } from "@/lib/cost-estimate-service" // Import createMultipleCostEstimates
+import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
@@ -709,37 +709,16 @@ function SalesDashboardContent() {
           type: site.type || "Unknown",
         }))
 
-        if (selectedSites.length > 1) {
-          console.log("[v0] Creating multiple cost estimates for sites:", selectedSites.length)
-          console.log("[v0] Sites data:", sitesData)
+        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+          startDate,
+          endDate,
+        })
 
-          // Create separate cost estimates for each site
-          const costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
-            startDate,
-            endDate,
-          })
-
-          console.log("[v0] Created cost estimate IDs:", costEstimateIds)
-          console.log("[v0] Redirecting to:", `/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`)
-
-          toast({
-            title: "Multiple Cost Estimates Created",
-            description: `${costEstimateIds.length} cost estimates have been created successfully.`,
-          })
-          router.push(`/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`)
-        } else {
-          // Single site - use existing logic
-          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
-            startDate,
-            endDate,
-          })
-
-          toast({
-            title: "Cost Estimate Created",
-            description: "Your cost estimate has been created successfully.",
-          })
-          router.push(`/sales/cost-estimates/${newCostEstimateId}`)
-        }
+        toast({
+          title: "Cost Estimate Created",
+          description: "Your cost estimate has been created successfully.",
+        })
+        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       } else if (actionAfterDateSelection === "quotation") {
         // Prepare products for quotation
         const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
@@ -842,39 +821,16 @@ function SalesDashboardContent() {
           type: site.type || "Unknown",
         }))
 
-        if (selectedSites.length > 1) {
-          console.log("[v0] Creating multiple cost estimates (skip dates) for sites:", selectedSites.length)
+        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+          startDate: undefined,
+          endDate: undefined,
+        })
 
-          // Create separate cost estimates for each site
-          const costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
-            startDate: undefined,
-            endDate: undefined,
-          })
-
-          console.log("[v0] Created cost estimate IDs (skip dates):", costEstimateIds)
-          console.log(
-            "[v0] Redirecting to (skip dates):",
-            `/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`,
-          )
-
-          toast({
-            title: "Multiple Cost Estimates Created",
-            description: `${costEstimateIds.length} cost estimates have been created successfully.`,
-          })
-          router.push(`/sales/cost-estimates/multiple?ids=${costEstimateIds.join(",")}`)
-        } else {
-          // Single site - use existing logic
-          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
-            startDate: undefined,
-            endDate: undefined,
-          })
-
-          toast({
-            title: "Cost Estimate Created",
-            description: "Your cost estimate has been created successfully without dates.",
-          })
-          router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
-        }
+        toast({
+          title: "Cost Estimate Created",
+          description: "Your cost estimate has been created successfully without dates.",
+        })
+        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       }
     } catch (error) {
       console.error("Error creating cost estimate:", error)
