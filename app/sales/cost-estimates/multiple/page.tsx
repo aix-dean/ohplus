@@ -10,21 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, DownloadIcon, Send, CheckCircle, XCircle, FileText, Loader2, MapPin, Save, Eye } from "lucide-react"
 import { format } from "date-fns"
-import type { CostEstimateLineItem } from "@/lib/types/cost-estimate"
-
-// Mock data structure for multiple sites
-interface SiteCostEstimate {
-  id: string
-  siteId: string
-  siteName: string
-  location: string
-  title: string
-  status: "draft" | "sent" | "viewed" | "approved" | "rejected"
-  totalAmount: number
-  lineItems: CostEstimateLineItem[]
-  notes?: string
-  createdAt: Date
-}
+import type { CostEstimate } from "@/lib/types/cost-estimate"
+import { getCostEstimate, sendCostEstimateEmail, updateCostEstimate } from "@/lib/cost-estimate-service"
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -35,141 +22,72 @@ const generateQRCodeUrl = (costEstimateId: string) => {
 export default function MultipleSitesCostEstimatesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const { toast } = useToast()
 
-  const [siteCostEstimates, setSiteCostEstimates] = useState<SiteCostEstimate[]>([])
+  const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [sending, setSending] = useState(false)
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set())
 
-  // Mock data - in real implementation, this would come from API
   useEffect(() => {
-    const mockData: SiteCostEstimate[] = [
-      {
-        id: "ce-site-1",
-        siteId: "site-001",
-        siteName: "EDSA Guadalupe Billboard",
-        location: "EDSA Guadalupe, Makati City",
-        title: "Q1 2024 Campaign - EDSA Guadalupe",
-        status: "draft",
-        totalAmount: 450000,
-        createdAt: new Date(),
-        lineItems: [
-          {
-            id: "item-1",
-            description: "Billboard Space Rental (30 days)",
-            quantity: 1,
-            unitPrice: 300000,
-            total: 300000,
-            category: "media_cost",
-          },
-          {
-            id: "item-2",
-            description: "Creative Design & Production",
-            quantity: 1,
-            unitPrice: 75000,
-            total: 75000,
-            category: "production_cost",
-          },
-          {
-            id: "item-3",
-            description: "Installation & Setup",
-            quantity: 1,
-            unitPrice: 50000,
-            total: 50000,
-            category: "installation_cost",
-          },
-        ],
-        notes: "Premium location with high visibility during rush hours.",
-      },
-      {
-        id: "ce-site-2",
-        siteId: "site-002",
-        siteName: "BGC Central Square LED",
-        location: "Bonifacio Global City, Taguig",
-        title: "Q1 2024 Campaign - BGC Central",
-        status: "draft",
-        totalAmount: 680000,
-        createdAt: new Date(),
-        lineItems: [
-          {
-            id: "item-4",
-            description: "LED Display Rental (30 days)",
-            quantity: 1,
-            unitPrice: 500000,
-            total: 500000,
-            category: "media_cost",
-          },
-          {
-            id: "item-5",
-            description: "Digital Content Creation",
-            quantity: 1,
-            unitPrice: 100000,
-            total: 100000,
-            category: "production_cost",
-          },
-          {
-            id: "item-6",
-            description: "Technical Setup & Monitoring",
-            quantity: 1,
-            unitPrice: 80000,
-            total: 80000,
-            category: "installation_cost",
-          },
-        ],
-        notes: "Digital LED display with premium positioning in BGC business district.",
-      },
-      {
-        id: "ce-site-3",
-        siteId: "site-003",
-        siteName: "Ortigas Transit Billboard",
-        location: "Ortigas Avenue, Pasig City",
-        title: "Q1 2024 Campaign - Ortigas Transit",
-        status: "draft",
-        totalAmount: 320000,
-        createdAt: new Date(),
-        lineItems: [
-          {
-            id: "item-7",
-            description: "Transit Billboard Space (30 days)",
-            quantity: 1,
-            unitPrice: 220000,
-            total: 220000,
-            category: "media_cost",
-          },
-          {
-            id: "item-8",
-            description: "Weather-resistant Printing",
-            quantity: 1,
-            unitPrice: 60000,
-            total: 60000,
-            category: "production_cost",
-          },
-          {
-            id: "item-9",
-            description: "Installation & Maintenance",
-            quantity: 1,
-            unitPrice: 40000,
-            total: 40000,
-            category: "installation_cost",
-          },
-        ],
-        notes: "Strategic location near major transit hub with consistent foot traffic.",
-      },
-    ]
+    const fetchCostEstimates = async () => {
+      const idsParam = searchParams.get("ids")
+      if (!idsParam) {
+        toast({
+          title: "Error",
+          description: "No cost estimate IDs provided.",
+          variant: "destructive",
+        })
+        router.push("/sales/dashboard")
+        return
+      }
 
-    // Simulate loading
-    setTimeout(() => {
-      setSiteCostEstimates(mockData)
-      setLoading(false)
-      // Expand all sites by default
-      setExpandedSites(new Set(mockData.map((site) => site.id)))
-    }, 1000)
-  }, [])
+      const ids = idsParam.split(",")
+      setLoading(true)
 
-  const getStatusConfig = (status: SiteCostEstimate["status"]) => {
+      try {
+        const estimates = await Promise.all(
+          ids.map(async (id) => {
+            const estimate = await getCostEstimate(id.trim())
+            return estimate
+          }),
+        )
+
+        // Filter out null results
+        const validEstimates = estimates.filter((est): est is CostEstimate => est !== null)
+
+        if (validEstimates.length === 0) {
+          toast({
+            title: "Error",
+            description: "No valid cost estimates found.",
+            variant: "destructive",
+          })
+          router.push("/sales/dashboard")
+          return
+        }
+
+        setCostEstimates(validEstimates)
+        // Expand all sites by default
+        setExpandedSites(new Set(validEstimates.map((est) => est.id)))
+      } catch (error) {
+        console.error("Error fetching cost estimates:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load cost estimates.",
+          variant: "destructive",
+        })
+        router.push("/sales/dashboard")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCostEstimates()
+  }, [searchParams, toast, router])
+
+  const getStatusConfig = (status: CostEstimate["status"]) => {
     switch (status) {
       case "draft":
         return {
@@ -223,13 +141,21 @@ export default function MultipleSitesCostEstimatesPage() {
   const handleSaveAll = async () => {
     setSaving(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Update all cost estimates to ensure they're saved
+      await Promise.all(
+        costEstimates.map(async (estimate) => {
+          await updateCostEstimate(estimate.id, {
+            updatedAt: new Date(),
+          })
+        }),
+      )
+
       toast({
         title: "Success",
         description: "All cost estimates have been saved as drafts.",
       })
     } catch (error) {
+      console.error("Error saving cost estimates:", error)
       toast({
         title: "Error",
         description: "Failed to save cost estimates.",
@@ -241,17 +167,39 @@ export default function MultipleSitesCostEstimatesPage() {
   }
 
   const handleSendAll = async () => {
+    if (!costEstimates.length || !costEstimates[0].client?.email) {
+      toast({
+        title: "Error",
+        description: "Client email not found.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSending(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // Send all cost estimates to the client
+      await Promise.all(
+        costEstimates.map(async (estimate) => {
+          await sendCostEstimateEmail(estimate, estimate.client.email, estimate.client, userData?.email)
+
+          // Update status to sent
+          await updateCostEstimate(estimate.id, {
+            status: "sent",
+            updatedAt: new Date(),
+          })
+        }),
+      )
+
       toast({
         title: "Success",
         description: "All cost estimates have been sent to the client.",
       })
-      // Update status of all sites
-      setSiteCostEstimates((prev) => prev.map((site) => ({ ...site, status: "sent" as const })))
+
+      // Update local state
+      setCostEstimates((prev) => prev.map((est) => ({ ...est, status: "sent" as const })))
     } catch (error) {
+      console.error("Error sending cost estimates:", error)
       toast({
         title: "Error",
         description: "Failed to send cost estimates.",
@@ -262,7 +210,34 @@ export default function MultipleSitesCostEstimatesPage() {
     }
   }
 
-  const totalAmount = siteCostEstimates.reduce((sum, site) => sum + site.totalAmount, 0)
+  const totalAmount = costEstimates.reduce((sum, estimate) => sum + estimate.totalAmount, 0)
+
+  const getSiteName = (estimate: CostEstimate): string => {
+    // Try to extract site name from the first line item that looks like a site
+    const siteLineItem = estimate.lineItems.find(
+      (item) =>
+        item.category === "LED Billboard Rental" ||
+        item.category === "Static Billboard Rental" ||
+        item.notes?.includes("Location:"),
+    )
+
+    if (siteLineItem) {
+      return siteLineItem.description
+    }
+
+    // Fallback to title
+    return estimate.title.replace("Cost Estimate for ", "").split(" - ")[0]
+  }
+
+  const getSiteLocation = (estimate: CostEstimate): string => {
+    const siteLineItem = estimate.lineItems.find((item) => item.notes?.includes("Location:"))
+
+    if (siteLineItem?.notes) {
+      return siteLineItem.notes.replace("Location: ", "")
+    }
+
+    return "Location not specified"
+  }
 
   if (loading) {
     return (
@@ -270,6 +245,22 @@ export default function MultipleSitesCostEstimatesPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-gray-600">Loading multiple site cost estimates...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (costEstimates.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Cost Estimates Found</h2>
+          <p className="text-gray-600 mb-4">The cost estimates you're looking for could not be loaded.</p>
+          <Button onClick={() => router.push("/sales/dashboard")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
         </div>
       </div>
     )
@@ -288,7 +279,12 @@ export default function MultipleSitesCostEstimatesPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Multiple Sites Cost Estimates</h1>
               <p className="text-gray-600">
-                {siteCostEstimates.length} sites • Total: ₱{totalAmount.toLocaleString()}
+                {costEstimates.length} sites • Total: ₱{totalAmount.toLocaleString()}
+                {costEstimates[0]?.client && (
+                  <span className="ml-2">
+                    • Client: {costEstimates[0].client.company || costEstimates[0].client.name}
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -326,17 +322,20 @@ export default function MultipleSitesCostEstimatesPage() {
       {/* Sites Overview Cards */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {siteCostEstimates.map((site) => {
-            const statusConfig = getStatusConfig(site.status)
+          {costEstimates.map((estimate) => {
+            const statusConfig = getStatusConfig(estimate.status)
+            const siteName = getSiteName(estimate)
+            const siteLocation = getSiteLocation(estimate)
+
             return (
-              <Card key={site.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <Card key={estimate.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">{site.siteName}</h3>
+                      <h3 className="font-semibold text-gray-900 mb-1">{siteName}</h3>
                       <p className="text-sm text-gray-600 flex items-center">
                         <MapPin className="h-4 w-4 mr-1" />
-                        {site.location}
+                        {siteLocation}
                       </p>
                     </div>
                     <Badge className={`${statusConfig.color} border font-medium px-2 py-1`}>
@@ -347,20 +346,26 @@ export default function MultipleSitesCostEstimatesPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Total Amount:</span>
-                      <span className="font-semibold">₱{site.totalAmount.toLocaleString()}</span>
+                      <span className="font-semibold">₱{estimate.totalAmount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Line Items:</span>
-                      <span>{site.lineItems.length} items</span>
+                      <span>{estimate.lineItems.length} items</span>
                     </div>
+                    {estimate.costEstimateNumber && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">CE Number:</span>
+                        <span className="font-mono text-xs">{estimate.costEstimateNumber}</span>
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full mt-4 bg-transparent"
-                    onClick={() => toggleSiteExpansion(site.id)}
+                    onClick={() => toggleSiteExpansion(estimate.id)}
                   >
-                    {expandedSites.has(site.id) ? "Hide Details" : "View Details"}
+                    {expandedSites.has(estimate.id) ? "Hide Details" : "View Details"}
                   </Button>
                 </CardContent>
               </Card>
@@ -369,23 +374,28 @@ export default function MultipleSitesCostEstimatesPage() {
         </div>
       </div>
 
-      {/* Detailed Cost Estimate Documents */}
-      <div className="max-w-7xl mx-auto space-y-8">
-        {siteCostEstimates.map((site) => {
-          const statusConfig = getStatusConfig(site.status)
-          const isExpanded = expandedSites.has(site.id)
+      {/* Detailed Cost Estimate Documents - Each as separate page */}
+      <div className="max-w-7xl mx-auto space-y-12">
+        {costEstimates.map((estimate, index) => {
+          const statusConfig = getStatusConfig(estimate.status)
+          const isExpanded = expandedSites.has(estimate.id)
+          const siteName = getSiteName(estimate)
+          const siteLocation = getSiteLocation(estimate)
 
           if (!isExpanded) return null
 
           return (
-            <div key={site.id} className="bg-white shadow-md rounded-sm overflow-hidden">
+            <div
+              key={estimate.id}
+              className={`bg-white shadow-md rounded-sm overflow-hidden ${index > 0 ? "page-break-before" : ""}`}
+            >
               {/* Document Header */}
               <div className="border-b-2 border-blue-600 p-6 sm:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
                   <div>
                     <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h2>
                     <p className="text-sm text-gray-500 flex items-center gap-2">
-                      {site.id}
+                      {estimate.costEstimateNumber || estimate.id}
                       <Badge className={`${statusConfig.color} border font-medium px-2 py-1`}>
                         {statusConfig.icon}
                         <span className="ml-1">{statusConfig.label}</span>
@@ -397,7 +407,7 @@ export default function MultipleSitesCostEstimatesPage() {
                     <div className="flex flex-col items-center">
                       <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                         <img
-                          src={generateQRCodeUrl(site.id) || "/placeholder.svg"}
+                          src={generateQRCodeUrl(estimate.id) || "/placeholder.svg"}
                           alt="QR Code for cost estimate view"
                           className="w-20 h-20"
                         />
@@ -411,6 +421,45 @@ export default function MultipleSitesCostEstimatesPage() {
 
               {/* Document Content */}
               <div className="p-6 sm:p-8">
+                {/* Client Information */}
+                {estimate.client && (
+                  <div className="mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                      Client Information
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500 mb-2">Company</Label>
+                        <p className="text-base font-medium text-gray-900">{estimate.client.company}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500 mb-2">Contact Person</Label>
+                        <p className="text-base text-gray-900">{estimate.client.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500 mb-2">Email</Label>
+                        <p className="text-base text-gray-900">{estimate.client.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
+                        <p className="text-base text-gray-900">{estimate.client.phone || "N/A"}</p>
+                      </div>
+                      {estimate.client.designation && (
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500 mb-2">Designation</Label>
+                          <p className="text-base text-gray-900">{estimate.client.designation}</p>
+                        </div>
+                      )}
+                      {estimate.client.industry && (
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500 mb-2">Industry</Label>
+                          <p className="text-base text-gray-900">{estimate.client.industry}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Site Information */}
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
@@ -419,23 +468,43 @@ export default function MultipleSitesCostEstimatesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Site Name</Label>
-                      <p className="text-base font-medium text-gray-900">{site.siteName}</p>
+                      <p className="text-base font-medium text-gray-900">{siteName}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Location</Label>
                       <p className="text-base text-gray-900 flex items-center">
                         <MapPin className="h-4 w-4 mr-2 text-gray-400" />
-                        {site.location}
+                        {siteLocation}
                       </p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Campaign Title</Label>
-                      <p className="text-base font-medium text-gray-900">{site.title}</p>
+                      <p className="text-base font-medium text-gray-900">{estimate.title}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Created Date</Label>
-                      <p className="text-base text-gray-900">{format(site.createdAt, "PPP")}</p>
+                      <p className="text-base text-gray-900">
+                        {estimate.createdAt ? format(estimate.createdAt, "PPP") : "N/A"}
+                      </p>
                     </div>
+                    {estimate.startDate && estimate.endDate && (
+                      <>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500 mb-2">Campaign Start</Label>
+                          <p className="text-base text-gray-900">{format(estimate.startDate, "PPP")}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500 mb-2">Campaign End</Label>
+                          <p className="text-base text-gray-900">{format(estimate.endDate, "PPP")}</p>
+                        </div>
+                      </>
+                    )}
+                    {estimate.durationDays && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500 mb-2">Duration</Label>
+                        <p className="text-base text-gray-900">{estimate.durationDays} days</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -463,10 +532,11 @@ export default function MultipleSitesCostEstimatesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {site.lineItems.map((item, index) => (
+                        {estimate.lineItems.map((item, index) => (
                           <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                             <td className="py-3 px-4 border-b border-gray-200">
                               <div className="font-medium text-gray-900">{item.description}</div>
+                              {item.notes && <div className="text-xs text-gray-500 mt-1">{item.notes}</div>}
                             </td>
                             <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
                             <td className="py-3 px-4 text-right border-b border-gray-200">
@@ -482,7 +552,7 @@ export default function MultipleSitesCostEstimatesPage() {
                             Site Total:
                           </td>
                           <td className="py-3 px-4 text-right font-bold text-blue-600">
-                            ₱{site.totalAmount.toLocaleString()}
+                            ₱{estimate.totalAmount.toLocaleString()}
                           </td>
                         </tr>
                       </tbody>
@@ -491,13 +561,13 @@ export default function MultipleSitesCostEstimatesPage() {
                 </div>
 
                 {/* Notes */}
-                {site.notes && (
+                {estimate.notes && (
                   <div className="mb-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Site Notes
+                      Additional Notes
                     </h3>
                     <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                      <p className="text-sm text-gray-700 leading-relaxed">{site.notes}</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{estimate.notes}</p>
                     </div>
                   </div>
                 )}
@@ -523,7 +593,12 @@ export default function MultipleSitesCostEstimatesPage() {
               <div>
                 <h3 className="text-lg font-semibold text-blue-900 mb-1">Campaign Summary</h3>
                 <p className="text-blue-700">
-                  {siteCostEstimates.length} sites • Total estimated cost: ₱{totalAmount.toLocaleString()}
+                  {costEstimates.length} sites • Total estimated cost: ₱{totalAmount.toLocaleString()}
+                  {costEstimates[0]?.client && (
+                    <span className="block sm:inline sm:ml-2">
+                      Client: {costEstimates[0].client.company || costEstimates[0].client.name}
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center space-x-3">
@@ -531,7 +606,13 @@ export default function MultipleSitesCostEstimatesPage() {
                   <DownloadIcon className="h-4 w-4 mr-2" />
                   Download All PDFs
                 </Button>
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    // Expand all sites for preview
+                    setExpandedSites(new Set(costEstimates.map((est) => est.id)))
+                  }}
+                >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview All
                 </Button>
