@@ -47,25 +47,56 @@ export default function MultipleSitesCostEstimatesPage() {
       const ids = idsParam.split(",")
       setLoading(true)
 
+      const fetchWithRetry = async (id: string, maxRetries = 3, delay = 1000): Promise<CostEstimate | null> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          console.log(`[v0] Fetching cost estimate ${id}, attempt ${attempt}/${maxRetries}`)
+
+          const estimate = await getCostEstimate(id.trim())
+          if (estimate) {
+            console.log(`[v0] Successfully fetched cost estimate ${id}`)
+            return estimate
+          }
+
+          if (attempt < maxRetries) {
+            console.log(`[v0] Cost estimate ${id} not found, retrying in ${delay}ms...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            delay *= 1.5 // Exponential backoff
+          }
+        }
+
+        console.log(`[v0] Failed to fetch cost estimate ${id} after ${maxRetries} attempts`)
+        return null
+      }
+
       try {
         const estimates = await Promise.all(
           ids.map(async (id) => {
-            const estimate = await getCostEstimate(id.trim())
-            return estimate
+            return await fetchWithRetry(id.trim())
           }),
         )
 
         // Filter out null results
         const validEstimates = estimates.filter((est): est is CostEstimate => est !== null)
 
+        console.log(`[v0] Successfully loaded ${validEstimates.length}/${ids.length} cost estimates`)
+
         if (validEstimates.length === 0) {
           toast({
             title: "Error",
-            description: "No valid cost estimates found.",
+            description: "No valid cost estimates found. They may still be processing.",
             variant: "destructive",
           })
           router.push("/sales/dashboard")
           return
+        }
+
+        // Show warning if some estimates couldn't be loaded
+        if (validEstimates.length < ids.length) {
+          toast({
+            title: "Warning",
+            description: `Only ${validEstimates.length} of ${ids.length} cost estimates could be loaded.`,
+            variant: "destructive",
+          })
         }
 
         setCostEstimates(validEstimates)
@@ -75,7 +106,7 @@ export default function MultipleSitesCostEstimatesPage() {
         console.error("Error fetching cost estimates:", error)
         toast({
           title: "Error",
-          description: "Failed to load cost estimates.",
+          description: "Failed to load cost estimates. Please try again.",
           variant: "destructive",
         })
         router.push("/sales/dashboard")
