@@ -5,22 +5,25 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { CheckCircle2, Clock, XCircle, Info, CalendarDays, FileCheck, Loader2 } from "lucide-react"
-import { getCampaigns, type Campaign, type CampaignTimelineEvent } from "@/lib/campaign-service"
+import { Clock, XCircle, Info, Loader2, BookOpen, Briefcase, Calendar } from "lucide-react"
+import { bookingService, type Booking } from "@/lib/booking-service"
+import { getJobOrdersByCompanyId, type JobOrder } from "@/lib/job-order-service"
+import { getSalesEvents, type SalesEvent } from "@/lib/planner-service"
+import { useAuth } from "@/contexts/auth-context"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface BulletinBoardActivity {
   id: string
-  campaignId: string
-  campaignName: string
-  status: Campaign["status"] // Overall campaign status
-  description: string // From timeline event
-  timestamp: Date // From timeline event
-  user: { name: string; avatar: string } // From timeline event
-  type: CampaignTimelineEvent["type"] // For icon mapping
+  title: string
+  description: string
+  timestamp: Date
+  user: { name: string; avatar: string }
+  type: "booking" | "job_order" | "planner"
+  status?: string
+  badge?: string
+  metadata?: any
 }
 
-// Helper to format date/time
 const formatDateTime = (date: Date) => {
   return date.toLocaleString("en-US", {
     year: "numeric",
@@ -32,115 +35,172 @@ const formatDateTime = (date: Date) => {
   })
 }
 
-// Helper to get status badge variant
-const getStatusBadgeVariant = (status: Campaign["status"]) => {
-  switch (status) {
-    case "campaign_completed":
-    case "proposal_accepted":
-    case "cost_estimate_approved":
-    case "quotation_accepted":
-    case "booking_confirmed":
-      return "default" // Greenish or primary
-    case "campaign_active":
-      return "secondary" // Blueish or secondary
-    case "proposal_draft":
-    case "proposal_sent":
-    case "cost_estimate_pending":
-    case "cost_estimate_sent":
-    case "quotation_pending":
-    case "quotation_sent":
-      return "outline" // Light gray
-    case "proposal_declined":
-    case "cost_estimate_declined":
-    case "quotation_declined":
-    case "campaign_cancelled":
-      return "destructive" // Red
-    default:
-      return "secondary"
+const getStatusBadgeVariant = (status: string, type: BulletinBoardActivity["type"]) => {
+  if (type === "booking") {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "default"
+      case "pending":
+        return "secondary"
+      case "cancelled":
+        return "destructive"
+      default:
+        return "outline"
+    }
+  } else if (type === "job_order") {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "default"
+      case "in_progress":
+        return "secondary"
+      case "pending":
+        return "outline"
+      case "cancelled":
+        return "destructive"
+      default:
+        return "outline"
+    }
+  } else if (type === "planner") {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "default"
+      case "scheduled":
+        return "secondary"
+      case "cancelled":
+        return "destructive"
+      default:
+        return "outline"
+    }
   }
+  return "outline"
 }
 
-// Helper to get icon for activity type
-const getActivityIcon = (type: CampaignTimelineEvent["type"]) => {
+const getActivityIcon = (type: BulletinBoardActivity["type"]) => {
   switch (type) {
-    case "proposal_created":
-    case "cost_estimate_created":
-    case "quotation_created":
-      return <FileCheck className="h-4 w-4 text-purple-500" />
-    case "proposal_sent":
-    case "cost_estimate_sent":
-    case "quotation_sent":
-      return <Info className="h-4 w-4 text-blue-500" />
-    case "proposal_accepted":
-    case "cost_estimate_approved":
-    case "quotation_accepted":
-    case "booking_confirmed":
-    case "campaign_completed":
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />
-    case "proposal_declined":
-    case "cost_estimate_declined":
-    case "quotation_declined":
-    case "campaign_cancelled":
-      return <XCircle className="h-4 w-4 text-red-500" />
-    case "campaign_started":
-      return <CalendarDays className="h-4 w-4 text-orange-500" />
-    case "note_added":
-      return <Info className="h-4 w-4 text-gray-500" />
+    case "booking":
+      return <BookOpen className="h-4 w-4 text-blue-500" />
+    case "job_order":
+      return <Briefcase className="h-4 w-4 text-purple-500" />
+    case "planner":
+      return <Calendar className="h-4 w-4 text-green-500" />
     default:
       return <Info className="h-4 w-4 text-gray-500" />
   }
 }
 
 export default function SalesBulletinBoardPage() {
+  const { user } = useAuth()
   const [activities, setActivities] = useState<BulletinBoardActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchCampaignActivities = async () => {
+    const fetchLatestActivities = async () => {
+      if (!user?.uid) return
+
       try {
         setLoading(true)
-        const campaigns = await getCampaigns()
         const allActivities: BulletinBoardActivity[] = []
 
-        campaigns.forEach((campaign) => {
-          campaign.timeline.forEach((event) => {
+        // Fetch latest bookings
+        try {
+          const bookings = await bookingService.getCompletedBookings(user.company_id || user.uid, {
+            page: 1,
+            pageSize: 10,
+          })
+
+          bookings.forEach((booking: Booking) => {
+            const createdDate = booking.created?.toDate ? booking.created.toDate() : new Date(booking.created)
             allActivities.push({
-              id: event.id,
-              campaignId: campaign.id,
-              campaignName: campaign.title,
-              status: campaign.status, // Use overall campaign status for the badge
-              description: event.title, // Use event title as description
-              timestamp: event.timestamp,
+              id: `booking-${booking.id}`,
+              title: `Booking: ${booking.username}`,
+              description: `${booking.type} - ${booking.product_owner} (₱${booking.total_cost?.toLocaleString()})`,
+              timestamp: createdDate,
               user: {
-                name: event.userName,
-                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.userName)}`, // Dynamic avatar
+                name: booking.username || "Unknown Client",
+                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(booking.username || "Client")}`,
               },
-              type: event.type,
+              type: "booking",
+              status: booking.status,
+              badge: booking.status?.replace(/_/g, " "),
+              metadata: booking,
             })
           })
-        })
+        } catch (bookingError) {
+          console.error("Error fetching bookings:", bookingError)
+        }
+
+        // Fetch latest job orders
+        try {
+          const jobOrders = await getJobOrdersByCompanyId(user.company_id || user.uid)
+
+          jobOrders.slice(0, 10).forEach((jobOrder: JobOrder) => {
+            const createdDate = jobOrder.created?.toDate ? jobOrder.created.toDate() : new Date(jobOrder.created)
+            allActivities.push({
+              id: `job_order-${jobOrder.id}`,
+              title: `Job Order: ${jobOrder.joNumber}`,
+              description: `${jobOrder.joType} - ${jobOrder.siteName} (Assigned to: ${jobOrder.assignTo})`,
+              timestamp: createdDate,
+              user: {
+                name: jobOrder.requestedBy || "Unknown User",
+                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(jobOrder.requestedBy || "User")}`,
+              },
+              type: "job_order",
+              status: jobOrder.status,
+              badge: jobOrder.status?.replace(/_/g, " "),
+              metadata: jobOrder,
+            })
+          })
+        } catch (jobOrderError) {
+          console.error("Error fetching job orders:", jobOrderError)
+        }
+
+        // Fetch latest planner events
+        try {
+          const plannerEvents = await getSalesEvents(user.uid)
+
+          plannerEvents.slice(0, 10).forEach((event: SalesEvent) => {
+            const eventDate = event.start instanceof Date ? event.start : event.start.toDate()
+            allActivities.push({
+              id: `planner-${event.id}`,
+              title: `Event: ${event.title}`,
+              description: `${event.type} with ${event.clientName} at ${event.location}`,
+              timestamp: eventDate,
+              user: {
+                name: event.clientName || "Unknown Client",
+                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
+              },
+              type: "planner",
+              status: event.status,
+              badge: event.status?.replace(/_/g, " "),
+              metadata: event,
+            })
+          })
+        } catch (plannerError) {
+          console.error("Error fetching planner events:", plannerError)
+        }
 
         // Sort activities by timestamp in descending order (latest first)
         allActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 
-        setActivities(allActivities)
+        // Take only the latest 20 activities
+        setActivities(allActivities.slice(0, 20))
       } catch (err) {
-        console.error("Failed to fetch campaign activities:", err)
+        console.error("Failed to fetch bulletin board activities:", err)
         setError("Failed to load bulletin board. Please try again.")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchCampaignActivities()
-  }, [])
+    fetchLatestActivities()
+  }, [user])
 
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:gap-6">
         <h1 className="text-xl md:text-2xl font-bold">Sales Bulletin Board</h1>
-        <p className="text-gray-600">Stay updated with the latest project campaign statuses and activities.</p>
+        <p className="text-gray-600">Stay updated with the latest bookings, job orders, and planner activities.</p>
 
         <Card className="flex-1">
           <CardHeader>
@@ -169,10 +229,12 @@ export default function SalesBulletinBoardPage() {
                       <div className="flex-shrink-0 pt-1">{getActivityIcon(activity.type)}</div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-gray-900">{activity.campaignName}</h3>
-                          <Badge variant={getStatusBadgeVariant(activity.status)}>
-                            {activity.status.replace(/_/g, " ")}
-                          </Badge>
+                          <h3 className="font-medium text-gray-900">{activity.title}</h3>
+                          {activity.badge && (
+                            <Badge variant={getStatusBadgeVariant(activity.status || "", activity.type)}>
+                              {activity.badge}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-700 mt-1">{activity.description}</p>
                         <div className="flex items-center text-xs text-gray-500 mt-2">
