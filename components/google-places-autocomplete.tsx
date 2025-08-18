@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { MapPin, Loader2 } from "lucide-react"
+import { getGoogleMapsScriptUrl } from "@/lib/actions/google-maps"
 
 interface GooglePlacesAutocompleteProps {
   value: string
@@ -41,7 +41,7 @@ export function GooglePlacesAutocomplete({
   const [geocoder, setGeocoder] = useState<any>(null)
 
   useEffect(() => {
-    const loadGoogleMaps = () => {
+    const loadGoogleMaps = async () => {
       if (window.google && window.google.maps) {
         setIsLoaded(true)
         setIsLoading(false)
@@ -59,17 +59,24 @@ export function GooglePlacesAutocomplete({
         return
       }
 
-      const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`
-      script.async = true
-      script.defer = true
+      try {
+        const scriptUrl = await getGoogleMapsScriptUrl()
 
-      window.initMap = () => {
-        setIsLoaded(true)
+        const script = document.createElement("script")
+        script.src = scriptUrl
+        script.async = true
+        script.defer = true
+
+        window.initMap = () => {
+          setIsLoaded(true)
+          setIsLoading(false)
+        }
+
+        document.head.appendChild(script)
+      } catch (error) {
+        console.error("Failed to load Google Maps:", error)
         setIsLoading(false)
       }
-
-      document.head.appendChild(script)
     }
 
     loadGoogleMaps()

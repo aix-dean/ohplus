@@ -143,7 +143,6 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
   )
 }
 
-// Replace the existing LEDSiteCard component with this updated version
 function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
@@ -180,4 +179,48 @@ function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateRe
       }
     }
 
-    fetch
+    fetchProductAssignments()
+  }, [product.id])
+
+  return (
+    <div
+      className="bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
+      <div className="aspect-video bg-gray-100 rounded-t-lg overflow-hidden">
+        <img
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "LED Site"}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/led-billboard-1.png"
+          }}
+        />
+      </div>
+      <div className="p-4">
+        <h3 className="font-medium text-sm mb-1 truncate">{product.name || "Unnamed Site"}</h3>
+        <p className="text-xs text-gray-500 mb-2 truncate">{location}</p>
+
+        {/* Service Assignment Status */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs">
+            {isLoadingAssignments ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : activeAssignments.length > 0 ? (
+              <span className="text-green-600 font-medium">
+                {activeAssignments.length} Active Assignment{activeAssignments.length > 1 ? "s" : ""}
+              </span>
+            ) : (
+              <span className="text-gray-400">No Active Assignments</span>
+            )}
+          </div>
+        </div>
+
+        <Button size="sm" variant="outline" className="w-full text-xs bg-transparent" onClick={handleCreateReport}>
+          Create Report
+        </Button>
+      </div>
+    </div>
+  )
+}
