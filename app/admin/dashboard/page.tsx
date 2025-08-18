@@ -198,7 +198,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-treasury-green",
       contentBgColor: "bg-card-content-treasury",
       members: [],
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       id: "it",
