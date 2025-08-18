@@ -59,7 +59,7 @@ export default function TreasuryCollectibleDetailsPage() {
 
       try {
         setLoading(true)
-        const collectibleRef = doc(db, "treasury_collectibles", params.id as string)
+        const collectibleRef = doc(db, "collectibles", params.id as string)
         const docSnapshot = await getDoc(collectibleRef)
 
         if (docSnapshot.exists()) {

@@ -92,7 +92,7 @@ export default function EditTreasuryCollectiblePage() {
 
       try {
         setLoading(true)
-        const collectibleRef = doc(db, "treasury_collectibles", params.id as string)
+        const collectibleRef = doc(db, "collectibles", params.id as string)
         const docSnapshot = await getDoc(collectibleRef)
 
         if (docSnapshot.exists()) {
@@ -222,7 +222,7 @@ export default function EditTreasuryCollectiblePage() {
         collectibleData.next_status = ""
       }
 
-      const collectibleRef = doc(db, "treasury_collectibles", params.id as string)
+      const collectibleRef = doc(db, "collectibles", params.id as string)
       await updateDoc(collectibleRef, collectibleData)
 
       console.log("Treasury collectible updated successfully")

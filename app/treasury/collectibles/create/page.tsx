@@ -244,7 +244,7 @@ export default function CreateTreasuryCollectiblePage() {
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       }
 
-      const docRef = await addDoc(collection(db, "treasury_collectibles"), collectibleData)
+      const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
       console.log("Treasury collectible created with ID:", docRef.id)
 
       // Navigate back to treasury collectibles list

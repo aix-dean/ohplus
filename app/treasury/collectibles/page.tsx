@@ -65,7 +65,7 @@ export default function TreasuryCollectiblesPage() {
 
       try {
         setLoading(true)
-        const collectiblesRef = collection(db, "treasury_collectibles")
+        const collectiblesRef = collection(db, "collectibles")
 
         // Query collectibles for the current user's company
         const q = query(
@@ -120,7 +120,7 @@ export default function TreasuryCollectiblesPage() {
 
   const handleSoftDelete = async (id: string) => {
     try {
-      const collectibleRef = doc(db, "treasury_collectibles", id)
+      const collectibleRef = doc(db, "collectibles", id)
       await updateDoc(collectibleRef, {
         deleted: true,
         updated: serverTimestamp(),
