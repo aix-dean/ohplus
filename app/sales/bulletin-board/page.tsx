@@ -108,6 +108,10 @@ export default function SalesBulletinBoardPage() {
         fiveDaysAgo.setHours(0, 0, 0, 0) // Start of day
         today.setHours(23, 59, 59, 999) // End of day
 
+        const threeDaysAgo = new Date()
+        threeDaysAgo.setDate(today.getDate() - 2) // 3 days including today
+        threeDaysAgo.setHours(0, 0, 0, 0) // Start of day
+
         // Fetch latest bookings
         try {
           const bookings = await bookingService.getCompletedBookings(user.company_id || user.uid, {
@@ -144,7 +148,7 @@ export default function SalesBulletinBoardPage() {
 
           jobOrders.forEach((jobOrder: JobOrder) => {
             const createdDate = jobOrder.created?.toDate ? jobOrder.created.toDate() : new Date(jobOrder.created)
-            if (createdDate >= fiveDaysAgo && createdDate <= today) {
+            if (createdDate >= threeDaysAgo && createdDate <= today) {
               allActivities.push({
                 id: `job_order-${jobOrder.id}`,
                 title: `Job Order: ${jobOrder.joNumber}`,
