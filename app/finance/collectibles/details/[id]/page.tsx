@@ -86,45 +86,6 @@ export default function CollectibleDetailsPage() {
     }).format(amount)
   }
 
-  const formatDate = (dateValue: any): string => {
-    if (!dateValue) return "-"
-
-    try {
-      let date: Date
-
-      // Handle Firebase Timestamp object
-      if (dateValue && typeof dateValue === "object" && dateValue.seconds) {
-        date = new Date(dateValue.seconds * 1000)
-      }
-      // Handle string dates
-      else if (typeof dateValue === "string") {
-        date = new Date(dateValue)
-      }
-      // Handle Date objects
-      else if (dateValue instanceof Date) {
-        date = dateValue
-      } else {
-        return String(dateValue)
-      }
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return String(dateValue)
-      }
-
-      return new Intl.DateTimeFormat("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date)
-    } catch (error) {
-      console.error("Error formatting date:", error)
-      return String(dateValue)
-    }
-  }
-
   const displayValue = (value: string | number | undefined | null): string => {
     if (value === null || value === undefined || value === "" || (typeof value === "string" && value.trim() === "")) {
       return "-"
@@ -229,7 +190,7 @@ export default function CollectibleDetailsPage() {
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Created</label>
-              <p className="text-sm">{formatDate(collectible.created)}</p>
+              <p className="text-sm">{displayValue(collectible.created)}</p>
             </div>
           </CardContent>
         </Card>
@@ -373,7 +334,7 @@ export default function CollectibleDetailsPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Next Collection Date</label>
-                <p className="text-sm">{formatDate(collectible.next_collection_date)}</p>
+                <p className="text-sm">{displayValue(collectible.next_collection_date)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Next Collection Status</label>

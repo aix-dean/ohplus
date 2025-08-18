@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addDays, addMonths, addWeeks, addYears } from "date-fns"
+import { createDepartmentNotifications } from "@/lib/notification-service"
 
 // Define recurrence types
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "yearly"
@@ -233,6 +234,7 @@ export async function getSalesEventById(eventId: string, userId: string): Promis
 export async function createSalesEvent(
   userId: string,
   eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt">,
+  companyId?: string, // Added companyId parameter
 ): Promise<string> {
   try {
     // Convert Date objects to Firestore Timestamps
@@ -259,6 +261,29 @@ export async function createSalesEvent(
     }
 
     const docRef = await addDoc(collection(db, "planner"), newEvent)
+
+    if (companyId) {
+      try {
+        const eventStart = eventData.start instanceof Date ? eventData.start : eventData.start.toDate()
+
+        await createDepartmentNotifications(
+          eventData.title,
+          eventData.type,
+          eventStart,
+          companyId, // Use the provided companyId instead of hardcoded value
+          "Sales",
+          `/sales/planner`,
+        )
+
+        console.log("Department notifications created successfully for event:", docRef.id)
+      } catch (notificationError) {
+        console.error("Error creating department notifications:", notificationError)
+        // Don't throw here - we don't want notification failure to break event creation
+      }
+    } else {
+      console.warn("No company_id provided, skipping notification creation")
+    }
+
     return docRef.id
   } catch (error) {
     console.error("Error creating sales event:", error)
