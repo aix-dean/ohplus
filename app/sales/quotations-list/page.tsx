@@ -488,7 +488,7 @@ export default function SalesQuotationsPage() {
                               ) : (
                                 <>
                                   <CheckCircle className="h-3 w-3 mr-1" />
-                                  Request Invoice
+                                  Quote Signed
                                 </>
                               )}
                             </Button>
