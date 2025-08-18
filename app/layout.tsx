@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
+import { FleetProvider } from "@/contexts/fleet-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -29,11 +30,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
-            <AuthLayout>
-              <div className="flex flex-col h-screen">{children}</div>
-              <AssistantProvider />
-              <Toaster />
-            </AuthLayout>
+            <FleetProvider>
+              <AuthLayout>
+                <div className="flex flex-col h-screen">{children}</div>
+                <AssistantProvider />
+                <Toaster />
+              </AuthLayout>
+            </FleetProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
