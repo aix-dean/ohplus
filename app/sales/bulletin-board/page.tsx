@@ -165,28 +165,34 @@ export default function SalesBulletinBoardPage() {
           console.error("Error fetching job orders:", jobOrderError)
         }
 
-        // Fetch latest planner events
         try {
-          const plannerEvents = await getSalesEvents(user.uid)
+          const plannerEvents = await getSalesEvents(user.company_id || user.uid)
 
-          plannerEvents.forEach((event: SalesEvent) => {
+          // Sort by created date and take only the 5 most recent
+          const sortedPlannerEvents = plannerEvents
+            .sort((a, b) => {
+              const dateA = a.created?.toDate ? a.created.toDate() : new Date(a.created)
+              const dateB = b.created?.toDate ? b.created.toDate() : new Date(b.created)
+              return dateB.getTime() - dateA.getTime()
+            })
+            .slice(0, 5)
+
+          sortedPlannerEvents.forEach((event: SalesEvent) => {
             const createdDate = event.created?.toDate ? event.created.toDate() : new Date(event.created)
-            if (createdDate >= fiveDaysAgo && createdDate <= today) {
-              allActivities.push({
-                id: `planner-${event.id}`,
-                title: `Event: ${event.title}`,
-                description: `${event.type} with ${event.clientName} at ${event.location}`,
-                timestamp: createdDate,
-                user: {
-                  name: event.clientName || "Unknown Client",
-                  avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
-                },
-                type: "planner",
-                status: event.status,
-                badge: event.status?.replace(/_/g, " "),
-                metadata: event,
-              })
-            }
+            allActivities.push({
+              id: `planner-${event.id}`,
+              title: `Event: ${event.title}`,
+              description: `${event.type} with ${event.clientName} at ${event.location}`,
+              timestamp: createdDate,
+              user: {
+                name: event.clientName || "Unknown Client",
+                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
+              },
+              type: "planner",
+              status: event.status,
+              badge: event.status?.replace(/_/g, " "),
+              metadata: event,
+            })
           })
         } catch (plannerError) {
           console.error("Error fetching planner events:", plannerError)
