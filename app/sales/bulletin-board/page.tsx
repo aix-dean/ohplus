@@ -168,8 +168,12 @@ export default function SalesBulletinBoardPage() {
         try {
           const plannerEvents = await getSalesEvents(user.company_id || user.uid)
 
-          // Sort by created date and take only the 5 most recent
+          const currentDate = new Date()
           const sortedPlannerEvents = plannerEvents
+            .filter((event: SalesEvent) => {
+              const endDate = event.end?.toDate ? event.end.toDate() : new Date(event.end)
+              return endDate >= currentDate // Only show events that haven't ended yet
+            })
             .sort((a, b) => {
               const dateA = a.created?.toDate ? a.created.toDate() : new Date(a.created)
               const dateB = b.created?.toDate ? b.created.toDate() : new Date(b.created)
