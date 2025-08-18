@@ -170,13 +170,13 @@ export default function SalesBulletinBoardPage() {
           const plannerEvents = await getSalesEvents(user.uid)
 
           plannerEvents.forEach((event: SalesEvent) => {
-            const eventDate = event.start instanceof Date ? event.start : event.start.toDate()
-            if (eventDate >= fiveDaysAgo && eventDate <= today) {
+            const createdDate = event.created?.toDate ? event.created.toDate() : new Date(event.created)
+            if (createdDate >= fiveDaysAgo && createdDate <= today) {
               allActivities.push({
                 id: `planner-${event.id}`,
                 title: `Event: ${event.title}`,
                 description: `${event.type} with ${event.clientName} at ${event.location}`,
-                timestamp: eventDate,
+                timestamp: createdDate,
                 user: {
                   name: event.clientName || "Unknown Client",
                   avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
