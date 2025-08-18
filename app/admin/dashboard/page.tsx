@@ -198,6 +198,8 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-treasury-green",
       contentBgColor: "bg-card-content-treasury",
       members: [],
+      badgeCount: 2,
+      href: "/treasury", // Added href to link Treasury card to treasury page
       isAvailable: true,
     },
     {
