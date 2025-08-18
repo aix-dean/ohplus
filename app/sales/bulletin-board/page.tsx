@@ -102,29 +102,37 @@ export default function SalesBulletinBoardPage() {
         setLoading(true)
         const allActivities: BulletinBoardActivity[] = []
 
+        const today = new Date()
+        const fiveDaysAgo = new Date()
+        fiveDaysAgo.setDate(today.getDate() - 4) // 5 days including today
+        fiveDaysAgo.setHours(0, 0, 0, 0) // Start of day
+        today.setHours(23, 59, 59, 999) // End of day
+
         // Fetch latest bookings
         try {
           const bookings = await bookingService.getCompletedBookings(user.company_id || user.uid, {
             page: 1,
-            pageSize: 10,
+            pageSize: 50, // Increased to get more data for filtering
           })
 
           bookings.forEach((booking: Booking) => {
             const createdDate = booking.created?.toDate ? booking.created.toDate() : new Date(booking.created)
-            allActivities.push({
-              id: `booking-${booking.id}`,
-              title: `Booking: ${booking.username}`,
-              description: `${booking.type} - ${booking.product_owner} (₱${booking.total_cost?.toLocaleString()})`,
-              timestamp: createdDate,
-              user: {
-                name: booking.username || "Unknown Client",
-                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(booking.username || "Client")}`,
-              },
-              type: "booking",
-              status: booking.status,
-              badge: booking.status?.replace(/_/g, " "),
-              metadata: booking,
-            })
+            if (createdDate >= fiveDaysAgo && createdDate <= today) {
+              allActivities.push({
+                id: `booking-${booking.id}`,
+                title: `Booking: ${booking.username}`,
+                description: `${booking.type} - ${booking.product_owner} (₱${booking.total_cost?.toLocaleString()})`,
+                timestamp: createdDate,
+                user: {
+                  name: booking.username || "Unknown Client",
+                  avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(booking.username || "Client")}`,
+                },
+                type: "booking",
+                status: booking.status,
+                badge: booking.status?.replace(/_/g, " "),
+                metadata: booking,
+              })
+            }
           })
         } catch (bookingError) {
           console.error("Error fetching bookings:", bookingError)
@@ -134,22 +142,24 @@ export default function SalesBulletinBoardPage() {
         try {
           const jobOrders = await getJobOrdersByCompanyId(user.company_id || user.uid)
 
-          jobOrders.slice(0, 10).forEach((jobOrder: JobOrder) => {
+          jobOrders.forEach((jobOrder: JobOrder) => {
             const createdDate = jobOrder.created?.toDate ? jobOrder.created.toDate() : new Date(jobOrder.created)
-            allActivities.push({
-              id: `job_order-${jobOrder.id}`,
-              title: `Job Order: ${jobOrder.joNumber}`,
-              description: `${jobOrder.joType} - ${jobOrder.siteName} (Assigned to: ${jobOrder.assignTo})`,
-              timestamp: createdDate,
-              user: {
-                name: jobOrder.requestedBy || "Unknown User",
-                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(jobOrder.requestedBy || "User")}`,
-              },
-              type: "job_order",
-              status: jobOrder.status,
-              badge: jobOrder.status?.replace(/_/g, " "),
-              metadata: jobOrder,
-            })
+            if (createdDate >= fiveDaysAgo && createdDate <= today) {
+              allActivities.push({
+                id: `job_order-${jobOrder.id}`,
+                title: `Job Order: ${jobOrder.joNumber}`,
+                description: `${jobOrder.joType} - ${jobOrder.siteName} (Assigned to: ${jobOrder.assignTo})`,
+                timestamp: createdDate,
+                user: {
+                  name: jobOrder.requestedBy || "Unknown User",
+                  avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(jobOrder.requestedBy || "User")}`,
+                },
+                type: "job_order",
+                status: jobOrder.status,
+                badge: jobOrder.status?.replace(/_/g, " "),
+                metadata: jobOrder,
+              })
+            }
           })
         } catch (jobOrderError) {
           console.error("Error fetching job orders:", jobOrderError)
@@ -159,22 +169,24 @@ export default function SalesBulletinBoardPage() {
         try {
           const plannerEvents = await getSalesEvents(user.uid)
 
-          plannerEvents.slice(0, 10).forEach((event: SalesEvent) => {
+          plannerEvents.forEach((event: SalesEvent) => {
             const eventDate = event.start instanceof Date ? event.start : event.start.toDate()
-            allActivities.push({
-              id: `planner-${event.id}`,
-              title: `Event: ${event.title}`,
-              description: `${event.type} with ${event.clientName} at ${event.location}`,
-              timestamp: eventDate,
-              user: {
-                name: event.clientName || "Unknown Client",
-                avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
-              },
-              type: "planner",
-              status: event.status,
-              badge: event.status?.replace(/_/g, " "),
-              metadata: event,
-            })
+            if (eventDate >= fiveDaysAgo && eventDate <= today) {
+              allActivities.push({
+                id: `planner-${event.id}`,
+                title: `Event: ${event.title}`,
+                description: `${event.type} with ${event.clientName} at ${event.location}`,
+                timestamp: eventDate,
+                user: {
+                  name: event.clientName || "Unknown Client",
+                  avatar: `/placeholder.svg?height=32&width=32&query=${encodeURIComponent(event.clientName || "Client")}`,
+                },
+                type: "planner",
+                status: event.status,
+                badge: event.status?.replace(/_/g, " "),
+                metadata: event,
+              })
+            }
           })
         } catch (plannerError) {
           console.error("Error fetching planner events:", plannerError)
@@ -183,8 +195,7 @@ export default function SalesBulletinBoardPage() {
         // Sort activities by timestamp in descending order (latest first)
         allActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 
-        // Take only the latest 20 activities
-        setActivities(allActivities.slice(0, 20))
+        setActivities(allActivities)
       } catch (err) {
         console.error("Failed to fetch bulletin board activities:", err)
         setError("Failed to load bulletin board. Please try again.")
@@ -200,7 +211,7 @@ export default function SalesBulletinBoardPage() {
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:gap-6">
         <h1 className="text-xl md:text-2xl font-bold">Sales Bulletin Board</h1>
-        <p className="text-gray-600">Stay updated with the latest bookings, job orders, and planner activities.</p>
+        <p className="text-gray-600">Stay updated with activities from the last 5 days.</p>
 
         <Card className="flex-1">
           <CardHeader>
