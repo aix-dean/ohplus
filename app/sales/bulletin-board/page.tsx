@@ -147,7 +147,7 @@ export default function SalesBulletinBoardPage() {
           const jobOrders = await getJobOrdersByCompanyId(user.company_id || user.uid)
 
           jobOrders.forEach((jobOrder: JobOrder) => {
-            const createdDate = jobOrder.created?.toDate ? jobOrder.created.toDate() : new Date(jobOrder.created)
+            const createdDate = jobOrder.createdAt?.toDate ? jobOrder.createdAt.toDate() : new Date(jobOrder.createdAt)
             if (createdDate >= threeDaysAgo && createdDate <= today) {
               allActivities.push({
                 id: `job_order-${jobOrder.id}`,
