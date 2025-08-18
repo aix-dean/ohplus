@@ -23,8 +23,8 @@ interface CreateCostEstimateOptions {
   notes?: string
   customMessage?: string
   sendEmail?: boolean
-  startDate?: Date // New field
-  endDate?: Date // New field
+  startDate?: Date | undefined // Made startDate and endDate optional and allow undefined
+  endDate?: Date | undefined
   customLineItems?: CostEstimateLineItem[] // Allow passing custom line items
 }
 
@@ -47,12 +47,6 @@ interface CostEstimateSiteData {
   type: string
 }
 
-// Helper function to get Firestore instance, handling client/server environments
-async function getDbInstance(): Promise<any> {
-  // This function is not needed after the updates as db is imported directly
-  return db
-}
-
 // Generate a secure password for cost estimate access
 function generateCostEstimatePassword(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -64,7 +58,7 @@ function generateCostEstimatePassword(): string {
 }
 
 // Calculate duration in days
-function calculateDurationDays(startDate: Date | null, endDate: Date | null): number | null {
+function calculateDurationDays(startDate: Date | null | undefined, endDate: Date | null | undefined): number | null {
   if (startDate && endDate) {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -176,7 +170,7 @@ export async function createDirectCostEstimate(
     if (!options?.customLineItems || options.customLineItems.length === 0) {
       sitesData.forEach((site) => {
         const pricePerDay = site.price / 30
-        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price // Use original price if no duration
+        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price
         lineItems.push({
           id: site.id,
           description: site.name,
@@ -235,7 +229,7 @@ export async function createDirectCostEstimate(
         phone: clientData.phone || "",
         address: clientData.address || "",
         designation: clientData.designation || "",
-        industry: clientData.industry || "", // Ensure industry is included here
+        industry: clientData.industry || "",
       },
       lineItems,
       totalAmount,
@@ -245,8 +239,8 @@ export async function createDirectCostEstimate(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
-      startDate: options?.startDate || null, // Store new dates
-      endDate: options?.endDate || null, // Store new dates
+      startDate: options?.startDate || null,
+      endDate: options?.endDate || null,
       durationDays: durationDays, // Store duration in days
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
@@ -548,5 +542,106 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
   } catch (error) {
     console.error("Error fetching cost estimates by createdBy ID:", error)
     return []
+  }
+}
+
+// Create multiple cost estimates for multiple sites
+export async function createMultipleCostEstimates(
+  clientData: CostEstimateClientData,
+  sitesData: CostEstimateSiteData[],
+  userId: string,
+  options?: CreateCostEstimateOptions,
+): Promise<string[]> {
+  try {
+    const costEstimateIds: string[] = []
+
+    // Create a separate cost estimate for each site
+    for (const site of sitesData) {
+      const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
+      let totalAmount = 0
+      const lineItems: CostEstimateLineItem[] = []
+
+      // Create line item for this specific site
+      const pricePerDay = site.price / 30
+      const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price
+      lineItems.push({
+        id: site.id,
+        description: site.name,
+        quantity: 1,
+        unitPrice: site.price, // Keep original unit price for reference
+        total: calculatedTotalPrice,
+        category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
+        notes: `Location: ${site.location}`,
+      })
+
+      // Add default cost categories for each site
+      lineItems.push({
+        id: `production-cost-${site.id}`,
+        description: "Production Cost (Tarpaulin/LED Content)",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Production",
+        notes: "Estimated cost for content production.",
+      })
+      lineItems.push({
+        id: `installation-cost-${site.id}`,
+        description: "Installation/Dismantling Fees",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Installation",
+        notes: "Estimated cost for installation and dismantling.",
+      })
+      lineItems.push({
+        id: `maintenance-cost-${site.id}`,
+        description: "Maintenance & Monitoring",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Maintenance",
+        notes: "Estimated cost for ongoing maintenance and monitoring.",
+      })
+
+      // Calculate total amount for this site
+      totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
+
+      const costEstimateNumber = `CE${Date.now()}-${site.id.slice(-4)}` // Generate unique CE number for each site
+
+      const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
+        proposalId: null, // No associated proposal
+        costEstimateNumber: costEstimateNumber,
+        title: `Cost Estimate for ${site.name} - ${clientData.company || clientData.name}`,
+        client: {
+          id: clientData.id,
+          name: clientData.name,
+          email: clientData.email,
+          company: clientData.company,
+          phone: clientData.phone || "",
+          address: clientData.address || "",
+          designation: clientData.designation || "",
+          industry: clientData.industry || "",
+        },
+        lineItems,
+        totalAmount,
+        status: "draft",
+        notes: options?.notes || "",
+        customMessage: options?.customMessage || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: userId,
+        startDate: options?.startDate || null,
+        endDate: options?.endDate || null,
+        durationDays: durationDays,
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
+      })
+
+      costEstimateIds.push(newCostEstimateRef.id)
+    }
+
+    return costEstimateIds
+  } catch (error) {
+    console.error("Error creating multiple cost estimates:", error)
+    throw new Error("Failed to create multiple cost estimates.")
   }
 }
