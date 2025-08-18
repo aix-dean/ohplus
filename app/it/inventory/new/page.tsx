@@ -125,7 +125,7 @@ const softwareCategories = [
   "Utility Software",
 ]
 
-const consumablesCategories = ["Papers", "Photo Papers", "Sticker Papers", "Printer Ink"]
+const consumablesCategories = ["Papers", "Photo Papers", "Sticker Papers", "Printer Ink", "Keyboards", "Mouse"]
 
 // Helper function to get categories based on item type
 const getCategoriesForType = (type: "hardware" | "software" | "consumables") => {
