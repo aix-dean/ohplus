@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CheckCircle, Search, X, ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react"
+import { CheckCircle, Search, X, MoreHorizontal } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -37,7 +37,6 @@ export default function SalesQuotationsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -289,18 +288,6 @@ export default function SalesQuotationsPage() {
     }
   }
 
-  const toggleRowExpansion = (quotationId: string) => {
-    setExpandedRows((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(quotationId)) {
-        newSet.delete(quotationId)
-      } else {
-        newSet.add(quotationId)
-      }
-      return newSet
-    })
-  }
-
   const getProjectCompliance = (quotation: any) => {
     const items = [
       { name: "Signed Quotation", status: "completed", file: "Quotation_Fairyskin.jpeg" },
@@ -446,137 +433,116 @@ export default function SalesQuotationsPage() {
                       <TableBody>
                         {paginatedQuotations.map((quotation) => {
                           const compliance = getProjectCompliance(quotation)
-                          const isExpanded = expandedRows.has(quotation.id)
 
                           return (
-                            <>
-                              <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                <TableCell className="py-3">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleRowExpansion(quotation.id)}
-                                    className="p-0 h-auto"
-                                  >
-                                    {isExpanded ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-400" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                                    )}
-                                  </Button>
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 text-sm text-gray-700 cursor-pointer font-medium"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
-                                  {quotation.quotation_number || "N/A"}
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 text-sm text-blue-600 cursor-pointer hover:underline"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
-                                  {quotation.items?.[0]?.name || quotation.product_name || "N/A"}
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 text-sm text-gray-700 cursor-pointer"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
-                                  {quotation.client_name || "N/A"}
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 text-sm text-gray-700 cursor-pointer"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
+                            <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <TableCell className="py-3"></TableCell>
+                              <TableCell
+                                className="py-3 text-sm text-gray-700 cursor-pointer font-medium"
+                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                              >
+                                {quotation.quotation_number || "N/A"}
+                              </TableCell>
+                              <TableCell
+                                className="py-3 text-sm text-blue-600 cursor-pointer hover:underline"
+                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                              >
+                                {quotation.items?.[0]?.name || quotation.product_name || "N/A"}
+                              </TableCell>
+                              <TableCell
+                                className="py-3 text-sm text-gray-700 cursor-pointer"
+                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                              >
+                                {quotation.client_name || "N/A"}
+                              </TableCell>
+                              <TableCell className="py-3 text-sm text-gray-700">
+                                <div className="space-y-2">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">
                                       {compliance.completed}/{compliance.total}
                                     </span>
                                     <div className="w-2 h-2 rounded-full bg-gray-300"></div>
                                   </div>
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 cursor-pointer"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
-                                  <Badge
-                                    variant="outline"
-                                    className={`px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
-                                      quotation.status,
-                                    )}`}
-                                  >
-                                    {quotation.status || "Draft"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell
-                                  className="py-3 text-sm text-gray-700 cursor-pointer"
-                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                >
-                                  {quotation.status === "sent"
-                                    ? `Follow up on ${format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "MMM d, yyyy")}.`
-                                    : "-NA"}
-                                </TableCell>
-                                <TableCell className="py-3">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="p-0 h-auto">
-                                        <MoreHorizontal className="h-4 w-4 text-gray-400" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                                      >
-                                        View Details
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleQuoteSigned(quotation)
-                                        }}
-                                      >
-                                        Mark as Signed
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
 
-                              {isExpanded && (
-                                <TableRow className="bg-gray-50">
-                                  <TableCell colSpan={8} className="py-4 px-6">
-                                    <div className="space-y-3">
-                                      {compliance.items.map((item, index) => (
-                                        <div key={index} className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3">
-                                            {item.status === "completed" ? (
-                                              <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                                                <CheckCircle className="w-3 h-3 text-white" />
-                                              </div>
-                                            ) : (
-                                              <div className="w-4 h-4 rounded-full border-2 border-gray-300"></div>
-                                            )}
-                                            <span className="text-sm text-gray-700">{item.name}</span>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            {item.file && (
-                                              <span className="text-xs text-blue-600 hover:underline cursor-pointer">
-                                                {item.file}
-                                              </span>
-                                            )}
-                                            {item.status === "upload" && (
-                                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                                Upload
-                                              </span>
-                                            )}
-                                            {item.note && <span className="text-xs text-gray-500">{item.note}</span>}
-                                          </div>
+                                  <div className="space-y-1">
+                                    {compliance.items.map((item, index) => (
+                                      <div key={index} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                          {item.status === "completed" ? (
+                                            <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                                              <CheckCircle className="w-2 h-2 text-white" />
+                                            </div>
+                                          ) : (
+                                            <div className="w-3 h-3 rounded-full border border-gray-300"></div>
+                                          )}
+                                          <span className="text-gray-700">{item.name}</span>
                                         </div>
-                                      ))}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              )}
-                            </>
+                                        <div className="flex items-center gap-1">
+                                          {item.file && (
+                                            <span className="text-blue-600 hover:underline cursor-pointer">
+                                              {item.file}
+                                            </span>
+                                          )}
+                                          {item.status === "upload" && (
+                                            <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                              Upload
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {compliance.items.find((item) => item.note) && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {compliance.items.find((item) => item.note)?.note}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className="py-3 cursor-pointer"
+                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className={`px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+                                    quotation.status,
+                                  )}`}
+                                >
+                                  {quotation.status || "Draft"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell
+                                className="py-3 text-sm text-gray-700 cursor-pointer"
+                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                              >
+                                {quotation.status === "sent"
+                                  ? `Follow up on ${format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "MMM d, yyyy")}.`
+                                  : "-NA"}
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="p-0 h-auto">
+                                      <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                                      View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleQuoteSigned(quotation)
+                                      }}
+                                    >
+                                      Mark as Signed
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
                           )
                         })}
                       </TableBody>
