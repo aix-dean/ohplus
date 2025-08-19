@@ -857,7 +857,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
                 </div>
                 <p className="text-sm font-medium text-gray-900">
-                  {userData?.firstName} {userData?.lastName}
+                  {userData?.first_name} {userData?.last_name}
                 </p>
               </div>
 
