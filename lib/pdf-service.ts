@@ -1678,6 +1678,10 @@ export async function generateCostEstimatePDF(
       yPosition += 6
 
       let representativeName = "Representative Name"
+      let companyData: any = null
+      let companyName = "Company Name"
+      let companyLocation = "Company Location"
+      let companyPhone = "Company Phone"
 
       if (costEstimate.createdBy) {
         try {
@@ -1690,9 +1694,33 @@ export async function generateCostEstimatePDF(
               `${userData.first_name || ""} ${userData.last_name || ""}`.trim() ||
               userData.display_name ||
               "Representative Name"
+
+            // Fetch company data using user's company_id
+            if (userData.company_id) {
+              const companyDocRef = doc(db, "companies", userData.company_id)
+              const companyDoc = await getDoc(companyDocRef)
+
+              if (companyDoc.exists()) {
+                companyData = companyDoc.data()
+                companyName = companyData.name || "Company Name"
+
+                // Build company location from address object
+                if (companyData.address) {
+                  const addressParts = []
+                  if (companyData.address.street) addressParts.push(companyData.address.street)
+                  if (companyData.address.city) addressParts.push(companyData.address.city)
+                  if (companyData.address.province) addressParts.push(companyData.address.province)
+                  companyLocation = addressParts.join(", ") || "Company Location"
+                } else if (companyData.company_location) {
+                  companyLocation = companyData.company_location
+                }
+
+                companyPhone = companyData.phone || companyData.contact_phone || "Company Phone"
+              }
+            }
           }
         } catch (error) {
-          console.error("Error fetching user data for signature:", error)
+          console.error("Error fetching user and company data for signature:", error)
         }
       }
 
@@ -1730,11 +1758,8 @@ export async function generateCostEstimatePDF(
 
       pdf.setFontSize(7)
       pdf.setTextColor(100, 100, 100)
-      pdf.text(
-        "Company Location • phone: Company Phone",
-        (pageWidth - pdf.getTextWidth("Company Location • phone: Company Phone")) / 2,
-        footerY,
-      )
+      const footerText = `${companyLocation} • phone: ${companyPhone}`
+      pdf.text(footerText, (pageWidth - pdf.getTextWidth(footerText)) / 2, footerY)
 
       if (validUntil) {
         pdf.text(
@@ -1748,11 +1773,8 @@ export async function generateCostEstimatePDF(
         )
       }
 
-      pdf.text(
-        `© ${new Date().getFullYear()} Company Name. All rights reserved.`,
-        (pageWidth - pdf.getTextWidth(`© ${new Date().getFullYear()} Company Name. All rights reserved.`)) / 2,
-        footerY + (validUntil ? 6 : 3),
-      )
+      const copyrightText = `© ${new Date().getFullYear()} ${companyName}. All rights reserved.`
+      pdf.text(copyrightText, (pageWidth - pdf.getTextWidth(copyrightText)) / 2, footerY + (validUntil ? 6 : 3))
     })
 
     if (returnBase64) {
