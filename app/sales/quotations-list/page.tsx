@@ -30,7 +30,7 @@ import {
   CheckCircle,
   Search,
   X,
-  MoreHorizontal,
+  MoreVertical,
   ChevronDown,
   ChevronRight,
   Upload,
@@ -715,20 +715,25 @@ export default function SalesQuotationsPage() {
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="p-0 h-auto">
-                                      <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                                      <MoreVertical className="h-4 w-4 text-gray-400" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
-                                      View Details
+                                    <DropdownMenuItem onClick={() => console.log("Create JO for", quotation.id)}>
+                                      Create JO
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleQuoteSigned(quotation)
-                                      }}
-                                    >
-                                      Mark as Signed
+                                    <DropdownMenuItem onClick={() => window.print()}>Print</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => console.log("Share", quotation.id)}>
+                                      Share
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => console.log("Cancel", quotation.id)}>
+                                      Cancel
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => console.log("Set alarm for", quotation.id)}>
+                                      Set an Alarm
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => console.log("Make copy of", quotation.id)}>
+                                      Make a Copy
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
