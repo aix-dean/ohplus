@@ -19,13 +19,14 @@ import { db } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, CheckCircle, Search, X, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { CheckCircle, Search, X, ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -36,6 +37,7 @@ export default function SalesQuotationsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -135,10 +137,14 @@ export default function SalesQuotationsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case "accepted":
-        return "bg-green-100 text-green-800 border-green-200"
+      case "booked":
+        return "bg-red-100 text-red-800 border-red-200"
       case "sent":
         return "bg-blue-100 text-blue-800 border-blue-200"
+      case "reserved":
+        return "bg-gray-100 text-gray-800 border-gray-200"
+      case "accepted":
+        return "bg-green-100 text-green-800 border-green-200"
       case "draft":
         return "bg-gray-100 text-gray-800 border-gray-200"
       case "rejected":
@@ -283,315 +289,323 @@ export default function SalesQuotationsPage() {
     }
   }
 
+  const toggleRowExpansion = (quotationId: string) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(quotationId)) {
+        newSet.delete(quotationId)
+      } else {
+        newSet.add(quotationId)
+      }
+      return newSet
+    })
+  }
+
+  const getProjectCompliance = (quotation: any) => {
+    const items = [
+      { name: "Signed Quotation", status: "completed", file: "Quotation_Fairyskin.jpeg" },
+      { name: "Signed Contract", status: "upload" },
+      { name: "PO/MO", status: "upload" },
+      { name: "Final Artwork", status: "upload" },
+      { name: "Payment as Deposit", status: "confirmation", note: "For Treasury's confirmation" },
+    ]
+
+    const completed = items.filter((item) => item.status === "completed").length
+    return { completed, total: items.length, items }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         {user?.uid ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardHeader className="px-6 py-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle className="text-xl font-semibold text-gray-900">Quotations List</CardTitle>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold text-gray-900">Quotation</h1>
+              <p className="text-sm text-gray-600">See the status of the quotations you've generated</p>
+            </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search by client, phone, or quotation number..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-10 w-full sm:w-80"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+            <Card className="border-gray-200 shadow-sm rounded-xl">
+              <CardHeader className="px-6 py-4 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search by client, phone, or quotation number..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-10 w-full sm:w-80"
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-40">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
+                        <SelectItem value="booked">Booked</SelectItem>
+                        <SelectItem value="reserved">Reserved</SelectItem>
+                        <SelectItem value="viewed">Viewed</SelectItem>
+                        <SelectItem value="accepted">Accepted</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {(searchTerm || statusFilter !== "all") && (
+                      <Button variant="outline" onClick={clearFilters} size="sm">
+                        Clear Filters
+                      </Button>
                     )}
                   </div>
-
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="sent">Sent</SelectItem>
-                      <SelectItem value="viewed">Viewed</SelectItem>
-                      <SelectItem value="accepted">Accepted</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="expired">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {(searchTerm || statusFilter !== "all") && (
-                    <Button variant="outline" onClick={clearFilters} size="sm">
-                      Clear Filters
-                    </Button>
-                  )}
                 </div>
-              </div>
 
-              {!loading && (
-                <div className="text-sm text-gray-600 mt-2">
-                  Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
-                  {filteredQuotations.length !== allQuotations.length &&
-                    ` (filtered from ${allQuotations.length} total)`}
-                </div>
-              )}
-            </CardHeader>
+                {!loading && (
+                  <div className="text-sm text-gray-600 mt-2">
+                    Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
+                    {filteredQuotations.length !== allQuotations.length &&
+                      ` (filtered from ${allQuotations.length} total)`}
+                  </div>
+                )}
+              </CardHeader>
 
-            {loading ? (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array(pageSize)
-                    .fill(0)
-                    .map((_, i) => (
-                      <TableRow key={i} className="border-b border-gray-100">
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-48" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-28" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-36" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-28" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            ) : paginatedQuotations.length > 0 ? (
-              <>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50 border-b border-gray-200">
-                        <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedQuotations.map((quotation) => (
-                        <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {formatDate(quotation.created)}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_name || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_address || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_phone || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_designation || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            <Badge
-                              variant="outline"
-                              className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                                quotation.status,
-                              )}`}
-                            >
-                              {quotation.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            ₱{quotation.total_amount?.toLocaleString() || "0.00"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                          >
-                            {quotation.quotation_number || "N/A"}
+              {loading ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 border-b border-gray-200">
+                      <TableHead className="font-semibold text-gray-900 py-3 w-8"></TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">NO.</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array(pageSize)
+                      .fill(0)
+                      .map((_, i) => (
+                        <TableRow key={i} className="border-b border-gray-100">
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-4" />
                           </TableCell>
                           <TableCell className="py-3">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleQuoteSigned(quotation)
-                              }}
-                              disabled={signingQuotes.has(quotation.id)}
-                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                            >
-                              {signingQuotes.has(quotation.id) ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Quote Signed
-                                </>
-                              )}
-                            </Button>
+                            <Skeleton className="h-4 w-32" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-40" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-32" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-16" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-20" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-8" />
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-
-                {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
-                    <div className="text-sm text-gray-600">
-                      Page {currentPage} of {totalPages}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(1)}
-                        disabled={currentPage === 1}
-                        className="hidden sm:flex"
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        <span className="hidden sm:inline ml-1">Previous</span>
-                      </Button>
-
-                      {/* Page numbers */}
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum
-                          if (totalPages <= 5) {
-                            pageNum = i + 1
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i
-                          } else {
-                            pageNum = currentPage - 2 + i
-                          }
+                  </TableBody>
+                </Table>
+              ) : paginatedQuotations.length > 0 ? (
+                <>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50 border-b border-gray-200">
+                          <TableHead className="font-semibold text-gray-900 py-3 w-8"></TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">NO.</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
+                          <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedQuotations.map((quotation) => {
+                          const compliance = getProjectCompliance(quotation)
+                          const isExpanded = expandedRows.has(quotation.id)
 
                           return (
-                            <Button
-                              key={pageNum}
-                              variant={currentPage === pageNum ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handlePageChange(pageNum)}
-                              className="w-8 h-8 p-0"
-                            >
-                              {pageNum}
-                            </Button>
+                            <>
+                              <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <TableCell className="py-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleRowExpansion(quotation.id)}
+                                    className="p-0 h-auto"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                                    )}
+                                  </Button>
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 text-sm text-gray-700 cursor-pointer font-medium"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  {quotation.quotation_number || "N/A"}
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 text-sm text-blue-600 cursor-pointer hover:underline"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  {quotation.items?.[0]?.name || quotation.product_name || "N/A"}
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 text-sm text-gray-700 cursor-pointer"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  {quotation.client_name || "N/A"}
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 text-sm text-gray-700 cursor-pointer"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">
+                                      {compliance.completed}/{compliance.total}
+                                    </span>
+                                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                                  </div>
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 cursor-pointer"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  <Badge
+                                    variant="outline"
+                                    className={`px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+                                      quotation.status,
+                                    )}`}
+                                  >
+                                    {quotation.status || "Draft"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell
+                                  className="py-3 text-sm text-gray-700 cursor-pointer"
+                                  onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                >
+                                  {quotation.status === "sent"
+                                    ? `Follow up on ${format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "MMM d, yyyy")}.`
+                                    : "-NA"}
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="p-0 h-auto">
+                                        <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                                      >
+                                        View Details
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleQuoteSigned(quotation)
+                                        }}
+                                      >
+                                        Mark as Signed
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+
+                              {isExpanded && (
+                                <TableRow className="bg-gray-50">
+                                  <TableCell colSpan={8} className="py-4 px-6">
+                                    <div className="space-y-3">
+                                      {compliance.items.map((item, index) => (
+                                        <div key={index} className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            {item.status === "completed" ? (
+                                              <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                                                <CheckCircle className="w-3 h-3 text-white" />
+                                              </div>
+                                            ) : (
+                                              <div className="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+                                            )}
+                                            <span className="text-sm text-gray-700">{item.name}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {item.file && (
+                                              <span className="text-xs text-blue-600 hover:underline cursor-pointer">
+                                                {item.file}
+                                              </span>
+                                            )}
+                                            {item.status === "upload" && (
+                                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                                Upload
+                                              </span>
+                                            )}
+                                            {item.note && <span className="text-xs text-gray-500">{item.note}</span>}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
                           )
                         })}
-                      </div>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                      >
-                        <span className="hidden sm:inline mr-1">Next</span>
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={currentPage === totalPages}
-                        className="hidden sm:flex"
-                      >
-                        <ChevronsRight className="h-4 w-4" />
+                  <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <p className="text-xs text-gray-500 italic">
+                      A quotation is marked as "Booked" if signed quotation is uploaded. It will then be marked as
+                      "Reserved" after uploading the "Signed Contract."
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <CardContent className="p-6 text-center text-gray-600">
+                  {searchTerm || statusFilter !== "all" ? (
+                    <div>
+                      <p className="mb-2">No quotations found matching your filters.</p>
+                      <Button variant="outline" onClick={clearFilters} size="sm">
+                        Clear Filters
                       </Button>
                     </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <CardContent className="p-6 text-center text-gray-600">
-                {searchTerm || statusFilter !== "all" ? (
-                  <div>
-                    <p className="mb-2">No quotations found matching your filters.</p>
-                    <Button variant="outline" onClick={clearFilters} size="sm">
-                      Clear Filters
-                    </Button>
-                  </div>
-                ) : (
-                  <p>No quotations found for your account.</p>
-                )}
-              </CardContent>
-            )}
-          </Card>
+                  ) : (
+                    <p>No quotations found for your account.</p>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          </div>
         ) : (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-6 text-center text-gray-600">
