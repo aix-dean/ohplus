@@ -1328,17 +1328,23 @@ export async function generateSeparateCostEstimatePDFs(
   selectedPages?: string[],
 ): Promise<void> {
   try {
+    // Use the exact same grouping logic as the page
     const groupLineItemsBySite = (lineItems: any[]) => {
-      const siteGroups: { [key: string]: any[] } = {}
+      console.log("[v0] All line items:", lineItems)
 
+      const siteGroups: { [siteName: string]: any[] } = {}
+
+      // Group line items by site based on the site rental items
       lineItems.forEach((item) => {
         if (item.category.includes("Billboard Rental")) {
+          // This is a site rental item - use its description as the site name
           const siteName = item.description
           if (!siteGroups[siteName]) {
             siteGroups[siteName] = []
           }
           siteGroups[siteName].push(item)
 
+          // Find related production, installation, and maintenance items for this site
           const siteId = item.id
           const relatedItems = lineItems.filter(
             (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
@@ -1348,9 +1354,28 @@ export async function generateSeparateCostEstimatePDFs(
       })
 
       if (Object.keys(siteGroups).length === 0) {
+        console.log("[v0] No billboard rental items found, treating as single site with all items")
         siteGroups["Single Site"] = lineItems
+      } else {
+        // Check for orphaned items (items not associated with any site)
+        const groupedItemIds = new Set()
+        Object.values(siteGroups).forEach((items) => {
+          items.forEach((item) => groupedItemIds.add(item.id))
+        })
+
+        const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
+        if (orphanedItems.length > 0) {
+          console.log("[v0] Found orphaned items:", orphanedItems)
+          const siteNames = Object.keys(siteGroups)
+          siteNames.forEach((siteName) => {
+            // Create copies of orphaned items for each site to avoid reference issues
+            const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
+            siteGroups[siteName].push(...orphanedCopies)
+          })
+        }
       }
 
+      console.log("[v0] Final site groups:", siteGroups)
       return siteGroups
     }
 
@@ -1369,11 +1394,18 @@ export async function generateSeparateCostEstimatePDFs(
       const siteName = sitesToProcess[i]
       const siteLineItems = siteGroups[siteName] || []
 
-      // Create a modified cost estimate for this specific site
+      // Create a modified cost estimate for this specific site with proper CE number
+      const baseCENumber = costEstimate.costEstimateNumber || costEstimate.id
+      const uniqueCENumber =
+        sites.length > 1
+          ? `${baseCENumber}-${String.fromCharCode(64 + (sites.indexOf(siteName) + 1))}` // Appends -A, -B, -C, etc.
+          : baseCENumber
+
       const singleSiteCostEstimate = {
         ...costEstimate,
         lineItems: siteLineItems,
-        title: sites.length > 1 ? `${costEstimate.title || "Cost Estimate"} - ${siteName}` : costEstimate.title,
+        title: sites.length > 1 ? siteName : costEstimate.title,
+        costEstimateNumber: uniqueCENumber,
       }
 
       // Generate PDF for this single site
@@ -1788,7 +1820,7 @@ export async function generateReportPDF(
       if (!product) return "N/A"
       const specs = product.specs_rental
       if (specs?.height && specs?.width) {
-        const panels = specs.panels || "N/A"
+        const panels = specs || "N/A"
         return `${specs.height} (H) x ${specs.width} (W) x ${panels} Panels`
       }
       return product.specs_rental?.size || product.light?.size || "N/A"
