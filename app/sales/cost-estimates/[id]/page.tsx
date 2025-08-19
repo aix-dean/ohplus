@@ -31,8 +31,6 @@ import {
   Pencil,
   Save,
   X,
-  ChevronLeft,
-  ChevronRight,
   Building,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
@@ -847,7 +845,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 <p className="text-sm font-medium text-gray-900">
                   {userData?.firstName} {userData?.lastName}
                 </p>
-                <p className="text-sm text-gray-600">Account Management</p>
               </div>
 
               {/* Right side - Client conforme */}
@@ -1090,7 +1087,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               disabled={Object.keys(siteGroups).length <= 1}
               className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
             >
-              
               Previous
             </Button>
             <div className="relative">
@@ -1107,7 +1103,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
             >
               Next
-              
             </Button>
           </div>
         </div>
