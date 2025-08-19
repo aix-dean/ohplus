@@ -1733,7 +1733,7 @@ export async function generateCostEstimatePDF(
 
       pdf.setLineWidth(0.5)
       pdf.line(margin, yPosition, margin + 60, yPosition)
-      // pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
+      pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
       yPosition += 6
 
       // Names
