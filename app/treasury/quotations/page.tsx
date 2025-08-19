@@ -83,7 +83,12 @@ export default function TreasuryQuotationsPage() {
 
     try {
       const quotationsRef = collection(db, "quotations")
-      const q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"))
+      const q = query(
+        quotationsRef,
+        where("created_by", "==", user.uid),
+        where("status", "==", "accepted"),
+        orderBy("created", "desc"),
+      )
 
       const querySnapshot = await getDocs(q)
       const fetchedQuotations: any[] = []
@@ -333,12 +338,7 @@ export default function TreasuryQuotationsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="sent">Sent</SelectItem>
-                      <SelectItem value="viewed">Viewed</SelectItem>
                       <SelectItem value="accepted">Accepted</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="expired">Expired</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -352,7 +352,7 @@ export default function TreasuryQuotationsPage() {
 
               {!loading && (
                 <div className="text-sm text-gray-600 mt-2">
-                  Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
+                  Showing {paginatedQuotations.length} of {filteredQuotations.length} signed quotations
                   {filteredQuotations.length !== allQuotations.length &&
                     ` (filtered from ${allQuotations.length} total)`}
                 </div>
@@ -597,13 +597,13 @@ export default function TreasuryQuotationsPage() {
               <CardContent className="p-6 text-center text-gray-600">
                 {searchTerm || statusFilter !== "all" ? (
                   <div>
-                    <p className="mb-2">No quotations found matching your filters.</p>
+                    <p className="mb-2">No signed quotations found matching your filters.</p>
                     <Button variant="outline" onClick={clearFilters} size="sm">
                       Clear Filters
                     </Button>
                   </div>
                 ) : (
-                  <p>No quotations found for your account.</p>
+                  <p>No signed quotations found for your account.</p>
                 )}
               </CardContent>
             )}
