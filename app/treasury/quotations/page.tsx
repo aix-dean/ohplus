@@ -23,9 +23,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, CheckCircle, Search, X, ChevronsLeft, ChevronsRight, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, CheckCircle, Search, X, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { TreasuryGenerateQuotationDialog } from "@/components/treasury-generate-quotation-dialog"
 
 export default function TreasuryQuotationsPage() {
   const { user } = useAuth()
@@ -36,7 +35,6 @@ export default function TreasuryQuotationsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
-  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -289,15 +287,6 @@ export default function TreasuryQuotationsPage() {
     }
   }
 
-  const handleQuotationCreated = (quotationId: string) => {
-    // Refresh the quotations list
-    fetchAllQuotations()
-    toast({
-      title: "Success",
-      description: "Quotation created successfully!",
-    })
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -305,18 +294,13 @@ export default function TreasuryQuotationsPage() {
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardHeader className="px-6 py-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle className="text-xl font-semibold text-gray-900">Treasury Quotations</CardTitle>
+                <CardTitle className="text-xl font-semibold text-gray-900">Treasury Signed Contracts</CardTitle>
 
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <Button onClick={() => setIsGenerateDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Generate Quotation
-                  </Button>
-
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Search by client, phone, or quotation number..."
+                      placeholder="Search by client, phone, or contract reference..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 pr-10 w-full sm:w-80"
@@ -351,7 +335,7 @@ export default function TreasuryQuotationsPage() {
 
               {!loading && (
                 <div className="text-sm text-gray-600 mt-2">
-                  Showing {paginatedQuotations.length} of {filteredQuotations.length} signed quotations
+                  Showing {paginatedQuotations.length} of {filteredQuotations.length} signed contracts
                   {filteredQuotations.length !== allQuotations.length &&
                     ` (filtered from ${allQuotations.length} total)`}
                 </div>
@@ -545,13 +529,13 @@ export default function TreasuryQuotationsPage() {
               <CardContent className="p-6 text-center text-gray-600">
                 {searchTerm || statusFilter !== "all" ? (
                   <div>
-                    <p className="mb-2">No signed quotations found matching your filters.</p>
+                    <p className="mb-2">No signed contracts found matching your filters.</p>
                     <Button variant="outline" onClick={clearFilters} size="sm">
                       Clear Filters
                     </Button>
                   </div>
                 ) : (
-                  <p>No signed quotations found for your account.</p>
+                  <p>No signed contracts found for your account.</p>
                 )}
               </CardContent>
             )}
@@ -559,17 +543,11 @@ export default function TreasuryQuotationsPage() {
         ) : (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-6 text-center text-gray-600">
-              <p>Please log in to view your quotations.</p>
+              <p>Please log in to view your signed contracts.</p>
             </CardContent>
           </Card>
         )}
       </div>
-
-      <TreasuryGenerateQuotationDialog
-        isOpen={isGenerateDialogOpen}
-        onClose={() => setIsGenerateDialogOpen(false)}
-        onQuotationCreated={handleQuotationCreated}
-      />
     </div>
   )
 }
