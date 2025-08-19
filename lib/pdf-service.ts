@@ -1707,6 +1707,8 @@ export async function generateCostEstimatePDF(
       yPosition += 10
 
       // Footer
+      checkNewPage(20) // Ensure enough space for footer content
+
       pdf.setFontSize(8)
       pdf.setTextColor(100, 100, 100)
       pdf.text(
