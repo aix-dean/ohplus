@@ -1082,7 +1082,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       {/* Floating Navigation for Multiple Sites */}
       {hasMultipleSites && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-6 py-3 bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
             <Button
               variant="outline"
               size="sm"
