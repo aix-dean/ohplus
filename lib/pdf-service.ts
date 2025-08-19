@@ -1495,7 +1495,7 @@ export async function generateCostEstimatePDF(
       throw new Error("No sites selected for PDF generation")
     }
 
-    sitesToProcess.forEach((siteName, siteIndex) => {
+    sitesToProcess.forEach(async (siteName, siteIndex) => {
       if (siteIndex > 0) {
         pdf.addPage()
         yPosition = margin
@@ -1601,8 +1601,8 @@ export async function generateCostEstimatePDF(
 
       // Calculation breakdown section
       checkNewPage(35)
-      pdf.setFillColor(245, 245, 245)
-      pdf.rect(margin, yPosition, contentWidth, 28, "F")
+      // pdf.setFillColor(245, 245, 245)
+      // pdf.rect(margin, yPosition, contentWidth, 28, "F")
 
       pdf.setFontSize(9)
 
@@ -1677,6 +1677,25 @@ export async function generateCostEstimatePDF(
 
       yPosition += 6
 
+      let representativeName = "Representative Name"
+
+      if (costEstimate.createdBy) {
+        try {
+          const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            representativeName =
+              `${userData.first_name || ""} ${userData.last_name || ""}`.trim() ||
+              userData.display_name ||
+              "Representative Name"
+          }
+        } catch (error) {
+          console.error("Error fetching user data for signature:", error)
+        }
+      }
+
       // Signature section
       checkNewPage(30)
       pdf.setFontSize(9)
@@ -1684,15 +1703,14 @@ export async function generateCostEstimatePDF(
       pdf.text("Conforme:", margin + contentWidth / 2, yPosition)
       yPosition += 15
 
-      // Signature lines
-      pdf.setLineWidth(0.5)
-      pdf.line(margin, yPosition, margin + 60, yPosition)
-      pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
+      // pdf.setLineWidth(0.5)
+      // pdf.line(margin, yPosition, margin + 60, yPosition)
+      // pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
       yPosition += 6
 
       // Names
       pdf.setFont("helvetica", "bold")
-      pdf.text("Representative Name", margin, yPosition)
+      pdf.text(representativeName, margin, yPosition)
       pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
       yPosition += 4
 
