@@ -13,9 +13,11 @@ import {
   serverTimestamp,
   doc,
   getDoc,
+  updateDoc,
   Timestamp,
 } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { db, storage } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -24,7 +26,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CheckCircle, Search, X, MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  CheckCircle,
+  Search,
+  X,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
+  Upload,
+  FileText,
+  Loader2,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -38,6 +50,7 @@ export default function SalesQuotationsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
   const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -289,13 +302,107 @@ export default function SalesQuotationsPage() {
     }
   }
 
+  const handleFileUpload = async (quotationId: string, complianceType: string, file: File) => {
+    const uploadKey = `${quotationId}-${complianceType}`
+    setUploadingFiles((prev) => new Set(prev).add(uploadKey))
+
+    try {
+      // Validate file type (PDF only)
+      if (file.type !== "application/pdf") {
+        throw new Error("Only PDF files are allowed")
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error("File size must be less than 10MB")
+      }
+
+      // Create storage reference
+      const fileName = `${Date.now()}-${file.name}`
+      const storageRef = ref(storage, `quotations/${quotationId}/compliance/${complianceType}/${fileName}`)
+
+      // Upload file
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+
+      // Update quotation document with compliance data
+      const quotationRef = doc(db, "quotations", quotationId)
+      const updateData = {
+        [`projectCompliance.${complianceType}`]: {
+          status: "completed",
+          fileUrl: downloadURL,
+          fileName: file.name,
+          uploadedAt: serverTimestamp(),
+          uploadedBy: user?.uid,
+        },
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      // Refresh quotations list
+      await fetchAllQuotations()
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} uploaded successfully`,
+      })
+    } catch (error: any) {
+      console.error("Error uploading file:", error)
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingFiles((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(uploadKey)
+        return newSet
+      })
+    }
+  }
+
   const getProjectCompliance = (quotation: any) => {
+    const compliance = quotation.projectCompliance || {}
+
     const items = [
-      { name: "Signed Quotation", status: "completed", file: "Quotation_Fairyskin.jpeg" },
-      { name: "Signed Contract", status: "upload" },
-      { name: "PO/MO", status: "upload" },
-      { name: "Final Artwork", status: "upload" },
-      { name: "Payment as Deposit", status: "confirmation", note: "For Treasury's confirmation" },
+      {
+        key: "signedQuotation",
+        name: "Signed Quotation",
+        status: compliance.signedQuotation?.status || "upload",
+        file: compliance.signedQuotation?.fileName,
+        fileUrl: compliance.signedQuotation?.fileUrl,
+      },
+      {
+        key: "signedContract",
+        name: "Signed Contract",
+        status: compliance.signedContract?.status || "upload",
+        file: compliance.signedContract?.fileName,
+        fileUrl: compliance.signedContract?.fileUrl,
+      },
+      {
+        key: "poMo",
+        name: "PO/MO",
+        status: compliance.poMo?.status || "upload",
+        file: compliance.poMo?.fileName,
+        fileUrl: compliance.poMo?.fileUrl,
+      },
+      {
+        key: "finalArtwork",
+        name: "Final Artwork",
+        status: compliance.finalArtwork?.status || "upload",
+        file: compliance.finalArtwork?.fileName,
+        fileUrl: compliance.finalArtwork?.fileUrl,
+      },
+      {
+        key: "paymentAsDeposit",
+        name: "Payment as Deposit",
+        status: compliance.paymentAsDeposit?.status || "confirmation",
+        note: "For Treasury's confirmation",
+        file: compliance.paymentAsDeposit?.fileName,
+        fileUrl: compliance.paymentAsDeposit?.fileUrl,
+      },
     ]
 
     const completed = items.filter((item) => item.status === "completed").length
@@ -312,6 +419,19 @@ export default function SalesQuotationsPage() {
       }
       return newSet
     })
+  }
+
+  const triggerFileUpload = (quotationId: string, complianceType: string) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".pdf"
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        handleFileUpload(quotationId, complianceType, file)
+      }
+    }
+    input.click()
   }
 
   return (
@@ -494,39 +614,73 @@ export default function SalesQuotationsPage() {
                                     }`}
                                   >
                                     <div className="space-y-1 pt-1">
-                                      {compliance.items.map((item, index) => (
-                                        <div
-                                          key={index}
-                                          className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                          style={{
-                                            animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                            animationDuration: "200ms",
-                                          }}
-                                        >
-                                          <div className="flex items-center gap-2">
-                                            {item.status === "completed" ? (
-                                              <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                                                <CheckCircle className="w-2 h-2 text-white" />
-                                              </div>
-                                            ) : (
-                                              <div className="w-3 h-3 rounded-full border border-gray-300"></div>
-                                            )}
-                                            <span className="text-gray-700">{item.name}</span>
+                                      {compliance.items.map((item, index) => {
+                                        const uploadKey = `${quotation.id}-${item.key}`
+                                        const isUploading = uploadingFiles.has(uploadKey)
+
+                                        return (
+                                          <div
+                                            key={index}
+                                            className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                            style={{
+                                              animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                              animationDuration: "200ms",
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {item.status === "completed" ? (
+                                                <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                                                  <CheckCircle className="w-2 h-2 text-white" />
+                                                </div>
+                                              ) : (
+                                                <div className="w-3 h-3 rounded-full border border-gray-300"></div>
+                                              )}
+                                              <span className="text-gray-700">{item.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              {item.file && item.fileUrl ? (
+                                                <a
+                                                  href={item.fileUrl}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  <FileText className="w-3 h-3" />
+                                                  {item.file}
+                                                </a>
+                                              ) : item.status === "upload" ? (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="h-6 px-2 text-xs bg-transparent"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    triggerFileUpload(quotation.id, item.key)
+                                                  }}
+                                                  disabled={isUploading}
+                                                >
+                                                  {isUploading ? (
+                                                    <>
+                                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                      Uploading...
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <Upload className="w-3 h-3 mr-1" />
+                                                      Upload
+                                                    </>
+                                                  )}
+                                                </Button>
+                                              ) : item.status === "confirmation" ? (
+                                                <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                                  Pending
+                                                </span>
+                                              ) : null}
+                                            </div>
                                           </div>
-                                          <div className="flex items-center gap-1">
-                                            {item.file && (
-                                              <span className="text-blue-600 hover:underline cursor-pointer">
-                                                {item.file}
-                                              </span>
-                                            )}
-                                            {item.status === "upload" && (
-                                              <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                                Upload
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
+                                        )
+                                      })}
                                       {compliance.items.find((item) => item.note) && (
                                         <div className="text-xs text-gray-500 mt-1 animate-in fade-in-0 slide-in-from-top-1">
                                           {compliance.items.find((item) => item.note)?.note}
