@@ -1509,13 +1509,6 @@ export async function generateCostEstimatePDF(
         ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
         : costEstimate.costEstimateNumber || costEstimate.id
 
-      const checkNewPage = (requiredHeight: number) => {
-        if (yPosition + requiredHeight > pageHeight - margin) {
-          pdf.addPage()
-          yPosition = margin
-        }
-      }
-
       // Header section matching page format
       pdf.setFontSize(9)
       pdf.setTextColor(100, 100, 100)
@@ -1588,7 +1581,6 @@ export async function generateCostEstimatePDF(
       ]
 
       bulletPoints.forEach((point) => {
-        checkNewPage(8)
         pdf.text("•", margin, yPosition)
         pdf.setFont("helvetica", "bold")
         pdf.text(point.label, margin + 5, yPosition)
@@ -1600,7 +1592,6 @@ export async function generateCostEstimatePDF(
       yPosition += 3
 
       // Calculation breakdown section
-      checkNewPage(35)
       // pdf.setFillColor(245, 245, 245)
       // pdf.rect(margin, yPosition, contentWidth, 28, "F")
 
@@ -1651,7 +1642,6 @@ export async function generateCostEstimatePDF(
       yPosition += 35
 
       // Terms and Conditions section
-      checkNewPage(45)
       pdf.setFont("helvetica", "bold")
       pdf.setFontSize(11)
       pdf.text("Terms and Conditions:", margin, yPosition)
@@ -1670,7 +1660,6 @@ export async function generateCostEstimatePDF(
       ]
 
       terms.forEach((term) => {
-        checkNewPage(6)
         pdf.text(term, margin, yPosition)
         yPosition += 5
       })
@@ -1725,7 +1714,6 @@ export async function generateCostEstimatePDF(
       }
 
       // Signature section
-      checkNewPage(30)
       pdf.setFontSize(9)
       pdf.text("Very truly yours,", margin, yPosition)
       pdf.text("Conforme:", margin + contentWidth / 2, yPosition)
