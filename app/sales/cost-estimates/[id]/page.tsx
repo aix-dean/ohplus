@@ -57,9 +57,13 @@ import { collection, query, where, getDocs, doc, getDoc } from "firebase/firesto
 interface CompanyData {
   id: string
   name?: string
-  company_location?: any
-  address?: any
-  company_website?: string
+  address?: {
+    city?: string
+    province?: string
+    street?: string
+  }
+  business_type?: string
+  position?: string
   website?: string
   photo_url?: string
   contact_person?: string
@@ -71,8 +75,8 @@ interface CompanyData {
     youtube?: string
   }
   created_by?: string
-  created?: Date
-  updated?: Date
+  created_at?: Date
+  updated_at?: Date
 }
 
 // Helper function to generate QR code URL
@@ -161,20 +165,26 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         const company: CompanyData = {
           id: companyDoc.id,
           name: companyDataResult.name,
-          company_location: companyDataResult.company_location || companyDataResult.address,
-          company_website: companyDataResult.company_website || companyDataResult.website,
+          address: companyDataResult.address || {
+            city: companyDataResult.city,
+            province: companyDataResult.province,
+            street: companyDataResult.street,
+          },
+          business_type: companyDataResult.business_type,
+          position: companyDataResult.position,
+          website: companyDataResult.website,
           photo_url: companyDataResult.photo_url,
           contact_person: companyDataResult.contact_person,
           email: companyDataResult.email,
           phone: companyDataResult.phone,
           social_media: companyDataResult.social_media || {},
           created_by: companyDataResult.created_by,
-          created: companyDataResult.created?.toDate
-            ? companyDataResult.created.toDate()
-            : companyDataResult.created_at?.toDate(),
-          updated: companyDataResult.updated?.toDate
-            ? companyDataResult.updated.toDate()
-            : companyDataResult.updated_at?.toDate(),
+          created_at: companyDataResult.created_at?.toDate
+            ? companyDataResult.created_at.toDate()
+            : companyDataResult.created?.toDate(),
+          updated_at: companyDataResult.updated_at?.toDate
+            ? companyDataResult.updated_at.toDate()
+            : companyDataResult.updated?.toDate(),
         }
 
         setCompanyData(company)
@@ -881,7 +891,11 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="text-center text-xs text-gray-500">
               <p className="flex items-center justify-center gap-2 mb-2">
-                <span>{companyData?.address || companyData?.address || ""}</span>
+                <span>
+                  {companyData?.address?.street && companyData?.address?.city && companyData?.address?.province
+                    ? `${companyData.address.street}, ${companyData.address.city}, ${companyData.address.province}`
+                    : companyData?.address?.street || companyData?.address?.city || ""}
+                </span>
                 {companyData?.phone && (
                   <>
                     <span>•</span>
