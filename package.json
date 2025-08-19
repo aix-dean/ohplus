@@ -53,6 +53,7 @@
     "date-fns": "latest",
     "embla-carousel-react": "latest",
     "firebase": "latest",
+    "html2canvas": "latest",
     "https": "latest",
     "input-otp": "latest",
     "jspdf": "latest",

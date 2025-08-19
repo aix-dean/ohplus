@@ -39,7 +39,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
+import { copyQuotation, getQuotationById } from "@/lib/quotation-service"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -493,12 +493,211 @@ export default function SalesQuotationsPage() {
         throw new Error("Quotation not found")
       }
 
-      // Generate and download the PDF
-      await generateQuotationPDF(quotation)
+      // Import jsPDF and html2canvas for PDF generation
+      const { jsPDF } = await import("jspdf")
+      const html2canvas = (await import("html2canvas")).default
+
+      // Create a temporary container for the quotation content
+      const tempContainer = document.createElement("div")
+      tempContainer.style.position = "absolute"
+      tempContainer.style.left = "-9999px"
+      tempContainer.style.top = "0"
+      tempContainer.style.width = "210mm" // A4 width
+      tempContainer.style.backgroundColor = "white"
+      tempContainer.style.padding = "20mm"
+      tempContainer.style.fontFamily = "Arial, sans-serif"
+
+      // Generate the quotation HTML content (similar to the detail page)
+      tempContainer.innerHTML = `
+        <div style="max-width: 170mm; margin: 0 auto; background: white; font-size: 12px; line-height: 1.4;">
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px;">
+            <div>
+              <h1 style="font-size: 28px; font-weight: bold; color: #1f2937; margin: 0;">QUOTATION</h1>
+              <p style="color: #6b7280; margin: 5px 0 0 0;">${quotation.quotation_number || "N/A"}</p>
+            </div>
+            <div style="text-align: right;">
+              <div style="width: 60px; height: 60px; border: 1px solid #d1d5db; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280;">
+                QR Code
+              </div>
+              <p style="font-size: 10px; color: #6b7280; margin: 5px 0 0 0;">Scan for more details</p>
+            </div>
+          </div>
+
+          <!-- Quotation Information -->
+          <div style="margin-bottom: 25px;">
+            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Quotation Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">Quotation Number:</span><br>
+                  <span style="color: #6b7280;">${quotation.quotation_number || "N/A"}</span>
+                </div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">Start Date:</span><br>
+                  <span style="color: #6b7280;">${quotation.start_date ? new Date(quotation.start_date).toLocaleDateString() : "N/A"}</span>
+                </div>
+                <div>
+                  <span style="font-weight: 600; color: #374151;">Valid Until:</span><br>
+                  <span style="color: #6b7280;">${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}</span>
+                </div>
+              </div>
+              <div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">Created Date:</span><br>
+                  <span style="color: #6b7280;">${quotation.created ? new Date(quotation.created.toDate()).toLocaleDateString() : "N/A"}</span>
+                </div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">End Date:</span><br>
+                  <span style="color: #6b7280;">${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}</span>
+                </div>
+                <div>
+                  <span style="font-weight: 600; color: #374151;">Total Amount:</span><br>
+                  <span style="color: #6b7280; font-weight: bold;">₱${quotation.total_amount?.toLocaleString() || "0.00"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Client Information -->
+          <div style="margin-bottom: 25px;">
+            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Client Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">Client Name:</span><br>
+                  <span style="color: #6b7280;">${quotation.client_name || "N/A"}</span>
+                </div>
+                <div>
+                  <span style="font-weight: 600; color: #374151;">Designation:</span><br>
+                  <span style="color: #6b7280;">${quotation.client_designation || "N/A"}</span>
+                </div>
+              </div>
+              <div>
+                <div style="margin-bottom: 10px;">
+                  <span style="font-weight: 600; color: #374151;">Client Email:</span><br>
+                  <span style="color: #6b7280;">${quotation.client_email || "N/A"}</span>
+                </div>
+                <div>
+                  <span style="font-weight: 600; color: #374151;">Phone:</span><br>
+                  <span style="color: #6b7280;">${quotation.client_phone || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Products & Services -->
+          <div style="margin-bottom: 25px;">
+            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Product & Services</h3>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
+              <thead>
+                <tr style="background-color: #f9fafb;">
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Product</th>
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Type</th>
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Location</th>
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; font-weight: 600; color: #374151;">Price (Monthly)</th>
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; font-weight: 600; color: #374151;">Item Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  quotation.items
+                    ?.map(
+                      (item) => `
+                  <tr>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.name || "N/A"}</td>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.type || "N/A"}</td>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.location || "N/A"}</td>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #6b7280;">₱${item.price?.toLocaleString() || "0.00"}</td>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #6b7280;">₱${item.item_total_amount?.toLocaleString() || "0.00"}</td>
+                  </tr>
+                `,
+                    )
+                    .join("") ||
+                  '<tr><td colspan="5" style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; color: #6b7280;">No items found</td></tr>'
+                }
+              </tbody>
+              <tfoot>
+                <tr style="background-color: #f9fafb; font-weight: bold;">
+                  <td colspan="4" style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #374151;">Total Amount:</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #374151;">₱${quotation.total_amount?.toLocaleString() || "0.00"}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Footer -->
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #6b7280;">
+            <p style="margin: 0;">This quotation is valid until ${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}.</p>
+            <p style="margin: 5px 0 0 0;">© 2024 OOH Outdoor Advertising. All rights reserved.</p>
+          </div>
+        </div>
+      `
+
+      document.body.appendChild(tempContainer)
+
+      // Generate PDF from the HTML content
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+      })
+
+      document.body.removeChild(tempContainer)
+
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgWidth = 210
+      const pageHeight = 295
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      let position = 0
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Create blob and open in popup
+      const pdfBlob = pdf.output("blob")
+      const blobUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in a popup window
+      const popup = window.open("", "_blank", "width=800,height=900,scrollbars=yes,resizable=yes")
+      if (popup) {
+        popup.document.write(`
+          <html>
+            <head>
+              <title>Quotation ${quotation.quotation_number}</title>
+              <style>
+                body { margin: 0; padding: 0; }
+                iframe { width: 100%; height: 100vh; border: none; }
+              </style>
+            </head>
+            <body>
+              <iframe src="${blobUrl}" type="application/pdf"></iframe>
+            </body>
+          </html>
+        `)
+        popup.document.close()
+      } else {
+        // Fallback: download if popup is blocked
+        const link = document.createElement("a")
+        link.href = blobUrl
+        link.download = `quotation-${quotation.quotation_number}.pdf`
+        link.click()
+      }
 
       toast({
         title: "Success",
-        description: "Quotation PDF generated and downloaded successfully",
+        description: "Quotation PDF opened in popup window",
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
