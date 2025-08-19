@@ -67,11 +67,9 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6">
-      <div className="w-full max-w-6xl mx-auto">
-        <div className="bg-white rounded-3xl border-2 border-gray-900 min-h-[600px] p-8">
-          {/* Container content will go here */}
-        </div>
+    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
+      <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent p-8 min-h-[600px]">
+        {/* Container content will go here */}
       </div>
     </div>
   )
