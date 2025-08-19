@@ -39,7 +39,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { copyQuotation } from "@/lib/quotation-service"
+import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -53,6 +53,7 @@ export default function SalesQuotationsPage() {
   const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
+  const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -482,6 +483,39 @@ export default function SalesQuotationsPage() {
     }
   }
 
+  const handlePrintQuotation = async (quotationId: string) => {
+    setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
+
+    try {
+      // Get the full quotation data
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+
+      // Generate and download the PDF
+      await generateQuotationPDF(quotation)
+
+      toast({
+        title: "Success",
+        description: "Quotation PDF generated and downloaded successfully",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Print Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -770,7 +804,19 @@ export default function SalesQuotationsPage() {
                                     <DropdownMenuItem onClick={() => console.log("Create JO for", quotation.id)}>
                                       Create JO
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => window.print()}>Print</DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handlePrintQuotation(quotation.id)}
+                                      disabled={generatingPDFs.has(quotation.id)}
+                                    >
+                                      {generatingPDFs.has(quotation.id) ? (
+                                        <>
+                                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                          Generating PDF...
+                                        </>
+                                      ) : (
+                                        "Print"
+                                      )}
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => console.log("Share", quotation.id)}>
                                       Share
                                     </DropdownMenuItem>
