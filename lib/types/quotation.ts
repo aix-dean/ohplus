@@ -36,6 +36,23 @@ export interface QuotationProduct {
   item_total_amount?: number // Total amount for this specific item
 }
 
+export interface ProjectComplianceItem {
+  status: "pending" | "completed" | "uploaded"
+  pdf_url?: string
+  uploaded_date?: any // Firebase Timestamp
+  uploaded_by?: string
+  file_name?: string
+  notes?: string
+}
+
+export interface ProjectCompliance {
+  signed_quotation: ProjectComplianceItem
+  signed_contract: ProjectComplianceItem
+  po_mo: ProjectComplianceItem // Purchase Order/Marketing Order
+  final_artwork: ProjectComplianceItem
+  payment_as_deposit: ProjectComplianceItem
+}
+
 export interface Quotation {
   id?: string
   quotation_number: string
@@ -62,4 +79,5 @@ export interface Quotation {
   valid_until?: any // Firebase Timestamp
   seller_id?: string
   items: QuotationProduct[] // Renamed from 'products' to 'items'
+  project_compliance?: ProjectCompliance
 }
