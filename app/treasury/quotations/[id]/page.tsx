@@ -7,19 +7,25 @@ import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Edit, Send, Download } from "lucide-react"
-import Link from "next/link"
+import { ArrowLeft, Send, Download } from "lucide-react"
 import { format } from "date-fns"
+import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import type { Quotation } from "@/lib/types/quotation"
+import { TreasurySendQuotationDialog } from "@/components/treasury-send-quotation-dialog"
+import { TreasurySendQuotationOptionsDialog } from "@/components/treasury-send-quotation-options-dialog"
 
 export default function TreasuryQuotationDetailsPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { user } = useAuth()
+  const { toast } = useToast()
+
   const [quotation, setQuotation] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const params = useParams()
-  const router = useRouter()
-  const { toast } = useToast()
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
 
   useEffect(() => {
     const fetchQuotation = async () => {
@@ -27,18 +33,18 @@ export default function TreasuryQuotationDetailsPage() {
 
       try {
         setLoading(true)
-        const quotationRef = doc(db, "treasury_quotations", params.id as string)
+        const quotationRef = doc(db, "quotations", params.id as string)
         const docSnapshot = await getDoc(quotationRef)
 
         if (docSnapshot.exists()) {
           const data = docSnapshot.data()
           setQuotation({ id: docSnapshot.id, ...data } as Quotation)
         } else {
-          setError("Treasury quotation not found")
+          setError("Quotation not found")
         }
       } catch (error) {
-        console.error("Error fetching treasury quotation:", error)
-        setError("Error loading treasury quotation details")
+        console.error("Error fetching quotation:", error)
+        setError("Error loading quotation")
       } finally {
         setLoading(false)
       }
@@ -51,10 +57,10 @@ export default function TreasuryQuotationDetailsPage() {
     if (!date) return "N/A"
     try {
       if (date && typeof date.toDate === "function") {
-        return format(date.toDate(), "MMM d, yyyy")
+        return format(date.toDate(), "PPP")
       }
       if (typeof date === "string") {
-        return format(new Date(date), "MMM d, yyyy")
+        return format(new Date(date), "PPP")
       }
       return "Invalid date"
     } catch (error) {
@@ -62,38 +68,67 @@ export default function TreasuryQuotationDetailsPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: Quotation["status"]) => {
     switch (status?.toLowerCase()) {
-      case "accepted":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "sent":
-        return "bg-blue-100 text-blue-800 border-blue-200"
       case "draft":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      case "rejected":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "expired":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          label: "Draft",
+        }
+      case "sent":
+        return {
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+          label: "Sent",
+        }
       case "viewed":
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return {
+          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          label: "Viewed",
+        }
+      case "accepted":
+        return {
+          color: "bg-green-100 text-green-800 border-green-200",
+          label: "Accepted",
+        }
+      case "rejected":
+        return {
+          color: "bg-red-100 text-red-800 border-red-200",
+          label: "Rejected",
+        }
+      case "expired":
+        return {
+          color: "bg-orange-100 text-orange-800 border-orange-200",
+          label: "Expired",
+        }
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          label: "Unknown",
+        }
     }
+  }
+
+  const handleQuotationSent = (quotationId: string, newStatus: Quotation["status"]) => {
+    if (quotation) {
+      setQuotation({ ...quotation, status: newStatus })
+    }
+    toast({
+      title: "Success",
+      description: "Quotation sent successfully!",
+    })
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/treasury/quotations">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
           <div>
             <h1 className="text-3xl font-bold">Treasury Quotation Details</h1>
-            <p className="text-muted-foreground">Loading treasury quotation information...</p>
+            <p className="text-muted-foreground">Loading quotation information...</p>
           </div>
         </div>
       </div>
@@ -102,14 +137,12 @@ export default function TreasuryQuotationDetailsPage() {
 
   if (error || !quotation) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/treasury/quotations">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
           <div>
             <h1 className="text-3xl font-bold">Treasury Quotation Details</h1>
             <p className="text-muted-foreground text-red-500">{error}</p>
@@ -119,66 +152,60 @@ export default function TreasuryQuotationDetailsPage() {
     )
   }
 
+  const statusConfig = getStatusConfig(quotation.status)
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Link href="/treasury/quotations">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
           <div>
-            <h1 className="text-3xl font-bold">Treasury Quotation {quotation.quotation_number}</h1>
-            <p className="text-muted-foreground">View and manage treasury quotation details</p>
+            <h1 className="text-3xl font-bold">Treasury Quotation Details</h1>
+            <p className="text-muted-foreground">View and manage quotation information</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsSendOptionsDialogOpen(true)}>
+            <Send className="h-4 w-4 mr-2" />
+            Send Quotation
+          </Button>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Download PDF
-          </Button>
-          <Button variant="outline">
-            <Send className="h-4 w-4 mr-2" />
-            Send Email
-          </Button>
-          <Button>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6">
-        {/* Basic Information */}
+        {/* Header Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Treasury Quotation Information</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl">{quotation.quotation_number}</CardTitle>
+              <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                {statusConfig.label}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Quotation Number</label>
-              <p className="text-sm font-medium">{quotation.quotation_number}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Status</label>
-              <div className="mt-1">
-                <Badge
-                  variant="outline"
-                  className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(quotation.status)}`}
-                >
-                  {quotation.status}
-                </Badge>
-              </div>
-            </div>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Created Date</label>
-              <p className="text-sm">{formatDate(quotation.created)}</p>
+              <p className="text-sm font-medium">{formatDate(quotation.created)}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Valid Until</label>
-              <p className="text-sm">{formatDate(quotation.valid_until)}</p>
+              <p className="text-sm font-medium">{formatDate(quotation.valid_until)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Duration</label>
+              <p className="text-sm font-medium">{quotation.duration_days} days</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
+              <p className="text-xl font-bold text-blue-600">₱{quotation.total_amount?.toLocaleString()}</p>
             </div>
           </CardContent>
         </Card>
@@ -212,12 +239,12 @@ export default function TreasuryQuotationDetailsPage() {
           </CardContent>
         </Card>
 
-        {/* Campaign Details */}
+        {/* Campaign Period */}
         <Card>
           <CardHeader>
-            <CardTitle>Campaign Details</CardTitle>
+            <CardTitle>Campaign Period</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Start Date</label>
               <p className="text-sm font-medium">{formatDate(quotation.start_date)}</p>
@@ -226,81 +253,110 @@ export default function TreasuryQuotationDetailsPage() {
               <label className="text-sm font-medium text-muted-foreground">End Date</label>
               <p className="text-sm font-medium">{formatDate(quotation.end_date)}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Duration</label>
-              <p className="text-sm font-medium">{quotation.duration_days} days</p>
-            </div>
-            {quotation.notes && (
-              <div className="md:col-span-3">
-                <label className="text-sm font-medium text-muted-foreground">Notes</label>
-                <p className="text-sm">{quotation.notes}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Items */}
+        {/* Items/Products */}
         <Card>
           <CardHeader>
-            <CardTitle>Treasury Quotation Items</CardTitle>
+            <CardTitle>Quotation Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {quotation.items?.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Product Name</label>
-                      <p className="text-sm font-medium">{item.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Location</label>
-                      <p className="text-sm">{item.location}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Monthly Price</label>
-                      <p className="text-sm font-medium">₱{item.price?.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
-                      <p className="text-sm font-medium">₱{item.item_total_amount?.toLocaleString()}</p>
+            {quotation.items && quotation.items.length > 0 ? (
+              <div className="space-y-4">
+                {quotation.items.map((item, index) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Product Name</label>
+                        <p className="text-sm font-medium">{item.name}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Location</label>
+                        <p className="text-sm">{item.location}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Monthly Price</label>
+                        <p className="text-sm font-medium">₱{item.price?.toLocaleString()}</p>
+                      </div>
+                      {item.site_code && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Site Code</label>
+                          <p className="text-sm">{item.site_code}</p>
+                        </div>
+                      )}
+                      {item.type && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Type</label>
+                          <p className="text-sm">{item.type}</p>
+                        </div>
+                      )}
+                      {item.item_total_amount && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
+                          <p className="text-sm font-medium">₱{item.item_total_amount.toLocaleString()}</p>
+                        </div>
+                      )}
                     </div>
                     {item.description && (
-                      <div className="md:col-span-2 lg:col-span-4">
+                      <div className="mt-2">
                         <label className="text-sm font-medium text-muted-foreground">Description</label>
                         <p className="text-sm">{item.description}</p>
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No items found in this quotation.</p>
+            )}
           </CardContent>
         </Card>
 
-        {/* Financial Summary */}
+        {/* Notes */}
+        {quotation.notes && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">{quotation.notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Created By */}
         <Card>
           <CardHeader>
-            <CardTitle>Financial Summary</CardTitle>
+            <CardTitle>Created By</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Duration</p>
-                <p className="text-2xl font-bold">{quotation.duration_days} days</p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Items Count</p>
-                <p className="text-2xl font-bold">{quotation.items?.length || 0}</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-bold text-green-600">₱{quotation.total_amount?.toLocaleString()}</p>
-              </div>
-            </div>
+            <p className="text-sm">
+              {quotation.created_by_first_name || quotation.created_by_last_name
+                ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
+                : "Unknown"}
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      <TreasurySendQuotationDialog
+        isOpen={isSendDialogOpen}
+        onClose={() => setIsSendDialogOpen(false)}
+        quotation={quotation}
+        requestorEmail={quotation.client_email || ""}
+        onQuotationSent={handleQuotationSent}
+      />
+
+      <TreasurySendQuotationOptionsDialog
+        isOpen={isSendOptionsDialogOpen}
+        onClose={() => setIsSendOptionsDialogOpen(false)}
+        quotation={quotation}
+        onEmailClick={() => {
+          setIsSendOptionsDialogOpen(false)
+          setIsSendDialogOpen(true)
+        }}
+      />
     </div>
   )
 }

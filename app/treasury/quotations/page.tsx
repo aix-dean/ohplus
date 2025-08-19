@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight, CheckCircle, Search, X, ChevronsLeft, ChevronsRight, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { GenerateQuotationDialog } from "@/components/generate-quotation-dialog"
+import { TreasuryGenerateQuotationDialog } from "@/components/treasury-generate-quotation-dialog"
 
 export default function TreasuryQuotationsPage() {
   const { user } = useAuth()
@@ -82,7 +82,7 @@ export default function TreasuryQuotationsPage() {
     setLoading(true)
 
     try {
-      const quotationsRef = collection(db, "treasury_quotations")
+      const quotationsRef = collection(db, "quotations")
       const q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"))
 
       const querySnapshot = await getDocs(q)
@@ -94,7 +94,7 @@ export default function TreasuryQuotationsPage() {
 
       setAllQuotations(fetchedQuotations)
     } catch (error) {
-      console.error("Error fetching treasury quotations:", error)
+      console.error("Error fetching quotations:", error)
     } finally {
       setLoading(false)
     }
@@ -161,18 +161,18 @@ export default function TreasuryQuotationsPage() {
 
     try {
       // First, get the full quotation details including items
-      const quotationRef = doc(db, "treasury_quotations", quotation.id)
+      const quotationRef = doc(db, "quotations", quotation.id)
       const quotationDoc = await getDoc(quotationRef)
 
       if (!quotationDoc.exists()) {
-        throw new Error("Treasury quotation not found")
+        throw new Error("Quotation not found")
       }
 
       const fullQuotationData = quotationDoc.data()
       const items = fullQuotationData.items || []
 
       if (items.length === 0) {
-        throw new Error("No items found in treasury quotation")
+        throw new Error("No items found in quotation")
       }
 
       const startDate = fullQuotationData.start_date ? new Date(fullQuotationData.start_date) : new Date()
@@ -216,9 +216,9 @@ export default function TreasuryQuotationsPage() {
             total_amount: periodAmount,
 
             // Document references with period number
-            invoice_no: `TINV-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
-            or_no: `TOR-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
-            bi_no: `TBI-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            invoice_no: `INV-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            or_no: `OR-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            bi_no: `BI-${Date.now()}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
 
             // Payment information
             mode_of_payment: "Credit/Debit Card", // Default payment method
@@ -231,7 +231,7 @@ export default function TreasuryQuotationsPage() {
 
             // Sites-specific fields
             site: item.location || item.site_code || "",
-            booking_no: `TBK-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
+            booking_no: `BK-${quotation.quotation_number}-${productId.toString().slice(-4)}-P${period.periodNumber}`,
 
             // Additional fields from collectibles model
             vendor_name: quotation.client_name || fullQuotationData.client_name || "",
@@ -264,7 +264,7 @@ export default function TreasuryQuotationsPage() {
 
       toast({
         title: "Success",
-        description: `Treasury quote signed successfully! Generated ${results.length} collectible document${results.length > 1 ? "s" : ""} across ${collectionPeriods.length} collection period${collectionPeriods.length > 1 ? "s" : ""}.`,
+        description: `Quote signed successfully! Generated ${results.length} collectible document${results.length > 1 ? "s" : ""} across ${collectionPeriods.length} collection period${collectionPeriods.length > 1 ? "s" : ""}.`,
       })
 
       // Optionally update quotation status to 'accepted'
@@ -290,7 +290,7 @@ export default function TreasuryQuotationsPage() {
     fetchAllQuotations()
     toast({
       title: "Success",
-      description: "Treasury quotation created successfully!",
+      description: "Quotation created successfully!",
     })
   }
 
@@ -352,7 +352,7 @@ export default function TreasuryQuotationsPage() {
 
               {!loading && (
                 <div className="text-sm text-gray-600 mt-2">
-                  Showing {paginatedQuotations.length} of {filteredQuotations.length} treasury quotations
+                  Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
                   {filteredQuotations.length !== allQuotations.length &&
                     ` (filtered from ${allQuotations.length} total)`}
                 </div>
@@ -515,7 +515,6 @@ export default function TreasuryQuotationsPage() {
                   </Table>
                 </CardContent>
 
-                {/* ... existing code for pagination ... */}
                 {totalPages > 1 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
                     <div className="text-sm text-gray-600">
@@ -598,19 +597,13 @@ export default function TreasuryQuotationsPage() {
               <CardContent className="p-6 text-center text-gray-600">
                 {searchTerm || statusFilter !== "all" ? (
                   <div>
-                    <p className="mb-2">No treasury quotations found matching your filters.</p>
+                    <p className="mb-2">No quotations found matching your filters.</p>
                     <Button variant="outline" onClick={clearFilters} size="sm">
                       Clear Filters
                     </Button>
                   </div>
                 ) : (
-                  <div>
-                    <p className="mb-4">No treasury quotations found for your account.</p>
-                    <Button onClick={() => setIsGenerateDialogOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create First Treasury Quotation
-                    </Button>
-                  </div>
+                  <p>No quotations found for your account.</p>
                 )}
               </CardContent>
             )}
@@ -618,13 +611,13 @@ export default function TreasuryQuotationsPage() {
         ) : (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-6 text-center text-gray-600">
-              <p>Please log in to view your treasury quotations.</p>
+              <p>Please log in to view your quotations.</p>
             </CardContent>
           </Card>
         )}
       </div>
 
-      <GenerateQuotationDialog
+      <TreasuryGenerateQuotationDialog
         isOpen={isGenerateDialogOpen}
         onClose={() => setIsGenerateDialogOpen(false)}
         onQuotationCreated={handleQuotationCreated}

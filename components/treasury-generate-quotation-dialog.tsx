@@ -13,16 +13,19 @@ import { format } from "date-fns"
 import { CalendarIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
-import { calculateQuotationTotal, type QuotationProduct } from "@/lib/quotation-service"
+import {
+  createQuotation,
+  generateQuotationNumber,
+  calculateQuotationTotal,
+  type QuotationProduct,
+} from "@/lib/quotation-service"
 import { getAllClients, type Client } from "@/lib/client-service"
 import { getProducts, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
-interface GenerateTreasuryQuotationDialogProps {
+interface TreasuryGenerateQuotationDialogProps {
   isOpen: boolean
   onClose: () => void
   onQuotationCreated: (quotationId: string) => void
@@ -30,13 +33,13 @@ interface GenerateTreasuryQuotationDialogProps {
   initialProductIds?: string[]
 }
 
-export function GenerateTreasuryQuotationDialog({
+export function TreasuryGenerateQuotationDialog({
   isOpen,
   onClose,
   onQuotationCreated,
   initialClientId,
   initialProductIds,
-}: GenerateTreasuryQuotationDialogProps) {
+}: TreasuryGenerateQuotationDialogProps) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
@@ -53,14 +56,6 @@ export function GenerateTreasuryQuotationDialog({
   const [notes, setNotes] = useState("")
   const [totalAmount, setTotalAmount] = useState(0)
   const [durationDays, setDurationDays] = useState(0)
-
-  const generateTreasuryQuotationNumber = () => {
-    const timestamp = Date.now().toString().slice(-6)
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")
-    return `TQ-${timestamp}-${random}`
-  }
 
   useEffect(() => {
     async function fetchData() {
@@ -79,7 +74,7 @@ export function GenerateTreasuryQuotationDialog({
           }
         }
       } catch (error) {
-        console.error("Error fetching data for treasury quotation dialog:", error)
+        console.error("Error fetching data for quotation dialog:", error)
         toast({
           title: "Error",
           description: "Failed to load clients or products.",
@@ -140,7 +135,7 @@ export function GenerateTreasuryQuotationDialog({
 
     setLoading(true)
     try {
-      const quotationNumber = generateTreasuryQuotationNumber()
+      const quotationNumber = generateQuotationNumber()
       const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id))
 
       const quotationProducts: QuotationProduct[] = selectedProducts.map((p) => ({
@@ -186,17 +181,14 @@ export function GenerateTreasuryQuotationDialog({
         created_by_last_name: user?.displayName?.split(" ").slice(1).join(" ") || "",
         seller_id: user?.uid || "unknown",
         items: quotationProducts,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
       }
 
-      const docRef = await addDoc(collection(db, "treasury_quotations"), newQuotationData)
-
+      const quotationId = await createQuotation(newQuotationData)
       toast({
         title: "Success",
-        description: `Treasury Quotation ${quotationNumber} created successfully!`,
+        description: `Treasury quotation ${quotationNumber} created successfully!`,
       })
-      onQuotationCreated(docRef.id)
+      onQuotationCreated(quotationId)
       onClose()
     } catch (error) {
       console.error("Error creating treasury quotation:", error)
@@ -363,7 +355,7 @@ export function GenerateTreasuryQuotationDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="col-span-3"
-              placeholder="Any additional notes for the treasury quotation"
+              placeholder="Any additional notes for the quotation"
             />
           </div>
 
