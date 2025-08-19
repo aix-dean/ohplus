@@ -83,7 +83,7 @@ export default function TreasuryQuotationsPage() {
       const q = query(
         quotationsRef,
         where("created_by", "==", user.uid),
-        where("status", "==", "accepted"),
+        where("projectCompliance.signedQuotation.status", "==", "completed"),
         orderBy("created", "desc"),
       )
 
