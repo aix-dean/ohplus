@@ -18,7 +18,6 @@ import {
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -363,14 +362,10 @@ export default function TreasuryQuotationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                    <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Contract Date</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Client Name</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Contract Amount</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Contract Reference</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -384,18 +379,6 @@ export default function TreasuryQuotationsPage() {
                         </TableCell>
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-48" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-28" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-36" />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <Skeleton className="h-4 w-20" />
                         </TableCell>
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-24" />
@@ -416,14 +399,10 @@ export default function TreasuryQuotationsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50 border-b border-gray-200">
-                        <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                        <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Contract Date</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Client Name</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Contract Amount</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Contract Reference</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -441,37 +420,6 @@ export default function TreasuryQuotationsPage() {
                             onClick={() => router.push(`/treasury/quotations/${quotation.id}`)}
                           >
                             {quotation.client_name || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/treasury/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_address || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/treasury/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_phone || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 text-sm text-gray-700 cursor-pointer"
-                            onClick={() => router.push(`/treasury/quotations/${quotation.id}`)}
-                          >
-                            {quotation.client_designation || "N/A"}
-                          </TableCell>
-                          <TableCell
-                            className="py-3 cursor-pointer"
-                            onClick={() => router.push(`/treasury/quotations/${quotation.id}`)}
-                          >
-                            <Badge
-                              variant="outline"
-                              className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                                quotation.status,
-                              )}`}
-                            >
-                              {quotation.status}
-                            </Badge>
                           </TableCell>
                           <TableCell
                             className="py-3 text-sm text-gray-700 cursor-pointer"
@@ -504,7 +452,7 @@ export default function TreasuryQuotationsPage() {
                               ) : (
                                 <>
                                   <CheckCircle className="h-3 w-3 mr-1" />
-                                  Quote Signed
+                                  Generate Collectibles
                                 </>
                               )}
                             </Button>
