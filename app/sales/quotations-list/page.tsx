@@ -50,7 +50,8 @@ import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
 
-export default function SalesQuotationsPage() {
+export default function QuotationsListPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [allQuotations, setAllQuotations] = useState<any[]>([])
@@ -66,7 +67,6 @@ export default function SalesQuotationsPage() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
-  const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
 
@@ -670,6 +670,51 @@ export default function SalesQuotationsPage() {
     }
   }
 
+  const validateComplianceForJO = (quotation: any) => {
+    const compliance = quotation.projectCompliance || {}
+
+    // Required compliance items (excluding Payment as Deposit)
+    const requiredItems = [
+      { key: "signedQuotation", name: "Signed Quotation" },
+      { key: "signedContract", name: "Signed Contract" },
+      { key: "poMo", name: "PO/MO" },
+      { key: "finalArtwork", name: "Final Artwork" },
+    ]
+
+    const missingItems = requiredItems.filter((item) => compliance[item.key]?.status !== "completed")
+
+    return {
+      isValid: missingItems.length === 0,
+      missingItems: missingItems.map((item) => item.name),
+    }
+  }
+
+  const handleCreateJO = (quotationId: string) => {
+    const quotation = quotations.find((q) => q.id === quotationId)
+    if (!quotation) {
+      toast({
+        title: "Error",
+        description: "Quotation not found. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const validation = validateComplianceForJO(quotation)
+
+    if (!validation.isValid) {
+      toast({
+        title: "Compliance Requirements Not Met",
+        description: `Please complete the following items before creating a Job Order: ${validation.missingItems.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Navigate to JO creation with the quotation ID
+    router.push(`/sales/job-orders/create?quotationId=${quotationId}`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -955,7 +1000,7 @@ export default function SalesQuotationsPage() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => console.log("Create JO for", quotation.id)}>
+                                    <DropdownMenuItem onClick={() => handleCreateJO(quotation.id)}>
                                       Create JO
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
