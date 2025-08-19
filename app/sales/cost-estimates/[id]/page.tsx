@@ -19,9 +19,6 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   DownloadIcon,
@@ -32,9 +29,11 @@ import {
   Loader2,
   LayoutGrid,
   Pencil,
-  CalendarIcon,
   Save,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Building,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -54,6 +53,29 @@ import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-s
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+
+interface CompanyData {
+  id: string
+  name?: string
+  company_location?: any
+  address?: any
+  company_website?: string
+  website?: string
+  photo_url?: string
+  contact_person?: string
+  email?: string
+  phone?: string
+  social_media?: {
+    facebook?: string
+    instagram?: string
+    youtube?: string
+  }
+  created_by?: string
+  created?: Date
+  updated?: Date
+}
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -63,7 +85,7 @@ const generateQRCodeUrl = (costEstimateId: string) => {
 
 export default function CostEstimateDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
 
   const { toast } = useToast()
 
@@ -87,6 +109,84 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
   const [showPageSelection, setShowPageSelection] = useState(false)
   const [selectedPages, setSelectedPages] = useState<string[]>([])
+  const [currentProductIndex, setCurrentProductIndex] = useState(0)
+  const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null)
+
+  const fetchCompanyData = async () => {
+    if (!user?.uid || !userData) return
+
+    try {
+      let companyDoc = null
+      let companyDataResult = null
+
+      // First, try to find company by company_id if it exists in userData
+      if (userData?.company_id) {
+        try {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          const companyDocSnap = await getDoc(companyDocRef)
+
+          if (companyDocSnap.exists()) {
+            companyDoc = companyDocSnap
+            companyDataResult = companyDocSnap.data()
+          }
+        } catch (error) {
+          console.error("Error fetching company by company_id:", error)
+        }
+      }
+
+      // If no company found by company_id, try other methods
+      if (!companyDoc) {
+        // Try to find company by created_by field
+        let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+        let companiesSnapshot = await getDocs(companiesQuery)
+
+        // If no company found by created_by, try to find by email or other identifiers
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        // If still no company found, try to find by contact_person email
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        if (!companiesSnapshot.empty) {
+          companyDoc = companiesSnapshot.docs[0]
+          companyDataResult = companyDoc.data()
+        }
+      }
+
+      if (companyDoc && companyDataResult) {
+        const company: CompanyData = {
+          id: companyDoc.id,
+          name: companyDataResult.name,
+          company_location: companyDataResult.company_location || companyDataResult.address,
+          company_website: companyDataResult.company_website || companyDataResult.website,
+          photo_url: companyDataResult.photo_url,
+          contact_person: companyDataResult.contact_person,
+          email: companyDataResult.email,
+          phone: companyDataResult.phone,
+          social_media: companyDataResult.social_media || {},
+          created_by: companyDataResult.created_by,
+          created: companyDataResult.created?.toDate
+            ? companyDataResult.created.toDate()
+            : companyDataResult.created_at?.toDate(),
+          updated: companyDataResult.updated?.toDate
+            ? companyDataResult.updated.toDate()
+            : companyDataResult.updated_at?.toDate(),
+        }
+
+        setCompanyData(company)
+      } else {
+        setCompanyData(null)
+      }
+    } catch (error) {
+      console.error("Error fetching company data:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -126,6 +226,24 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
     fetchCostEstimateData()
   }, [costEstimateId, router, toast])
+
+  useEffect(() => {
+    if (user && userData) {
+      fetchCompanyData()
+    }
+  }, [user, userData])
+
+  useEffect(() => {
+    const fetchProjectData = async () => {
+      // Simulate fetching project data
+      setProjectData({
+        company_logo: "/path/to/company-logo.svg",
+        company_name: "OH Plus Outdoor Advertising",
+      })
+    }
+
+    fetchProjectData()
+  }, [])
 
   useEffect(() => {
     if (isSendEmailDialogOpen && costEstimate) {
@@ -455,6 +573,20 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     }
   }
 
+  const handleNextProduct = () => {
+    if (!costEstimate) return
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const totalProducts = Object.keys(siteGroups).length
+    setCurrentProductIndex((prev) => (prev + 1) % totalProducts)
+  }
+
+  const handlePreviousProduct = () => {
+    if (!costEstimate) return
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const totalProducts = Object.keys(siteGroups).length
+    setCurrentProductIndex((prev) => (prev - 1 + totalProducts) % totalProducts)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
@@ -554,9 +686,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites
-      ? `Cost Estimate for ${costEstimate?.client?.company || costEstimate?.client?.name} – ${siteName}`
-      : costEstimate?.title
+    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
@@ -565,446 +695,201 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
-        {/* Document Header */}
-        <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+        <div className="p-6 sm:p-8 border-b">
+          <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
-              <p className="text-sm text-gray-500 flex items-center gap-2">
-                {uniqueCENumber}
-                {isEditing && (
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                    <Pencil className="h-3 w-3 mr-1" /> Editing
-                  </Badge>
-                )}
+              <p className="text-sm text-gray-600 mb-2">
+                {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
               </p>
-            </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-              {/* QR Code */}
-              <div className="flex flex-col items-center">
-                <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                  <img
-                    src={generateQRCodeUrl(costEstimate?.id || "") || "/placeholder.svg"}
-                    alt="QR Code for cost estimate view"
-                    className="w-20 h-20"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
+              <div className="space-y-1">
+                <p className="font-semibold text-gray-900">{costEstimate?.client.name}</p>
+                <p className="text-gray-700">{costEstimate?.client.company}</p>
               </div>
-              <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
             </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">RFQ No.</p>
+              <p className="font-semibold text-gray-900">{uniqueCENumber}</p>
+            </div>
+          </div>
+
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
+          </div>
+
+          <div className="mb-6">
+            <p className="font-semibold text-gray-900 mb-2">Details as follows:</p>
           </div>
         </div>
 
-        {/* Document Content */}
-        <div className="p-6 sm:p-8">
-          {/* Cost Estimate Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Cost Estimate Information
-            </h2>
+        <div className="p-4 sm:p-6">
+          <div className="space-y-2 mb-6">
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Site Location</span>
+              <span className="text-gray-700">: {siteName}</span>
+            </div>
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Type</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
+            </div>
+            {siteLineItems[0] && (
+              <div className="flex">
+                <span className="w-4 text-center">•</span>
+                <span className="font-medium text-gray-700 w-32">Size</span>
+                <span className="text-gray-700">: {siteLineItems[0].notes || "Standard Size"}</span>
+              </div>
+            )}
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Contract Duration</span>
+              <span className="text-gray-700">: {costEstimate?.durationDays} DAYS</span>
+            </div>
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Contract Period</span>
+              <span className="text-gray-700">
+                : {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
+                {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
+              </span>
+            </div>
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Proposal to</span>
+              <span className="text-gray-700">: {costEstimate?.client.company}</span>
+            </div>
+            {siteLineItems.length > 0 && (
+              <div className="flex">
+                <span className="w-4 text-center">•</span>
+                <span className="font-medium text-gray-700 w-32">Illumination</span>
+                <span className="text-gray-700">: {siteLineItems[0].quantity} units of lighting system</span>
+              </div>
+            )}
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
+              <span className="text-gray-700">
+                : PHP{" "}
+                {(
+                  siteTotal / (costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1)
+                ).toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
+                (Exclusive of VAT)
+              </span>
+            </div>
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Total Lease</span>
+              <span className="text-gray-700">
+                : PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+              </span>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="title" className="text-sm font-medium text-gray-500 mb-2">
-                  Title
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="title"
-                    name="title"
-                    value={editableCostEstimate?.title || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base font-medium text-gray-900">{adjustedTitle}</p>
-                )}
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Lease rate per month</span>
+                <span className="text-gray-900">
+                  PHP{" "}
+                  {(
+                    siteTotal / (costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1)
+                  ).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                <p className="text-base text-gray-900">{costEstimate ? format(costEstimate.createdAt, "PPP") : ""}</p>
+              <div className="flex justify-between">
+                <span className="text-gray-700">
+                  x {costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1} months
+                </span>
+                <span className="text-gray-900">
+                  PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
               </div>
-              <div>
-                <Label htmlFor="startDate" className="text-sm font-medium text-gray-500 mb-2">
-                  Start Date
-                </Label>
-                {isEditing ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal mt-1",
-                          !editableCostEstimate?.startDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editableCostEstimate?.startDate ? (
-                          format(editableCostEstimate.startDate, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={editableCostEstimate?.startDate}
-                        onSelect={(date) => handleDateChange(date, "startDate")}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <p className="text-base text-gray-900">
-                    {costEstimate?.startDate ? format(costEstimate.startDate, "PPP") : "N/A"}
-                  </p>
-                )}
+              <div className="flex justify-between">
+                <span className="text-gray-700">12% VAT</span>
+                <span className="text-gray-900">
+                  PHP {(siteTotal * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
               </div>
-              <div>
-                <Label htmlFor="endDate" className="text-sm font-medium text-gray-500 mb-2">
-                  End Date
-                </Label>
-                {isEditing ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal mt-1",
-                          !editableCostEstimate?.endDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editableCostEstimate?.endDate ? (
-                          format(editableCostEstimate.endDate, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={editableCostEstimate?.endDate}
-                        onSelect={(date) => handleDateChange(date, "endDate")}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <p className="text-base text-gray-900">
-                    {costEstimate?.endDate ? format(costEstimate.endDate, "PPP") : "N/A"}
-                  </p>
-                )}
+              <div className="border-t pt-2 mt-2">
+                <div className="flex justify-between font-bold text-lg">
+                  <span className="text-gray-900">TOTAL</span>
+                  <span className="text-gray-900">
+                    PHP {(siteTotal * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="validUntil" className="text-sm font-medium text-gray-500 mb-2">
-                  Valid Until
-                </Label>
-                {isEditing ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal mt-1",
-                          !editableCostEstimate?.validUntil && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editableCostEstimate?.validUntil ? (
-                          format(editableCostEstimate.validUntil, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={editableCostEstimate?.validUntil}
-                        onSelect={(date) => handleDateChange(date, "validUntil")}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <p className="text-base text-gray-900">
-                    {costEstimate?.validUntil ? format(costEstimate.validUntil, "PPP") : "N/A"}
-                  </p>
-                )}
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="font-semibold text-gray-900 mb-3">Terms and Conditions:</h3>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p>1. Quotation validity: 5 working days.</p>
+              <p>
+                2. Availability of the site is on first-come-first-served basis only. Only official documents such as
+                P.O.'s, Media Orders, signed quotation, & contracts are accepted in order to be booked the site.
+              </p>
+              <p>3. To book the site, one (1) month advance and one (2) months security deposit.</p>
+              <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
+              <p>4. Final artwork should be approved ten (10) days before the contract period</p>
+              <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
+            </div>
+          </div>
+
+          <div className="mt-12 mb-8">
+            <div className="flex justify-between items-start">
+              {/* Left side - Company signature */}
+              <div className="w-1/2">
+                <p className="text-sm text-gray-700 mb-8">Very truly yours,</p>
+                <div className="mb-2">
+                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
+                </div>
+                <p className="text-sm font-medium text-gray-900">
+                  {userData?.firstName} {userData?.lastName}
+                </p>
+                <p className="text-sm text-gray-600">Account Management</p>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                <p className="text-base font-semibold text-gray-900">
-                  ₱{hasMultipleSites ? siteTotal.toLocaleString() : costEstimate?.totalAmount.toLocaleString() || "0"}
+
+              {/* Right side - Client conforme */}
+              <div className="w-1/2 pl-8">
+                <p className="text-sm text-gray-700 mb-8">Conforme:</p>
+                <div className="mb-2">
+                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
+                </div>
+                <p className="text-sm font-medium text-gray-900">{costEstimate?.clientName || "Client Name"}</p>
+                <p className="text-sm text-gray-600">{costEstimate?.clientCompany || "Client Company"}</p>
+                <p className="text-sm text-gray-500 italic mt-2">
+                  This signed quotation serves as an
+                  <br />
+                  official document for billing purposes
                 </p>
               </div>
-              {costEstimate?.durationDays !== null && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Duration</h3>
-                  <p className="text-base text-gray-900">
-                    {costEstimate?.durationDays} day{costEstimate?.durationDays !== 1 ? "s" : ""}
-                  </p>
-                </div>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="text-center text-xs text-gray-500">
+              <p className="flex items-center justify-center gap-2 mb-2">
+                <span>{companyData?.company_location || ""}</span>
+                <span>📞</span>
+                <span>🔒</span>
+                <span>📋</span>
+                <span>🗑️</span>
+                <span>•••</span>
+                <span>phone: {companyData?.phone || ""}</span>
+              </p>
+              {costEstimate?.validUntil && (
+                <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+              )}
+              <p className="mt-1">
+                © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
+              </p>
+              {hasMultipleSites && (
+                <p className="mt-2 font-medium">
+                  Page {pageNumber} of {totalPages}
+                </p>
               )}
             </div>
-          </div>
-
-          {/* Client Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Client Information
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="client.company" className="text-sm font-medium text-gray-500 mb-2">
-                  Company
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.company"
-                    name="client.company"
-                    value={editableCostEstimate?.client.company || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base font-medium text-gray-900">{costEstimate?.client.company}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="client.contactPerson" className="text-sm font-medium text-gray-500 mb-2">
-                  Contact Person
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.contactPerson"
-                    name="client.contactPerson"
-                    value={editableCostEstimate?.client.name || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.name}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="client.designation" className="text-sm font-medium text-gray-500 mb-2">
-                  Designation
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.designation"
-                    name="client.designation"
-                    value={editableCostEstimate?.client.designation || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.designation || "N/A"}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="client.email" className="text-sm font-medium text-gray-500 mb-2">
-                  Email
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.email"
-                    name="client.email"
-                    type="email"
-                    value={editableCostEstimate?.client.email || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.email}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="client.phone" className="text-sm font-medium text-gray-500 mb-2">
-                  Phone
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.phone"
-                    name="client.phone"
-                    value={editableCostEstimate?.client.phone || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.phone}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="client.industry" className="text-sm font-medium text-gray-500 mb-2">
-                  Industry
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="client.industry"
-                    name="client.industry"
-                    value={editableCostEstimate?.client.industry || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.industry || "N/A"}</p>
-                )}
-              </div>
-            </div>
-
-            {(costEstimate?.client.address || isEditing) && (
-              <div className="mt-4">
-                <Label htmlFor="client.address" className="text-sm font-medium text-gray-500 mb-2">
-                  Address
-                </Label>
-                {isEditing ? (
-                  <Textarea
-                    id="client.address"
-                    name="client.address"
-                    value={editableCostEstimate?.client.address || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.address}</p>
-                )}
-              </div>
-            )}
-
-            {(costEstimate?.client.campaignObjective || isEditing) && (
-              <div className="mt-4">
-                <Label htmlFor="client.campaignObjective" className="text-sm font-medium text-gray-500 mb-2">
-                  Campaign Objective
-                </Label>
-                {isEditing ? (
-                  <Textarea
-                    id="client.campaignObjective"
-                    name="client.campaignObjective"
-                    value={editableCostEstimate?.client.campaignObjective || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-base text-gray-900">{costEstimate?.client.campaignObjective}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Cost Breakdown */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Cost Breakdown
-            </h2>
-
-            <div className="border border-gray-300 rounded-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                      Description
-                    </th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Quantity</th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                      Unit Price
-                    </th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {siteLineItems.map((item, index) => (
-                    <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <div className="font-medium text-gray-900">{item.description}</div>
-                        {item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}
-                      </td>
-                      <td className="py-3 px-4 border-b border-gray-200">{item.quantity}</td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        ₱{item.unitPrice.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        <div className="font-medium text-gray-900">₱{item.total.toLocaleString()}</div>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                      Total Estimated Cost:
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-blue-600">₱{siteTotal.toLocaleString()}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Additional Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Additional Information
-            </h2>
-
-            {(costEstimate?.customMessage || isEditing) && (
-              <div className="mb-4">
-                <Label htmlFor="customMessage" className="text-sm font-medium text-gray-500 mb-2">
-                  Custom Message
-                </Label>
-                {isEditing ? (
-                  <Textarea
-                    id="customMessage"
-                    name="customMessage"
-                    value={editableCostEstimate?.customMessage || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
-                    <p className="text-sm text-gray-700 leading-relaxed">{costEstimate?.customMessage}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(costEstimate?.notes || isEditing) && (
-              <div>
-                <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
-                  Internal Notes
-                </Label>
-                {isEditing ? (
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    value={editableCostEstimate?.notes || ""}
-                    onChange={handleChange}
-                    className="mt-1"
-                  />
-                ) : (
-                  <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                    <p className="text-sm text-gray-700 leading-relaxed">{costEstimate?.notes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Document Footer */}
-          <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-            {costEstimate?.validUntil && (
-              <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
-            )}
-            <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
-            {hasMultipleSites && (
-              <p className="mt-2 font-medium">
-                Page {pageNumber} of {totalPages}
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -1014,7 +899,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const statusConfig = getStatusConfig(costEstimate.status)
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 relative">
+    <div className="min-h-screen bg-gray-50">
       <style jsx>{`
         @media print {
           .page-break-before {
@@ -1090,11 +975,35 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         </div>
 
         <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-          {hasMultipleSites
-            ? // Render separate pages for each site
-              siteNames.map((siteName, index) => renderCostEstimationBlock(siteName, siteGroups[siteName], index + 1))
-            : // Render single page for single site (original behavior)
-              renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              {companyData?.photo_url ? (
+                <img
+                  src={companyData.photo_url || "/placeholder.svg"}
+                  alt="Company Logo"
+                  className="h-16 w-auto object-contain"
+                />
+              ) : (
+                <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Building className="h-8 w-8 text-gray-400" />
+                </div>
+              )}
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+          </div>
+
+          {hasMultipleSites ? (
+            <>
+              {renderCostEstimationBlock(
+                siteNames[currentProductIndex],
+                siteGroups[siteNames[currentProductIndex]],
+                currentProductIndex + 1,
+              )}
+            </>
+          ) : (
+            // Render single page for single site (original behavior)
+            renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+          )}
 
           {proposal && (
             <div className="p-6 sm:p-8 border-t border-gray-200">
@@ -1168,6 +1077,40 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </Button>
           </div>
         )
+      )}
+
+      {/* Floating Navigation for Multiple Sites */}
+      {hasMultipleSites && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center gap-4 px-6 py-3 bg-white border border-gray-200 rounded-lg shadow-lg">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePreviousProduct}
+              disabled={Object.keys(siteGroups).length <= 1}
+              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <div className="relative">
+              <span className="text-sm font-medium text-gray-700 px-4">
+                Product {currentProductIndex + 1} of {Object.keys(siteGroups).length}
+              </span>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextProduct}
+              disabled={Object.keys(siteGroups).length <= 1}
+              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Send Cost Estimate Options Dialog */}
