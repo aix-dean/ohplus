@@ -1090,7 +1090,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               disabled={Object.keys(siteGroups).length <= 1}
               className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
             >
-              <ChevronLeft className="h-4 w-4" />
+              
               Previous
             </Button>
             <div className="relative">
@@ -1107,7 +1107,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
             >
               Next
-              <ChevronRight className="h-4 w-4" />
+              
             </Button>
           </div>
         </div>
