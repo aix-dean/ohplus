@@ -881,7 +881,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="text-center text-xs text-gray-500">
               <p className="flex items-center justify-center gap-2 mb-2">
-                <span>{companyData?.address.street || companyData?.address || ""}</span>
+                <span>{companyData?.address || companyData?.address || ""}</span>
                 {companyData?.phone && (
                   <>
                     <span>•</span>
