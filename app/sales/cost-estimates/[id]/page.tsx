@@ -1095,7 +1095,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </Button>
             <div className="relative">
               <span className="text-sm font-medium text-gray-700 px-4">
-                Product {currentProductIndex + 1} of {Object.keys(siteGroups).length}
+                {currentProductIndex + 1} of {Object.keys(siteGroups).length}
               </span>
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
             </div>
