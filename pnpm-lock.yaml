@@ -140,9 +140,6 @@ importers:
       firebase:
         specifier: latest
         version: 12.1.0
-      html2canvas:
-        specifier: latest
-        version: 1.4.1
       https:
         specifier: latest
         version: 1.0.0
@@ -6082,7 +6079,8 @@ snapshots:
 
   balanced-match@1.0.2: {}
 
-  base64-arraybuffer@1.0.2: {}
+  base64-arraybuffer@1.0.2:
+    optional: true
 
   binary-extensions@2.3.0: {}
 
@@ -6231,6 +6229,7 @@ snapshots:
   css-line-break@2.1.0:
     dependencies:
       utrie: 1.0.2
+    optional: true
 
   cssesc@3.0.0: {}
 
@@ -6962,6 +6961,7 @@ snapshots:
     dependencies:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
+    optional: true
 
   htmlparser2@8.0.2:
     dependencies:
@@ -8047,6 +8047,7 @@ snapshots:
   text-segmentation@1.0.3:
     dependencies:
       utrie: 1.0.2
+    optional: true
 
   text-table@0.2.0: {}
 
@@ -8196,6 +8197,7 @@ snapshots:
   utrie@1.0.2:
     dependencies:
       base64-arraybuffer: 1.0.2
+    optional: true
 
   v8-compile-cache@2.4.0: {}
 

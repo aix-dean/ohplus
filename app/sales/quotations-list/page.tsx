@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   CheckCircle,
   Search,
@@ -36,10 +37,18 @@ import {
   Upload,
   FileText,
   Loader2,
+  Share2,
+  Copy,
+  Mail,
+  MessageSquare,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Check,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { copyQuotation, getQuotationById } from "@/lib/quotation-service"
+import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -54,6 +63,9 @@ export default function SalesQuotationsPage() {
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
   const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -493,211 +505,12 @@ export default function SalesQuotationsPage() {
         throw new Error("Quotation not found")
       }
 
-      // Import jsPDF and html2canvas for PDF generation
-      const { jsPDF } = await import("jspdf")
-      const html2canvas = (await import("html2canvas")).default
-
-      // Create a temporary container for the quotation content
-      const tempContainer = document.createElement("div")
-      tempContainer.style.position = "absolute"
-      tempContainer.style.left = "-9999px"
-      tempContainer.style.top = "0"
-      tempContainer.style.width = "210mm" // A4 width
-      tempContainer.style.backgroundColor = "white"
-      tempContainer.style.padding = "20mm"
-      tempContainer.style.fontFamily = "Arial, sans-serif"
-
-      // Generate the quotation HTML content (similar to the detail page)
-      tempContainer.innerHTML = `
-        <div style="max-width: 170mm; margin: 0 auto; background: white; font-size: 12px; line-height: 1.4;">
-          <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px;">
-            <div>
-              <h1 style="font-size: 28px; font-weight: bold; color: #1f2937; margin: 0;">QUOTATION</h1>
-              <p style="color: #6b7280; margin: 5px 0 0 0;">${quotation.quotation_number || "N/A"}</p>
-            </div>
-            <div style="text-align: right;">
-              <div style="width: 60px; height: 60px; border: 1px solid #d1d5db; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280;">
-                QR Code
-              </div>
-              <p style="font-size: 10px; color: #6b7280; margin: 5px 0 0 0;">Scan for more details</p>
-            </div>
-          </div>
-
-          <!-- Quotation Information -->
-          <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Quotation Information</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-              <div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">Quotation Number:</span><br>
-                  <span style="color: #6b7280;">${quotation.quotation_number || "N/A"}</span>
-                </div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">Start Date:</span><br>
-                  <span style="color: #6b7280;">${quotation.start_date ? new Date(quotation.start_date).toLocaleDateString() : "N/A"}</span>
-                </div>
-                <div>
-                  <span style="font-weight: 600; color: #374151;">Valid Until:</span><br>
-                  <span style="color: #6b7280;">${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}</span>
-                </div>
-              </div>
-              <div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">Created Date:</span><br>
-                  <span style="color: #6b7280;">${quotation.created ? new Date(quotation.created.toDate()).toLocaleDateString() : "N/A"}</span>
-                </div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">End Date:</span><br>
-                  <span style="color: #6b7280;">${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}</span>
-                </div>
-                <div>
-                  <span style="font-weight: 600; color: #374151;">Total Amount:</span><br>
-                  <span style="color: #6b7280; font-weight: bold;">₱${quotation.total_amount?.toLocaleString() || "0.00"}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Client Information -->
-          <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Client Information</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-              <div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">Client Name:</span><br>
-                  <span style="color: #6b7280;">${quotation.client_name || "N/A"}</span>
-                </div>
-                <div>
-                  <span style="font-weight: 600; color: #374151;">Designation:</span><br>
-                  <span style="color: #6b7280;">${quotation.client_designation || "N/A"}</span>
-                </div>
-              </div>
-              <div>
-                <div style="margin-bottom: 10px;">
-                  <span style="font-weight: 600; color: #374151;">Client Email:</span><br>
-                  <span style="color: #6b7280;">${quotation.client_email || "N/A"}</span>
-                </div>
-                <div>
-                  <span style="font-weight: 600; color: #374151;">Phone:</span><br>
-                  <span style="color: #6b7280;">${quotation.client_phone || "N/A"}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Products & Services -->
-          <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 14px; font-weight: bold; color: #1f2937; margin: 0 0 15px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Product & Services</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
-              <thead>
-                <tr style="background-color: #f9fafb;">
-                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Product</th>
-                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Type</th>
-                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left; font-weight: 600; color: #374151;">Location</th>
-                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; font-weight: 600; color: #374151;">Price (Monthly)</th>
-                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; font-weight: 600; color: #374151;">Item Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  quotation.items
-                    ?.map(
-                      (item) => `
-                  <tr>
-                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.name || "N/A"}</td>
-                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.type || "N/A"}</td>
-                    <td style="border: 1px solid #e5e7eb; padding: 8px; color: #6b7280;">${item.location || "N/A"}</td>
-                    <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #6b7280;">₱${item.price?.toLocaleString() || "0.00"}</td>
-                    <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #6b7280;">₱${item.item_total_amount?.toLocaleString() || "0.00"}</td>
-                  </tr>
-                `,
-                    )
-                    .join("") ||
-                  '<tr><td colspan="5" style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; color: #6b7280;">No items found</td></tr>'
-                }
-              </tbody>
-              <tfoot>
-                <tr style="background-color: #f9fafb; font-weight: bold;">
-                  <td colspan="4" style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #374151;">Total Amount:</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right; color: #374151;">₱${quotation.total_amount?.toLocaleString() || "0.00"}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Footer -->
-          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #6b7280;">
-            <p style="margin: 0;">This quotation is valid until ${quotation.end_date ? new Date(quotation.end_date).toLocaleDateString() : "N/A"}.</p>
-            <p style="margin: 5px 0 0 0;">© 2024 OOH Outdoor Advertising. All rights reserved.</p>
-          </div>
-        </div>
-      `
-
-      document.body.appendChild(tempContainer)
-
-      // Generate PDF from the HTML content
-      const canvas = await html2canvas(tempContainer, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-      })
-
-      document.body.removeChild(tempContainer)
-
-      const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF("p", "mm", "a4")
-      const imgWidth = 210
-      const pageHeight = 295
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-
-      let position = 0
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
-      // Create blob and open in popup
-      const pdfBlob = pdf.output("blob")
-      const blobUrl = URL.createObjectURL(pdfBlob)
-
-      // Open PDF in a popup window
-      const popup = window.open("", "_blank", "width=800,height=900,scrollbars=yes,resizable=yes")
-      if (popup) {
-        popup.document.write(`
-          <html>
-            <head>
-              <title>Quotation ${quotation.quotation_number}</title>
-              <style>
-                body { margin: 0; padding: 0; }
-                iframe { width: 100%; height: 100vh; border: none; }
-              </style>
-            </head>
-            <body>
-              <iframe src="${blobUrl}" type="application/pdf"></iframe>
-            </body>
-          </html>
-        `)
-        popup.document.close()
-      } else {
-        // Fallback: download if popup is blocked
-        const link = document.createElement("a")
-        link.href = blobUrl
-        link.download = `quotation-${quotation.quotation_number}.pdf`
-        link.click()
-      }
+      // Generate and download the PDF
+      await generateQuotationPDF(quotation)
 
       toast({
         title: "Success",
-        description: "Quotation PDF opened in popup window",
+        description: "Quotation PDF generated and downloaded successfully",
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
@@ -712,6 +525,148 @@ export default function SalesQuotationsPage() {
         newSet.delete(quotationId)
         return newSet
       })
+    }
+  }
+
+  const handleShareQuotation = async (quotationId: string) => {
+    try {
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+      setSelectedQuotationForShare(quotation)
+      setShareDialogOpen(true)
+    } catch (error: any) {
+      console.error("Error loading quotation for sharing:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load quotation details for sharing",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const generateShareableLink = (quotation: any) => {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    return `${baseUrl}/sales/quotations/${quotation.id}`
+  }
+
+  const generateShareText = (quotation: any) => {
+    return `Check out this quotation: ${quotation.quotation_number || "Quotation"} for ${quotation.client_name || "Client"} - ${quotation.items?.[0]?.name || "Service"}`
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedToClipboard(true)
+      setTimeout(() => setCopiedToClipboard(false), 2000)
+      toast({
+        title: "Copied!",
+        description: "Link copied to clipboard successfully",
+      })
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error)
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy to clipboard. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const shareViaEmail = (quotation: any) => {
+    const subject = encodeURIComponent(`Quotation: ${quotation.quotation_number || "New Quotation"}`)
+    const body = encodeURIComponent(
+      `${generateShareText(quotation)}\n\nView details: ${generateShareableLink(quotation)}`,
+    )
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`
+    window.open(mailtoUrl, "_blank")
+
+    toast({
+      title: "Email Client Opened",
+      description: "Your email client has been opened with the quotation details",
+    })
+  }
+
+  const shareViaSMS = (quotation: any) => {
+    const text = encodeURIComponent(`${generateShareText(quotation)} ${generateShareableLink(quotation)}`)
+    const smsUrl = `sms:?body=${text}`
+    window.open(smsUrl, "_blank")
+
+    toast({
+      title: "SMS App Opened",
+      description: "Your SMS app has been opened with the quotation details",
+    })
+  }
+
+  const shareViaWhatsApp = (quotation: any) => {
+    const text = encodeURIComponent(`${generateShareText(quotation)} ${generateShareableLink(quotation)}`)
+    const whatsappUrl = `https://wa.me/?text=${text}`
+    window.open(whatsappUrl, "_blank")
+
+    toast({
+      title: "WhatsApp Opened",
+      description: "WhatsApp has been opened with the quotation details",
+    })
+  }
+
+  const shareViaFacebook = (quotation: any) => {
+    const url = encodeURIComponent(generateShareableLink(quotation))
+    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`
+    window.open(facebookUrl, "_blank", "width=600,height=400")
+
+    toast({
+      title: "Facebook Opened",
+      description: "Facebook sharing dialog has been opened",
+    })
+  }
+
+  const shareViaTwitter = (quotation: any) => {
+    const text = encodeURIComponent(generateShareText(quotation))
+    const url = encodeURIComponent(generateShareableLink(quotation))
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`
+    window.open(twitterUrl, "_blank", "width=600,height=400")
+
+    toast({
+      title: "Twitter Opened",
+      description: "Twitter sharing dialog has been opened",
+    })
+  }
+
+  const shareViaLinkedIn = (quotation: any) => {
+    const url = encodeURIComponent(generateShareableLink(quotation))
+    const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`
+    window.open(linkedinUrl, "_blank", "width=600,height=400")
+
+    toast({
+      title: "LinkedIn Opened",
+      description: "LinkedIn sharing dialog has been opened",
+    })
+  }
+
+  const shareViaNativeAPI = async (quotation: any) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Quotation: ${quotation.quotation_number || "New Quotation"}`,
+          text: generateShareText(quotation),
+          url: generateShareableLink(quotation),
+        })
+
+        toast({
+          title: "Shared Successfully",
+          description: "Quotation has been shared successfully",
+        })
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Error sharing:", error)
+          toast({
+            title: "Share Failed",
+            description: "Failed to share quotation. Please try another method.",
+            variant: "destructive",
+          })
+        }
+      }
     }
   }
 
@@ -1016,7 +971,8 @@ export default function SalesQuotationsPage() {
                                         "Print"
                                       )}
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => console.log("Share", quotation.id)}>
+                                    <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
+                                      <Share2 className="w-3 h-3 mr-2" />
                                       Share
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => console.log("Cancel", quotation.id)}>
@@ -1079,6 +1035,132 @@ export default function SalesQuotationsPage() {
           </Card>
         )}
       </div>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Share Quotation
+            </DialogTitle>
+            <DialogDescription>Share this quotation with others using various platforms and methods.</DialogDescription>
+          </DialogHeader>
+
+          {selectedQuotationForShare && (
+            <div className="space-y-4">
+              {/* Quotation Info */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-900">
+                  {selectedQuotationForShare.quotation_number || "New Quotation"}
+                </div>
+                <div className="text-xs text-gray-600">
+                  {selectedQuotationForShare.client_name} • {selectedQuotationForShare.items?.[0]?.name || "Service"}
+                </div>
+              </div>
+
+              {/* Copy Link */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Share Link</label>
+                <div className="flex gap-2">
+                  <Input value={generateShareableLink(selectedQuotationForShare)} readOnly className="flex-1 text-sm" />
+                  <Button
+                    size="sm"
+                    onClick={() => copyToClipboard(generateShareableLink(selectedQuotationForShare))}
+                    className="flex-shrink-0"
+                  >
+                    {copiedToClipboard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Native Share (if supported) */}
+              {navigator.share && (
+                <Button
+                  onClick={() => shareViaNativeAPI(selectedQuotationForShare)}
+                  className="w-full"
+                  variant="outline"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share via Device
+                </Button>
+              )}
+
+              {/* Share Options */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Share via</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaEmail(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaSMS(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    SMS
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaWhatsApp(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    WhatsApp
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaFacebook(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <Facebook className="w-4 h-4 mr-2" />
+                    Facebook
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaTwitter(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <Twitter className="w-4 h-4 mr-2" />
+                    Twitter
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => shareViaLinkedIn(selectedQuotationForShare)}
+                    className="justify-start"
+                  >
+                    <Linkedin className="w-4 h-4 mr-2" />
+                    LinkedIn
+                  </Button>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
