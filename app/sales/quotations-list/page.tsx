@@ -479,17 +479,30 @@ export default function SalesQuotationsPage() {
                                       {compliance.completed}/{compliance.total}
                                     </span>
                                     <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                                    {isExpanded ? (
-                                      <ChevronDown className="w-3 h-3 text-gray-400" />
-                                    ) : (
-                                      <ChevronRight className="w-3 h-3 text-gray-400" />
-                                    )}
+                                    <div className="transition-transform duration-200 ease-in-out">
+                                      {isExpanded ? (
+                                        <ChevronDown className="w-3 h-3 text-gray-400" />
+                                      ) : (
+                                        <ChevronRight className="w-3 h-3 text-gray-400" />
+                                      )}
+                                    </div>
                                   </div>
 
-                                  {isExpanded && (
-                                    <div className="space-y-1">
+                                  <div
+                                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                      isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                                    }`}
+                                  >
+                                    <div className="space-y-1 pt-1">
                                       {compliance.items.map((item, index) => (
-                                        <div key={index} className="flex items-center justify-between text-xs">
+                                        <div
+                                          key={index}
+                                          className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                          style={{
+                                            animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                            animationDuration: "200ms",
+                                          }}
+                                        >
                                           <div className="flex items-center gap-2">
                                             {item.status === "completed" ? (
                                               <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
@@ -515,12 +528,12 @@ export default function SalesQuotationsPage() {
                                         </div>
                                       ))}
                                       {compliance.items.find((item) => item.note) && (
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-gray-500 mt-1 animate-in fade-in-0 slide-in-from-top-1">
                                           {compliance.items.find((item) => item.note)?.note}
                                         </div>
                                       )}
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell
