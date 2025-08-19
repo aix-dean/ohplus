@@ -629,11 +629,11 @@ export default function SalesQuotationsPage() {
                                           >
                                             <div className="flex items-center gap-2">
                                               {item.status === "completed" ? (
-                                                <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                                                  <CheckCircle className="w-2 h-2 text-white" />
+                                                <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                                  <CheckCircle className="w-3 h-3 text-white" />
                                                 </div>
                                               ) : (
-                                                <div className="w-3 h-3 rounded-full border border-gray-300"></div>
+                                                <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
                                               )}
                                               <span className="text-gray-700">{item.name}</span>
                                             </div>
