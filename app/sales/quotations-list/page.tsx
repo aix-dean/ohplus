@@ -98,7 +98,7 @@ export default function SalesQuotationsPage() {
 
     try {
       const quotationsRef = collection(db, "quotations")
-      const q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"))
+      const q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"))
 
       const querySnapshot = await getDocs(q)
       const fetchedQuotations: any[] = []
