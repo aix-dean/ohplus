@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CheckCircle, Search, X, MoreHorizontal } from "lucide-react"
+import { CheckCircle, Search, X, MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -37,6 +37,7 @@ export default function SalesQuotationsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
+  const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -301,6 +302,18 @@ export default function SalesQuotationsPage() {
     return { completed, total: items.length, items }
   }
 
+  const toggleComplianceExpansion = (quotationId: string) => {
+    setExpandedCompliance((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(quotationId)) {
+        newSet.delete(quotationId)
+      } else {
+        newSet.add(quotationId)
+      }
+      return newSet
+    })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -433,6 +446,7 @@ export default function SalesQuotationsPage() {
                       <TableBody>
                         {paginatedQuotations.map((quotation) => {
                           const compliance = getProjectCompliance(quotation)
+                          const isExpanded = expandedCompliance.has(quotation.id)
 
                           return (
                             <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -457,46 +471,56 @@ export default function SalesQuotationsPage() {
                               </TableCell>
                               <TableCell className="py-3 text-sm text-gray-700">
                                 <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
+                                  <div
+                                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                                    onClick={() => toggleComplianceExpansion(quotation.id)}
+                                  >
                                     <span className="font-medium">
                                       {compliance.completed}/{compliance.total}
                                     </span>
                                     <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    {compliance.items.map((item, index) => (
-                                      <div key={index} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2">
-                                          {item.status === "completed" ? (
-                                            <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                                              <CheckCircle className="w-2 h-2 text-white" />
-                                            </div>
-                                          ) : (
-                                            <div className="w-3 h-3 rounded-full border border-gray-300"></div>
-                                          )}
-                                          <span className="text-gray-700">{item.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          {item.file && (
-                                            <span className="text-blue-600 hover:underline cursor-pointer">
-                                              {item.file}
-                                            </span>
-                                          )}
-                                          {item.status === "upload" && (
-                                            <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                              Upload
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {compliance.items.find((item) => item.note) && (
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        {compliance.items.find((item) => item.note)?.note}
-                                      </div>
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-3 h-3 text-gray-400" />
+                                    ) : (
+                                      <ChevronRight className="w-3 h-3 text-gray-400" />
                                     )}
                                   </div>
+
+                                  {isExpanded && (
+                                    <div className="space-y-1">
+                                      {compliance.items.map((item, index) => (
+                                        <div key={index} className="flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-2">
+                                            {item.status === "completed" ? (
+                                              <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                                                <CheckCircle className="w-2 h-2 text-white" />
+                                              </div>
+                                            ) : (
+                                              <div className="w-3 h-3 rounded-full border border-gray-300"></div>
+                                            )}
+                                            <span className="text-gray-700">{item.name}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            {item.file && (
+                                              <span className="text-blue-600 hover:underline cursor-pointer">
+                                                {item.file}
+                                              </span>
+                                            )}
+                                            {item.status === "upload" && (
+                                              <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                                Upload
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {compliance.items.find((item) => item.note) && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {compliance.items.find((item) => item.note)?.note}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell
