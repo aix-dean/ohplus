@@ -326,8 +326,18 @@ export default function ProposalDetailsPage() {
   const statusConfig = getStatusConfig(proposal.status)
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 relative">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
+    <div
+      className="min-h-screen py-6 px-4 sm:px-6 relative"
+      style={{
+        backgroundImage: `url('/placeholder.svg?height=1080&width=1920')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <div className="absolute inset-0 bg-black/20"></div>
+
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm mb-6">
         <div className="max-w-[850px] mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -376,14 +386,12 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      {/* New Wrapper for Sidebar + Document */}
-      <div className="flex justify-center items-start gap-6 mt-6">
-        {/* Left Panel */}
+      <div className="flex justify-center items-start gap-6 mt-6 relative z-10">
         <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
           <Button
             variant="ghost"
             onClick={() => setIsComingSoonDialogOpen(true)}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white/90 backdrop-blur-sm shadow-md border border-gray-200 hover:bg-white/95"
           >
             <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
             <span className="text-[10px] text-gray-700">Templates</span>
@@ -392,7 +400,7 @@ export default function ProposalDetailsPage() {
             variant="ghost"
             onClick={handleEditClick}
             disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white/90 backdrop-blur-sm shadow-md border border-gray-200 hover:bg-white/95"
           >
             <Pencil className="h-8 w-8 text-gray-500 mb-1" />
             <span className="text-[10px] text-gray-700">Edit</span>
@@ -401,7 +409,7 @@ export default function ProposalDetailsPage() {
             variant="ghost"
             onClick={handleDownloadPDF}
             disabled={downloadingPDF}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white/90 backdrop-blur-sm shadow-md border border-gray-200 hover:bg-white/95"
           >
             {downloadingPDF ? (
               <>
@@ -417,22 +425,10 @@ export default function ProposalDetailsPage() {
           </Button>
         </div>
 
-        <div className="max-w-[850px] bg-white shadow-lg rounded-lg overflow-hidden">
-          {/* Colorful Cityscape Header Banner */}
-          <div className="h-24 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 relative overflow-hidden">
-            <img
-              src="/images/cityscape-banner.png"
-              alt="Cityscape Banner"
-              className="w-full h-full object-cover opacity-80"
-            />
-          </div>
-
-          {/* Main Content Area */}
+        <div className="max-w-[850px] bg-white/95 backdrop-blur-sm shadow-lg rounded-lg overflow-hidden">
           <div className="p-8">
-            {/* Header with GTS Logo and Title */}
             <div className="flex items-start justify-between mb-8">
               <div className="flex items-center space-x-6">
-                {/* GTS Logo */}
                 <div className="bg-yellow-400 rounded-full p-4 shadow-lg">
                   <div className="text-2xl font-bold text-black">GTS</div>
                 </div>
@@ -446,16 +442,15 @@ export default function ProposalDetailsPage() {
               </div>
             </div>
 
-            {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Left Side - Building Image */}
               <div className="space-y-4">
                 {proposal.products[0]?.media && proposal.products[0].media.length > 0 && (
                   <div className="relative">
                     <img
                       src={
                         proposal.products[0].media[0].url ||
-                        "/placeholder.svg?height=300&width=400&query=building billboard"
+                        "/placeholder.svg?height=300&width=400&query=building billboard" ||
+                        "/placeholder.svg"
                       }
                       alt="Building Location"
                       className="w-full h-80 object-cover rounded-lg shadow-md"
@@ -464,7 +459,6 @@ export default function ProposalDetailsPage() {
                 )}
               </div>
 
-              {/* Right Side - Location Details */}
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
@@ -510,16 +504,6 @@ export default function ProposalDetailsPage() {
               </div>
             </div>
 
-            {/* Colorful Cityscape Footer Banner */}
-            <div className="h-16 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-lg relative overflow-hidden mb-8">
-              <img
-                src="/images/cityscape-banner.png"
-                alt="Cityscape Banner"
-                className="w-full h-full object-cover opacity-80"
-              />
-            </div>
-
-            {/* Bottom Section with GTS Logo and Action Buttons */}
             <div className="flex items-center justify-between pt-6 border-t border-gray-200">
               <div className="bg-yellow-400 rounded-full p-3">
                 <div className="text-xl font-bold text-black">GTS</div>
@@ -548,7 +532,7 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
 
-        <div className="w-80 bg-white rounded-lg shadow-md p-6 hidden xl:block">
+        <div className="w-80 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-6 hidden xl:block">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Proposal History</h3>
           <div className="space-y-4">
             <div className="flex items-start space-x-3">
@@ -558,12 +542,10 @@ export default function ProposalDetailsPage() {
                 <p className="text-xs text-gray-500 mt-1">{proposal.createdAt.toLocaleDateString()}</p>
               </div>
             </div>
-            {/* Additional timeline items would go here */}
           </div>
         </div>
       </div>
 
-      {/* Floating Action Buttons */}
       {isEditing ? (
         <div className="fixed bottom-6 right-6 flex space-x-4">
           <Button
@@ -594,15 +576,15 @@ export default function ProposalDetailsPage() {
         proposal.status === "draft" && (
           <div className="fixed bottom-6 right-6 flex space-x-4">
             <Button
-              onClick={() => handleStatusUpdate("draft")} // Explicitly save as draft
-              variant="outline" // Use outline variant for a secondary action
+              onClick={() => handleStatusUpdate("draft")}
+              variant="outline"
               className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
             >
-              <FileText className="h-5 w-5 mr-2" /> {/* Using FileText as a "draft" icon */}
+              <FileText className="h-5 w-5 mr-2" />
               Save as Draft
             </Button>
             <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the options dialog first
+              onClick={() => setIsSendOptionsDialogOpen(true)}
               className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
             >
               <Send className="h-5 w-5 mr-2" />
@@ -612,7 +594,6 @@ export default function ProposalDetailsPage() {
         )
       )}
 
-      {/* Send Proposal Options Dialog */}
       {proposal && (
         <SendProposalOptionsDialog
           isOpen={isSendOptionsDialogOpen}
@@ -622,23 +603,19 @@ export default function ProposalDetailsPage() {
         />
       )}
 
-      {/* Send Proposal Email Dialog */}
       {proposal && (
         <SendProposalDialog
-          isOpen={isSendEmailDialogOpen} // Controlled by new state
+          isOpen={isSendEmailDialogOpen}
           onClose={() => setIsSendEmailDialogOpen(false)}
           proposal={proposal}
           onProposalSent={handleProposalSent}
         />
       )}
 
-      {/* Timeline Sidebar */}
       {timelineOpen && (
         <>
-          {/* Backdrop */}
           <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setTimelineOpen(false)} />
 
-          {/* Sidebar */}
           <div className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
@@ -662,7 +639,6 @@ export default function ProposalDetailsPage() {
           </div>
         </>
       )}
-      {/* Image Lightbox */}
       {lightboxImage && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
@@ -690,7 +666,6 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      {/* Coming Soon Dialog */}
       <ComingSoonDialog
         isOpen={isComingSoonDialogOpen}
         onClose={() => setIsComingSoonDialogOpen(false)}
