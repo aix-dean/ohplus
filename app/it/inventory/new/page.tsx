@@ -125,9 +125,27 @@ const softwareCategories = [
   "Utility Software",
 ]
 
+const consumablesCategories = ["Papers", "Photo Papers", "Sticker Papers", "Printer Ink", "Keyboards", "Mouse"]
+
 // Helper function to get categories based on item type
-const getCategoriesForType = (type: "hardware" | "software") => {
-  return type === "hardware" ? hardwareCategories : softwareCategories
+const getCategoriesForType = (type: "hardware" | "software" | "consumables") => {
+  if (type === "hardware") return hardwareCategories
+  if (type === "software") return softwareCategories
+  if (type === "consumables") return consumablesCategories
+  return hardwareCategories
+}
+
+const getCategoryTypeForItemType = (
+  itemType: "assets" | "consumables" | "tools" | "license",
+): "hardware" | "software" | "consumables" => {
+  // License items should show software categories since they're typically for software/OS
+  if (itemType === "license") return "software"
+  // Consumables should show consumables categories
+  if (itemType === "consumables") return "consumables"
+  // Assets are typically hardware items
+  if (itemType === "assets") return "hardware"
+  // Default to hardware for other types
+  return "hardware"
 }
 
 // Generate product number
@@ -588,7 +606,7 @@ export default function NewInventoryItemPage() {
                         <SelectValue placeholder={`Select a ${formData.type} category`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {getCategoriesForType(formData.type).map((category) => (
+                        {getCategoriesForType(getCategoryTypeForItemType(formData.type)).map((category) => (
                           <SelectItem key={category} value={category}>
                             {category}
                           </SelectItem>

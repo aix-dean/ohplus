@@ -787,6 +787,63 @@ function SalesDashboardContent() {
     }
   }
 
+  const handleSkipDates = async () => {
+    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+      toast({
+        title: "Missing Information",
+        description: "Client, sites, or user information is missing. Cannot create document.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCreatingDocument(true)
+    setIsDateRangeDialogOpen(false) // Close dialog immediately
+
+    try {
+      if (actionAfterDateSelection === "cost_estimate") {
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          designation: selectedClientForProposal.designation,
+          address: selectedClientForProposal.address,
+          industry: selectedClientForProposal.industry,
+        }
+
+        const sitesData = selectedSites.map((site) => ({
+          id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+        }))
+
+        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+          startDate: undefined,
+          endDate: undefined,
+        })
+
+        toast({
+          title: "Cost Estimate Created",
+          description: "Your cost estimate has been created successfully without dates.",
+        })
+        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+      }
+    } catch (error) {
+      console.error("Error creating cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create cost estimate. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingDocument(false)
+    }
+  }
+
   const handleCancelCeQuote = () => {
     setCeQuoteMode(false)
     setSelectedSites([])
@@ -1494,8 +1551,10 @@ function SalesDashboardContent() {
         isOpen={isDateRangeDialogOpen}
         onClose={() => setIsDateRangeDialogOpen(false)}
         onSelectDates={handleDatesSelected}
-        selectedSiteIds={selectedSites.map((s) => s.id)}
+        onSkipDates={handleSkipDates}
+        selectedSiteIds={selectedSites.map((site) => site.id)}
         selectedClientId={selectedClientForProposal?.id}
+        showSkipButton={actionAfterDateSelection === "cost_estimate"}
       />
 
       {/* Delete Confirmation Dialog */}

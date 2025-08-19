@@ -27,6 +27,10 @@ import {
   Save,
   X,
   Clock,
+  ChevronDown,
+  ChevronRight,
+  Upload,
+  ExternalLink,
 } from "lucide-react"
 import {
   getQuotationById,
@@ -42,6 +46,8 @@ import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
 import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
 import { Input } from "@/components/ui/input"
+import { storage } from "@/lib/firebase"
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 
 // Helper function to generate QR code URL - Updated to point to public quotation page
 const generateQRCodeUrl = (quotationId: string) => {
@@ -107,6 +113,10 @@ export default function QuotationDetailsPage() {
   const [isQuotationSentSuccessDialogOpen, setIsQuotationSentSuccessDialogOpen] = useState(false)
 
   const [isSendQuotationOptionsDialogOpen, setIsSendQuotationOptionsDialogOpen] = useState(false)
+
+  const [expandedCompliance, setExpandedCompliance] = useState<{ [key: string]: boolean }>({})
+  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({})
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
 
   useEffect(() => {
     async function fetchQuotationData() {
@@ -458,6 +468,130 @@ export default function QuotationDetailsPage() {
 
   const currentQuotation = isEditing ? editableQuotation : quotation
 
+  const handleFileUpload = async (
+    file: File,
+    quotationId: string,
+    complianceType: keyof NonNullable<Quotation["projectCompliance"]>,
+  ) => {
+    if (!file || !quotationId) return
+
+    // Validate file type
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a PDF file only.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload a file smaller than 10MB.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUploadingFiles((prev) => ({ ...prev, [complianceType]: true }))
+    setUploadProgress((prev) => ({ ...prev, [complianceType]: 0 }))
+
+    try {
+      const fileName = `quotations/${quotationId}/compliance/${complianceType}_${Date.now()}.pdf`
+      const storageRef = ref(storage, fileName)
+      const uploadTask = uploadBytesResumable(storageRef, file)
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          setUploadProgress((prev) => ({ ...prev, [complianceType]: progress }))
+        },
+        (error) => {
+          console.error("Upload error:", error)
+          toast({
+            title: "Upload Failed",
+            description: "Failed to upload file. Please try again.",
+            variant: "destructive",
+          })
+          setUploadingFiles((prev) => ({ ...prev, [complianceType]: false }))
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+
+            // Update quotation with the new file URL
+            const updatedQuotation = {
+              ...quotation!,
+              projectCompliance: {
+                ...quotation!.projectCompliance,
+                [complianceType]: {
+                  ...quotation!.projectCompliance?.[complianceType],
+                  status: "completed" as const,
+                  fileUrl: downloadURL,
+                  fileName: file.name,
+                  uploadedAt: new Date().toISOString(),
+                },
+              },
+            }
+
+            await updateQuotation(quotationId, updatedQuotation, "current_user_id", "Current User")
+
+            setQuotation(updatedQuotation)
+            setEditableQuotation(updatedQuotation)
+
+            toast({
+              title: "Upload Successful",
+              description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} uploaded successfully.`,
+            })
+          } catch (error) {
+            console.error("Error updating quotation:", error)
+            toast({
+              title: "Update Failed",
+              description: "File uploaded but failed to update record.",
+              variant: "destructive",
+            })
+          } finally {
+            setUploadingFiles((prev) => ({ ...prev, [complianceType]: false }))
+            setUploadProgress((prev) => ({ ...prev, [complianceType]: 0 }))
+          }
+        },
+      )
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: "Failed to start upload. Please try again.",
+        variant: "destructive",
+      })
+      setUploadingFiles((prev) => ({ ...prev, [complianceType]: false }))
+    }
+  }
+
+  const handleComplianceToggle = (quotationId: string) => {
+    setExpandedCompliance((prev) => ({
+      ...prev,
+      [quotationId]: !prev[quotationId],
+    }))
+  }
+
+  const getComplianceCount = (compliance: Quotation["projectCompliance"]) => {
+    if (!compliance) return { completed: 0, total: 5 }
+
+    const items = [
+      compliance.signedQuotation,
+      compliance.signedContract,
+      compliance.poMo,
+      compliance.finalArtwork,
+      compliance.paymentAsDeposit,
+    ]
+
+    const completed = items.filter((item) => item?.status === "completed").length
+    return { completed, total: 5 }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 relative">
       {/* Word-style Toolbar */}
@@ -803,6 +937,7 @@ export default function QuotationDetailsPage() {
                               item.media_url ||
                               item.media?.[0]?.url ||
                               "/placeholder.svg?height=64&width=64&query=product" ||
+                              "/placeholder.svg" ||
                               "/placeholder.svg"
                             }
                             alt={item.name}
@@ -857,7 +992,7 @@ export default function QuotationDetailsPage() {
                 </table>
               </div>
             </div>
-            
+
             {/* Additional Information (Notes) */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
@@ -885,6 +1020,140 @@ export default function QuotationDetailsPage() {
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Project Compliance
+              </h2>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => handleComplianceToggle(currentQuotation.id || "")}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      {getComplianceCount(currentQuotation.projectCompliance).completed}/
+                      {getComplianceCount(currentQuotation.projectCompliance).total}
+                    </span>
+                    <div className="flex space-x-1">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-2 h-2 rounded-full ${
+                            i < getComplianceCount(currentQuotation.projectCompliance).completed
+                              ? "bg-green-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {expandedCompliance[currentQuotation.id || ""] ? (
+                    <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+                  )}
+                </div>
+
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    expandedCompliance[currentQuotation.id || ""] ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="mt-4 space-y-3">
+                    {[
+                      { key: "signedQuotation", label: "Signed Quotation" },
+                      { key: "signedContract", label: "Signed Contract" },
+                      { key: "poMo", label: "PO/MO" },
+                      { key: "finalArtwork", label: "Final Artwork" },
+                      { key: "paymentAsDeposit", label: "Payment as Deposit" },
+                    ].map((item, index) => {
+                      const complianceItem =
+                        currentQuotation.projectCompliance?.[
+                          item.key as keyof NonNullable<Quotation["projectCompliance"]>
+                        ]
+                      const isCompleted = complianceItem?.status === "completed"
+                      const isUploading = uploadingFiles[item.key]
+                      const progress = uploadProgress[item.key] || 0
+
+                      return (
+                        <div
+                          key={item.key}
+                          className={`flex items-center justify-between p-2 rounded transition-all duration-200 ${
+                            index < getComplianceCount(currentQuotation.projectCompliance).completed
+                              ? "animate-in slide-in-from-left-2"
+                              : ""
+                          }`}
+                          style={{ animationDelay: `${index * 50}ms` }}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                isCompleted ? "bg-green-500" : "bg-gray-300"
+                              }`}
+                            >
+                              {isCompleted && <CheckCircle className="w-3 h-3 text-white" />}
+                            </div>
+                            <span className="text-sm text-gray-700">{item.label}</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            {isCompleted && complianceItem?.fileUrl ? (
+                              <a
+                                href={complianceItem.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-sm flex items-center space-x-1"
+                              >
+                                <span>{complianceItem.fileName || "View File"}</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : isUploading ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-500">{Math.round(progress)}%</span>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept=".pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file && currentQuotation.id) {
+                                      handleFileUpload(
+                                        file,
+                                        currentQuotation.id,
+                                        item.key as keyof NonNullable<Quotation["projectCompliance"]>,
+                                      )
+                                    }
+                                  }}
+                                />
+                                <Button variant="outline" size="sm" className="text-xs px-3 py-1 h-7 bg-transparent">
+                                  <Upload className="w-3 h-3 mr-1" />
+                                  Upload
+                                </Button>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {currentQuotation.projectCompliance?.paymentAsDeposit?.status === "completed" && (
+                      <div className="mt-2 text-xs text-blue-600 italic">For Treasury's confirmation</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Document Footer */}
