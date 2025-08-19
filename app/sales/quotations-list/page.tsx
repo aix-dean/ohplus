@@ -451,15 +451,21 @@ export default function SalesQuotationsPage() {
     setCopyingQuotations((prev) => new Set(prev).add(quotationId))
 
     try {
+      console.log("[v0] Starting quotation copy for:", quotationId)
       const newQuotationId = await copyQuotation(quotationId, user.uid, userName)
+      console.log("[v0] Quotation copied successfully, new ID:", newQuotationId)
 
       toast({
         title: "Success",
         description: "Quotation copied successfully! The new quotation has been created with a new quotation number.",
       })
 
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      console.log("[v0] Refreshing quotations list...")
       // Refresh the quotations list to show the new copied quotation
       await fetchAllQuotations()
+      console.log("[v0] Quotations list refreshed, total quotations:", allQuotations.length)
     } catch (error: any) {
       console.error("Error copying quotation:", error)
       toast({
