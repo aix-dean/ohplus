@@ -690,7 +690,18 @@ export default function QuotationsListPage() {
   }
 
   const handleCreateJO = (quotationId: string) => {
+    console.log("[v0] Create JO clicked for quotationId:", quotationId)
+    console.log(
+      "[v0] Available quotations:",
+      quotations.map((q) => ({ id: q.id, number: q.quotation_number })),
+    )
+
     const quotation = quotations.find((q) => q.id === quotationId)
+    console.log(
+      "[v0] Found quotation:",
+      quotation ? { id: quotation.id, number: quotation.quotation_number } : "NOT FOUND",
+    )
+
     if (!quotation) {
       toast({
         title: "Error",
