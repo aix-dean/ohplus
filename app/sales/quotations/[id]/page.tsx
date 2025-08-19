@@ -31,7 +31,6 @@ import {
   ChevronRight,
   Upload,
   ExternalLink,
-  Copy,
 } from "lucide-react"
 import {
   getQuotationById,
@@ -40,8 +39,6 @@ import {
   updateQuotation,
   calculateQuotationTotal,
   type Quotation,
-  createQuotation,
-  generateQuotationNumber,
 } from "@/lib/quotation-service"
 import { useToast } from "@/hooks/use-toast"
 import { SendQuotationDialog } from "@/components/send-quotation-dialog"
@@ -120,7 +117,6 @@ export default function QuotationDetailsPage() {
   const [expandedCompliance, setExpandedCompliance] = useState<{ [key: string]: boolean }>({})
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({})
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
-  const [isCopying, setIsCopying] = useState(false)
 
   useEffect(() => {
     async function fetchQuotationData() {
@@ -340,52 +336,6 @@ export default function QuotationDetailsPage() {
   const handleDismissQuotationSentSuccess = () => {
     setIsQuotationSentSuccessDialogOpen(false)
     router.push("/sales/dashboard") // Changed this line to sales dashboard
-  }
-
-  const handleMakeACopy = async () => {
-    if (!quotation) return
-
-    setIsCopying(true)
-    try {
-      // Create a copy of the quotation with new quotation number and reset certain fields
-      const quotationCopy: Omit<Quotation, "id"> = {
-        ...quotation,
-        quotation_number: generateQuotationNumber(),
-        status: "draft",
-        created_by: quotation.created_by || "current_user", // Use current user or fallback
-        // Reset project compliance to initial state
-        projectCompliance: {
-          signedQuotation: { status: "pending", uploadDate: null, fileUrl: null, fileName: null, notes: null },
-          signedContract: { status: "pending", uploadDate: null, fileUrl: null, fileName: null, notes: null },
-          poMo: { status: "pending", uploadDate: null, fileUrl: null, fileName: null, notes: null },
-          finalArtwork: { status: "pending", uploadDate: null, fileUrl: null, fileName: null, notes: null },
-          paymentAsDeposit: { status: "pending", uploadDate: null, fileUrl: null, fileName: null, notes: null },
-        },
-        // Remove timestamps that should be regenerated
-        created: undefined as any,
-        updated: undefined as any,
-      }
-
-      // Create the new quotation
-      const newQuotationId = await createQuotation(quotationCopy)
-
-      toast({
-        title: "Success",
-        description: `Quotation copied successfully! New quotation number: ${quotationCopy.quotation_number}`,
-      })
-
-      // Navigate to the new quotation
-      router.push(`/sales/quotations/${newQuotationId}`)
-    } catch (error) {
-      console.error("Error copying quotation:", error)
-      toast({
-        title: "Error",
-        description: "Failed to copy quotation. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCopying(false)
-    }
   }
 
   const getStatusConfig = (status: string) => {
@@ -678,26 +628,6 @@ export default function QuotationDetailsPage() {
             >
               <History className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Activity</span>
-            </Button>
-
-            <Button
-              onClick={handleMakeACopy}
-              disabled={isCopying}
-              variant="outline"
-              size="sm"
-              className="border-green-300 text-green-700 hover:bg-green-50 bg-transparent"
-            >
-              {isCopying ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Copying...</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Make a Copy</span>
-                </>
-              )}
             </Button>
           </div>
         </div>
@@ -1007,7 +937,6 @@ export default function QuotationDetailsPage() {
                               item.media_url ||
                               item.media?.[0]?.url ||
                               "/placeholder.svg?height=64&width=64&query=product" ||
-                              "/placeholder.svg" ||
                               "/placeholder.svg" ||
                               "/placeholder.svg"
                             }

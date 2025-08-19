@@ -39,6 +39,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { copyQuotation } from "@/lib/quotation-service"
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -51,6 +52,7 @@ export default function SalesQuotationsPage() {
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
   const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
+  const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
   const router = useRouter()
   const pageSize = 10
   const { toast } = useToast()
@@ -434,6 +436,46 @@ export default function SalesQuotationsPage() {
     input.click()
   }
 
+  const handleCopyQuotation = async (quotationId: string) => {
+    if (!user?.uid) {
+      toast({
+        title: "Error",
+        description: "User information not available. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const userName = user.displayName || user.email || `User-${user.uid.slice(-6)}`
+
+    setCopyingQuotations((prev) => new Set(prev).add(quotationId))
+
+    try {
+      const newQuotationId = await copyQuotation(quotationId, user.uid, userName)
+
+      toast({
+        title: "Success",
+        description: "Quotation copied successfully! The new quotation has been created with a new quotation number.",
+      })
+
+      // Refresh the quotations list to show the new copied quotation
+      await fetchAllQuotations()
+    } catch (error: any) {
+      console.error("Error copying quotation:", error)
+      toast({
+        title: "Copy Failed",
+        description: error.message || "Failed to copy quotation. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCopyingQuotations((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -732,8 +774,18 @@ export default function SalesQuotationsPage() {
                                     <DropdownMenuItem onClick={() => console.log("Set alarm for", quotation.id)}>
                                       Set an Alarm
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => console.log("Make copy of", quotation.id)}>
-                                      Make a Copy
+                                    <DropdownMenuItem
+                                      onClick={() => handleCopyQuotation(quotation.id)}
+                                      disabled={copyingQuotations.has(quotation.id)}
+                                    >
+                                      {copyingQuotations.has(quotation.id) ? (
+                                        <>
+                                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                          Copying...
+                                        </>
+                                      ) : (
+                                        "Make a Copy"
+                                      )}
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>

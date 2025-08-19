@@ -859,3 +859,48 @@ export async function getQuotationsPaginated(
 
   return { quotations, lastVisibleId, hasMore }
 }
+
+// Copy an existing quotation with a new quotation number
+export async function copyQuotation(originalQuotationId: string, userId: string, userName: string): Promise<string> {
+  try {
+    console.log("Copying quotation:", originalQuotationId)
+
+    // Get the original quotation
+    const originalQuotation = await getQuotationById(originalQuotationId)
+    if (!originalQuotation) {
+      throw new Error("Original quotation not found")
+    }
+
+    // Create a copy with new quotation number and reset fields
+    const quotationCopy: Omit<Quotation, "id"> = {
+      ...originalQuotation,
+      quotation_number: generateQuotationNumber(),
+      status: "draft", // Reset status to draft
+      created_by: userName,
+      seller_id: userId,
+      // Reset project compliance to initial state
+      projectCompliance: {
+        signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+      },
+      // Remove timestamps - they will be set by createQuotation
+      created: undefined as any,
+      updated: undefined as any,
+    }
+
+    // Remove the id field since it's auto-generated
+    delete (quotationCopy as any).id
+
+    // Create the new quotation
+    const newQuotationId = await createQuotation(quotationCopy)
+    console.log("Quotation copied successfully with ID:", newQuotationId)
+
+    return newQuotationId
+  } catch (error: any) {
+    console.error("Error copying quotation:", error)
+    throw new Error("Failed to copy quotation: " + error.message)
+  }
+}
