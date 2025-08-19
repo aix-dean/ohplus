@@ -1323,6 +1323,73 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
   }
 }
 
+export async function generateSeparateCostEstimatePDFs(
+  costEstimate: CostEstimate,
+  selectedPages?: string[],
+): Promise<void> {
+  try {
+    const groupLineItemsBySite = (lineItems: any[]) => {
+      const siteGroups: { [key: string]: any[] } = {}
+
+      lineItems.forEach((item) => {
+        if (item.category.includes("Billboard Rental")) {
+          const siteName = item.description
+          if (!siteGroups[siteName]) {
+            siteGroups[siteName] = []
+          }
+          siteGroups[siteName].push(item)
+
+          const siteId = item.id
+          const relatedItems = lineItems.filter(
+            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+          )
+          siteGroups[siteName].push(...relatedItems)
+        }
+      })
+
+      if (Object.keys(siteGroups).length === 0) {
+        siteGroups["Single Site"] = lineItems
+      }
+
+      return siteGroups
+    }
+
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
+
+    const sitesToProcess =
+      selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
+
+    if (sitesToProcess.length === 0) {
+      throw new Error("No sites selected for PDF generation")
+    }
+
+    // Generate separate PDF for each site
+    for (let i = 0; i < sitesToProcess.length; i++) {
+      const siteName = sitesToProcess[i]
+      const siteLineItems = siteGroups[siteName] || []
+
+      // Create a modified cost estimate for this specific site
+      const singleSiteCostEstimate = {
+        ...costEstimate,
+        lineItems: siteLineItems,
+        title: sites.length > 1 ? `${costEstimate.title || "Cost Estimate"} - ${siteName}` : costEstimate.title,
+      }
+
+      // Generate PDF for this single site
+      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false)
+
+      // Add a small delay between downloads to ensure proper file naming
+      if (i < sitesToProcess.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+  } catch (error) {
+    console.error("Error generating separate PDFs:", error)
+    throw error
+  }
+}
+
 export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
@@ -1658,9 +1725,11 @@ export async function generateCostEstimatePDF(
       const sitesSuffix =
         selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
           ? `_selected-${selectedPages.length}-sites`
-          : isMultipleSites
-            ? `_all-${sites.length}-sites`
-            : ""
+          : isMultipleSites && sitesToProcess.length === 1
+            ? `_${sitesToProcess[0].replace(/[^a-z0-9]/gi, "_").toLowerCase()}`
+            : isMultipleSites
+              ? `_all-${sites.length}-sites`
+              : ""
       const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
 
       console.log("[v0] Attempting to download PDF:", fileName)

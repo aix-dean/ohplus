@@ -46,7 +46,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { generateCostEstimatePDF } from "@/lib/pdf-service" // Import the new PDF generation function
+import { generateCostEstimatePDF, generateSeparateCostEstimatePDFs } from "@/lib/pdf-service" // Import the new PDF generation function
 import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
 import { Checkbox } from "@/components/ui/checkbox"
@@ -387,9 +387,23 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     const sites = Object.keys(siteGroups)
 
     if (sites.length > 1) {
-      // Show page selection modal for multiple sites
-      setSelectedPages([]) // Reset selection
-      setShowPageSelection(true)
+      setDownloadingPDF(true)
+      try {
+        await generateSeparateCostEstimatePDFs(costEstimate)
+        toast({
+          title: "PDFs Generated",
+          description: `${sites.length} separate PDF files have been downloaded for each product.`,
+        })
+      } catch (error) {
+        console.error("Error downloading separate PDFs:", error)
+        toast({
+          title: "Error",
+          description: "Failed to generate separate PDFs. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setDownloadingPDF(false)
+      }
       return
     }
 
