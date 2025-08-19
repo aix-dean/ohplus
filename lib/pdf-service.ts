@@ -1707,17 +1707,16 @@ export async function generateCostEstimatePDF(
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
       yPosition += 6
 
-      // Footer
-      checkNewPage(15)
+      // Footer - positioned at bottom of page
+      const footerY = pageHeight - 25
 
       pdf.setFontSize(7)
       pdf.setTextColor(100, 100, 100)
       pdf.text(
         "Company Location • phone: Company Phone",
         (pageWidth - pdf.getTextWidth("Company Location • phone: Company Phone")) / 2,
-        yPosition,
+        footerY,
       )
-      yPosition += 3
 
       if (validUntil) {
         pdf.text(
@@ -1727,26 +1726,15 @@ export async function generateCostEstimatePDF(
               `This cost estimate is valid until ${validUntil.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
             )) /
             2,
-          yPosition,
+          footerY + 3,
         )
-        yPosition += 3
       }
 
       pdf.text(
         `© ${new Date().getFullYear()} Company Name. All rights reserved.`,
         (pageWidth - pdf.getTextWidth(`© ${new Date().getFullYear()} Company Name. All rights reserved.`)) / 2,
-        yPosition,
+        footerY + (validUntil ? 6 : 3),
       )
-
-      if (isMultipleSites) {
-        yPosition += 3
-        pdf.setFont("helvetica", "bold")
-        pdf.text(
-          `Page ${siteIndex + 1} of ${sitesToProcess.length}`,
-          (pageWidth - pdf.getTextWidth(`Page ${siteIndex + 1} of ${sitesToProcess.length}`)) / 2,
-          yPosition,
-        )
-      }
     })
 
     if (returnBase64) {
