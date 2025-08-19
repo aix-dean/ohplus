@@ -1431,7 +1431,7 @@ export async function generateCostEstimatePDF(
     const pdf = new jsPDF("p", "mm", "a4")
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 20
+    const margin = 15
     const contentWidth = pageWidth - margin * 2
     let yPosition = margin
 
@@ -1517,34 +1517,34 @@ export async function generateCostEstimatePDF(
       }
 
       // Header section matching page format
-      pdf.setFontSize(10)
+      pdf.setFontSize(9)
       pdf.setTextColor(100, 100, 100)
       pdf.text(
         createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
         margin,
         yPosition,
       )
-      yPosition += 10
+      yPosition += 8
 
-      pdf.setFontSize(12)
+      pdf.setFontSize(11)
       pdf.setFont("helvetica", "bold")
       pdf.setTextColor(0, 0, 0)
       pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
-      yPosition += 5
+      yPosition += 4
       pdf.setFont("helvetica", "normal")
       pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
-      yPosition += 10
+      yPosition += 8
 
       // RFQ Number (right aligned)
-      pdf.setFontSize(10)
+      pdf.setFontSize(9)
       pdf.setTextColor(100, 100, 100)
-      pdf.text("RFQ No.", pageWidth - margin - 30, yPosition - 15)
+      pdf.text("RFQ No.", pageWidth - margin - 30, yPosition - 12)
       pdf.setFont("helvetica", "bold")
       pdf.setTextColor(0, 0, 0)
-      pdf.text(ceNumber, pageWidth - margin - 30, yPosition - 10)
+      pdf.text(ceNumber, pageWidth - margin - 30, yPosition - 8)
 
       // Title section
-      pdf.setFontSize(16)
+      pdf.setFontSize(14)
       pdf.setFont("helvetica", "bold")
       const adjustedTitle = isMultipleSites ? siteName : costEstimate?.title
       const titleText = `${adjustedTitle} COST ESTIMATE`
@@ -1554,16 +1554,16 @@ export async function generateCostEstimatePDF(
       // Underline the title
       pdf.setLineWidth(0.5)
       pdf.line((pageWidth - titleWidth) / 2, yPosition + 2, (pageWidth + titleWidth) / 2, yPosition + 2)
-      yPosition += 15
+      yPosition += 12
 
       // "Details as follows:" section
-      pdf.setFontSize(12)
+      pdf.setFontSize(11)
       pdf.setFont("helvetica", "bold")
       pdf.text("Details as follows:", margin, yPosition)
-      yPosition += 10
+      yPosition += 8
 
       // Bullet points section matching page format
-      pdf.setFontSize(10)
+      pdf.setFontSize(9)
       pdf.setFont("helvetica", "normal")
 
       const bulletPoints = [
@@ -1594,70 +1594,71 @@ export async function generateCostEstimatePDF(
         pdf.text(point.label, margin + 5, yPosition)
         pdf.setFont("helvetica", "normal")
         pdf.text(`: ${point.value}`, margin + 35, yPosition)
-        yPosition += 6
+        yPosition += 5
       })
 
-      yPosition += 5
+      yPosition += 3
 
       // Calculation breakdown section
-      checkNewPage(50)
+      checkNewPage(35)
       pdf.setFillColor(245, 245, 245)
-      pdf.rect(margin, yPosition, contentWidth, 35, "F")
+      pdf.rect(margin, yPosition, contentWidth, 28, "F")
+
+      pdf.setFontSize(9)
 
       const monthlyRate = siteTotal / (costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1)
-      const vatAmount = siteTotal * 0.12
-      const totalWithVat = siteTotal * 1.12
       const months = costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1
+      const vatAmount = siteTotal * 0.12
+      const totalWithVat = siteTotal + vatAmount
 
-      pdf.setFontSize(10)
-      pdf.text("Lease rate per month", margin + 5, yPosition + 8)
+      pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
         `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
-        yPosition + 8,
+        yPosition + 6,
         { align: "right" },
       )
 
-      pdf.text(`x ${months} months`, margin + 5, yPosition + 16)
+      pdf.text(`x ${months} months`, margin + 5, yPosition + 12)
       pdf.text(
         `PHP ${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
-        yPosition + 16,
+        yPosition + 12,
         { align: "right" },
       )
 
-      pdf.text("12% VAT", margin + 5, yPosition + 24)
+      pdf.text("12% VAT", margin + 5, yPosition + 18)
       pdf.text(
         `PHP ${vatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
-        yPosition + 24,
+        yPosition + 18,
         { align: "right" },
       )
 
       // Total line
       pdf.setLineWidth(0.5)
-      pdf.line(margin + 5, yPosition + 28, pageWidth - margin - 5, yPosition + 28)
+      pdf.line(margin + 5, yPosition + 22, pageWidth - margin - 5, yPosition + 22)
       pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(12)
-      pdf.text("TOTAL", margin + 5, yPosition + 35)
+      pdf.setFontSize(11)
+      pdf.text("TOTAL", margin + 5, yPosition + 28)
       pdf.text(
         `PHP ${totalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
-        yPosition + 35,
+        yPosition + 28,
         { align: "right" },
       )
 
-      yPosition += 45
+      yPosition += 35
 
       // Terms and Conditions section
-      checkNewPage(60)
+      checkNewPage(45)
       pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(12)
+      pdf.setFontSize(11)
       pdf.text("Terms and Conditions:", margin, yPosition)
-      yPosition += 8
+      yPosition += 6
 
       pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(10)
+      pdf.setFontSize(9)
       const terms = [
         "1. Quotation validity: 5 working days.",
         "2. Availability of the site is on first-come-first-served basis only. Only official documents such as",
@@ -1671,52 +1672,52 @@ export async function generateCostEstimatePDF(
       terms.forEach((term) => {
         checkNewPage(6)
         pdf.text(term, margin, yPosition)
-        yPosition += 6
+        yPosition += 5
       })
 
-      yPosition += 10
+      yPosition += 6
 
       // Signature section
-      checkNewPage(40)
-      pdf.setFontSize(10)
+      checkNewPage(30)
+      pdf.setFontSize(9)
       pdf.text("Very truly yours,", margin, yPosition)
       pdf.text("Conforme:", margin + contentWidth / 2, yPosition)
-      yPosition += 20
+      yPosition += 15
 
       // Signature lines
       pdf.setLineWidth(0.5)
       pdf.line(margin, yPosition, margin + 60, yPosition)
       pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
-      yPosition += 8
+      yPosition += 6
 
       // Names
       pdf.setFont("helvetica", "bold")
       pdf.text("Representative Name", margin, yPosition)
       pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
-      yPosition += 5
+      yPosition += 4
 
       pdf.setFont("helvetica", "normal")
       pdf.text(costEstimate?.clientCompany || "Client Company", margin + contentWidth / 2, yPosition)
-      yPosition += 8
+      yPosition += 6
 
-      pdf.setFontSize(8)
+      pdf.setFontSize(7)
       pdf.setFont("helvetica", "italic")
       pdf.text("This signed quotation serves as an", margin + contentWidth / 2, yPosition)
-      yPosition += 4
+      yPosition += 3
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
-      yPosition += 10
+      yPosition += 6
 
       // Footer
-      checkNewPage(20) // Ensure enough space for footer content
+      checkNewPage(15)
 
-      pdf.setFontSize(8)
+      pdf.setFontSize(7)
       pdf.setTextColor(100, 100, 100)
       pdf.text(
         "Company Location • phone: Company Phone",
         (pageWidth - pdf.getTextWidth("Company Location • phone: Company Phone")) / 2,
         yPosition,
       )
-      yPosition += 4
+      yPosition += 3
 
       if (validUntil) {
         pdf.text(
@@ -1728,7 +1729,7 @@ export async function generateCostEstimatePDF(
             2,
           yPosition,
         )
-        yPosition += 4
+        yPosition += 3
       }
 
       pdf.text(
@@ -1738,7 +1739,7 @@ export async function generateCostEstimatePDF(
       )
 
       if (isMultipleSites) {
-        yPosition += 4
+        yPosition += 3
         pdf.setFont("helvetica", "bold")
         pdf.text(
           `Page ${siteIndex + 1} of ${sitesToProcess.length}`,
@@ -1819,7 +1820,7 @@ export async function generateReportPDF(
       const specs = product.specs_rental
       if (specs?.height && specs?.width) {
         const panels = specs || "N/A"
-        return `${specs.height} (H) x ${specs.width} (W) x ${panels} Panels`
+        return `${specs.height} (H) x ${specs.width} x ${panels} Panels`
       }
       return product.specs_rental?.size || product.light?.size || "N/A"
     }
