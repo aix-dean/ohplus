@@ -1581,7 +1581,7 @@ export async function generateCostEstimatePDF(
       ]
 
       bulletPoints.forEach((point) => {
-        pdf.text("•", margin, yPosition)
+        pdf.text("●", margin, yPosition)
         pdf.setFont("helvetica", "bold")
         pdf.text(point.label, margin + 5, yPosition)
         pdf.setFont("helvetica", "normal")
@@ -1604,10 +1604,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
-        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}\`\`\`javascript
-yPosition + 6)
-      pdf.text(
-        \`PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
         yPosition + 6,
         { align: "right" },
