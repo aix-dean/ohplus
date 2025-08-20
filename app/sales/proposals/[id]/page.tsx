@@ -3,12 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, FileText, LayoutTemplateIcon as Template } from "lucide-react"
+import { ArrowLeft, Loader2, FileText } from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
-import type { ProposalTemplate } from "@/lib/types/proposal-template"
 import { useToast } from "@/hooks/use-toast"
-import { ProposalTemplateDialog } from "@/components/proposal-template-dialog"
 
 export default function ProposalDetailsPage() {
   const params = useParams()
@@ -38,16 +36,6 @@ export default function ProposalDetailsPage() {
 
     fetchProposal()
   }, [params.id, toast])
-
-  const handleTemplateSelect = (template: ProposalTemplate) => {
-    // Here you would implement the logic to apply the template to the current proposal
-    // For now, we'll just show a success message
-    console.log("Selected template:", template)
-    toast({
-      title: "Template Applied",
-      description: `Template "${template.name}" has been applied to this proposal`,
-    })
-  }
 
   if (loading) {
     return (
@@ -81,21 +69,7 @@ export default function ProposalDetailsPage() {
   return (
     <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
       <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent p-8 min-h-[600px]">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">{proposal.title}</h1>
-          <ProposalTemplateDialog onSelectTemplate={handleTemplateSelect}>
-            <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-              <Template className="h-4 w-4" />
-              Use Template
-            </Button>
-          </ProposalTemplateDialog>
-        </div>
-
         {/* Container content will go here */}
-        <div className="text-center py-12 text-gray-500">
-          <p>Proposal content will be displayed here.</p>
-          <p className="text-sm mt-2">Click "Use Template" to apply a template to this proposal.</p>
-        </div>
       </div>
     </div>
   )

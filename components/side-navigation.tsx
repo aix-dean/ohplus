@@ -35,7 +35,6 @@ import {
   Droplets,
   Bot,
   Lightbulb,
-  LayoutTemplateIcon,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -1153,7 +1152,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Templates", href: "/sales/templates", icon: LayoutTemplateIcon },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
@@ -1253,7 +1251,7 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
@@ -1849,7 +1847,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Templates", href: "/sales/templates", icon: LayoutTemplateIcon },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
@@ -1961,22 +1958,6 @@ export function SideNavigation() {
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -2011,14 +1992,6 @@ export function SideNavigation() {
                     >
                       <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
-                      {item.title === "AI Assistant" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-auto h-5 w-5 p-0 text-xs flex items-center justify-center"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
                     </Link>
                   )
                 })}
