@@ -192,183 +192,299 @@ export async function generateCostEstimatePDF(
       }
     }
 
-    // Header section - Client name and RFQ number on same line
-    pdf.setFontSize(11)
-    pdf.setFont("helvetica", "bold")
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
-    pdf.text(`RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`, pageWidth - margin - 50, yPosition)
-    yPosition += 6
+    // Group line items by site for multi-site handling
+    const groupLineItemsBySite = (lineItems: any[]) => {
+      const siteGroups: { [key: string]: any[] } = {}
 
-    // Company name
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
-    yPosition += 10
+      lineItems.forEach((item) => {
+        if (item.category.includes("Billboard Rental")) {
+          const siteName = item.description
+          if (!siteGroups[siteName]) {
+            siteGroups[siteName] = []
+          }
+          siteGroups[siteName].push(item)
 
-    // Greeting message positioned at top
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
-    yPosition += 5
-    pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
-    yPosition += 10
+          const siteId = item.id
+          const relatedItems = lineItems.filter(
+            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+          )
+          siteGroups[siteName].push(...relatedItems)
+        }
+      })
 
-    // "Details as follows:" section
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Details as follows:", margin, yPosition)
-    yPosition += 6
+      if (Object.keys(siteGroups).length === 0) {
+        siteGroups["Single Site"] = lineItems
+      } else {
+        // Handle orphaned items
+        const groupedItemIds = new Set()
+        Object.values(siteGroups).forEach((items) => {
+          items.forEach((item) => groupedItemIds.add(item.id))
+        })
 
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
+        const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
+        if (orphanedItems.length > 0) {
+          const siteNames = Object.keys(siteGroups)
+          siteNames.forEach((siteName) => {
+            const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
+            siteGroups[siteName].push(...orphanedCopies)
+          })
+        }
+      }
 
-    const bulletPoints = [
-      { label: "Site Location", value: siteLocation },
-      { label: "Type", value: "Billboard" },
-      { label: "Size", value: "100ft (H) x 60ft (W)" },
-      { label: "Contract Duration", value: calculateDurationDisplay(costEstimate.durationDays) },
-      {
-        label: "Contract Period",
-        value: `${startDate ? startDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "June 15, 2025"} - ${endDate ? endDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "December 14, 2025"}`,
-      },
-      { label: "Proposal to", value: costEstimate?.client?.company || "Client Company" },
-      { label: "Illumination", value: `${siteRentalItems[0]?.quantity || 10} units of 1000 watts metal Halide` },
-      {
-        label: "Lease Rate/Month",
-        value: `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     (Exclusive of VAT)`,
-      },
-      {
-        label: "Total Lease",
-        value: `${subtotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     (Exclusive of VAT)`,
-      },
-    ]
+      return siteGroups
+    }
 
-    bulletPoints.forEach((point) => {
-      pdf.text("●", margin, yPosition)
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
+    const isMultipleSites = sites.length > 1
+
+    const sitesToProcess =
+      selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
+
+    if (sitesToProcess.length === 0) {
+      throw new Error("No sites selected for PDF generation")
+    }
+
+    // Process each site
+    sitesToProcess.forEach(async (siteName, siteIndex) => {
+      if (siteIndex > 0) {
+        pdf.addPage()
+        yPosition = margin
+      }
+
+      const siteLineItems = siteGroups[siteName] || []
+      const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
+
+      const originalSiteIndex = sites.indexOf(siteName)
+      const ceNumber = isMultipleSites
+        ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
+        : costEstimate.costEstimateNumber || costEstimate.id
+
+      // Client name and company (top left)
+      pdf.setFontSize(11)
       pdf.setFont("helvetica", "bold")
-      pdf.text(`${point.label}:`, margin + 5, yPosition)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
+      yPosition += 5
       pdf.setFont("helvetica", "normal")
-      pdf.text(point.value, margin + 50, yPosition)
+      pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
+      yPosition += 10
+
+      // RFQ Number (top right)
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(`RFQ. No. ${ceNumber}`, pageWidth - margin - 40, yPosition - 15)
+
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(
+        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+        pageWidth - margin - 40,
+        yPosition - 10,
+      )
+
+      // Greeting message - positioned prominently at top
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+      pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
       yPosition += 5
-    })
+      pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
+      yPosition += 15
 
-    yPosition += 5
+      // "Details as follows:" section
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Details as follows:", margin, yPosition)
+      yPosition += 8
 
-    const formattedDuration = calculateDurationDisplay(costEstimate.durationDays)
-    const calculatedTotal = monthlyRate * exactDurationInMonths
-    const siteVatAmount = calculatedTotal * 0.12
-    const siteTotalWithVat = calculatedTotal + siteVatAmount
+      // Bullet points section with exact formatting
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
 
-    pdf.text("Lease rate per month", margin + 5, yPosition)
-    pdf.text(
-      `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 5
+      // Extract size information from line items or use default
+      const sizeInfo = siteLineItems[0]?.notes?.includes("Location:")
+        ? "100ft (H) x 60ft (W)"
+        : siteLineItems[0]?.notes || "100ft (H) x 60ft (W)"
 
-    pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
-    pdf.text(
-      `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 5
+      const bulletPoints = [
+        { label: "Site Location", value: siteLocation },
+        { label: "Type", value: "Billboard" },
+        { label: "Size", value: sizeInfo },
+        { label: "Contract Duration", value: calculateDurationDisplay(costEstimate.durationDays) },
+        {
+          label: "Contract Period",
+          value: `${startDate ? startDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "June 15, 2025"} - ${endDate ? endDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "December 14, 2025"}`,
+        },
+        { label: "Proposal to", value: costEstimate?.client?.company || "Client Company" },
+        { label: "Illumination", value: `${siteLineItems[0]?.quantity || 10} units of 1000 watts metal Halide` },
+        { label: "Lease Rate/Month", value: "(Exclusive of VAT)" },
+        { label: "Total Lease", value: "(Exclusive of VAT)" },
+      ]
 
-    pdf.text("12 % VAT", margin + 5, yPosition)
-    pdf.text(
-      `${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 8
+      bulletPoints.forEach((point) => {
+        pdf.text("•", margin, yPosition)
+        pdf.setFont("helvetica", "bold")
+        pdf.text(`${point.label}:`, margin + 5, yPosition)
+        pdf.setFont("helvetica", "normal")
 
-    pdf.setFont("helvetica", "bold")
-    pdf.text("TOTAL", margin + 5, yPosition)
-    pdf.text(
-      `${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 8
+        // Special handling for lease rate values
+        if (point.label === "Lease Rate/Month") {
+          pdf.text(
+            `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+            margin + 65,
+            yPosition,
+          )
+        } else if (point.label === "Total Lease") {
+          pdf.text(
+            `${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+            margin + 65,
+            yPosition,
+          )
+        } else {
+          pdf.text(point.value, margin + 65, yPosition)
+        }
+        yPosition += 6
+      })
 
-    // Note about free material changes
-    pdf.setFont("helvetica", "normal")
-    pdf.setFontSize(9)
-    pdf.text(`Note: free two (2) change material for ${formattedDuration} rental`, margin, yPosition)
-    yPosition += 10
-
-    // Terms and Conditions with exact formatting
-    pdf.setFont("helvetica", "bold")
-    pdf.setFontSize(10)
-    pdf.text("Terms and Conditions:", margin, yPosition)
-    yPosition += 6
-
-    pdf.setFont("helvetica", "normal")
-    const terms = [
-      "1. Quotation validity:  5 working days.",
-      "2. Availability of the site is on first-come-first-served-basis only. Only offical documents such as P.O's,",
-      "    Media Orders, signed quotation, & contracts are accepted in order to booked the site.",
-      "3. To book the site, one (1) month advance and one (2) months security deposit",
-      "    payment dated 7 days before the start of rental is required.",
-      "4. Final artwork should be approved ten (10) days before the contract period",
-      "5. Print is exclusively for Golden Touch Imaging Specialist Only.",
-    ]
-
-    terms.forEach((term) => {
-      pdf.text(term, margin, yPosition)
       yPosition += 5
+
+      // Calculation breakdown section with exact formatting
+      pdf.setFontSize(10)
+      const siteRentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+
+      const actualMonthlyRate = siteRentalItem ? siteRentalItem.unitPrice : 0
+      const actualDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
+      const calculatedTotal = actualMonthlyRate * actualDurationInMonths
+      const formattedDuration = calculateDurationDisplay(costEstimate.durationDays)
+      const siteVatAmount = calculatedTotal * 0.12
+      const siteTotalWithVat = calculatedTotal + siteVatAmount
+
+      // Lease rate calculation - using actual monthly rate
+      pdf.text("Lease rate per month", margin + 5, yPosition)
+      pdf.text(
+        `${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        pageWidth - margin - 40,
+        yPosition,
+      )
+      yPosition += 6
+
+      pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
+      pdf.text(
+        `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        pageWidth - margin - 40,
+        yPosition,
+      )
+      yPosition += 6
+
+      pdf.text("12 % VAT", margin + 5, yPosition)
+      pdf.text(
+        `${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        pageWidth - margin - 40,
+        yPosition,
+      )
+      yPosition += 8
+
+      // Total line
+      pdf.setFont("helvetica", "bold")
+      pdf.text("TOTAL", margin + 5, yPosition)
+      pdf.text(
+        `${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        pageWidth - margin - 40,
+        yPosition,
+      )
+      yPosition += 10
+
+      // Note about free material changes
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(9)
+      pdf.text(`Note: free two (2) change material for ${formattedDuration} rental`, margin, yPosition)
+      yPosition += 10
+
+      // Terms and Conditions section with exact formatting
+      pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(11)
+      pdf.text("Terms and Conditions:", margin, yPosition)
+      yPosition += 8
+
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(10)
+      const terms = [
+        "1. Quotation validity:  5 working days.",
+        "2. Availability of the site is on first-come-first-served-basis only. Only offical documents such as P.O's,",
+        "    Media Orders, signed quotation, & contracts are accepted in order to booked the site.",
+        "3. To book the site, one (1) month advance and one (2) months security deposit",
+        "    payment dated 7 days before the start of rental is required.",
+        "4. Final artwork should be approved ten (10) days before the contract period",
+        "5. Print is exclusively for Golden Touch Imaging Specialist Only.",
+      ]
+
+      terms.forEach((term) => {
+        pdf.text(term, margin, yPosition)
+        yPosition += 6
+      })
+
+      yPosition += 15
+
+      // Signature section with exact formatting
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
+
+      // "Very truly yours," and "Conforme:" on same line
+      pdf.text("Very truly yours,", margin, yPosition)
+      pdf.text("C o n f o r m e:", margin + contentWidth / 2, yPosition)
+      yPosition += 20
+
+      // Names
+      pdf.setFont("helvetica", "normal")
+      const userFullName =
+        userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
+      pdf.text(userFullName, margin, yPosition)
+      pdf.text(costEstimate.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
+      yPosition += 6
+
+      // Titles/Companies
+      pdf.setFont("helvetica", "normal")
+      pdf.text("Account Management", margin, yPosition)
+      pdf.text(costEstimate.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
+      yPosition += 10
+
+      // Billing purpose note
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.text("This signed Quotation serves as an", margin + contentWidth / 2, yPosition)
+      yPosition += 4
+      pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
+      yPosition += 15
+
+      // Footer with company details only - no description text
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text(
+        "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
+        margin,
+        pageHeight - 20,
+      )
+      pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
     })
-
-    yPosition += 10
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    pdf.text("Very truly yours,", margin, yPosition)
-    pdf.text("C o n f o r m e:", margin + contentWidth / 2, yPosition)
-    yPosition += 15
-
-    // Names
-    const userFullName =
-      userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
-    pdf.text(userFullName, margin, yPosition)
-    pdf.text(costEstimate.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
-    yPosition += 5
-
-    // Titles
-    pdf.text("Account Management", margin, yPosition)
-    pdf.text(costEstimate.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
-    yPosition += 8
-
-    // Billing purpose note
-    pdf.setFontSize(9)
-    pdf.text("This signed Quotation serves as an", margin + contentWidth / 2, yPosition)
-    yPosition += 4
-    pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
-
-    pdf.setFontSize(8)
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(
-      "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
-      margin,
-      pageHeight - 25,
-    )
-    pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 20)
-
-    // Date and title at bottom
-    pdf.text(
-      createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-      margin,
-      pageHeight - 10,
-    )
-    pdf.text(`${siteName} QUOTATION`, pageWidth - margin - 60, pageHeight - 10)
 
     // Return base64 or download PDF
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `cost-estimate-${(costEstimate.title || "estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
+      const sitesSuffix =
+        selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
+          ? `_selected-${selectedPages.length}-sites`
+          : sites.length > 1 && sitesToProcess.length === 1
+            ? `_${sitesToProcess[0].replace(/[^a-z0-9]/gi, "_").toLowerCase()}`
+            : sites.length > 1
+              ? `_all-${sites.length}-sites`
+              : ""
+      const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
+
+      console.log("[v0] Attempting to download PDF:", fileName)
       pdf.save(fileName)
+      console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
@@ -398,16 +514,41 @@ export async function generateDetailedCostEstimatePDF(
     const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
     const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
 
-    // Header with company branding
-    pdf.setFontSize(20)
+    // Client name and company (top left)
+    pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    pdf.text("COST ESTIMATE", pageWidth / 2, yPosition, { align: "center" })
+    pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
+    yPosition += 5
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
     yPosition += 10
 
-    // Underline
-    pdf.setLineWidth(1)
-    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    // RFQ Number (top right)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`, pageWidth - margin - 40, yPosition - 15)
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(
+      createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+      pageWidth - margin - 40,
+      yPosition - 10,
+    )
+
+    // Greeting message - positioned prominently at top
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
+    yPosition += 5
+    pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
+    yPosition += 15
+
+    // "Details as follows:" section
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Details as follows:", margin, yPosition)
     yPosition += 15
 
     // Cost estimate information
@@ -565,6 +706,14 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
     pdf.text(`© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`, margin, yPosition)
+
+    // Return base64 or download PDF
+    if (returnBase64) {
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      const fileName = `detailed-cost-estimate-${(costEstimate.title || "estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
   } catch (error) {
     console.error("Error generating detailed Cost Estimate PDF:", error)
     throw new Error("Failed to generate detailed Cost Estimate PDF")
