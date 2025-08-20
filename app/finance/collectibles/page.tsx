@@ -30,7 +30,7 @@ interface Collectible {
   or_no: string
   invoice_no: string
   next_collection_date: string
-  status: "pending" | "collected" | "overdue"
+  status: "pending" | "collected" | "overdue" | "paid"
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -47,7 +47,7 @@ interface Collectible {
   net_amount_collection?: number
 }
 
-export default function CollectiblesPage() {
+export default function FinanceCollectiblesPage() {
   const [collectibles, setCollectibles] = useState<Collectible[]>([])
   const [filteredCollectibles, setFilteredCollectibles] = useState<Collectible[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -84,7 +84,7 @@ export default function CollectiblesPage() {
 
         setCollectibles(fetchedCollectibles)
       } catch (error) {
-        console.error("Error fetching collectibles:", error)
+        console.error("Error fetching finance collectibles:", error)
         setCollectibles([])
       } finally {
         setLoading(false)
@@ -133,7 +133,26 @@ export default function CollectiblesPage() {
         ),
       )
     } catch (error) {
-      console.error("Error soft deleting collectible:", error)
+      console.error("Error soft deleting finance collectible:", error)
+    }
+  }
+
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      const collectibleRef = doc(db, "collectibles", id)
+      await updateDoc(collectibleRef, {
+        status: "paid",
+        updated: serverTimestamp(),
+      })
+
+      // Update local state
+      setCollectibles((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
+        ),
+      )
+    } catch (error) {
+      console.error("Error marking finance collectible as paid:", error)
     }
   }
 
@@ -142,7 +161,12 @@ export default function CollectiblesPage() {
       pending: "secondary",
       collected: "default",
       overdue: "destructive",
+      paid: "default", // Added paid status with default variant (green)
     } as const
+
+    if (status === "paid") {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{status}</Badge>
+    }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
   }
@@ -166,12 +190,12 @@ export default function CollectiblesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Collectibles</h1>
-            <p className="text-muted-foreground">Manage your collection records and track payments</p>
+            <h1 className="text-3xl font-bold">Finance Collectibles</h1>
+            <p className="text-muted-foreground">Manage your finance collection records and track payments</p>
           </div>
         </div>
         <div className="text-center py-8">
-          <p className="text-muted-foreground">Loading collectibles...</p>
+          <p className="text-muted-foreground">Loading finance collectibles...</p>
         </div>
       </div>
     )
@@ -181,8 +205,8 @@ export default function CollectiblesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Collectibles</h1>
-          <p className="text-muted-foreground">Manage your collection records and track payments</p>
+          <h1 className="text-3xl font-bold">Finance Collectibles</h1>
+          <p className="text-muted-foreground">Manage your finance collection records and track payments</p>
         </div>
         <Link href="/finance/collectibles/create">
           <Button>
@@ -218,6 +242,7 @@ export default function CollectiblesPage() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="collected">Collected</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem> {/* Added paid status to filter options */}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -236,12 +261,12 @@ export default function CollectiblesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Collectibles Records</CardTitle>
+          <CardTitle>Finance Collectibles Records</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredCollectibles.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No collectibles found</p>
+              <p className="text-muted-foreground">No finance collectibles found</p>
               <Link href="/finance/collectibles/create">
                 <Button className="mt-4">
                   <Plus className="h-4 w-4 mr-2" />
@@ -308,6 +333,15 @@ export default function CollectiblesPage() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleMarkAsPaid(collectible.id)}
+                              className="flex items-center text-green-600 focus:text-green-600"
+                            >
+                              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Mark As Paid
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleSoftDelete(collectible.id)}

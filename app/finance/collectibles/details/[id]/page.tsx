@@ -46,7 +46,7 @@ interface Collectible {
   next_collection_bir_2307?: string
 }
 
-export default function CollectibleDetailsPage() {
+export default function FinanceCollectibleDetailsPage() {
   const [collectible, setCollectible] = useState<Collectible | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,11 +66,11 @@ export default function CollectibleDetailsPage() {
           const data = docSnapshot.data()
           setCollectible({ id: docSnapshot.id, ...data } as Collectible)
         } else {
-          setError("Collectible not found")
+          setError("Finance collectible not found")
         }
       } catch (error) {
-        console.error("Error fetching collectible:", error)
-        setError("Error loading collectible details")
+        console.error("Error fetching finance collectible:", error)
+        setError("Error loading finance collectible details")
       } finally {
         setLoading(false)
       }
@@ -159,8 +159,8 @@ export default function CollectibleDetailsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
-            <p className="text-muted-foreground">Loading collectible information...</p>
+            <h1 className="text-3xl font-bold">Finance Collectible Details</h1>
+            <p className="text-muted-foreground">Loading finance collectible information...</p>
           </div>
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function CollectibleDetailsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
+            <h1 className="text-3xl font-bold">Finance Collectible Details</h1>
             <p className="text-muted-foreground text-red-500">{error}</p>
           </div>
         </div>
@@ -197,12 +197,12 @@ export default function CollectibleDetailsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
-            <p className="text-muted-foreground">View collectible information</p>
+            <h1 className="text-3xl font-bold">Finance Collectible Details</h1>
+            <p className="text-muted-foreground">View finance collectible information</p>
           </div>
         </div>
         <Link href={`/finance/collectibles/edit/${collectible.id}`}>
-          <Button>Edit Collectible</Button>
+          <Button>Edit Finance Collectible</Button>
         </Link>
       </div>
 
