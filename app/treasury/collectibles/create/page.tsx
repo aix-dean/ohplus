@@ -133,7 +133,6 @@ export default function CreateTreasuryCollectiblePage() {
         client_name: clientName,
         total_amount: totalAmount,
         net_amount: totalAmount, // Set net amount same as total initially
-        invoice_no: quotationNumber,
         type: "sites", // Default to sites for quotations
         status: "pending",
       }))
