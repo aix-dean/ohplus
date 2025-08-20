@@ -32,6 +32,7 @@ interface CollectibleFormData {
   proceed_next_collection: boolean
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
+  quotation_id?: string
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -256,6 +257,10 @@ export default function CreateCollectiblePage() {
         created: serverTimestamp(),
         updated: serverTimestamp(),
         company_id: user?.company_id || user?.uid || "",
+      }
+
+      if (formData.quotation_id) {
+        collectibleData.quotation_id = formData.quotation_id
       }
 
       // Add type-specific fields

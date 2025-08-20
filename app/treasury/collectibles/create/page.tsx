@@ -33,6 +33,7 @@ interface CollectibleFormData {
   proceed_next_collection: boolean
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
+  quotation_id?: string
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -127,6 +128,7 @@ export default function CreateTreasuryCollectiblePage() {
       const clientName = searchParams.get("client_name") || ""
       const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
       const quotationNumber = searchParams.get("quotation_number") || ""
+      const quotationId = searchParams.get("quotation_id") || ""
 
       setFormData((prev) => ({
         ...prev,
@@ -135,6 +137,7 @@ export default function CreateTreasuryCollectiblePage() {
         net_amount: totalAmount, // Set net amount same as total initially
         type: "sites", // Default to sites for quotations
         status: "pending",
+        quotation_id: quotationId,
       }))
 
       if (clientName) {
@@ -277,6 +280,10 @@ export default function CreateTreasuryCollectiblePage() {
         if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
         if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
+      }
+
+      if (formData.quotation_id) {
+        collectibleData.quotation_id = formData.quotation_id
       }
 
       const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
