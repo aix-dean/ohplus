@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -70,7 +71,9 @@ const initialFormData: CollectibleFormData = {
 export default function CreateTreasuryCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -82,6 +85,8 @@ export default function CreateTreasuryCollectiblePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -115,6 +120,36 @@ export default function CreateTreasuryCollectiblePage() {
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  useEffect(() => {
+    const fromQuotation = searchParams.get("from_quotation")
+    if (fromQuotation === "true" && !hasLoadedQuotationData) {
+      const clientName = searchParams.get("client_name") || ""
+      const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
+      const quotationNumber = searchParams.get("quotation_number") || ""
+
+      setFormData((prev) => ({
+        ...prev,
+        client_name: clientName,
+        total_amount: totalAmount,
+        net_amount: totalAmount, // Set net amount same as total initially
+        type: "sites", // Default to sites for quotations
+        status: "pending",
+      }))
+
+      if (clientName) {
+        setClientSearchTerm(clientName)
+      }
+
+      // Show success message
+      toast({
+        title: "Quotation Data Loaded",
+        description: `Form has been pre-populated with data from quotation ${quotationNumber}`,
+      })
+
+      setHasLoadedQuotationData(true)
+    }
+  }, [searchParams, hasLoadedQuotationData]) // Removed toast from dependencies
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -279,11 +314,15 @@ export default function CreateTreasuryCollectiblePage() {
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
-                setFormData((prev) => ({ ...prev, client_name: "" }))
+                setFormData((prev) => ({ ...prev, client_name: e.target.value }))
               }}
               onFocus={() => {
                 setIsClientDropdownOpen(true)
@@ -685,7 +724,11 @@ export default function CreateTreasuryCollectiblePage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Create Treasury Collectible</h1>
-          <p className="text-muted-foreground">Add a new treasury collectible record</p>
+          <p className="text-muted-foreground">
+            {searchParams.get("from_quotation") === "true"
+              ? `Creating collectible from quotation ${searchParams.get("quotation_number") || ""}`
+              : "Add a new treasury collectible record"}
+          </p>
         </div>
       </div>
 

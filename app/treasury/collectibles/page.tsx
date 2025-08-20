@@ -30,7 +30,7 @@ interface Collectible {
   or_no: string
   invoice_no: string
   next_collection_date: string
-  status: "pending" | "collected" | "overdue"
+  status: "pending" | "collected" | "overdue" | "paid"
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -137,12 +137,36 @@ export default function TreasuryCollectiblesPage() {
     }
   }
 
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      const collectibleRef = doc(db, "collectibles", id)
+      await updateDoc(collectibleRef, {
+        status: "paid",
+        updated: serverTimestamp(),
+      })
+
+      // Update local state
+      setCollectibles((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
+        ),
+      )
+    } catch (error) {
+      console.error("Error marking treasury collectible as paid:", error)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const variants = {
       pending: "secondary",
       collected: "default",
       overdue: "destructive",
+      paid: "default", // Added paid status with default variant (green)
     } as const
+
+    if (status === "paid") {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{status}</Badge>
+    }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
   }
@@ -218,6 +242,7 @@ export default function TreasuryCollectiblesPage() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="collected">Collected</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem> {/* Added paid status to filter options */}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -311,6 +336,15 @@ export default function TreasuryCollectiblesPage() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleMarkAsPaid(collectible.id)}
+                              className="flex items-center text-green-600 focus:text-green-600"
+                            >
+                              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Mark As Paid
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleSoftDelete(collectible.id)}
