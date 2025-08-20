@@ -104,6 +104,8 @@ export default function TreasuryQuotationsPage() {
       client_email: quotation.client_email || "",
       client_phone: quotation.client_phone || "",
       client_address: quotation.client_address || "",
+      start_date: quotation.start_date || "",
+      end_date: quotation.end_date || "",
     })
 
     router.push(`/treasury/collectibles/create?${params.toString()}`)

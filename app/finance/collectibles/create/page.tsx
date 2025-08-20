@@ -33,6 +33,8 @@ interface CollectibleFormData {
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
   quotation_id?: string
+  start_date?: string
+  end_date?: string
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -257,6 +259,13 @@ export default function CreateCollectiblePage() {
         created: serverTimestamp(),
         updated: serverTimestamp(),
         company_id: user?.company_id || user?.uid || "",
+      }
+
+      if (formData.start_date) {
+        collectibleData.start_date = formData.start_date
+      }
+      if (formData.end_date) {
+        collectibleData.end_date = formData.end_date
       }
 
       if (formData.quotation_id) {
@@ -584,12 +593,21 @@ export default function CreateCollectiblePage() {
             <Input id="site" value={formData.site || ""} onChange={(e) => handleInputChange("site", e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="covered_period">Covered Period</Label>
+            <Label htmlFor="start_date">Start Date</Label>
             <Input
-              id="covered_period"
+              id="start_date"
               type="date"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
+              value={formData.start_date || ""}
+              onChange={(e) => handleInputChange("start_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="end_date">End Date</Label>
+            <Input
+              id="end_date"
+              type="date"
+              value={formData.end_date || ""}
+              onChange={(e) => handleInputChange("end_date", e.target.value)}
             />
           </div>
           <div className="space-y-2">

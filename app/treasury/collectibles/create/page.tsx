@@ -34,6 +34,8 @@ interface CollectibleFormData {
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
   quotation_id?: string
+  start_date?: string
+  end_date?: string
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -129,6 +131,8 @@ export default function CreateTreasuryCollectiblePage() {
       const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
       const quotationNumber = searchParams.get("quotation_number") || ""
       const quotationId = searchParams.get("quotation_id") || ""
+      const startDate = searchParams.get("start_date") || ""
+      const endDate = searchParams.get("end_date") || ""
 
       setFormData((prev) => ({
         ...prev,
@@ -138,6 +142,8 @@ export default function CreateTreasuryCollectiblePage() {
         type: "sites", // Default to sites for quotations
         status: "pending",
         quotation_id: quotationId,
+        start_date: startDate,
+        end_date: endDate,
       }))
 
       if (clientName) {
@@ -263,6 +269,8 @@ export default function CreateTreasuryCollectiblePage() {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
         if (formData.covered_period) collectibleData.covered_period = formData.covered_period
+        if (formData.start_date) collectibleData.start_date = formData.start_date
+        if (formData.end_date) collectibleData.end_date = formData.end_date
         if (bir2307Url) collectibleData.bir_2307 = bir2307Url
         if (formData.collection_date) collectibleData.collection_date = formData.collection_date
       } else if (formData.type === "supplies") {
@@ -494,12 +502,21 @@ export default function CreateTreasuryCollectiblePage() {
             <Input id="site" value={formData.site || ""} onChange={(e) => handleInputChange("site", e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="covered_period">Covered Period</Label>
+            <Label htmlFor="start_date">Start Date</Label>
             <Input
-              id="covered_period"
+              id="start_date"
               type="date"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
+              value={formData.start_date || ""}
+              onChange={(e) => handleInputChange("start_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="end_date">End Date</Label>
+            <Input
+              id="end_date"
+              type="date"
+              value={formData.end_date || ""}
+              onChange={(e) => handleInputChange("end_date", e.target.value)}
             />
           </div>
           <div className="space-y-2">
