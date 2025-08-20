@@ -26,13 +26,21 @@ import {
 } from "lucide-react"
 import type { PhilippinesWeatherData } from "@/lib/accuweather-service"
 import { FloodMap } from "@/components/flood-map"
-import { LocationSearch } from "@/components/location-search"
+import { EnhancedLocationSelector } from "@/components/enhanced-location-selector"
+
+interface CustomLocation {
+  lat: number
+  lng: number
+  address: string
+  placeId?: string
+}
 
 export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { defaultLocation?: string }) {
   const [weather, setWeather] = useState<PhilippinesWeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState(defaultLocation)
+  const [customLocation, setCustomLocation] = useState<CustomLocation | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   // Fetch weather data
@@ -42,7 +50,13 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     async function loadWeatherData() {
       try {
         setLoading(true)
-        const response = await fetch(`/api/accuweather?location=${selectedLocation}`)
+
+        let apiUrl = `/api/accuweather?location=${selectedLocation}`
+        if (selectedLocation === "custom" && customLocation) {
+          apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
+        }
+
+        const response = await fetch(apiUrl)
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`)
@@ -73,19 +87,27 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return () => {
       isMounted = false
     }
-  }, [selectedLocation])
+  }, [selectedLocation, customLocation])
 
-  const handleLocationChange = (locationKey: string, locationName?: string) => {
+  const handleLocationChange = (locationKey: string, customLoc?: CustomLocation) => {
     setSelectedLocation(locationKey)
-    // If a custom location name is provided, we could store it for display
-    // For now, we'll let the weather data provide the location name
+    if (locationKey === "custom" && customLoc) {
+      setCustomLocation(customLoc)
+    } else {
+      setCustomLocation(null)
+    }
   }
 
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      const response = await fetch(`/api/accuweather?location=${selectedLocation}`)
+      let apiUrl = `/api/accuweather?location=${selectedLocation}`
+      if (selectedLocation === "custom" && customLocation) {
+        apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
+      }
+
+      const response = await fetch(apiUrl)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
@@ -161,7 +183,11 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
         </div>
 
         <div className="flex items-center gap-2">
-          <LocationSearch value={selectedLocation} onLocationChange={handleLocationChange} />
+          <EnhancedLocationSelector
+            value={selectedLocation}
+            onLocationChange={handleLocationChange}
+            customLocation={customLocation}
+          />
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
