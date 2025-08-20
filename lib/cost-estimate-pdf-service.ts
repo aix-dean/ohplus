@@ -286,9 +286,17 @@ export async function generateCostEstimatePDF(
       // Greeting message - positioned prominently at top
       pdf.setFontSize(11)
       pdf.setFont("helvetica", "normal")
-      pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
+      const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
+      const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
+
+      // Calculate center position for each line
+      const line1Width = pdf.getTextWidth(greetingLine1)
+      const line2Width = pdf.getTextWidth(greetingLine2)
+      const centerX = pageWidth / 2
+
+      pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
       yPosition += 5
-      pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
+      pdf.text(greetingLine2, centerX - line2Width / 2, yPosition)
       yPosition += 15
 
       // "Details as follows:" section
@@ -540,9 +548,17 @@ export async function generateDetailedCostEstimatePDF(
     // Greeting message - positioned prominently at top
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
+    const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
+    const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
+
+    // Calculate center position for each line
+    const line1Width = pdf.getTextWidth(greetingLine1)
+    const line2Width = pdf.getTextWidth(greetingLine2)
+    const centerX = pageWidth / 2
+
+    pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
     yPosition += 5
-    pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
+    pdf.text(greetingLine2, centerX - line2Width / 2, yPosition)
     yPosition += 15
 
     // "Details as follows:" section
