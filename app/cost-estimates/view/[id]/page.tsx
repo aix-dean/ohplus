@@ -316,8 +316,8 @@ export default function PublicCostEstimateViewPage() {
               </div>
 
               {/* Greeting Message */}
-              <div className="mb-6">
-                <p className="text-gray-700 leading-relaxed">
+              <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                <p className="text-gray-800 leading-relaxed font-medium">
                   Good Day! Thank you for considering Golden Touch for your business needs. We are pleased to submit our
                   quotation for your requirements:
                 </p>
