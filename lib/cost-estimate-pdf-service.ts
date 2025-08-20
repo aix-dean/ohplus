@@ -275,6 +275,14 @@ export async function generateCostEstimatePDF(
       pdf.setFont("helvetica", "normal")
       pdf.text(`RFQ. No. ${ceNumber}`, pageWidth - margin - 40, yPosition - 15)
 
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(
+        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+        pageWidth - margin - 40,
+        yPosition - 10,
+      )
+
       // Greeting message
       pdf.setFontSize(10)
       pdf.setFont("helvetica", "normal")
@@ -458,14 +466,8 @@ export async function generateCostEstimatePDF(
       )
       pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
 
-      // Date and title at bottom
       pdf.setTextColor(0, 0, 0)
       pdf.setFontSize(9)
-      pdf.text(
-        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-        margin,
-        pageHeight - 35,
-      )
       pdf.setFont("helvetica", "bold")
       pdf.text(`${siteName} QUOTATION`, margin, pageHeight - 30)
     })
