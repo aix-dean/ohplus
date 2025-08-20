@@ -126,6 +126,119 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
 
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
+
+  const handleFieldEdit = (fieldName: string, currentValue: any) => {
+    setEditingField(fieldName)
+    setTempValues({ [fieldName]: currentValue })
+  }
+
+  const handleFieldSave = async (fieldName: string) => {
+    if (!editableCostEstimate || !tempValues[fieldName]) return
+
+    const newValue = tempValues[fieldName]
+    const updatedCostEstimate = { ...editableCostEstimate }
+
+    // Handle different field types
+    switch (fieldName) {
+      case "unitPrice":
+        // Update unit price for rental items and recalculate totals
+        const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
+          if (item.category.includes("Billboard Rental")) {
+            const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+            return { ...item, unitPrice: newValue, total: newTotal }
+          }
+          return item
+        })
+        updatedCostEstimate.lineItems = updatedLineItems
+        updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
+        break
+
+      case "durationDays":
+        updatedCostEstimate.durationDays = newValue
+        // Recalculate totals based on new duration
+        const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
+          if (item.category.includes("Billboard Rental")) {
+            const newTotal = item.unitPrice * (newValue / 30)
+            return { ...item, total: newTotal }
+          }
+          return item
+        })
+        updatedCostEstimate.lineItems = recalculatedItems
+        updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
+
+        // Update end date based on new duration
+        if (updatedCostEstimate.startDate) {
+          const newEndDate = new Date(updatedCostEstimate.startDate)
+          newEndDate.setDate(newEndDate.getDate() + newValue)
+          updatedCostEstimate.endDate = newEndDate
+        }
+        break
+
+      case "illumination":
+        // Update illumination quantity for all items
+        const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => ({
+          ...item,
+          quantity: newValue,
+        }))
+        updatedCostEstimate.lineItems = illuminationUpdatedItems
+        break
+
+      case "startDate":
+      case "endDate":
+        updatedCostEstimate[fieldName] = newValue
+        // Recalculate duration days if both dates are set
+        if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
+          const diffTime = Math.abs(updatedCostEstimate.endDate.getTime() - updatedCostEstimate.startDate.getTime())
+          const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          updatedCostEstimate.durationDays = newDurationDays
+
+          // Recalculate totals based on new duration
+          const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+            if (item.category.includes("Billboard Rental")) {
+              const newTotal = item.unitPrice * (newDurationDays / 30)
+              return { ...item, total: newTotal }
+            }
+            return item
+          })
+          updatedCostEstimate.lineItems = durationUpdatedItems
+          updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
+        }
+        break
+    }
+
+    try {
+      // Save to database
+      await updateCostEstimate(updatedCostEstimate.id, updatedCostEstimate)
+
+      // Update local state
+      setEditableCostEstimate(updatedCostEstimate)
+      setCostEstimate(updatedCostEstimate)
+
+      // Clear editing state
+      setEditingField(null)
+      setTempValues({})
+
+      toast({
+        title: "Updated",
+        description: "Field updated successfully!",
+      })
+    } catch (error) {
+      console.error("Error updating field:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update field.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleFieldCancel = () => {
+    setEditingField(null)
+    setTempValues({})
+  }
+
   const fetchCompanyData = async () => {
     if (!user?.uid || !userData) return
 
@@ -720,6 +833,11 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       ? `${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.
       : baseCENumber
 
+    const rentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+    const monthlyRate = rentalItem
+      ? rentalItem.unitPrice
+      : siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)
+
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
         <div className="p-6 sm:p-8 border-b">
@@ -767,18 +885,89 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 <span className="text-gray-700">: {siteLineItems[0].notes || "Standard Size"}</span>
               </div>
             )}
-            <div className="flex">
+            <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Duration</span>
-              <span className="text-gray-700">: {formatDurationDisplay(costEstimate?.durationDays)}</span>
+              <span className="text-gray-700">: </span>
+              {isEditing && editingField === "durationDays" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.durationDays || ""}
+                    onChange={(e) =>
+                      setTempValues({ ...tempValues, durationDays: Number.parseInt(e.target.value) || 0 })
+                    }
+                    className="w-20 h-6 text-sm"
+                    placeholder="Days"
+                  />
+                  <span className="text-sm text-gray-600">days</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleFieldSave("durationDays")}
+                    className="h-6 px-2"
+                  >
+                    <Save className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  onClick={() => isEditing && handleFieldEdit("durationDays", costEstimate?.durationDays)}
+                >
+                  {formatDurationDisplay(costEstimate?.durationDays)}
+                </span>
+              )}
             </div>
-            <div className="flex">
+            <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Period</span>
-              <span className="text-gray-700">
-                : {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
-                {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
-              </span>
+              <span className="text-gray-700">: </span>
+              {isEditing && editingField === "contractPeriod" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="date"
+                    value={tempValues.startDate ? format(tempValues.startDate, "yyyy-MM-dd") : ""}
+                    onChange={(e) => setTempValues({ ...tempValues, startDate: new Date(e.target.value) })}
+                    className="w-32 h-6 text-sm"
+                  />
+                  <span>-</span>
+                  <Input
+                    type="date"
+                    value={tempValues.endDate ? format(tempValues.endDate, "yyyy-MM-dd") : ""}
+                    onChange={(e) => setTempValues({ ...tempValues, endDate: new Date(e.target.value) })}
+                    className="w-32 h-6 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleFieldSave("contractPeriod")}
+                    className="h-6 px-2"
+                  >
+                    <Save className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  onClick={() =>
+                    isEditing &&
+                    handleFieldEdit("contractPeriod", {
+                      startDate: costEstimate?.startDate,
+                      endDate: costEstimate?.endDate,
+                    })
+                  }
+                >
+                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
+                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
+                </span>
+              )}
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
@@ -786,23 +975,75 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               <span className="text-gray-700">: {costEstimate?.client.company}</span>
             </div>
             {siteLineItems.length > 0 && (
-              <div className="flex">
+              <div className="flex items-center">
                 <span className="w-4 text-center">•</span>
                 <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">: {siteLineItems[0].quantity} units of lighting system</span>
+                <span className="text-gray-700">: </span>
+                {isEditing && editingField === "illumination" ? (
+                  <div className="flex items-center gap-2 ml-1">
+                    <Input
+                      type="number"
+                      value={tempValues.illumination || ""}
+                      onChange={(e) =>
+                        setTempValues({ ...tempValues, illumination: Number.parseInt(e.target.value) || 0 })
+                      }
+                      className="w-16 h-6 text-sm"
+                      placeholder="Units"
+                    />
+                    <span className="text-sm text-gray-600">units of lighting system</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleFieldSave("illumination")}
+                      className="h-6 px-2"
+                    >
+                      <Save className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <span
+                    className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                    onClick={() => isEditing && handleFieldEdit("illumination", siteLineItems[0].quantity)}
+                  >
+                    {siteLineItems[0].quantity} units of lighting system
+                  </span>
+                )}
               </div>
             )}
-            <div className="flex">
+            <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
-              <span className="text-gray-700">
-                : PHP{" "}
-                {(siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)).toLocaleString(
-                  "en-US",
-                  { minimumFractionDigits: 2 },
-                )}{" "}
-                (Exclusive of VAT)
-              </span>
+              <span className="text-gray-700">: PHP </span>
+              {isEditing && editingField === "unitPrice" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.unitPrice || ""}
+                    onChange={(e) =>
+                      setTempValues({ ...tempValues, unitPrice: Number.parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-32 h-6 text-sm"
+                    placeholder="0.00"
+                  />
+                  <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+                  <Button size="sm" variant="ghost" onClick={() => handleFieldSave("unitPrice")} className="h-6 px-2">
+                    <Save className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  onClick={() => isEditing && handleFieldEdit("unitPrice", monthlyRate)}
+                >
+                  {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                </span>
+              )}
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
@@ -818,11 +1059,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               <div className="flex justify-between">
                 <span className="text-gray-700">Lease rate per month</span>
                 <span className="text-gray-900">
-                  PHP{" "}
-                  {(siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)).toLocaleString(
-                    "en-US",
-                    { minimumFractionDigits: 2 },
-                  )}
+                  PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex justify-between">
