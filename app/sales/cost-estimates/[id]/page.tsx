@@ -96,13 +96,13 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
-export default function CostEstimateDetailsPage() {
+export default function CostEstimateDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user, userData } = useAuth()
 
   const { toast } = useToast()
 
-  const costEstimateId = useRouter().query.id as string
+  const costEstimateId = params.id
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
   const [loading, setLoading] = useState(true)
