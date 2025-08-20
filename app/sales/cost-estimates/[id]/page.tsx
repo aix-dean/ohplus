@@ -128,115 +128,109 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
-    setTempValues({ [fieldName]: currentValue })
+    setTempValues({ ...tempValues, [fieldName]: currentValue })
+    setHasUnsavedChanges(true)
   }
 
-  const handleFieldSave = async (fieldName: string) => {
-    if (!editableCostEstimate || !tempValues[fieldName]) return
+  const handleSaveAllChanges = async () => {
+    if (!editableCostEstimate || Object.keys(tempValues).length === 0) return
 
-    const newValue = tempValues[fieldName]
     const updatedCostEstimate = { ...editableCostEstimate }
 
-    // Handle different field types
-    switch (fieldName) {
-      case "unitPrice":
-        // Update unit price for rental items and recalculate totals
-        const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
-          if (item.category.includes("Billboard Rental")) {
-            const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
-            return { ...item, unitPrice: newValue, total: newTotal }
-          }
-          return item
-        })
-        updatedCostEstimate.lineItems = updatedLineItems
-        updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
-        break
-
-      case "durationDays":
-        updatedCostEstimate.durationDays = newValue
-        // Recalculate totals based on new duration
-        const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
-          if (item.category.includes("Billboard Rental")) {
-            const newTotal = item.unitPrice * (newValue / 30)
-            return { ...item, total: newTotal }
-          }
-          return item
-        })
-        updatedCostEstimate.lineItems = recalculatedItems
-        updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
-
-        // Update end date based on new duration
-        if (updatedCostEstimate.startDate) {
-          const newEndDate = new Date(updatedCostEstimate.startDate)
-          newEndDate.setDate(newEndDate.getDate() + newValue)
-          updatedCostEstimate.endDate = newEndDate
-        }
-        break
-
-      case "illumination":
-        // Update illumination quantity for all items
-        const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => ({
-          ...item,
-          quantity: newValue,
-        }))
-        updatedCostEstimate.lineItems = illuminationUpdatedItems
-        break
-
-      case "startDate":
-      case "endDate":
-        updatedCostEstimate[fieldName] = newValue
-        // Recalculate duration days if both dates are set
-        if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
-          const diffTime = Math.abs(updatedCostEstimate.endDate.getTime() - updatedCostEstimate.startDate.getTime())
-          const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-          updatedCostEstimate.durationDays = newDurationDays
-
-          // Recalculate totals based on new duration
-          const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+    // Apply all temp values to the cost estimate
+    Object.entries(tempValues).forEach(([fieldName, newValue]) => {
+      switch (fieldName) {
+        case "unitPrice":
+          const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
             if (item.category.includes("Billboard Rental")) {
-              const newTotal = item.unitPrice * (newDurationDays / 30)
+              const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+              return { ...item, unitPrice: newValue, total: newTotal }
+            }
+            return item
+          })
+          updatedCostEstimate.lineItems = updatedLineItems
+          updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
+          break
+
+        case "durationDays":
+          updatedCostEstimate.durationDays = newValue
+          const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
+            if (item.category.includes("Billboard Rental")) {
+              const newTotal = item.unitPrice * (newValue / 30)
               return { ...item, total: newTotal }
             }
             return item
           })
-          updatedCostEstimate.lineItems = durationUpdatedItems
-          updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
-        }
-        break
-    }
+          updatedCostEstimate.lineItems = recalculatedItems
+          updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
+
+          if (updatedCostEstimate.startDate) {
+            const newEndDate = new Date(updatedCostEstimate.startDate)
+            newEndDate.setDate(newEndDate.getDate() + newValue)
+            updatedCostEstimate.endDate = newEndDate
+          }
+          break
+
+        case "illumination":
+          const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => ({
+            ...item,
+            quantity: newValue,
+          }))
+          updatedCostEstimate.lineItems = illuminationUpdatedItems
+          break
+
+        case "startDate":
+        case "endDate":
+          updatedCostEstimate[fieldName] = newValue
+          if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
+            const diffTime = Math.abs(updatedCostEstimate.endDate.getTime() - updatedCostEstimate.startDate.getTime())
+            const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            updatedCostEstimate.durationDays = newDurationDays
+
+            const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+              if (item.category.includes("Billboard Rental")) {
+                const newTotal = item.unitPrice * (newDurationDays / 30)
+                return { ...item, total: newTotal }
+              }
+              return item
+            })
+            updatedCostEstimate.lineItems = durationUpdatedItems
+            updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
+          }
+          break
+      }
+    })
 
     try {
-      // Save to database
       await updateCostEstimate(updatedCostEstimate.id, updatedCostEstimate)
-
-      // Update local state
       setEditableCostEstimate(updatedCostEstimate)
       setCostEstimate(updatedCostEstimate)
-
-      // Clear editing state
       setEditingField(null)
       setTempValues({})
+      setHasUnsavedChanges(false)
 
       toast({
         title: "Updated",
-        description: "Field updated successfully!",
+        description: "All changes saved successfully!",
       })
     } catch (error) {
-      console.error("Error updating field:", error)
+      console.error("Error updating cost estimate:", error)
       toast({
         title: "Error",
-        description: "Failed to update field.",
+        description: "Failed to save changes.",
         variant: "destructive",
       })
     }
   }
 
-  const handleFieldCancel = () => {
+  const handleCancelAllChanges = () => {
     setEditingField(null)
     setTempValues({})
+    setHasUnsavedChanges(false)
   }
 
   const fetchCompanyData = async () => {
@@ -901,17 +895,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                     placeholder="Days"
                   />
                   <span className="text-sm text-gray-600">days</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleFieldSave("durationDays")}
-                    className="h-6 px-2"
-                  >
-                    <Save className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
-                    <X className="h-3 w-3" />
-                  </Button>
                 </div>
               ) : (
                 <span
@@ -941,17 +924,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                     onChange={(e) => setTempValues({ ...tempValues, endDate: new Date(e.target.value) })}
                     className="w-32 h-6 text-sm"
                   />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleFieldSave("contractPeriod")}
-                    className="h-6 px-2"
-                  >
-                    <Save className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
-                    <X className="h-3 w-3" />
-                  </Button>
                 </div>
               ) : (
                 <span
@@ -991,17 +963,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                       placeholder="Units"
                     />
                     <span className="text-sm text-gray-600">units of lighting system</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleFieldSave("illumination")}
-                      className="h-6 px-2"
-                    >
-                      <Save className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
-                      <X className="h-3 w-3" />
-                    </Button>
                   </div>
                 ) : (
                   <span
@@ -1029,12 +990,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                     placeholder="0.00"
                   />
                   <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
-                  <Button size="sm" variant="ghost" onClick={() => handleFieldSave("unitPrice")} className="h-6 px-2">
-                    <Save className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleFieldCancel} className="h-6 px-2">
-                    <X className="h-3 w-3" />
-                  </Button>
                 </div>
               ) : (
                 <span
@@ -1155,6 +1110,22 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </div>
           </div>
         </div>
+        {isEditing && hasUnsavedChanges && (
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={handleCancelAllChanges}
+              className="flex items-center gap-2 bg-transparent"
+            >
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAllChanges} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+              <Save className="h-4 w-4" />
+              Save Changes
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
