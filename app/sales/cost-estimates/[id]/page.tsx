@@ -136,6 +136,31 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     setHasUnsavedChanges(true)
   }
 
+  const updateTempValues = (fieldName: string, newValue: any) => {
+    const updatedTempValues = { ...tempValues, [fieldName]: newValue }
+
+    // Bidirectional sync: duration days <-> contract period
+    if (fieldName === "durationDays" && costEstimate?.startDate) {
+      // When duration changes, update end date
+      const newEndDate = new Date(costEstimate.startDate)
+      newEndDate.setDate(newEndDate.getDate() + newValue)
+      updatedTempValues.endDate = newEndDate
+    } else if (fieldName === "startDate" || fieldName === "endDate") {
+      // When dates change, update duration
+      const startDate = fieldName === "startDate" ? newValue : tempValues.startDate || costEstimate?.startDate
+      const endDate = fieldName === "endDate" ? newValue : tempValues.endDate || costEstimate?.endDate
+
+      if (startDate && endDate) {
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+        const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        updatedTempValues.durationDays = newDurationDays
+      }
+    }
+
+    setTempValues(updatedTempValues)
+    setHasUnsavedChanges(true)
+  }
+
   const handleSaveAllChanges = async () => {
     if (!editableCostEstimate || Object.keys(tempValues).length === 0) return
 
@@ -888,9 +913,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   <Input
                     type="number"
                     value={tempValues.durationDays || ""}
-                    onChange={(e) =>
-                      setTempValues({ ...tempValues, durationDays: Number.parseInt(e.target.value) || 0 })
-                    }
+                    onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
                     className="w-20 h-6 text-sm"
                     placeholder="Days"
                   />
@@ -914,14 +937,14 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   <Input
                     type="date"
                     value={tempValues.startDate ? format(tempValues.startDate, "yyyy-MM-dd") : ""}
-                    onChange={(e) => setTempValues({ ...tempValues, startDate: new Date(e.target.value) })}
+                    onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
                     className="w-32 h-6 text-sm"
                   />
                   <span>-</span>
                   <Input
                     type="date"
                     value={tempValues.endDate ? format(tempValues.endDate, "yyyy-MM-dd") : ""}
-                    onChange={(e) => setTempValues({ ...tempValues, endDate: new Date(e.target.value) })}
+                    onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
                     className="w-32 h-6 text-sm"
                   />
                 </div>
@@ -956,9 +979,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                     <Input
                       type="number"
                       value={tempValues.illumination || ""}
-                      onChange={(e) =>
-                        setTempValues({ ...tempValues, illumination: Number.parseInt(e.target.value) || 0 })
-                      }
+                      onChange={(e) => updateTempValues("illumination", Number.parseInt(e.target.value) || 0)}
                       className="w-16 h-6 text-sm"
                       placeholder="Units"
                     />
@@ -983,9 +1004,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   <Input
                     type="number"
                     value={tempValues.unitPrice || ""}
-                    onChange={(e) =>
-                      setTempValues({ ...tempValues, unitPrice: Number.parseFloat(e.target.value) || 0 })
-                    }
+                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
                     className="w-32 h-6 text-sm"
                     placeholder="0.00"
                   />
