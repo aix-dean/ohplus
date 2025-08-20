@@ -717,7 +717,7 @@ export default function RequestsView() {
                             View Details
                           </DropdownMenuItem>
 
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/finance/requests/edit/${request.id}`)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Request
                           </DropdownMenuItem>
