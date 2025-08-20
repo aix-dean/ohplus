@@ -72,8 +72,12 @@ export default function TreasuryQuotationsPage() {
   }
 
   const handleViewPDF = (quotation: any) => {
-    // Navigate to the individual quotation page where PDF can be viewed/downloaded
-    router.push(`/treasury/quotations/${quotation.id}`)
+    const fileUrl = quotation.projectCompliance?.signedQuotation?.fileUrl
+    if (fileUrl) {
+      window.open(fileUrl, "_blank")
+    } else {
+      console.error("No signed quotation file URL found")
+    }
   }
 
   return (
