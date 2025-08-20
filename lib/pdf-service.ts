@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf"
 import type { CostEstimate } from "./types" // Assuming CostEstimate is defined in a types file
-import { doc, getDoc, db } from "./firebase" // Assuming these are imported from a firebase file
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "./firebase" // Import db from local firebase config
 import { safeToDate } from "./utils" // Assuming safeToDate is imported from a utils file
 
 export async function generateCostEstimatePDF(
