@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -25,14 +24,27 @@ import {
   CloudSnow,
   CloudFog,
 } from "lucide-react"
-import { PHILIPPINES_LOCATIONS, type PhilippinesWeatherData } from "@/lib/accuweather-service"
+import type { PhilippinesWeatherData } from "@/lib/accuweather-service"
 import { FloodMap } from "@/components/flood-map"
+import { EnhancedLocationSelector } from "@/components/enhanced-location-selector"
+
+interface CustomLocation {
+  lat: number
+  lng: number
+  address: string
+  placeId?: string
+}
 
 export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { defaultLocation?: string }) {
   const [weather, setWeather] = useState<PhilippinesWeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedLocation, setSelectedLocation] = useState(defaultLocation)
+  const [selectedLocation, setSelectedLocation] = useState("custom")
+  const [customLocation, setCustomLocation] = useState<CustomLocation | null>({
+    lat: 14.5995,
+    lng: 120.9842,
+    address: "Manila, Metro Manila, Philippines",
+  })
   const [refreshing, setRefreshing] = useState(false)
 
   // Fetch weather data
@@ -40,9 +52,17 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     let isMounted = true
 
     async function loadWeatherData() {
+      if (!customLocation) {
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
-        const response = await fetch(`/api/accuweather?location=${selectedLocation}`)
+
+        const apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
+
+        const response = await fetch(apiUrl)
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`)
@@ -73,18 +93,24 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return () => {
       isMounted = false
     }
-  }, [selectedLocation])
+  }, [customLocation])
 
-  // Handle location change
-  const handleLocationChange = (value: string) => {
-    setSelectedLocation(value)
+  const handleLocationChange = (locationKey: string, customLoc?: CustomLocation) => {
+    setSelectedLocation(locationKey)
+    if (locationKey === "custom" && customLoc) {
+      setCustomLocation(customLoc)
+    }
   }
 
   // Handle refresh
   const handleRefresh = async () => {
+    if (!customLocation) return
+
     setRefreshing(true)
     try {
-      const response = await fetch(`/api/accuweather?location=${selectedLocation}`)
+      const apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
+
+      const response = await fetch(apiUrl)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
@@ -129,6 +155,34 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return "bg-blue-100 text-blue-800 border-blue-200"
   }
 
+  if (!customLocation && !loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Philippines Weather</h1>
+            <p className="text-sm text-gray-500">Powered by AccuWeather</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <MapPin className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Select a Location</h3>
+            <p className="text-gray-500 text-center">
+              Click "Select Location" to choose a location on the map and view weather information.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (loading && !weather) {
     return (
       <div className="space-y-6">
@@ -160,18 +214,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
         </div>
 
         <div className="flex items-center gap-2">
-          <Select value={selectedLocation} onValueChange={handleLocationChange}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select location" />
-            </SelectTrigger>
-            <SelectContent>
-              {PHILIPPINES_LOCATIONS.map((location) => (
-                <SelectItem key={location.key} value={location.key}>
-                  {location.name}, {location.region}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -190,6 +233,51 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
 
       {weather && (
         <>
+          {/* 5-Day Forecast */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                5-Day Forecast
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {weather.forecast.map((day, index) => (
+                  <div key={index} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                    <p className="font-medium text-sm">{day.dayOfWeek}</p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+
+                    {/* Day Weather */}
+                    <div className="flex flex-col items-center mb-2">
+                      <div className="mb-1">{getWeatherIcon(day.day.icon, 32)}</div>
+                      <p className="text-xs text-center text-gray-600">{day.day.condition}</p>
+                      {day.day.precipitation && (
+                        <Badge variant="outline" className="text-xs mt-1 bg-blue-50 text-blue-700">
+                          Rain
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Temperature */}
+                    <div className="flex gap-2 text-sm">
+                      <span className="font-semibold">{day.temperature.max}°</span>
+                      <span className="text-gray-500">{day.temperature.min}°</span>
+                    </div>
+
+                    {/* Night conditions */}
+                    <div className="flex flex-col items-center mt-2 pt-2 border-t border-gray-200">
+                      <div className="mb-1">{getWeatherIcon(day.night.icon, 20)}</div>
+                      <p className="text-xs text-center text-gray-500">Night: {day.night.condition}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Current Weather Card */}
           <Card>
             <CardHeader>
@@ -262,52 +350,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
           </Card>
 
           {/* Flood Map */}
-          <FloodMap locationKey={selectedLocation} />
-
-          {/* 5-Day Forecast */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                5-Day Forecast
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {weather.forecast.map((day, index) => (
-                  <div key={index} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-                    <p className="font-medium text-sm">{day.dayOfWeek}</p>
-                    <p className="text-xs text-gray-500 mb-2">
-                      {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </p>
-
-                    {/* Day Weather */}
-                    <div className="flex flex-col items-center mb-2">
-                      <div className="mb-1">{getWeatherIcon(day.day.icon, 32)}</div>
-                      <p className="text-xs text-center text-gray-600">{day.day.condition}</p>
-                      {day.day.precipitation && (
-                        <Badge variant="outline" className="text-xs mt-1 bg-blue-50 text-blue-700">
-                          Rain
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Temperature */}
-                    <div className="flex gap-2 text-sm">
-                      <span className="font-semibold">{day.temperature.max}°</span>
-                      <span className="text-gray-500">{day.temperature.min}°</span>
-                    </div>
-
-                    {/* Night conditions */}
-                    <div className="flex flex-col items-center mt-2 pt-2 border-t border-gray-200">
-                      <div className="mb-1">{getWeatherIcon(day.night.icon, 20)}</div>
-                      <p className="text-xs text-center text-gray-500">Night: {day.night.condition}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <FloodMap locationKey={customLocation ? `${customLocation.lat},${customLocation.lng}` : selectedLocation} />
 
           {/* Weather Alerts */}
           {weather.alerts.length > 0 && (
