@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -33,8 +34,6 @@ interface CollectibleFormData {
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
   quotation_id?: string
-  start_date?: string
-  end_date?: string
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -112,7 +111,9 @@ const initialFormData: CollectibleFormData = {
 export default function CreateCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -124,6 +125,8 @@ export default function CreateCollectiblePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -157,6 +160,44 @@ export default function CreateCollectiblePage() {
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  useEffect(() => {
+    const fromQuotation = searchParams.get("from_quotation")
+    if (fromQuotation === "true" && !hasLoadedQuotationData) {
+      const clientName = searchParams.get("client_name") || ""
+      const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
+      const quotationNumber = searchParams.get("quotation_number") || ""
+      const quotationId = searchParams.get("quotation_id") || ""
+      const startDate = searchParams.get("start_date") || ""
+      const endDate = searchParams.get("end_date") || ""
+
+      // Use start date as covered period
+      const coveredPeriod = startDate || ""
+
+      setFormData((prev) => ({
+        ...prev,
+        client_name: clientName,
+        total_amount: totalAmount,
+        net_amount: totalAmount, // Set net amount same as total initially
+        type: "sites", // Default to sites for quotations
+        status: "pending",
+        quotation_id: quotationId,
+        covered_period: coveredPeriod, // Auto-fill covered period with start date
+      }))
+
+      if (clientName) {
+        setClientSearchTerm(clientName)
+      }
+
+      // Show success message
+      toast({
+        title: "Quotation Data Loaded",
+        description: `Form has been pre-populated with data from quotation ${quotationNumber}${startDate ? ` (Period: ${startDate}${endDate ? ` to ${endDate}` : ""})` : ""}`,
+      })
+
+      setHasLoadedQuotationData(true)
+    }
+  }, [searchParams, hasLoadedQuotationData])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -259,13 +300,6 @@ export default function CreateCollectiblePage() {
         created: serverTimestamp(),
         updated: serverTimestamp(),
         company_id: user?.company_id || user?.uid || "",
-      }
-
-      if (formData.start_date) {
-        collectibleData.start_date = formData.start_date
-      }
-      if (formData.end_date) {
-        collectibleData.end_date = formData.end_date
       }
 
       if (formData.quotation_id) {
@@ -593,21 +627,12 @@ export default function CreateCollectiblePage() {
             <Input id="site" value={formData.site || ""} onChange={(e) => handleInputChange("site", e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="start_date">Start Date</Label>
+            <Label htmlFor="covered_period">Covered Period</Label>
             <Input
-              id="start_date"
+              id="covered_period"
               type="date"
-              value={formData.start_date || ""}
-              onChange={(e) => handleInputChange("start_date", e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="end_date">End Date</Label>
-            <Input
-              id="end_date"
-              type="date"
-              value={formData.end_date || ""}
-              onChange={(e) => handleInputChange("end_date", e.target.value)}
+              value={formData.covered_period || ""}
+              onChange={(e) => handleInputChange("covered_period", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -746,7 +771,11 @@ export default function CreateCollectiblePage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Create Collectible</h1>
-          <p className="text-muted-foreground">Add a new collectible record</p>
+          <p className="text-muted-foreground">
+            {searchParams.get("from_quotation") === "true"
+              ? `Creating collectible from quotation ${searchParams.get("quotation_number") || ""}`
+              : "Add a new collectible record"}
+          </p>
         </div>
       </div>
 
