@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -25,8 +24,9 @@ import {
   CloudSnow,
   CloudFog,
 } from "lucide-react"
-import { PHILIPPINES_LOCATIONS, type PhilippinesWeatherData } from "@/lib/accuweather-service"
+import type { PhilippinesWeatherData } from "@/lib/accuweather-service"
 import { FloodMap } from "@/components/flood-map"
+import { LocationSearch } from "@/components/location-search"
 
 export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { defaultLocation?: string }) {
   const [weather, setWeather] = useState<PhilippinesWeatherData | null>(null)
@@ -75,9 +75,10 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     }
   }, [selectedLocation])
 
-  // Handle location change
-  const handleLocationChange = (value: string) => {
-    setSelectedLocation(value)
+  const handleLocationChange = (locationKey: string, locationName?: string) => {
+    setSelectedLocation(locationKey)
+    // If a custom location name is provided, we could store it for display
+    // For now, we'll let the weather data provide the location name
   }
 
   // Handle refresh
@@ -160,18 +161,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
         </div>
 
         <div className="flex items-center gap-2">
-          <Select value={selectedLocation} onValueChange={handleLocationChange}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select location" />
-            </SelectTrigger>
-            <SelectContent>
-              {PHILIPPINES_LOCATIONS.map((location) => (
-                <SelectItem key={location.key} value={location.key}>
-                  {location.name}, {location.region}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <LocationSearch value={selectedLocation} onLocationChange={handleLocationChange} />
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
