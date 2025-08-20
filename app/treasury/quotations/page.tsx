@@ -86,9 +86,9 @@ export default function TreasuryQuotationsPage() {
         {user?.uid ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardHeader className="px-6 py-4 border-b border-gray-200">
-              <CardTitle className="text-xl font-semibold text-gray-900">Treasury Signed Requests</CardTitle>
+              <CardTitle className="text-xl font-semibold text-gray-900">Treasury Signed Contracts</CardTitle>
               {!loading && (
-                <div className="text-sm text-gray-600 mt-2">Showing {quotations.length} signed requests</div>
+                <div className="text-sm text-gray-600 mt-2">Showing {quotations.length} signed contracts</div>
               )}
             </CardHeader>
 
@@ -96,7 +96,7 @@ export default function TreasuryQuotationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-900 py-3">Request Date</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Contract Date</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Client Name</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                   </TableRow>
@@ -124,7 +124,7 @@ export default function TreasuryQuotationsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50 border-b border-gray-200">
-                      <TableHead className="font-semibold text-gray-900 py-3">Request Date</TableHead>
+                      <TableHead className="font-semibold text-gray-900 py-3">Contract Date</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Client Name</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                     </TableRow>
@@ -152,14 +152,14 @@ export default function TreasuryQuotationsPage() {
               </CardContent>
             ) : (
               <CardContent className="p-6 text-center text-gray-600">
-                <p>No signed requests found for your account.</p>
+                <p>No signed contracts found for your account.</p>
               </CardContent>
             )}
           </Card>
         ) : (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-6 text-center text-gray-600">
-              <p>Please log in to view your signed requests.</p>
+              <p>Please log in to view your signed contracts.</p>
             </CardContent>
           </Card>
         )}
