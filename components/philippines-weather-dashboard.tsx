@@ -190,6 +190,51 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
 
       {weather && (
         <>
+          {/* 5-Day Forecast */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                5-Day Forecast
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {weather.forecast.map((day, index) => (
+                  <div key={index} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                    <p className="font-medium text-sm">{day.dayOfWeek}</p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+
+                    {/* Day Weather */}
+                    <div className="flex flex-col items-center mb-2">
+                      <div className="mb-1">{getWeatherIcon(day.day.icon, 32)}</div>
+                      <p className="text-xs text-center text-gray-600">{day.day.condition}</p>
+                      {day.day.precipitation && (
+                        <Badge variant="outline" className="text-xs mt-1 bg-blue-50 text-blue-700">
+                          Rain
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Temperature */}
+                    <div className="flex gap-2 text-sm">
+                      <span className="font-semibold">{day.temperature.max}°</span>
+                      <span className="text-gray-500">{day.temperature.min}°</span>
+                    </div>
+
+                    {/* Night conditions */}
+                    <div className="flex flex-col items-center mt-2 pt-2 border-t border-gray-200">
+                      <div className="mb-1">{getWeatherIcon(day.night.icon, 20)}</div>
+                      <p className="text-xs text-center text-gray-500">Night: {day.night.condition}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Current Weather Card */}
           <Card>
             <CardHeader>
@@ -263,51 +308,6 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
 
           {/* Flood Map */}
           <FloodMap locationKey={selectedLocation} />
-
-          {/* 5-Day Forecast */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                5-Day Forecast
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {weather.forecast.map((day, index) => (
-                  <div key={index} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-                    <p className="font-medium text-sm">{day.dayOfWeek}</p>
-                    <p className="text-xs text-gray-500 mb-2">
-                      {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </p>
-
-                    {/* Day Weather */}
-                    <div className="flex flex-col items-center mb-2">
-                      <div className="mb-1">{getWeatherIcon(day.day.icon, 32)}</div>
-                      <p className="text-xs text-center text-gray-600">{day.day.condition}</p>
-                      {day.day.precipitation && (
-                        <Badge variant="outline" className="text-xs mt-1 bg-blue-50 text-blue-700">
-                          Rain
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Temperature */}
-                    <div className="flex gap-2 text-sm">
-                      <span className="font-semibold">{day.temperature.max}°</span>
-                      <span className="text-gray-500">{day.temperature.min}°</span>
-                    </div>
-
-                    {/* Night conditions */}
-                    <div className="flex flex-col items-center mt-2 pt-2 border-t border-gray-200">
-                      <div className="mb-1">{getWeatherIcon(day.night.icon, 20)}</div>
-                      <p className="text-xs text-center text-gray-500">Night: {day.night.condition}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Weather Alerts */}
           {weather.alerts.length > 0 && (
