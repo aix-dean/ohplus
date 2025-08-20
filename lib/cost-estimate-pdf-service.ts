@@ -35,7 +35,7 @@ const categoryLabels = {
 export async function generateSeparateCostEstimatePDFs(
   costEstimate: CostEstimate,
   selectedPages?: string[],
-  userData?: { name?: string; email?: string }, // Added userData parameter
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
 ): Promise<void> {
   try {
     // Group line items by site based on the site rental items
@@ -139,7 +139,7 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
-  userData?: { name?: string; email?: string }, // Added userData parameter
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -428,7 +428,9 @@ export async function generateCostEstimatePDF(
 
       // Names
       pdf.setFont("helvetica", "normal")
-      pdf.text(userData?.name || "Account Manager", margin, yPosition) // Use current user's name instead of hardcoded "Mathew Espanto"
+      const userFullName =
+        userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
+      pdf.text(userFullName, margin, yPosition)
       pdf.text(costEstimate.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
       yPosition += 6
 
@@ -499,7 +501,7 @@ export async function generateCostEstimatePDF(
 export async function generateDetailedCostEstimatePDF(
   costEstimate: CostEstimate,
   returnBase64 = false,
-  userData?: { name?: string; email?: string }, // Added userData parameter for consistency
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name for consistency
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
