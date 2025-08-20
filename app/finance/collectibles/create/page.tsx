@@ -175,7 +175,15 @@ export default function CreateCollectiblePage() {
           try {
             const quotationData = await getQuotationById(quotationId)
             if (quotationData && quotationData.start_date && quotationData.end_date) {
-              const coveredPeriod = `${quotationData.start_date} - ${quotationData.end_date}`
+              const formatDateOnly = (dateString: string) => {
+                const date = new Date(dateString)
+                return date.toISOString().split("T")[0]
+              }
+
+              const startDate = formatDateOnly(quotationData.start_date)
+              const endDate = formatDateOnly(quotationData.end_date)
+              const coveredPeriod = `${startDate} - ${endDate}`
+
               setFormData((prev) => ({
                 ...prev,
                 client_name: clientName,
