@@ -118,25 +118,6 @@ export default function CollectiblesPage() {
     setFilteredCollectibles(filtered)
   }, [collectibles, searchTerm, statusFilter, typeFilter])
 
-  const handleSoftDelete = async (id: string) => {
-    try {
-      const collectibleRef = doc(db, "collectibles", id)
-      await updateDoc(collectibleRef, {
-        deleted: true,
-        updated: serverTimestamp(),
-      })
-
-      // Update local state
-      setCollectibles((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, deleted: true, updated: new Date().toISOString().split("T")[0] } : item,
-        ),
-      )
-    } catch (error) {
-      console.error("Error soft deleting collectible:", error)
-    }
-  }
-
   const handleMarkAsPaid = async (id: string) => {
     try {
       const collectibleRef = doc(db, "collectibles", id)
