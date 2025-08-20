@@ -24,3 +24,29 @@ export function generateLicenseKey(): string {
   }
   return licenseKey
 }
+
+export function safeToDate(dateValue: any): Date {
+  if (!dateValue) {
+    return new Date()
+  }
+
+  // If it's already a Date object, return it
+  if (dateValue instanceof Date) {
+    return dateValue
+  }
+
+  // If it's a Firestore Timestamp, convert it
+  if (dateValue && typeof dateValue.toDate === "function") {
+    return dateValue.toDate()
+  }
+
+  // If it's a string or number, try to parse it
+  const parsed = new Date(dateValue)
+
+  // Check if the parsed date is valid
+  if (isNaN(parsed.getTime())) {
+    return new Date() // Return current date as fallback
+  }
+
+  return parsed
+}
