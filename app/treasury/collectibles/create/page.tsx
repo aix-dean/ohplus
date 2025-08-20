@@ -145,11 +145,16 @@ export default function CreateTreasuryCollectiblePage() {
               const endDate = formatDateOnly(quotationData.end_date)
               const coveredPeriod = `${startDate} - ${endDate}`
 
-              const siteNames =
-                quotationData.items
-                  ?.map((item) => item.location)
-                  .filter((location) => location && location.trim() !== "")
-                  .join(", ") || ""
+              let siteCode = ""
+              if (quotationData.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData.items && quotationData.items.length > 0) {
+                // If quotation has items, get site_code from first item
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
 
               setFormData((prev) => ({
                 ...prev,
@@ -160,14 +165,18 @@ export default function CreateTreasuryCollectiblePage() {
                 status: "pending",
                 quotation_id: quotationId,
                 covered_period: coveredPeriod,
-                site: siteNames, // Auto-fill site field with quotation locations
+                site: siteCode, // Auto-fill site field with quotation site code
               }))
             } else {
-              const siteNames =
-                quotationData?.items
-                  ?.map((item) => item.location)
-                  .filter((location) => location && location.trim() !== "")
-                  .join(", ") || ""
+              let siteCode = ""
+              if (quotationData?.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData?.items && quotationData.items.length > 0) {
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
 
               setFormData((prev) => ({
                 ...prev,
@@ -177,7 +186,7 @@ export default function CreateTreasuryCollectiblePage() {
                 type: "sites",
                 status: "pending",
                 quotation_id: quotationId,
-                site: siteNames, // Auto-fill site field with quotation locations
+                site: siteCode, // Auto-fill site field with quotation site code
               }))
             }
           } catch (error) {
