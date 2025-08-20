@@ -1716,39 +1716,40 @@ export async function generateCostEstimatePDF(
       console.log("[v0] yPosition before signature section:", yPosition)
       console.log("[v0] pageHeight:", pageHeight)
 
-      // Ensure we have enough space for signature section (minimum 80 units)
-      if (yPosition > pageHeight - 100) {
-        yPosition = pageHeight - 100
+      if (yPosition > pageHeight - 60) {
+        yPosition = pageHeight - 60
         console.log("[v0] Adjusted yPosition for signature section:", yPosition)
       }
 
       // Signature section
-      pdf.setFontSize(9)
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
       pdf.text("Very truly yours,", margin, yPosition)
       pdf.text("Conforme:", margin + contentWidth / 2, yPosition)
-      yPosition += 15
+      yPosition += 20
 
-      pdf.setLineWidth(0.5)
-      pdf.line(margin, yPosition, margin + 60, yPosition)
-      pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 60, yPosition)
-      yPosition += 6
+      pdf.setLineWidth(0.8)
+      pdf.line(margin, yPosition, margin + 80, yPosition)
+      pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 80, yPosition)
+      yPosition += 8
 
       // Names
       pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(9)
       pdf.text(representativeName, margin, yPosition)
       pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
-      yPosition += 4
+      yPosition += 5
 
       pdf.setFont("helvetica", "normal")
       pdf.text(costEstimate?.clientCompany || "Client Company", margin + contentWidth / 2, yPosition)
-      yPosition += 6
+      yPosition += 8
 
       pdf.setFontSize(7)
       pdf.setFont("helvetica", "italic")
       pdf.text("This signed quotation serves as an", margin + contentWidth / 2, yPosition)
       yPosition += 3
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
-      yPosition += 6
+      yPosition += 8
 
       console.log("[v0] Final yPosition after signature section:", yPosition)
 
