@@ -207,14 +207,18 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
     console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
 
+    const currentSiteRentalItem = currentSiteItems.find((item) => item.category.includes("Billboard Rental"))
+    const currentSiteId = currentSiteRentalItem?.id
+
     // Apply all temp values to the cost estimate - but only for current site
     Object.entries(tempValues).forEach(([fieldName, newValue]) => {
       switch (fieldName) {
         case "unitPrice":
           const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
-            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
+            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
               const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+              console.log("[v0] Updating price for item:", item.id, "from", item.unitPrice, "to", newValue)
               return { ...item, unitPrice: newValue, total: newTotal }
             }
             return item
@@ -226,9 +230,10 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         case "durationDays":
           updatedCostEstimate.durationDays = newValue
           const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
-            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
+            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
               const newTotal = item.unitPrice * (newValue / 30)
+              console.log("[v0] Updating duration for item:", item.id, "new total:", newTotal)
               return { ...item, total: newTotal }
             }
             return item
@@ -245,8 +250,9 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
         case "illumination":
           const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
-            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (isCurrentSiteItem) {
+            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (belongsToCurrentSite) {
+              console.log("[v0] Updating illumination for item:", item.id, "from", item.quantity, "to", newValue)
               return { ...item, quantity: newValue }
             }
             return item
@@ -263,9 +269,10 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             updatedCostEstimate.durationDays = newDurationDays
 
             const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
-              const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-              if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
+              const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+              if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
                 const newTotal = item.unitPrice * (newDurationDays / 30)
+                console.log("[v0] Updating date-based duration for item:", item.id, "new total:", newTotal)
                 return { ...item, total: newTotal }
               }
               return item
