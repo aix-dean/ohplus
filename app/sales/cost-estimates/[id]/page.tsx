@@ -176,6 +176,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       editableCostEstimate: !!costEstimate,
       tempValuesCount: Object.keys(tempValues).length,
       tempValues,
+      currentProductIndex,
     })
 
     if (!costEstimate) {
@@ -199,12 +200,20 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
     const updatedCostEstimate = { ...costEstimate }
 
-    // Apply all temp values to the cost estimate
+    const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
+    const siteNames = Object.keys(siteGroups)
+    const currentSiteName = siteNames[currentProductIndex]
+    const currentSiteItems = siteGroups[currentSiteName] || []
+
+    console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
+
+    // Apply all temp values to the cost estimate - but only for current site
     Object.entries(tempValues).forEach(([fieldName, newValue]) => {
       switch (fieldName) {
         case "unitPrice":
           const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
-            if (item.category.includes("Billboard Rental")) {
+            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
               const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
               return { ...item, unitPrice: newValue, total: newTotal }
             }
@@ -217,7 +226,8 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         case "durationDays":
           updatedCostEstimate.durationDays = newValue
           const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
-            if (item.category.includes("Billboard Rental")) {
+            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
               const newTotal = item.unitPrice * (newValue / 30)
               return { ...item, total: newTotal }
             }
@@ -234,10 +244,13 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           break
 
         case "illumination":
-          const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => ({
-            ...item,
-            quantity: newValue,
-          }))
+          const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+            const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            if (isCurrentSiteItem) {
+              return { ...item, quantity: newValue }
+            }
+            return item
+          })
           updatedCostEstimate.lineItems = illuminationUpdatedItems
           break
 
@@ -250,7 +263,8 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             updatedCostEstimate.durationDays = newDurationDays
 
             const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
-              if (item.category.includes("Billboard Rental")) {
+              const isCurrentSiteItem = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+              if (isCurrentSiteItem && item.category.includes("Billboard Rental")) {
                 const newTotal = item.unitPrice * (newDurationDays / 30)
                 return { ...item, total: newTotal }
               }
@@ -280,9 +294,9 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
       toast({
         title: "Success",
-        description: "Changes saved successfully",
+        description: `Changes saved successfully for ${currentSiteName}`,
       })
-      console.log("[v0] Save completed successfully")
+      console.log("[v0] Save completed successfully for site:", currentSiteName)
     } catch (error) {
       console.error("[v0] Save failed:", error)
       toast({
