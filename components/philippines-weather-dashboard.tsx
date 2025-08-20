@@ -39,7 +39,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
   const [weather, setWeather] = useState<PhilippinesWeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedLocation, setSelectedLocation] = useState(defaultLocation)
+  const [selectedLocation, setSelectedLocation] = useState("custom")
   const [customLocation, setCustomLocation] = useState<CustomLocation | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -48,13 +48,15 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     let isMounted = true
 
     async function loadWeatherData() {
+      if (!customLocation) {
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
 
-        let apiUrl = `/api/accuweather?location=${selectedLocation}`
-        if (selectedLocation === "custom" && customLocation) {
-          apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
-        }
+        const apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
 
         const response = await fetch(apiUrl)
 
@@ -87,25 +89,22 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return () => {
       isMounted = false
     }
-  }, [selectedLocation, customLocation])
+  }, [customLocation])
 
   const handleLocationChange = (locationKey: string, customLoc?: CustomLocation) => {
     setSelectedLocation(locationKey)
     if (locationKey === "custom" && customLoc) {
       setCustomLocation(customLoc)
-    } else {
-      setCustomLocation(null)
     }
   }
 
   // Handle refresh
   const handleRefresh = async () => {
+    if (!customLocation) return
+
     setRefreshing(true)
     try {
-      let apiUrl = `/api/accuweather?location=${selectedLocation}`
-      if (selectedLocation === "custom" && customLocation) {
-        apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
-      }
+      const apiUrl = `/api/accuweather?lat=${customLocation.lat}&lng=${customLocation.lng}&address=${encodeURIComponent(customLocation.address)}`
 
       const response = await fetch(apiUrl)
 
@@ -152,6 +151,34 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return "bg-blue-100 text-blue-800 border-blue-200"
   }
 
+  if (!customLocation && !loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Philippines Weather</h1>
+            <p className="text-sm text-gray-500">Powered by AccuWeather</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <MapPin className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Select a Location</h3>
+            <p className="text-gray-500 text-center">
+              Click "Select Location" to choose a location on the map and view weather information.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (loading && !weather) {
     return (
       <div className="space-y-6">
@@ -183,11 +210,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
         </div>
 
         <div className="flex items-center gap-2">
-          <EnhancedLocationSelector
-            value={selectedLocation}
-            onLocationChange={handleLocationChange}
-            customLocation={customLocation}
-          />
+          <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -323,7 +346,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
           </Card>
 
           {/* Flood Map */}
-          <FloodMap locationKey={selectedLocation} />
+          <FloodMap locationKey={customLocation ? `${customLocation.lat},${customLocation.lng}` : selectedLocation} />
 
           {/* Weather Alerts */}
           {weather.alerts.length > 0 && (
