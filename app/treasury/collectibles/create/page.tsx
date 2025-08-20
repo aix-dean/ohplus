@@ -138,6 +138,10 @@ export default function CreateTreasuryCollectiblePage() {
         status: "pending",
       }))
 
+      if (clientName) {
+        setClientSearchTerm(clientName)
+      }
+
       // Show success message
       toast({
         title: "Quotation Data Loaded",
@@ -311,11 +315,15 @@ export default function CreateTreasuryCollectiblePage() {
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
-                setFormData((prev) => ({ ...prev, client_name: "" }))
+                setFormData((prev) => ({ ...prev, client_name: e.target.value }))
               }}
               onFocus={() => {
                 setIsClientDropdownOpen(true)
