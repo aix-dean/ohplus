@@ -283,13 +283,13 @@ export async function generateCostEstimatePDF(
         yPosition - 10,
       )
 
-      // Greeting message
-      pdf.setFontSize(10)
+      // Greeting message - positioned prominently at top
+      pdf.setFontSize(11)
       pdf.setFont("helvetica", "normal")
       pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", margin, yPosition)
       yPosition += 5
       pdf.text("We are pleased to submit our quotation for your requirements:", margin, yPosition)
-      yPosition += 10
+      yPosition += 15
 
       // "Details as follows:" section
       pdf.setFontSize(11)
@@ -456,7 +456,7 @@ export async function generateCostEstimatePDF(
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
       yPosition += 15
 
-      // Footer with company details
+      // Footer with company details only - no description text
       pdf.setFontSize(8)
       pdf.setTextColor(100, 100, 100)
       pdf.text(
@@ -465,11 +465,6 @@ export async function generateCostEstimatePDF(
         pageHeight - 20,
       )
       pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
-
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "bold")
-      pdf.text(`${siteName} QUOTATION`, margin, pageHeight - 30)
     })
 
     // Return base64 or download PDF
@@ -685,21 +680,7 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
-    pdf.text(
-      "This cost estimate is subject to final approval and may be revised based on project requirements.",
-      margin,
-      yPosition,
-    )
-    yPosition += 4
     pdf.text(`© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`, margin, yPosition)
-
-    // Return base64 or download PDF
-    if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
-    } else {
-      const fileName = `detailed-cost-estimate-${costEstimate.costEstimateNumber || costEstimate.id}-${Date.now()}.pdf`
-      pdf.save(fileName)
-    }
   } catch (error) {
     console.error("Error generating detailed Cost Estimate PDF:", error)
     throw new Error("Failed to generate detailed Cost Estimate PDF")
