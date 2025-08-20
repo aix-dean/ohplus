@@ -137,25 +137,6 @@ export default function FinanceCollectiblesPage() {
     }
   }
 
-  const handleMarkAsPaid = async (id: string) => {
-    try {
-      const collectibleRef = doc(db, "collectibles", id)
-      await updateDoc(collectibleRef, {
-        status: "paid",
-        updated: serverTimestamp(),
-      })
-
-      // Update local state
-      setCollectibles((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
-        ),
-      )
-    } catch (error) {
-      console.error("Error marking finance collectible as paid:", error)
-    }
-  }
-
   const getStatusBadge = (status: string) => {
     const variants = {
       pending: "secondary",
@@ -333,15 +314,6 @@ export default function FinanceCollectiblesPage() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleMarkAsPaid(collectible.id)}
-                              className="flex items-center text-green-600 focus:text-green-600"
-                            >
-                              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Mark As Paid
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleSoftDelete(collectible.id)}
