@@ -126,7 +126,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
       { title: "Cash Management", href: "/treasury/cash-management", icon: DollarSign },
       { title: "Investments", href: "/treasury/investments", icon: PieChart },
-      { title: "Quotations", href: "/treasury/quotations", icon: FileText },
+      { title: "Request", href: "/treasury/quotations", icon: FileText },
       { title: "Credit Facilities", href: "/treasury/credit", icon: CreditCard },
       { title: "FX Trading", href: "/treasury/fx-trading", icon: TrendingUp },
       { title: "Risk Management", href: "/treasury/risk", icon: AlertTriangle },
@@ -1251,7 +1251,7 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
@@ -1297,14 +1297,6 @@ export function SideNavigation() {
                     >
                       <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
-                      {item.title === "AI Assistant" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-auto h-5 w-5 p-0 text-xs flex items-center justify-center"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
                     </Link>
                   )
                 })}
@@ -1939,6 +1931,30 @@ export function SideNavigation() {
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
