@@ -165,6 +165,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     console.log("[v0] handleSaveAllChanges called")
     console.log("[v0] editableCostEstimate:", editableCostEstimate)
     console.log("[v0] tempValues:", tempValues)
+    console.log("[v0] hasUnsavedChanges:", hasUnsavedChanges)
 
     if (!editableCostEstimate || Object.keys(tempValues).length === 0) {
       console.log("[v0] Early return - no editable cost estimate or temp values")
@@ -1154,15 +1155,27 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         </div>
         {isEditing && hasUnsavedChanges && (
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+            {console.log("[v0] Save button rendered - hasUnsavedChanges:", hasUnsavedChanges, "isEditing:", isEditing)}
             <Button
               variant="outline"
-              onClick={handleCancelAllChanges}
+              onClick={() => {
+                console.log("[v0] Cancel button clicked")
+                handleCancelAllChanges()
+              }}
               className="flex items-center gap-2 bg-transparent"
             >
               <X className="h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSaveAllChanges} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={() => {
+                console.log("[v0] Save button clicked!")
+                console.log("[v0] Current tempValues:", tempValues)
+                console.log("[v0] Current hasUnsavedChanges:", hasUnsavedChanges)
+                handleSaveAllChanges()
+              }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            >
               <Save className="h-4 w-4" />
               Save Changes
             </Button>
