@@ -23,7 +23,6 @@ import {
   Calendar,
   CloudSnow,
   CloudFog,
-  Navigation,
 } from "lucide-react"
 import type { PhilippinesWeatherData } from "@/lib/accuweather-service"
 import { FloodMap } from "@/components/flood-map"
@@ -41,62 +40,14 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState("custom")
-  const [customLocation, setCustomLocation] = useState<CustomLocation | null>(null)
+  const [customLocation, setCustomLocation] = useState<CustomLocation | null>({
+    lat: 14.5995,
+    lng: 120.9842,
+    address: "Manila, Metro Manila, Philippines",
+  })
   const [refreshing, setRefreshing] = useState(false)
-  const [detectingLocation, setDetectingLocation] = useState(false)
 
-  const getCurrentLocation = async () => {
-    setDetectingLocation(true)
-    setError(null)
-
-    try {
-      if (!navigator.geolocation) {
-        throw new Error("Geolocation is not supported by this browser")
-      }
-
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000, // 5 minutes
-        })
-      })
-
-      const { latitude, longitude } = position.coords
-
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
-      )
-
-      if (!response.ok) {
-        throw new Error("Failed to get location address")
-      }
-
-      const data = await response.json()
-      const address = data.results[0]?.formatted_address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-
-      const currentLocation: CustomLocation = {
-        lat: latitude,
-        lng: longitude,
-        address: address,
-      }
-
-      setCustomLocation(currentLocation)
-      setSelectedLocation("custom")
-    } catch (err) {
-      console.error("Error getting current location:", err)
-      setError(
-        err instanceof Error ? err.message : "Failed to get current location. Please select a location manually.",
-      )
-    } finally {
-      setDetectingLocation(false)
-    }
-  }
-
-  useEffect(() => {
-    getCurrentLocation()
-  }, [])
-
+  // Fetch weather data
   useEffect(() => {
     let isMounted = true
 
@@ -151,6 +102,7 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     }
   }
 
+  // Handle refresh
   const handleRefresh = async () => {
     if (!customLocation) return
 
@@ -203,30 +155,6 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
     return "bg-blue-100 text-blue-800 border-blue-200"
   }
 
-  if ((loading && !weather) || detectingLocation) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Navigation className="h-12 w-12 text-blue-500 mb-4 animate-pulse" />
-            <h3 className="text-lg font-semibold mb-2">
-              {detectingLocation ? "Detecting Your Location..." : "Loading Weather Data..."}
-            </h3>
-            <p className="text-gray-500 text-center">
-              {detectingLocation
-                ? "Please allow location access to get weather for your current location."
-                : "Fetching the latest weather information for your area."}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   if (!customLocation && !loading) {
     return (
       <div className="space-y-6">
@@ -239,10 +167,6 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
 
           <div className="flex items-center gap-2">
             <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
-            <Button variant="outline" onClick={getCurrentLocation} disabled={detectingLocation}>
-              <Navigation className={`h-4 w-4 mr-2 ${detectingLocation ? "animate-pulse" : ""}`} />
-              Current Location
-            </Button>
           </div>
         </div>
 
@@ -251,10 +175,31 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
             <MapPin className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Select a Location</h3>
             <p className="text-gray-500 text-center">
-              Click "Current Location" to use your device location or "Select Location" to choose a location on the map.
+              Click "Select Location" to choose a location on the map and view weather information.
             </p>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (loading && !weather) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -270,10 +215,6 @@ export function PhilippinesWeatherDashboard({ defaultLocation = "264885" }: { de
 
         <div className="flex items-center gap-2">
           <EnhancedLocationSelector onLocationChange={handleLocationChange} customLocation={customLocation} />
-          <Button variant="outline" onClick={getCurrentLocation} disabled={detectingLocation}>
-            <Navigation className={`h-4 w-4 mr-2 ${detectingLocation ? "animate-pulse" : ""}`} />
-            Current Location
-          </Button>
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
