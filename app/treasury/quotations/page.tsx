@@ -73,25 +73,38 @@ export default function TreasuryQuotationsPage() {
   }
 
   const handleCreateCollectible = async (quotation: any) => {
+    console.log("[v0] Creating collectible from quotation:", quotation)
+    console.log("[v0] Quotation client_id:", quotation.client_id)
+    console.log("[v0] Quotation client_name:", quotation.client_name)
+
     let clientCompany = ""
     let clientPersonName = ""
 
     // Try to fetch full client data if client_id exists
     if (quotation.client_id) {
       try {
+        console.log("[v0] Fetching client data for ID:", quotation.client_id)
         const clientData = await getClientById(quotation.client_id)
+        console.log("[v0] Fetched client data:", clientData)
+
         if (clientData) {
           clientCompany = clientData.company || ""
           clientPersonName = clientData.name || ""
+          console.log("[v0] Extracted - Company:", clientCompany, "Person:", clientPersonName)
+        } else {
+          console.log("[v0] No client data found for ID:", quotation.client_id)
         }
       } catch (error) {
-        console.error("Error fetching client data:", error)
+        console.error("[v0] Error fetching client data:", error)
       }
+    } else {
+      console.log("[v0] No client_id found in quotation")
     }
 
     // Fallback to quotation client_name if no client data found
     if (!clientCompany && !clientPersonName) {
       clientPersonName = quotation.client_name || ""
+      console.log("[v0] Using fallback client_name:", clientPersonName)
     }
 
     // Create combined client name: "Company Name (Person Name)" or just one if the other is missing
@@ -103,6 +116,8 @@ export default function TreasuryQuotationsPage() {
     } else if (clientPersonName) {
       combinedClientName = clientPersonName
     }
+
+    console.log("[v0] Final combined client name:", combinedClientName)
 
     const params = new URLSearchParams({
       from_quotation: "true",
