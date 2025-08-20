@@ -72,70 +72,6 @@ export default function TreasuryQuotationsPage() {
     }
   }
 
-  const handleCreateCollectible = async (quotation: any) => {
-    console.log("[v0] Creating collectible from quotation:", quotation)
-    console.log("[v0] Quotation client_id:", quotation.client_id)
-    console.log("[v0] Quotation client_name:", quotation.client_name)
-
-    let clientCompany = ""
-    let clientPersonName = ""
-
-    // Try to fetch full client data if client_id exists
-    if (quotation.client_id) {
-      try {
-        console.log("[v0] Fetching client data for ID:", quotation.client_id)
-        const clientData = await getClientById(quotation.client_id)
-        console.log("[v0] Fetched client data:", clientData)
-
-        if (clientData) {
-          clientCompany = clientData.company || ""
-          clientPersonName = clientData.name || ""
-          console.log("[v0] Extracted - Company:", clientCompany, "Person:", clientPersonName)
-        } else {
-          console.log("[v0] No client data found for ID:", quotation.client_id)
-        }
-      } catch (error) {
-        console.error("[v0] Error fetching client data:", error)
-      }
-    } else {
-      console.log("[v0] No client_id found in quotation")
-    }
-
-    // Fallback to quotation client_name if no client data found
-    if (!clientCompany && !clientPersonName) {
-      clientPersonName = quotation.client_name || ""
-      console.log("[v0] Using fallback client_name:", clientPersonName)
-    }
-
-    // Create combined client name: "Company Name (Person Name)" or just one if the other is missing
-    let combinedClientName = ""
-    if (clientCompany && clientPersonName) {
-      combinedClientName = `${clientCompany} (${clientPersonName})`
-    } else if (clientCompany) {
-      combinedClientName = clientCompany
-    } else if (clientPersonName) {
-      combinedClientName = clientPersonName
-    }
-
-    console.log("[v0] Final combined client name:", combinedClientName)
-
-    const params = new URLSearchParams({
-      from_quotation: "true",
-      client_name: combinedClientName,
-      total_amount: quotation.total_amount?.toString() || "0",
-      quotation_number: quotation.quotation_number || "",
-      quotation_id: quotation.id || "",
-      // Add additional fields that can be mapped
-      client_email: quotation.client_email || "",
-      client_phone: quotation.client_phone || "",
-      client_address: quotation.client_address || "",
-      client_company: clientCompany,
-      client_person_name: clientPersonName,
-    })
-
-    router.push(`/treasury/collectibles/create?${params.toString()}`)
-  }
-
   const handleViewPDF = (quotation: any) => {
     const fileUrl = quotation.projectCompliance?.signedQuotation?.fileUrl
     if (fileUrl) {
@@ -143,6 +79,34 @@ export default function TreasuryQuotationsPage() {
     } else {
       console.error("No signed quotation file URL found")
     }
+  }
+
+  const handleCreateCollectible = async (quotation: any) => {
+    let clientName = quotation.client_name || ""
+
+    if (quotation.client_id) {
+      try {
+        const clientData = await getClientById(quotation.client_id)
+        if (clientData && clientData.company) {
+          clientName = clientData.company
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    const params = new URLSearchParams({
+      from_quotation: "true",
+      client_name: clientName,
+      total_amount: quotation.total_amount?.toString() || "0",
+      quotation_number: quotation.quotation_number || "",
+      quotation_id: quotation.id || "",
+      client_email: quotation.client_email || "",
+      client_phone: quotation.client_phone || "",
+      client_address: quotation.client_address || "",
+    })
+
+    router.push(`/treasury/collectibles/create?${params.toString()}`)
   }
 
   return (
