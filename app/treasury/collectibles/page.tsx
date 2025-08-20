@@ -47,7 +47,7 @@ interface Collectible {
   net_amount_collection?: number
 }
 
-export default function CollectiblesPage() {
+export default function TreasuryCollectiblesPage() {
   const [collectibles, setCollectibles] = useState<Collectible[]>([])
   const [filteredCollectibles, setFilteredCollectibles] = useState<Collectible[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -84,7 +84,7 @@ export default function CollectiblesPage() {
 
         setCollectibles(fetchedCollectibles)
       } catch (error) {
-        console.error("Error fetching collectibles:", error)
+        console.error("Error fetching treasury collectibles:", error)
         setCollectibles([])
       } finally {
         setLoading(false)
@@ -133,7 +133,7 @@ export default function CollectiblesPage() {
         ),
       )
     } catch (error) {
-      console.error("Error soft deleting collectible:", error)
+      console.error("Error soft deleting treasury collectible:", error)
     }
   }
 
@@ -152,7 +152,7 @@ export default function CollectiblesPage() {
         ),
       )
     } catch (error) {
-      console.error("Error marking collectible as paid:", error)
+      console.error("Error marking treasury collectible as paid:", error)
     }
   }
 
@@ -161,7 +161,7 @@ export default function CollectiblesPage() {
       pending: "secondary",
       collected: "default",
       overdue: "destructive",
-      paid: "default",
+      paid: "default", // Added paid status with default variant (green)
     } as const
 
     if (status === "paid") {
@@ -190,12 +190,12 @@ export default function CollectiblesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Collectibles</h1>
-            <p className="text-muted-foreground">Manage your collection records and track payments</p>
+            <h1 className="text-3xl font-bold">Treasury Collectibles</h1>
+            <p className="text-muted-foreground">Manage your treasury collection records and track payments</p>
           </div>
         </div>
         <div className="text-center py-8">
-          <p className="text-muted-foreground">Loading collectibles...</p>
+          <p className="text-muted-foreground">Loading treasury collectibles...</p>
         </div>
       </div>
     )
@@ -205,10 +205,10 @@ export default function CollectiblesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Collectibles</h1>
-          <p className="text-muted-foreground">Manage your collection records and track payments</p>
+          <h1 className="text-3xl font-bold">Treasury Collectibles</h1>
+          <p className="text-muted-foreground">Manage your treasury collection records and track payments</p>
         </div>
-        <Link href="/finance/collectibles/create">
+        <Link href="/treasury/collectibles/create">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             Create Collectible
@@ -242,7 +242,7 @@ export default function CollectiblesPage() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="collected">Collected</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem> {/* Added paid status to filter options */}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -261,13 +261,13 @@ export default function CollectiblesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Collectibles Records</CardTitle>
+          <CardTitle>Treasury Collectibles Records</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredCollectibles.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No collectibles found</p>
-              <Link href="/finance/collectibles/create">
+              <p className="text-muted-foreground">No treasury collectibles found</p>
+              <Link href="/treasury/collectibles/create">
                 <Button className="mt-4">
                   <Plus className="h-4 w-4 mr-2" />
                   Create First Collectible
@@ -321,7 +321,7 @@ export default function CollectiblesPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
                               <Link
-                                href={`/finance/collectibles/details/${collectible.id}`}
+                                href={`/treasury/collectibles/details/${collectible.id}`}
                                 className="flex items-center"
                               >
                                 <Eye className="mr-2 h-4 w-4" />
@@ -329,7 +329,10 @@ export default function CollectiblesPage() {
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/finance/collectibles/edit/${collectible.id}`} className="flex items-center">
+                              <Link
+                                href={`/treasury/collectibles/edit/${collectible.id}`}
+                                className="flex items-center"
+                              >
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>

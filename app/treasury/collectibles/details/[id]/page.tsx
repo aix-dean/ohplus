@@ -46,7 +46,7 @@ interface Collectible {
   next_collection_bir_2307?: string
 }
 
-export default function CollectibleDetailsPage() {
+export default function TreasuryCollectibleDetailsPage() {
   const [collectible, setCollectible] = useState<Collectible | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,11 +66,11 @@ export default function CollectibleDetailsPage() {
           const data = docSnapshot.data()
           setCollectible({ id: docSnapshot.id, ...data } as Collectible)
         } else {
-          setError("Collectible not found")
+          setError("Treasury collectible not found")
         }
       } catch (error) {
-        console.error("Error fetching collectible:", error)
-        setError("Error loading collectible details")
+        console.error("Error fetching treasury collectible:", error)
+        setError("Error loading treasury collectible details")
       } finally {
         setLoading(false)
       }
@@ -152,15 +152,15 @@ export default function CollectibleDetailsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/finance/collectibles">
+          <Link href="/treasury/collectibles">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
-            <p className="text-muted-foreground">Loading collectible information...</p>
+            <h1 className="text-3xl font-bold">Treasury Collectible Details</h1>
+            <p className="text-muted-foreground">Loading treasury collectible information...</p>
           </div>
         </div>
       </div>
@@ -171,14 +171,14 @@ export default function CollectibleDetailsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/finance/collectibles">
+          <Link href="/treasury/collectibles">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
+            <h1 className="text-3xl font-bold">Treasury Collectible Details</h1>
             <p className="text-muted-foreground text-red-500">{error}</p>
           </div>
         </div>
@@ -190,19 +190,19 @@ export default function CollectibleDetailsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/finance/collectibles">
+          <Link href="/treasury/collectibles">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Collectible Details</h1>
-            <p className="text-muted-foreground">View collectible information</p>
+            <h1 className="text-3xl font-bold">Treasury Collectible Details</h1>
+            <p className="text-muted-foreground">View treasury collectible information</p>
           </div>
         </div>
-        <Link href={`/finance/collectibles/edit/${collectible.id}`}>
-          <Button>Edit Collectible</Button>
+        <Link href={`/treasury/collectibles/edit/${collectible.id}`}>
+          <Button>Edit Treasury Collectible</Button>
         </Link>
       </div>
 

@@ -1,22 +1,21 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
+import { ArrowLeft, Upload, X, FileText, PlusCircle, CheckCircle, Loader2, Eye } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage" // Added Firebase Storage imports
+import { db, storage } from "@/lib/firebase" // Added storage import
+import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
-import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
-import { useParams } from "next/navigation"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -31,13 +30,13 @@ interface CollectibleFormData {
   next_collection_date: string
   status: "pending" | "collected" | "overdue"
   proceed_next_collection: boolean
-  next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
+  next_collection_bir_2307?: File | string | null
   // Sites specific fields
   booking_no?: string
   site?: string
   covered_period?: string
-  bir_2307?: File | null
+  bir_2307?: File | string | null // Changed to support both File and existing file reference
   collection_date?: string
   // Supplies specific fields
   date?: string
@@ -47,12 +46,6 @@ interface CollectibleFormData {
   due_for_collection?: string
   date_paid?: string
   net_amount_collection?: number
-  vendor_name?: string
-  tin_no?: string
-  business_address?: string
-  // Existing file URLs
-  existing_bir_2307?: string
-  existing_next_collection_bir_2307?: string
 }
 
 const initialFormData: CollectibleFormData = {
@@ -71,15 +64,16 @@ const initialFormData: CollectibleFormData = {
   next_collection_status: "pending",
 }
 
-export default function EditFinanceCollectiblePage() {
+export default function EditCollectiblePage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const router = useRouter()
-  const params = useParams()
   const { user } = useAuth()
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [clientSearchTerm, setClientSearchTerm] = useState("")
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([])
   const [isSearchingClients, setIsSearchingClients] = useState(false)
@@ -87,22 +81,18 @@ export default function EditFinanceCollectiblePage() {
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
   const clientSearchRef = useRef<HTMLDivElement>(null)
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
   useEffect(() => {
     const fetchCollectible = async () => {
-      if (!params.id) return
-
       try {
         setLoading(true)
-        const collectibleRef = doc(db, "collectibles", params.id as string)
-        const docSnapshot = await getDoc(collectibleRef)
+        setError(null)
 
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data()
+        const collectibleDoc = await getDoc(doc(db, "collectibles", params.id))
 
-          // Convert data to form format
+        if (collectibleDoc.exists()) {
+          const data = collectibleDoc.data()
+
+          // Convert Firestore data to form format
           const collectibleData: CollectibleFormData = {
             type: data.type || "sites",
             client_name: data.client_name || "",
@@ -115,12 +105,18 @@ export default function EditFinanceCollectiblePage() {
             invoice_no: data.invoice_no || "",
             next_collection_date: data.next_collection_date || "",
             status: data.status || "pending",
-            proceed_next_collection: !!data.next_collection_date,
-            next_collection_status: data.next_status || "pending",
+            proceed_next_collection: !!(
+              data.next_collection_date ||
+              data.next_collection_status ||
+              data.next_collection_bir_2307
+            ),
+            next_collection_status: data.next_collection_status || "pending",
+            next_collection_bir_2307: data.next_collection_bir_2307 || null,
             // Sites specific fields
             booking_no: data.booking_no || "",
             site: data.site || "",
             covered_period: data.covered_period || "",
+            bir_2307: data.bir_2307 || null,
             collection_date: data.collection_date || "",
             // Supplies specific fields
             date: data.date || "",
@@ -130,27 +126,23 @@ export default function EditFinanceCollectiblePage() {
             due_for_collection: data.due_for_collection || "",
             date_paid: data.date_paid || "",
             net_amount_collection: data.net_amount_collection || 0,
-            vendor_name: data.vendor_name || "",
-            tin_no: data.tin_no || "",
-            business_address: data.business_address || "",
-            // Store existing file URLs
-            existing_bir_2307: data.bir_2307 || "",
-            existing_next_collection_bir_2307: data.next_bir_2307 || "",
           }
 
           setFormData(collectibleData)
         } else {
-          setError("Finance collectible not found")
+          setError("Collectible not found")
         }
       } catch (error) {
-        console.error("Error fetching finance collectible:", error)
-        setError("Error loading finance collectible")
+        console.error("Error fetching collectible:", error)
+        setError("Failed to load collectible data")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchCollectible()
+    if (params.id) {
+      fetchCollectible()
+    }
   }, [params.id])
 
   useEffect(() => {
@@ -190,19 +182,6 @@ export default function EditFinanceCollectiblePage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleClientSelect = (client: Client) => {
-    setSelectedClient(client)
-    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
-    setIsClientDropdownOpen(false)
-    setClientSearchTerm("")
-  }
-
-  const handleNewClientSuccess = (client: Client) => {
-    setSelectedClient(client)
-    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
-    setIsNewClientDialogOpen(false)
-  }
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -225,75 +204,63 @@ export default function EditFinanceCollectiblePage() {
     handleInputChange("bir_2307", null)
   }
 
-  const handleNextCollectionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const allowedTypes = [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ]
-      if (!allowedTypes.includes(file.type)) {
-        alert("Please upload only PDF or DOC files.")
-        return
-      }
-      setFormData((prev) => ({ ...prev, next_collection_bir_2307: file }))
+  const triggerFileReplace = () => {
+    const fileInput = document.getElementById("bir_2307_replace") as HTMLInputElement
+    if (fileInput) {
+      fileInput.click()
     }
   }
 
-  const removeNextCollectionFile = () => {
-    setFormData((prev) => ({ ...prev, next_collection_bir_2307: null }))
+  const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+    const storageRef = ref(storage, path)
+    const snapshot = await uploadBytes(storageRef, file)
+    return await getDownloadURL(snapshot.ref)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
-    setSubmitError(null)
 
     try {
-      // Upload BIR 2307 file if a new one is selected
-      let bir2307Url = formData.existing_bir_2307 || ""
-      if (formData.bir_2307 && formData.bir_2307 instanceof File) {
-        bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "finance_collectibles/bir_2307/")
-      }
+      setIsSubmitting(true)
+      setSubmitError(null)
 
-      // Upload Next Collection BIR 2307 file if a new one is selected
-      let nextBir2307Url = formData.existing_next_collection_bir_2307 || ""
-      if (
-        formData.proceed_next_collection &&
-        formData.next_collection_bir_2307 &&
-        formData.next_collection_bir_2307 instanceof File
-      ) {
-        nextBir2307Url = await uploadFileToFirebaseStorage(
-          formData.next_collection_bir_2307,
-          "finance_collectibles/next_bir_2307/",
-        )
-      }
+      const collectibleRef = doc(db, "collectibles", params.id)
 
+      // Prepare update data, filtering out undefined values
       const collectibleData: any = {
-        client_name: formData.client_name || "",
-        net_amount: Number.parseFloat(formData.net_amount.toString()) || 0,
-        total_amount: Number.parseFloat(formData.total_amount.toString()) || 0,
-        mode_of_payment: formData.mode_of_payment || "",
-        bank_name: formData.bank_name || "",
-        bi_no: formData.bi_no || "",
-        or_no: formData.or_no || "",
-        invoice_no: formData.invoice_no || "",
-        status: formData.status || "",
-        vendor_name: formData.vendor_name || "",
-        tin_no: formData.tin_no || "",
-        business_address: formData.business_address || "",
         type: formData.type,
+        client_name: formData.client_name,
+        net_amount: formData.net_amount,
+        total_amount: formData.total_amount,
+        mode_of_payment: formData.mode_of_payment,
+        bank_name: formData.bank_name,
+        bi_no: formData.bi_no,
+        or_no: formData.or_no,
+        invoice_no: formData.invoice_no,
+        status: formData.status,
         updated: serverTimestamp(),
       }
 
-      // Add type-specific fields
       if (formData.type === "sites") {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
         if (formData.covered_period) collectibleData.covered_period = formData.covered_period
-        if (bir2307Url) collectibleData.bir_2307 = bir2307Url
         if (formData.collection_date) collectibleData.collection_date = formData.collection_date
+
+        // Handle BIR 2307 file upload
+        if (formData.bir_2307) {
+          if (formData.bir_2307 instanceof File) {
+            // Upload new file
+            const fileUrl = await uploadFileToStorage(
+              formData.bir_2307,
+              `collectibles/${params.id}/bir_2307_${Date.now()}.${formData.bir_2307.name.split(".").pop()}`,
+            )
+            collectibleData.bir_2307 = fileUrl
+          } else {
+            // Keep existing file URL
+            collectibleData.bir_2307 = formData.bir_2307
+          }
+        }
       } else if (formData.type === "supplies") {
         if (formData.date) collectibleData.date = formData.date
         if (formData.product) collectibleData.product = formData.product
@@ -304,31 +271,49 @@ export default function EditFinanceCollectiblePage() {
         if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      // Add next collection fields only if proceed_next_collection is true
       if (formData.proceed_next_collection) {
-        if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
-        if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
-        if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
-      } else {
-        // Clear next collection fields if not proceeding
-        collectibleData.next_collection_date = ""
-        collectibleData.next_bir_2307 = ""
-        collectibleData.next_status = ""
+        collectibleData.next_collection_date = formData.next_collection_date
+        collectibleData.next_collection_status = formData.next_collection_status
+
+        // Handle next collection BIR 2307 file upload
+        if (formData.next_collection_bir_2307) {
+          if (formData.next_collection_bir_2307 instanceof File) {
+            // Upload new file
+            const fileUrl = await uploadFileToStorage(
+              formData.next_collection_bir_2307,
+              `collectibles/${params.id}/next_bir_2307_${Date.now()}.${formData.next_collection_bir_2307.name.split(".").pop()}`,
+            )
+            collectibleData.next_collection_bir_2307 = fileUrl
+          } else {
+            // Keep existing file URL
+            collectibleData.next_collection_bir_2307 = formData.next_collection_bir_2307
+          }
+        }
       }
 
-      const collectibleRef = doc(db, "collectibles", params.id as string)
       await updateDoc(collectibleRef, collectibleData)
 
-      console.log("Finance collectible updated successfully")
-
-      // Navigate back to finance collectibles list
+      // Navigate back to collectibles list
       router.push("/finance/collectibles")
     } catch (error) {
-      console.error("Error updating finance collectible:", error)
-      setSubmitError("Failed to update finance collectible. Please try again.")
+      console.error("Error updating collectible:", error)
+      setSubmitError("Failed to update collectible")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
+    setIsClientDropdownOpen(false)
+    setClientSearchTerm("")
+  }
+
+  const handleNewClientSuccess = (client: Client) => {
+    setSelectedClient(client)
+    setFormData((prev) => ({ ...prev, client_name: client.company || client.name }))
+    setIsNewClientDialogOpen(false)
   }
 
   const renderFormFields = () => (
@@ -353,7 +338,11 @@ export default function EditFinanceCollectiblePage() {
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
@@ -491,6 +480,146 @@ export default function EditFinanceCollectiblePage() {
         />
       </div>
 
+      <div className="md:col-span-2 space-y-4">
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="proceed_next_collection"
+            checked={formData.proceed_next_collection}
+            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
+            Proceed to set the next collection date?
+          </Label>
+        </div>
+
+        {formData.proceed_next_collection && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_date">Next Collection Date</Label>
+              <Input
+                id="next_collection_date"
+                type="date"
+                value={formData.next_collection_date}
+                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_status">Status for Next Collection</Label>
+              <Select
+                value={formData.next_collection_status}
+                onValueChange={(value) => handleInputChange("next_collection_status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="collected">Collected</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
+              {!formData.next_collection_bir_2307 ? (
+                <div className="flex items-center justify-center w-full">
+                  <label
+                    htmlFor="next_collection_bir_2307"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> BIR 2307 for Next Collection
+                      </p>
+                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                    </div>
+                    <input
+                      id="next_collection_bir_2307"
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleInputChange("next_collection_bir_2307", file)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-700">Existing file</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {typeof formData.next_collection_bir_2307 === "string" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const fileInput = document.getElementById(
+                            "next_collection_bir_2307_replace",
+                          ) as HTMLInputElement
+                          if (fileInput) {
+                            fileInput.click()
+                          }
+                        }}
+                        className="flex items-center space-x-1"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Replace</span>
+                      </Button>
+                    )}
+                    {typeof formData.next_collection_bir_2307 === "string" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(formData.next_collection_bir_2307 as string, "_blank")}
+                        className="flex items-center space-x-1"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>View</span>
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleInputChange("next_collection_bir_2307", null)}
+                      className="p-2"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <input
+                    id="next_collection_bir_2307_replace"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        handleInputChange("next_collection_bir_2307", file)
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
         <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
@@ -524,7 +653,6 @@ export default function EditFinanceCollectiblePage() {
             <Label htmlFor="covered_period">Covered Period</Label>
             <Input
               id="covered_period"
-              type="date"
               value={formData.covered_period || ""}
               onChange={(e) => handleInputChange("covered_period", e.target.value)}
             />
@@ -532,62 +660,69 @@ export default function EditFinanceCollectiblePage() {
           <div className="space-y-2">
             <Label htmlFor="bir_2307">BIR 2307 (PDF/DOC only)</Label>
             {!formData.bir_2307 ? (
-              <div>
-                {formData.existing_bir_2307 && (
-                  <div className="mb-2 p-2 bg-blue-50 rounded border">
-                    <p className="text-sm text-blue-700">Current file: BIR 2307 document</p>
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="bir_2307"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                    <p className="mb-2 text-sm text-gray-500">
+                      <span className="font-semibold">Click to upload</span> BIR 2307
+                    </p>
+                    <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                  </div>
+                  <input
+                    id="bir_2307"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-gray-500" />
+                  <span className="text-sm text-gray-700">Existing file</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {typeof formData.bir_2307 === "string" && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(formData.existing_bir_2307!, "_blank")}
-                      className="mt-1"
+                      onClick={triggerFileReplace}
+                      className="flex items-center space-x-1 bg-transparent"
                     >
-                      View Current File
+                      <Upload className="w-4 h-4" />
+                      <span>Replace</span>
                     </Button>
-                  </div>
-                )}
-                <div className="flex items-center justify-center w-full">
-                  <label
-                    htmlFor="bir_2307"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Click to upload</span> {formData.existing_bir_2307 ? "new" : ""}{" "}
-                        BIR 2307
-                      </p>
-                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
-                    </div>
-                    <input
-                      id="bir_2307"
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleFileChange}
-                    />
-                  </label>
+                  )}
+                  {typeof formData.bir_2307 === "string" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(formData.bir_2307 as string, "_blank")}
+                      className="flex items-center space-x-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View</span>
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={removeFile} className="p-2 bg-transparent">
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                <div className="flex items-center space-x-2">
-                  <Upload className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">{formData.bir_2307.name}</span>
-                  <span className="text-xs text-gray-500">
-                    ({(formData.bir_2307.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={removeFile}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+                <input
+                  id="bir_2307_replace"
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                />
               </div>
             )}
           </div>
@@ -668,116 +803,6 @@ export default function EditFinanceCollectiblePage() {
           </div>
         </>
       )}
-
-      <div className="md:col-span-2 space-y-4 border-t pt-4">
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="proceed_next_collection"
-            checked={formData.proceed_next_collection}
-            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
-            Proceed to set the next collection date?
-          </Label>
-        </div>
-
-        {formData.proceed_next_collection && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_date">Next Collection Date</Label>
-              <Input
-                id="next_collection_date"
-                type="date"
-                value={formData.next_collection_date}
-                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_status">Status</Label>
-              <Select
-                value={formData.next_collection_status}
-                onValueChange={(value) => handleInputChange("next_collection_status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="collected">Collected</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
-              {!formData.next_collection_bir_2307 ? (
-                <div>
-                  {formData.existing_next_collection_bir_2307 && (
-                    <div className="mb-2 p-2 bg-blue-50 rounded border">
-                      <p className="text-sm text-blue-700">Current file: Next Collection BIR 2307 document</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(formData.existing_next_collection_bir_2307!, "_blank")}
-                        className="mt-1"
-                      >
-                        View Current File
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center w-full">
-                    <label
-                      htmlFor="next_collection_bir_2307"
-                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                    >
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Click to upload</span>{" "}
-                          {formData.existing_next_collection_bir_2307 ? "new" : ""} BIR 2307 for Next Collection
-                        </p>
-                        <p className="text-xs text-gray-500">PDF or DOC files only</p>
-                      </div>
-                      <input
-                        id="next_collection_bir_2307"
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                        onChange={handleNextCollectionFileChange}
-                      />
-                    </label>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                  <div className="flex items-center space-x-2">
-                    <Upload className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-700">{formData.next_collection_bir_2307.name}</span>
-                    <span className="text-xs text-gray-500">
-                      ({(formData.next_collection_bir_2307.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeNextCollectionFile}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 
@@ -792,8 +817,8 @@ export default function EditFinanceCollectiblePage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Edit Finance Collectible</h1>
-            <p className="text-muted-foreground">Loading finance collectible information...</p>
+            <h1 className="text-3xl font-bold">Edit Collectible</h1>
+            <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
       </div>
@@ -811,8 +836,8 @@ export default function EditFinanceCollectiblePage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Edit Finance Collectible</h1>
-            <p className="text-muted-foreground text-red-500">{error}</p>
+            <h1 className="text-3xl font-bold">Edit Collectible</h1>
+            <p className="text-red-500">{error}</p>
           </div>
         </div>
       </div>
@@ -820,7 +845,7 @@ export default function EditFinanceCollectiblePage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/finance/collectibles">
           <Button variant="outline" size="sm">
@@ -829,33 +854,26 @@ export default function EditFinanceCollectiblePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Edit Finance Collectible</h1>
-          <p className="text-muted-foreground">Update finance collectible record</p>
+          <h1 className="text-3xl font-bold">Edit Collectible</h1>
+          <p className="text-muted-foreground">Update collectible record</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Finance Collectible Information</CardTitle>
+          <CardTitle>Collectible Information</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Form fields would go here - similar to create page */}
             {renderFormFields()}
-            {submitError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{submitError}</div>
-            )}
-            <div className="flex justify-end gap-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/finance/collectibles")}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Link href="/finance/collectibles">
+                <Button variant="outline" type="button">
+                  Cancel
+                </Button>
+              </Link>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Updating..." : "Update Finance Collectible"}
+                {isSubmitting ? "Updating..." : "Update Collectible"}
               </Button>
             </div>
           </form>

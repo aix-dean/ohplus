@@ -9,16 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
-import { getQuotationById } from "@/lib/quotation-service"
-import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { getQuotationById } from "@/lib/quotation-service"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -55,45 +54,6 @@ interface CollectibleFormData {
   business_address?: string
 }
 
-interface Collectible {
-  id?: string
-  created?: any
-  company_id?: string
-  type: string
-  updated?: any
-  deleted: boolean
-  client_name: string
-  net_amount: number
-  total_amount: number
-  mode_of_payment: string
-  bank_name?: string
-  bi_no?: string
-  or_no?: string
-  invoice_no?: string
-  next_collection_date?: string
-  status: string
-  vendor_name: string
-  tin_no: string
-  business_address: string
-  // Sites specific fields
-  booking_no?: string
-  site?: string
-  covered_period?: string
-  bir_2307?: string
-  collection_date?: string
-  // Supplies specific fields
-  date?: string
-  product?: string
-  transfer_date?: string
-  bs_no?: string
-  due_for_collection?: string
-  date_paid?: string
-  net_amount_collection?: number
-  // Next collection fields
-  next_bir_2307?: string
-  next_status?: string
-}
-
 const initialFormData: CollectibleFormData = {
   type: "sites",
   client_name: "",
@@ -110,12 +70,12 @@ const initialFormData: CollectibleFormData = {
   next_collection_status: "pending",
 }
 
-export default function CreateCollectiblePage() {
+export default function CreateTreasuryCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { toast } = useToast()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -127,6 +87,7 @@ export default function CreateCollectiblePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
   const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
 
   useEffect(() => {
@@ -184,6 +145,17 @@ export default function CreateCollectiblePage() {
               const endDate = formatDateOnly(quotationData.end_date)
               const coveredPeriod = `${startDate} - ${endDate}`
 
+              let siteCode = ""
+              if (quotationData.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData.items && quotationData.items.length > 0) {
+                // If quotation has items, get site_code from first item
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
+
               setFormData((prev) => ({
                 ...prev,
                 client_name: clientName,
@@ -193,8 +165,19 @@ export default function CreateCollectiblePage() {
                 status: "pending",
                 quotation_id: quotationId,
                 covered_period: coveredPeriod,
+                site: siteCode, // Auto-fill site field with quotation site code
               }))
             } else {
+              let siteCode = ""
+              if (quotationData?.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData?.items && quotationData.items.length > 0) {
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
+
               setFormData((prev) => ({
                 ...prev,
                 client_name: clientName,
@@ -203,6 +186,7 @@ export default function CreateCollectiblePage() {
                 type: "sites",
                 status: "pending",
                 quotation_id: quotationId,
+                site: siteCode, // Auto-fill site field with quotation site code
               }))
             }
           } catch (error) {
@@ -243,7 +227,7 @@ export default function CreateCollectiblePage() {
 
       loadQuotationData()
     }
-  }, [searchParams, hasLoadedQuotationData, toast])
+  }, [searchParams, hasLoadedQuotationData])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -311,7 +295,7 @@ export default function CreateCollectiblePage() {
     try {
       let bir2307Url = ""
       if (formData.bir_2307 && formData.bir_2307 instanceof File) {
-        bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "collectibles/bir_2307/")
+        bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "treasury_collectibles/bir_2307/")
       }
 
       let nextBir2307Url = ""
@@ -322,14 +306,14 @@ export default function CreateCollectiblePage() {
       ) {
         nextBir2307Url = await uploadFileToFirebaseStorage(
           formData.next_collection_bir_2307,
-          "collectibles/next_bir_2307/",
+          "treasury_collectibles/next_bir_2307/",
         )
       }
 
       const collectibleData: any = {
         client_name: formData.client_name || "",
-        net_amount: Number.parseFloat(formData.net_amount) || 0,
-        total_amount: Number.parseFloat(formData.total_amount) || 0,
+        net_amount: Number.parseFloat(formData.net_amount.toString()) || 0,
+        total_amount: Number.parseFloat(formData.total_amount.toString()) || 0,
         mode_of_payment: formData.mode_of_payment || "",
         bank_name: formData.bank_name || "",
         bi_no: formData.bi_no || "",
@@ -339,14 +323,11 @@ export default function CreateCollectiblePage() {
         vendor_name: formData.vendor_name || "",
         tin_no: formData.tin_no || "",
         business_address: formData.business_address || "",
+        type: formData.type,
         deleted: false,
         created: serverTimestamp(),
         updated: serverTimestamp(),
         company_id: user?.company_id || user?.uid || "",
-      }
-
-      if (formData.quotation_id) {
-        collectibleData.quotation_id = formData.quotation_id
       }
 
       if (formData.type === "sites") {
@@ -371,13 +352,17 @@ export default function CreateCollectiblePage() {
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       }
 
-      const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
-      console.log("Collectible created with ID:", docRef.id)
+      if (formData.quotation_id) {
+        collectibleData.quotation_id = formData.quotation_id
+      }
 
-      router.push("/finance/collectibles")
+      const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
+      console.log("Treasury collectible created with ID:", docRef.id)
+
+      router.push("/treasury/collectibles")
     } catch (error) {
-      console.error("Error creating collectible:", error)
-      setSubmitError("Failed to create collectible. Please try again.")
+      console.error("Error creating treasury collectible:", error)
+      setSubmitError("Failed to create treasury collectible. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -404,11 +389,15 @@ export default function CreateCollectiblePage() {
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
-                setFormData((prev) => ({ ...prev, client_name: "" }))
+                setFormData((prev) => ({ ...prev, client_name: e.target.value }))
               }}
               onFocus={() => {
                 setIsClientDropdownOpen(true)
@@ -538,99 +527,6 @@ export default function CreateCollectiblePage() {
           onChange={(e) => handleInputChange("invoice_no", e.target.value)}
           required
         />
-      </div>
-
-      <div className="md:col-span-2 space-y-4 border-t pt-4">
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="proceed_next_collection"
-            checked={formData.proceed_next_collection}
-            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
-            Proceed to set the next collection date?
-          </Label>
-        </div>
-
-        {formData.proceed_next_collection && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_date">Next Collection Date</Label>
-              <Input
-                id="next_collection_date"
-                type="date"
-                value={formData.next_collection_date}
-                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="next_collection_status">Status</Label>
-              <Select
-                value={formData.next_collection_status}
-                onValueChange={(value) => handleInputChange("next_collection_status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="collected">Collected</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
-              {!formData.next_collection_bir_2307 ? (
-                <div className="flex items-center justify-center w-full">
-                  <label
-                    htmlFor="next_collection_bir_2307"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Click to upload</span> BIR 2307 for Next Collection
-                      </p>
-                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
-                    </div>
-                    <input
-                      id="next_collection_bir_2307"
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleNextCollectionFileChange}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                  <div className="flex items-center space-x-2">
-                    <Upload className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-700">{formData.next_collection_bir_2307.name}</span>
-                    <span className="text-xs text-gray-500">
-                      ({(formData.next_collection_bir_2307.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeNextCollectionFile}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="space-y-2">
@@ -794,31 +690,124 @@ export default function CreateCollectiblePage() {
           </div>
         </>
       )}
+
+      <div className="md:col-span-2 space-y-4 border-t pt-4">
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="proceed_next_collection"
+            checked={formData.proceed_next_collection}
+            onChange={(e) => handleInputChange("proceed_next_collection", e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <Label htmlFor="proceed_next_collection" className="text-sm font-medium">
+            Proceed to set the next collection date?
+          </Label>
+        </div>
+
+        {formData.proceed_next_collection && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_date">Next Collection Date</Label>
+              <Input
+                id="next_collection_date"
+                type="date"
+                value={formData.next_collection_date}
+                onChange={(e) => handleInputChange("next_collection_date", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="next_collection_status">Status</Label>
+              <Select
+                value={formData.next_collection_status}
+                onValueChange={(value) => handleInputChange("next_collection_status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="collected">Collected</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="next_collection_bir_2307">BIR 2307 for Next Collection (PDF/DOC only)</Label>
+              {!formData.next_collection_bir_2307 ? (
+                <div className="flex items-center justify-center w-full">
+                  <label
+                    htmlFor="next_collection_bir_2307"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> BIR 2307 for Next Collection
+                      </p>
+                      <p className="text-xs text-gray-500">PDF or DOC files only</p>
+                    </div>
+                    <input
+                      id="next_collection_bir_2307"
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleNextCollectionFileChange}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex items-center space-x-2">
+                    <Upload className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">{formData.next_collection_bir_2307.name}</span>
+                    <span className="text-xs text-gray-500">
+                      ({(formData.next_collection_bir_2307.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeNextCollectionFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 
   return (
     <div className="container mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/finance/collectibles">
+        <Link href="/treasury/collectibles">
           <Button variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Create Collectible</h1>
+          <h1 className="text-3xl font-bold">Create Treasury Collectible</h1>
           <p className="text-muted-foreground">
             {searchParams.get("from_quotation") === "true"
               ? `Creating collectible from quotation ${searchParams.get("quotation_number") || ""}`
-              : "Add a new collectible record"}
+              : "Add a new treasury collectible record"}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Collectible Information</CardTitle>
+          <CardTitle>Treasury Collectible Information</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -830,13 +819,13 @@ export default function CreateCollectiblePage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/finance/collectibles")}
+                onClick={() => router.push("/treasury/collectibles")}
                 disabled={isSubmitting}
               >
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Collectible"}
+                {isSubmitting ? "Creating..." : "Create Treasury Collectible"}
               </Button>
             </div>
           </form>
