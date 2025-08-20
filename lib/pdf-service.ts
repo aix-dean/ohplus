@@ -1,8 +1,48 @@
 import { jsPDF } from "jspdf"
+import QRCode from "qrcode"
 import type { CostEstimate } from "./types" // Assuming CostEstimate is defined in a types file
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "./firebase" // Import db from local firebase config
 import { safeToDate } from "./utils" // Assuming safeToDate is imported from a utils file
+
+export async function generateQRCode(text: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(text, { margin: 1, width: 192 })
+  } catch (error) {
+    console.error("Error generating QR code:", error)
+    throw new Error("Failed to generate QR code")
+  }
+}
+
+export async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(imageUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`)
+    }
+    const blob = await response.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch (error) {
+    console.error("Error loading image as base64:", error)
+    return null
+  }
+}
+
+export async function getImageDimensions(base64Image: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height })
+    }
+    img.onerror = reject
+    img.src = base64Image
+  })
+}
 
 export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
