@@ -86,6 +86,8 @@ export default function CreateTreasuryCollectiblePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
+
   useEffect(() => {
     const fetchClients = async () => {
       if (user?.uid) {
@@ -121,7 +123,7 @@ export default function CreateTreasuryCollectiblePage() {
 
   useEffect(() => {
     const fromQuotation = searchParams.get("from_quotation")
-    if (fromQuotation === "true") {
+    if (fromQuotation === "true" && !hasLoadedQuotationData) {
       const clientName = searchParams.get("client_name") || ""
       const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
       const quotationNumber = searchParams.get("quotation_number") || ""
@@ -141,8 +143,10 @@ export default function CreateTreasuryCollectiblePage() {
         title: "Quotation Data Loaded",
         description: `Form has been pre-populated with data from quotation ${quotationNumber}`,
       })
+
+      setHasLoadedQuotationData(true)
     }
-  }, [searchParams, toast])
+  }, [searchParams, hasLoadedQuotationData]) // Removed toast from dependencies
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
