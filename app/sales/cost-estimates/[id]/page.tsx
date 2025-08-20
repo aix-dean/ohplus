@@ -1176,6 +1176,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 <p className="text-sm font-medium text-gray-900">
                   {userData?.first_name} {userData?.last_name}
                 </p>
+                <p className="text-sm text-gray-600">Account Manager</p>
               </div>
 
               {/* Right side - Client conforme */}
