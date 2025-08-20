@@ -465,7 +465,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       .split(",")
       .map((email) => email.trim())
       .filter(Boolean)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+\$/
     for (const email of ccEmailsArray) {
       if (!emailRegex.test(email)) {
         toast({
@@ -936,15 +936,15 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </div>
           </div>
 
-          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400">
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
+          </div>
+
+          <div className="mb-6 p-4 text-center">
             <p className="text-gray-800 font-medium">
               Good Day! Thank you for considering Golden Touch for your business needs. We are pleased to submit our
               quotation for your requirements:
             </p>
-          </div>
-
-          <div className="text-center mb-8">
-            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
           </div>
 
           <div className="mb-6">
