@@ -1165,7 +1165,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           </div>
         )}
 
-        {isEditing && hasUnsavedChanges && (
+        {hasUnsavedChanges && (
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
             <Button
               variant="outline"
