@@ -120,7 +120,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
-  const [showPageSelection, setShowPageSelection] = useState(showPageSelection)
+  const [showPageSelection, setShowPageSelection] = useState(false)
   const [selectedPages, setSelectedPages] = useState<string[]>([])
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
