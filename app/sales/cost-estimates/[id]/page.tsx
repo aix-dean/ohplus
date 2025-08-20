@@ -46,7 +46,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { generateCostEstimatePDF, generateSeparateCostEstimatePDFs } from "@/lib/pdf-service" // Import the new PDF generation function
+import { generateCostEstimatePDF, generateSeparateCostEstimatePDFs } from "@/lib/cost-estimate-pdf-service"
 import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
 import { Checkbox } from "@/components/ui/checkbox"
@@ -81,13 +81,28 @@ const generateQRCodeUrl = (costEstimateId: string) => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(costEstimateViewUrl)}`
 }
 
-export default function CostEstimateDetailsPage({ params }: { params: { id: string } }) {
+const formatDurationDisplay = (durationDays: number | null | undefined): string => {
+  if (!durationDays) return "1 month"
+  const months = Math.floor(durationDays / 30)
+  const days = durationDays % 30
+  if (months === 0) {
+    return days === 1 ? "1 day" : `${days} days`
+  } else if (days === 0) {
+    return months === 1 ? "1 month" : `${months} months`
+  } else {
+    const monthText = months === 1 ? "month" : "months"
+    const dayText = days === 1 ? "day" : "days"
+    return `${months} ${monthText} and ${days} ${dayText}`
+  }
+}
+
+export default function CostEstimateDetailsPage() {
   const router = useRouter()
   const { user, userData } = useAuth()
 
   const { toast } = useToast()
 
-  const costEstimateId = params.id as string
+  const costEstimateId = useRouter().query.id as string
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
   const [loading, setLoading] = useState(true)
@@ -490,7 +505,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }
 
   const handleSaveEdit = async () => {
-    if (!editableCostEstimate || !params.id || !user?.uid) return
+    if (!editableCostEstimate || !costEstimateId || !user?.uid) return
 
     setIsSaving(true)
     try {
@@ -755,7 +770,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Duration</span>
-              <span className="text-gray-700">: {costEstimate?.durationDays} DAYS</span>
+              <span className="text-gray-700">: {formatDurationDisplay(costEstimate?.durationDays)}</span>
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
@@ -782,9 +797,10 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
               <span className="text-gray-700">
                 : PHP{" "}
-                {(
-                  siteTotal / (costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1)
-                ).toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
+                {(siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)).toLocaleString(
+                  "en-US",
+                  { minimumFractionDigits: 2 },
+                )}{" "}
                 (Exclusive of VAT)
               </span>
             </div>
@@ -803,15 +819,14 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 <span className="text-gray-700">Lease rate per month</span>
                 <span className="text-gray-900">
                   PHP{" "}
-                  {(
-                    siteTotal / (costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1)
-                  ).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  {(siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)).toLocaleString(
+                    "en-US",
+                    { minimumFractionDigits: 2 },
+                  )}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-700">
-                  x {costEstimate?.durationDays ? Math.ceil(costEstimate.durationDays / 30) : 1} months
-                </span>
+                <span className="text-gray-700">x {formatDurationDisplay(costEstimate?.durationDays)}</span>
                 <span className="text-gray-900">
                   PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
