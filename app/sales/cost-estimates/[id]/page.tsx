@@ -292,12 +292,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
 
       await updateCostEstimate(updatedCostEstimate.id, updateData)
 
-      // Update local state
       setEditableCostEstimate(updatedCostEstimate)
       setCostEstimate(updatedCostEstimate)
       setEditingField(null)
       setTempValues({})
       setHasUnsavedChanges(false)
+      setIsEditing(false) // Added missing setIsEditing(false) to disable edit mode
 
       toast({
         title: "Success",
