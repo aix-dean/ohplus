@@ -906,73 +906,101 @@ export default function QuotationsListPage() {
                                     }`}
                                   >
                                     <div className="space-y-1 pt-1">
-                                      {compliance.items.map((item, index) => {
-                                        const uploadKey = `${quotation.id}-${item.key}`
-                                        const isUploading = uploadingFiles.has(uploadKey)
+                                      {compliance.items
+                                        .filter((item) => item.key !== "signedContract")
+                                        .map((item, index) => {
+                                          const uploadKey = `${quotation.id}-${item.key}`
+                                          const isUploading = uploadingFiles.has(uploadKey)
 
-                                        return (
-                                          <div
-                                            key={index}
-                                            className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                            style={{
-                                              animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                              animationDuration: "200ms",
-                                            }}
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              {item.status === "completed" ? (
-                                                <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                                  <CheckCircle className="w-3 h-3 text-white" />
-                                                </div>
-                                              ) : (
-                                                <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                              )}
-                                              <span className="text-gray-700">{item.name}</span>
+                                          return (
+                                            <div
+                                              key={index}
+                                              className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                              style={{
+                                                animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                                animationDuration: "200ms",
+                                              }}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                {item.status === "completed" ? (
+                                                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                                    <CheckCircle className="w-3 h-3 text-white" />
+                                                  </div>
+                                                ) : (
+                                                  <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                                )}
+                                                <span className="text-gray-700">{item.name}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                {item.file && item.fileUrl ? (
+                                                  <a
+                                                    href={item.fileUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  >
+                                                    <FileText className="w-3 h-3" />
+                                                    {item.file}
+                                                  </a>
+                                                ) : item.status === "upload" ? (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-6 px-2 text-xs bg-transparent"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      triggerFileUpload(quotation.id, item.key)
+                                                    }}
+                                                    disabled={isUploading}
+                                                  >
+                                                    {isUploading ? (
+                                                      <>
+                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                        Uploading...
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Upload className="w-3 h-3 mr-1" />
+                                                        Upload
+                                                      </>
+                                                    )}
+                                                  </Button>
+                                                ) : item.status === "confirmation" ? (
+                                                  <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                                    Pending
+                                                  </span>
+                                                ) : null}
+                                              </div>
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                              {item.file && item.fileUrl ? (
-                                                <a
-                                                  href={item.fileUrl}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  <FileText className="w-3 h-3" />
-                                                  {item.file}
-                                                </a>
-                                              ) : item.status === "upload" ? (
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="h-6 px-2 text-xs bg-transparent"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    triggerFileUpload(quotation.id, item.key)
-                                                  }}
-                                                  disabled={isUploading}
-                                                >
-                                                  {isUploading ? (
-                                                    <>
-                                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                      Uploading...
-                                                    </>
-                                                  ) : (
-                                                    <>
-                                                      <Upload className="w-3 h-3 mr-1" />
-                                                      Upload
-                                                    </>
-                                                  )}
-                                                </Button>
-                                              ) : item.status === "confirmation" ? (
-                                                <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                                  Pending
-                                                </span>
-                                              ) : null}
-                                            </div>
-                                          </div>
+                                          )
+                                        })}
+
+                                      {(() => {
+                                        const signedContract = compliance.items.find(
+                                          (item) => item.key === "signedContract",
                                         )
-                                      })}
+                                        if (signedContract?.status === "completed" && signedContract?.fileUrl) {
+                                          return (
+                                            <div className="flex justify-center pt-2 animate-in fade-in-0 slide-in-from-top-1">
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 px-4 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  window.open(signedContract.fileUrl, "_blank")
+                                                }}
+                                              >
+                                                <FileText className="w-3 h-3 mr-1" />
+                                                View Signed Contract
+                                              </Button>
+                                            </div>
+                                          )
+                                        }
+                                        return null
+                                      })()}
+
                                       {compliance.items.find((item) => item.note) && (
                                         <div className="text-xs text-gray-500 mt-1 animate-in fade-in-0 slide-in-from-top-1">
                                           {compliance.items.find((item) => item.note)?.note}
