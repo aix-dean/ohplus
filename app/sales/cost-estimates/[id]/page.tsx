@@ -966,10 +966,16 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 </div>
               ) : (
                 <span
-                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  className={`text-gray-700 ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
                   onClick={() => isEditing && handleFieldEdit("durationDays", costEstimate?.durationDays)}
+                  title={isEditing ? "Click to edit duration" : ""}
                 >
                   {formatDurationDisplay(costEstimate?.durationDays)}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
             </div>
@@ -995,7 +1001,11 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 </div>
               ) : (
                 <span
-                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  className={`text-gray-700 ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
                   onClick={() =>
                     isEditing &&
                     handleFieldEdit("contractPeriod", {
@@ -1003,9 +1013,11 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                       endDate: costEstimate?.endDate,
                     })
                   }
+                  title={isEditing ? "Click to edit contract period" : ""}
                 >
                   {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
                   {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
             </div>
@@ -1032,10 +1044,16 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   </div>
                 ) : (
                   <span
-                    className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                    className={`text-gray-700 ${
+                      isEditing
+                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                        : ""
+                    }`}
                     onClick={() => isEditing && handleFieldEdit("illumination", siteLineItems[0].quantity)}
+                    title={isEditing ? "Click to edit illumination" : ""}
                   >
                     {siteLineItems[0].quantity} units of lighting system
+                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                   </span>
                 )}
               </div>
@@ -1057,10 +1075,16 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 </div>
               ) : (
                 <span
-                  className={`text-gray-700 ${isEditing ? "cursor-pointer hover:bg-gray-100 px-1 rounded" : ""}`}
+                  className={`text-gray-700 ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
                   onClick={() => isEditing && handleFieldEdit("unitPrice", monthlyRate)}
+                  title={isEditing ? "Click to edit lease rate" : ""}
                 >
                   {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
             </div>
@@ -1353,6 +1377,14 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       </div>
 
       {/* Floating Action Buttons */}
+      {isEditing && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg shadow-lg z-50">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">✏️ Edit Mode Active</span>
+            <span className="text-xs">Click on highlighted fields to edit them</span>
+          </div>
+        </div>
+      )}
       {isEditing ? (
         <div className="fixed bottom-6 right-6 flex space-x-4">
           <Button
