@@ -145,6 +145,12 @@ export default function CreateTreasuryCollectiblePage() {
               const endDate = formatDateOnly(quotationData.end_date)
               const coveredPeriod = `${startDate} - ${endDate}`
 
+              const siteNames =
+                quotationData.items
+                  ?.map((item) => item.location)
+                  .filter((location) => location && location.trim() !== "")
+                  .join(", ") || ""
+
               setFormData((prev) => ({
                 ...prev,
                 client_name: clientName,
@@ -154,8 +160,15 @@ export default function CreateTreasuryCollectiblePage() {
                 status: "pending",
                 quotation_id: quotationId,
                 covered_period: coveredPeriod,
+                site: siteNames, // Auto-fill site field with quotation locations
               }))
             } else {
+              const siteNames =
+                quotationData?.items
+                  ?.map((item) => item.location)
+                  .filter((location) => location && location.trim() !== "")
+                  .join(", ") || ""
+
               setFormData((prev) => ({
                 ...prev,
                 client_name: clientName,
@@ -164,6 +177,7 @@ export default function CreateTreasuryCollectiblePage() {
                 type: "sites",
                 status: "pending",
                 quotation_id: quotationId,
+                site: siteNames, // Auto-fill site field with quotation locations
               }))
             }
           } catch (error) {
