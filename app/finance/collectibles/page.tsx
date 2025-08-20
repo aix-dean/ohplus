@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Eye, MoreHorizontal } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -118,22 +118,22 @@ export default function CollectiblesPage() {
     setFilteredCollectibles(filtered)
   }, [collectibles, searchTerm, statusFilter, typeFilter])
 
-  const handleMarkAsPaid = async (id: string) => {
+  const handleSoftDelete = async (id: string) => {
     try {
       const collectibleRef = doc(db, "collectibles", id)
       await updateDoc(collectibleRef, {
-        status: "paid",
+        deleted: true,
         updated: serverTimestamp(),
       })
 
       // Update local state
       setCollectibles((prev) =>
         prev.map((item) =>
-          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
+          item.id === id ? { ...item, deleted: true, updated: new Date().toISOString().split("T")[0] } : item,
         ),
       )
     } catch (error) {
-      console.error("Error marking collectible as paid:", error)
+      console.error("Error soft deleting collectible:", error)
     }
   }
 
@@ -316,13 +316,11 @@ export default function CollectiblesPage() {
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleMarkAsPaid(collectible.id)}
-                              className="flex items-center text-green-600 focus:text-green-600"
+                              onClick={() => handleSoftDelete(collectible.id)}
+                              className="flex items-center text-destructive focus:text-destructive"
                             >
-                              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Mark As Paid
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
