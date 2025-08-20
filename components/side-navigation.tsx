@@ -30,9 +30,6 @@ import {
   Receipt,
   CreditCard,
   Wallet,
-  PieChart,
-  Building,
-  Droplets,
   Bot,
   Lightbulb,
 } from "lucide-react"
@@ -124,12 +121,7 @@ const navigationItems = [
     icon: Wallet,
     items: [
       { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
-      { title: "Cash Management", href: "/treasury/cash-management", icon: DollarSign },
-      { title: "Investments", href: "/treasury/investments", icon: PieChart },
       { title: "Requests", href: "/treasury/quotations", icon: FileText },
-      { title: "Credit Facilities", href: "/treasury/credit", icon: CreditCard },
-      { title: "FX Trading", href: "/treasury/fx-trading", icon: TrendingUp },
-      { title: "Risk Management", href: "/treasury/risk", icon: AlertTriangle },
       { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
     ],
   },
@@ -729,6 +721,14 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -1263,6 +1263,14 @@ export function SideNavigation() {
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
               </div>
               <div className="flex justify-end mt-3">
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
@@ -1277,8 +1285,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
-                  { title: "Cash Management", href: "/treasury/cash-management", icon: DollarSign },
-                  { title: "Investments", href: "/treasury/investments", icon: PieChart },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/quotations", icon: FileText },
                 ].map((item) => {
@@ -1318,12 +1324,6 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Credit Facilities", href: "/treasury/credit", icon: CreditCard },
-                  { title: "FX Trading", href: "/treasury/fx-trading", icon: TrendingUp },
-                  { title: "Risk Management", href: "/treasury/risk", icon: AlertTriangle },
-                  { title: "Cash Forecasting", href: "/treasury/forecasting", icon: Calendar },
-                  { title: "Bank Relations", href: "/treasury/banking", icon: Building },
-                  { title: "Liquidity Planning", href: "/treasury/liquidity", icon: Droplets },
                   { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
                   { title: "Settings", href: "/treasury/settings", icon: Cog },
                 ].map((item) => {
@@ -1980,8 +1980,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
-                  { title: "Cash Management", href: "/treasury/cash-management", icon: DollarSign },
-                  { title: "Investments", href: "/treasury/investments", icon: PieChart },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/quotations", icon: FileText },
                 ].map((item) => {
@@ -2021,12 +2019,6 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Credit Facilities", href: "/treasury/credit", icon: CreditCard },
-                  { title: "FX Trading", href: "/treasury/fx-trading", icon: TrendingUp },
-                  { title: "Risk Management", href: "/treasury/risk", icon: AlertTriangle },
-                  { title: "Cash Forecasting", href: "/treasury/forecasting", icon: Calendar },
-                  { title: "Bank Relations", href: "/treasury/banking", icon: Building },
-                  { title: "Liquidity Planning", href: "/treasury/liquidity", icon: Droplets },
                   { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
                   { title: "Settings", href: "/treasury/settings", icon: Cog },
                 ].map((item) => {
@@ -2683,8 +2675,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
-                  { title: "Cash Management", href: "/treasury/cash-management", icon: DollarSign },
-                  { title: "Investments", href: "/treasury/investments", icon: PieChart },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/quotations", icon: FileText },
                 ].map((item) => {
@@ -2724,12 +2714,6 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Credit Facilities", href: "/treasury/credit", icon: CreditCard },
-                  { title: "FX Trading", href: "/treasury/fx-trading", icon: TrendingUp },
-                  { title: "Risk Management", href: "/treasury/risk", icon: AlertTriangle },
-                  { title: "Cash Forecasting", href: "/treasury/forecasting", icon: Calendar },
-                  { title: "Bank Relations", href: "/treasury/banking", icon: Building },
-                  { title: "Liquidity Planning", href: "/treasury/liquidity", icon: Droplets },
                   { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
                   { title: "Settings", href: "/treasury/settings", icon: Cog },
                 ].map((item) => {
