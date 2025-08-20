@@ -1604,7 +1604,10 @@ export async function generateCostEstimatePDF(
 
       pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
-        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}\`\`\`javascript
+yPosition + 6)
+      pdf.text(
+        \`PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
         yPosition + 6,
         { align: "right" },
@@ -1724,57 +1727,64 @@ export async function generateCostEstimatePDF(
       // Signature section
       pdf.setFontSize(10)
       pdf.setFont("helvetica", "normal")
+      console.log("[v0] Adding 'Very truly yours' text at:", margin, yPosition)
       pdf.text("Very truly yours,", margin, yPosition)
+      console.log("[v0] Adding 'Conforme' text at:", margin + contentWidth / 2, yPosition)
       pdf.text("Conforme:", margin + contentWidth / 2, yPosition)
       yPosition += 20
+      console.log("[v0] yPosition after signature headers:", yPosition)
 
       pdf.setLineWidth(0.8)
+      console.log("[v0] Drawing left signature line from", margin, "to", margin + 80, "at y:", yPosition)
       pdf.line(margin, yPosition, margin + 80, yPosition)
+      console.log(
+        "[v0] Drawing right signature line from",
+        margin + contentWidth / 2,
+        "to",
+        margin + contentWidth / 2 + 80,
+        "at y:",
+        yPosition,
+      )
       pdf.line(margin + contentWidth / 2, yPosition, margin + contentWidth / 2 + 80, yPosition)
       yPosition += 8
+      console.log("[v0] yPosition after signature lines:", yPosition)
 
       // Names
       pdf.setFont("helvetica", "bold")
       pdf.setFontSize(9)
+      console.log("[v0] Adding representative name:", representativeName, "at:", margin, yPosition)
       pdf.text(representativeName, margin, yPosition)
+      console.log(
+        "[v0] Adding client name:",
+        costEstimate?.clientName || "Client Name",
+        "at:",
+        margin + contentWidth / 2,
+        yPosition,
+      )
       pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
       yPosition += 5
 
       pdf.setFont("helvetica", "normal")
+      console.log(
+        "[v0] Adding client company:",
+        costEstimate?.clientCompany || "Client Company",
+        "at:",
+        margin + contentWidth / 2,
+        yPosition,
+      )
       pdf.text(costEstimate?.clientCompany || "Client Company", margin + contentWidth / 2, yPosition)
       yPosition += 8
 
       pdf.setFontSize(7)
       pdf.setFont("helvetica", "italic")
+      console.log("[v0] Adding billing purpose text at:", margin + contentWidth / 2, yPosition)
       pdf.text("This signed quotation serves as an", margin + contentWidth / 2, yPosition)
       yPosition += 3
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
       yPosition += 8
 
       console.log("[v0] Final yPosition after signature section:", yPosition)
-
-      // Footer - positioned at bottom of page
-      const footerY = pageHeight - 25
-
-      pdf.setFontSize(7)
-      pdf.setTextColor(100, 100, 100)
-      const footerText = `${companyLocation} • phone: ${companyPhone}`
-      pdf.text(footerText, (pageWidth - pdf.getTextWidth(footerText)) / 2, footerY)
-
-      if (validUntil) {
-        pdf.text(
-          `This cost estimate is valid until ${validUntil.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
-          (pageWidth -
-            pdf.getTextWidth(
-              `This cost estimate is valid until ${validUntil.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
-            )) /
-            2,
-          footerY + 3,
-        )
-      }
-
-      const copyrightText = `© ${new Date().getFullYear()} ${companyName}. All rights reserved.`
-      pdf.text(copyrightText, (pageWidth - pdf.getTextWidth(copyrightText)) / 2, footerY + (validUntil ? 6 : 3))
+      console.log("[v0] Page dimensions - width:", pageWidth, "height:", pageHeight)
     })
 
     if (returnBase64) {
