@@ -1166,21 +1166,32 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         )}
 
         {hasUnsavedChanges && (
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+          <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
             <Button
               variant="outline"
-              onClick={handleCancelAllChanges}
+              onClick={() => {
+                console.log("[v0] Cancel button clicked")
+                handleCancelAllChanges()
+              }}
               className="flex items-center gap-2 bg-transparent"
             >
               <X className="h-4 w-4" />
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                console.log("[v0] Save button clicked")
+              onClick={(e) => {
+                console.log("[v0] Save button clicked - event:", e)
+                console.log("[v0] Save button state check:", {
+                  hasUnsavedChanges,
+                  tempValuesCount: Object.keys(tempValues).length,
+                  tempValues,
+                })
+                e.preventDefault()
+                e.stopPropagation()
                 handleSaveAllChanges()
               }}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={Object.keys(tempValues).length === 0}
             >
               <Save className="h-4 w-4" />
               Save Changes
