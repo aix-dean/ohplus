@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -70,7 +71,9 @@ const initialFormData: CollectibleFormData = {
 export default function CreateTreasuryCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -115,6 +118,31 @@ export default function CreateTreasuryCollectiblePage() {
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  useEffect(() => {
+    const fromQuotation = searchParams.get("from_quotation")
+    if (fromQuotation === "true") {
+      const clientName = searchParams.get("client_name") || ""
+      const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
+      const quotationNumber = searchParams.get("quotation_number") || ""
+
+      setFormData((prev) => ({
+        ...prev,
+        client_name: clientName,
+        total_amount: totalAmount,
+        net_amount: totalAmount, // Set net amount same as total initially
+        invoice_no: quotationNumber,
+        type: "sites", // Default to sites for quotations
+        status: "pending",
+      }))
+
+      // Show success message
+      toast({
+        title: "Quotation Data Loaded",
+        description: `Form has been pre-populated with data from quotation ${quotationNumber}`,
+      })
+    }
+  }, [searchParams, toast])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -685,9 +713,30 @@ export default function CreateTreasuryCollectiblePage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Create Treasury Collectible</h1>
-          <p className="text-muted-foreground">Add a new treasury collectible record</p>
+          <p className="text-muted-foreground">
+            {searchParams.get("from_quotation") === "true"
+              ? `Creating collectible from quotation ${searchParams.get("quotation_number") || ""}`
+              : "Add a new treasury collectible record"}
+          </p>
         </div>
       </div>
+
+      {searchParams.get("from_quotation") === "true" && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-blue-800">
+              <PlusCircle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Creating from Quotation</p>
+                <p className="text-sm">
+                  Form has been pre-populated with data from quotation {searchParams.get("quotation_number")}. Please
+                  review and complete any missing information before submitting.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
