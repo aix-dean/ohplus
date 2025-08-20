@@ -1713,6 +1713,15 @@ export async function generateCostEstimatePDF(
         }
       }
 
+      console.log("[v0] yPosition before signature section:", yPosition)
+      console.log("[v0] pageHeight:", pageHeight)
+
+      // Ensure we have enough space for signature section (minimum 80 units)
+      if (yPosition > pageHeight - 100) {
+        yPosition = pageHeight - 100
+        console.log("[v0] Adjusted yPosition for signature section:", yPosition)
+      }
+
       // Signature section
       pdf.setFontSize(9)
       pdf.text("Very truly yours,", margin, yPosition)
@@ -1740,6 +1749,8 @@ export async function generateCostEstimatePDF(
       yPosition += 3
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
       yPosition += 6
+
+      console.log("[v0] Final yPosition after signature section:", yPosition)
 
       // Footer - positioned at bottom of page
       const footerY = pageHeight - 25
