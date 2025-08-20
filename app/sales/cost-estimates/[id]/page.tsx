@@ -574,18 +574,22 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
-    const sites = Object.keys(groupLineItemsBySite(costEstimate.lineItems || []))
+    // Check if there are multiple sites
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
 
-    const userData = {
-      first_name: user?.user_metadata?.first_name || user?.user_metadata?.name?.split(" ")[0] || "Account",
-      last_name: user?.user_metadata?.last_name || user?.user_metadata?.name?.split(" ")[1] || "Manager",
-      email: user?.email || "",
-    }
+    const userDataForPDF = userData
+      ? {
+          first_name: userData.first_name || "",
+          last_name: userData.last_name || "",
+          email: userData.email || "",
+        }
+      : undefined
 
     if (sites.length > 1) {
       setDownloadingPDF(true)
       try {
-        await generateSeparateCostEstimatePDFs(costEstimate, undefined, userData)
+        await generateSeparateCostEstimatePDFs(costEstimate, undefined, userDataForPDF)
         toast({
           title: "PDFs Generated",
           description: `${sites.length} separate PDF files have been downloaded for each product.`,
@@ -606,7 +610,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     // Single site - download directly
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, undefined, false, userData)
+      await generateCostEstimatePDF(costEstimate, undefined, false, userDataForPDF)
       toast({
         title: "PDF Generated",
         description: "Cost estimate PDF has been downloaded.",
@@ -647,15 +651,17 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const handleDownloadSelectedPages = async () => {
     if (!costEstimate || selectedPages.length === 0) return
 
-    const userData = {
-      first_name: user?.user_metadata?.first_name || user?.user_metadata?.name?.split(" ")[0] || "Account",
-      last_name: user?.user_metadata?.last_name || user?.user_metadata?.name?.split(" ")[1] || "Manager",
-      email: user?.email || "",
-    }
+    const userDataForPDF = userData
+      ? {
+          first_name: userData.first_name || "",
+          last_name: userData.last_name || "",
+          email: userData.email || "",
+        }
+      : undefined
 
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, selectedPages, false, userData)
+      await generateCostEstimatePDF(costEstimate, selectedPages, false, userDataForPDF)
       toast({
         title: "PDF Generated",
         description: `Cost estimate PDF with ${selectedPages.length} page(s) has been downloaded.`,
