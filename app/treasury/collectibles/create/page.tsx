@@ -732,23 +732,6 @@ export default function CreateTreasuryCollectiblePage() {
         </div>
       </div>
 
-      {searchParams.get("from_quotation") === "true" && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-blue-800">
-              <PlusCircle className="h-5 w-5" />
-              <div>
-                <p className="font-medium">Creating from Quotation</p>
-                <p className="text-sm">
-                  Form has been pre-populated with data from quotation {searchParams.get("quotation_number")}. Please
-                  review and complete any missing information before submitting.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Treasury Collectible Information</CardTitle>
