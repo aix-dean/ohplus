@@ -3,20 +3,23 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { FileText } from "lucide-react"
+import { FileText, Plus, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function TreasuryQuotationsPage() {
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [creatingCollectible, setCreatingCollectible] = useState<string | null>(null)
   const router = useRouter()
+  const { toast } = useToast()
 
   const fetchAllQuotations = async () => {
     if (!user?.uid) {
@@ -80,6 +83,58 @@ export default function TreasuryQuotationsPage() {
     }
   }
 
+  const handleCreateCollectible = async (quotation: any) => {
+    if (!user?.uid) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a collectible.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setCreatingCollectible(quotation.id)
+
+    try {
+      const collectibleData = {
+        type: "sites",
+        client_name: quotation.client_name || "",
+        net_amount: quotation.total_amount || 0,
+        total_amount: quotation.total_amount || 0,
+        mode_of_payment: "",
+        bank_name: "",
+        bi_no: "",
+        or_no: "",
+        invoice_no: quotation.quotation_number || "",
+        status: "pending",
+        deleted: false,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        company_id: user?.company_id || user?.uid || "",
+        source_quotation_id: quotation.id,
+        source_quotation_number: quotation.quotation_number,
+      }
+
+      const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
+
+      toast({
+        title: "Success",
+        description: `Collectible created successfully from quotation ${quotation.quotation_number}`,
+      })
+
+      router.push(`/treasury/collectibles/edit/${docRef.id}`)
+    } catch (error) {
+      console.error("Error creating collectible:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create collectible. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingCollectible(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -135,15 +190,31 @@ export default function TreasuryQuotationsPage() {
                         <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
                         <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
                         <TableCell className="py-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewPDF(quotation)}
-                            className="text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            <FileText className="h-3 w-3 mr-1" />
-                            View PDF
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewPDF(quotation)}
+                              className="text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              View PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCreateCollectible(quotation)}
+                              disabled={creatingCollectible === quotation.id}
+                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                            >
+                              {creatingCollectible === quotation.id ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3 mr-1" />
+                              )}
+                              Create Collectible
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
