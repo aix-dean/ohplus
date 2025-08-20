@@ -1326,6 +1326,7 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 export async function generateSeparateCostEstimatePDFs(
   costEstimate: CostEstimate,
   selectedPages?: string[],
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Added userData parameter
 ): Promise<void> {
   try {
     // Use the exact same grouping logic as the page
@@ -1409,7 +1410,7 @@ export async function generateSeparateCostEstimatePDFs(
       }
 
       // Generate PDF for this single site
-      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false)
+      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false, userData) // Now userData is properly defined
 
       // Add a small delay between downloads to ensure proper file naming
       if (i < sitesToProcess.length - 1) {
@@ -1426,6 +1427,7 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
+  userData?: any, // Added userData parameter
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -1604,10 +1606,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
-        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}\`\`\`javascript
-yPosition + 6)
-      pdf.text(
-        \`PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
         yPosition + 6,
         { align: "right" },
@@ -1934,7 +1933,7 @@ export async function generateReportPDF(
         return [point[0] - cyanPoints[0][0], point[1] - cyanPoints[0][1]]
       }),
       cyanPoints[0][0],
-      cyanPoints[0][1],
+      cyanPoints[0][0],
       [1, 1],
       "F",
     )
