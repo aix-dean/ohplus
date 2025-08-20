@@ -120,7 +120,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
-  const [showPageSelection, setShowPageSelection] = useState(false)
+  const [showPageSelection, setShowPageSelection] = useState(showPageSelection)
   const [selectedPages, setSelectedPages] = useState<string[]>([])
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
@@ -173,24 +173,31 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const handleSaveAllChanges = async () => {
     console.log("[v0] handleSaveAllChanges called")
     console.log("[v0] Current state:", {
-      editableCostEstimate: !!editableCostEstimate,
+      editableCostEstimate: !!costEstimate,
       tempValuesCount: Object.keys(tempValues).length,
       tempValues,
     })
 
-    if (!editableCostEstimate) {
-      console.log("[v0] No editable cost estimate, returning")
-      toast.error("No cost estimate data available")
+    if (!costEstimate) {
+      toast({
+        title: "Error",
+        description: "No cost estimate data available",
+        variant: "destructive",
+      })
       return
     }
 
     if (Object.keys(tempValues).length === 0) {
       console.log("[v0] No temp values to save, returning")
-      toast.error("No changes to save")
+      toast({
+        title: "No Changes",
+        description: "No changes to save",
+        variant: "destructive",
+      })
       return
     }
 
-    const updatedCostEstimate = { ...editableCostEstimate }
+    const updatedCostEstimate = { ...costEstimate }
 
     // Apply all temp values to the cost estimate
     Object.entries(tempValues).forEach(([fieldName, newValue]) => {
@@ -271,20 +278,29 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       setTempValues({})
       setHasUnsavedChanges(false)
 
-      toast.success("Changes saved successfully")
+      toast({
+        title: "Success",
+        description: "Changes saved successfully",
+      })
       console.log("[v0] Save completed successfully")
     } catch (error) {
       console.error("[v0] Save failed:", error)
-      toast.error("Failed to save changes")
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      })
     }
   }
 
   const handleCancelAllChanges = () => {
-    console.log("[v0] handleCancelAllChanges called")
-    setEditingField(null)
     setTempValues({})
     setHasUnsavedChanges(false)
-    toast.info("Changes cancelled")
+    setIsEditing(false)
+    toast({
+      title: "Cancelled",
+      description: "Changes cancelled",
+    })
   }
 
   const fetchCompanyData = async () => {
