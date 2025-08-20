@@ -162,23 +162,34 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }
 
   const handleSaveAllChanges = async () => {
-    if (!editableCostEstimate || Object.keys(tempValues).length === 0) return
+    console.log("[v0] handleSaveAllChanges called")
+    console.log("[v0] editableCostEstimate:", editableCostEstimate)
+    console.log("[v0] tempValues:", tempValues)
 
+    if (!editableCostEstimate || Object.keys(tempValues).length === 0) {
+      console.log("[v0] Early return - no editable cost estimate or temp values")
+      return
+    }
+
+    console.log("[v0] Starting to apply temp values...")
     const updatedCostEstimate = { ...editableCostEstimate }
 
     // Apply all temp values to the cost estimate
     Object.entries(tempValues).forEach(([fieldName, newValue]) => {
+      console.log("[v0] Processing field:", fieldName, "with value:", newValue)
       switch (fieldName) {
         case "unitPrice":
           const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
             if (item.category.includes("Billboard Rental")) {
               const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+              console.log("[v0] Updated unit price for item:", item.id, "new total:", newTotal)
               return { ...item, unitPrice: newValue, total: newTotal }
             }
             return item
           })
           updatedCostEstimate.lineItems = updatedLineItems
           updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
+          console.log("[v0] New total amount after unit price update:", updatedCostEstimate.totalAmount)
           break
 
         case "durationDays":
@@ -186,6 +197,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
             if (item.category.includes("Billboard Rental")) {
               const newTotal = item.unitPrice * (newValue / 30)
+              console.log("[v0] Recalculated total for duration change:", newTotal)
               return { ...item, total: newTotal }
             }
             return item
@@ -197,6 +209,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             const newEndDate = new Date(updatedCostEstimate.startDate)
             newEndDate.setDate(newEndDate.getDate() + newValue)
             updatedCostEstimate.endDate = newEndDate
+            console.log("[v0] Updated end date:", newEndDate)
           }
           break
 
@@ -206,6 +219,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             quantity: newValue,
           }))
           updatedCostEstimate.lineItems = illuminationUpdatedItems
+          console.log("[v0] Updated illumination quantity to:", newValue)
           break
 
         case "startDate":
@@ -215,6 +229,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             const diffTime = Math.abs(updatedCostEstimate.endDate.getTime() - updatedCostEstimate.startDate.getTime())
             const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
             updatedCostEstimate.durationDays = newDurationDays
+            console.log("[v0] Calculated new duration days:", newDurationDays)
 
             const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
               if (item.category.includes("Billboard Rental")) {
@@ -230,20 +245,28 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       }
     })
 
+    console.log("[v0] Final updated cost estimate:", updatedCostEstimate)
+
     try {
+      console.log("[v0] Calling updateCostEstimate with ID:", updatedCostEstimate.id)
       await updateCostEstimate(updatedCostEstimate.id, updatedCostEstimate)
+      console.log("[v0] updateCostEstimate completed successfully")
+
       setEditableCostEstimate(updatedCostEstimate)
       setCostEstimate(updatedCostEstimate)
       setEditingField(null)
       setTempValues({})
       setHasUnsavedChanges(false)
+      console.log("[v0] State updated successfully")
 
       toast({
         title: "Updated",
         description: "All changes saved successfully!",
       })
+      console.log("[v0] Success toast shown")
     } catch (error) {
-      console.error("Error updating cost estimate:", error)
+      console.error("[v0] Error updating cost estimate:", error)
+      console.error("[v0] Error details:", error.message, error.stack)
       toast({
         title: "Error",
         description: "Failed to save changes.",
