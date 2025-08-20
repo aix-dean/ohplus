@@ -921,6 +921,13 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </div>
           </div>
 
+          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400">
+            <p className="text-gray-800 font-medium">
+              Good Day! Thank you for considering Golden Touch for your business needs. We are pleased to submit our
+              quotation for your requirements:
+            </p>
+          </div>
+
           <div className="text-center mb-8">
             <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
           </div>
