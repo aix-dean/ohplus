@@ -312,7 +312,7 @@ export async function generateCostEstimatePDF(
       ]
 
       bulletPoints.forEach((point) => {
-        pdf.text("●", margin, yPosition)
+        pdf.text("•", margin, yPosition)
         pdf.setFont("helvetica", "bold")
         pdf.text(`${point.label}:`, margin + 5, yPosition)
         pdf.setFont("helvetica", "normal")
