@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { FileText, PlusCircle } from "lucide-react"
+import { getClientById } from "@/lib/client-service"
 
 export default function TreasuryQuotationsPage() {
   const { user } = useAuth()
@@ -71,19 +72,41 @@ export default function TreasuryQuotationsPage() {
     }
   }
 
-  const handleViewPDF = (quotation: any) => {
-    const fileUrl = quotation.projectCompliance?.signedQuotation?.fileUrl
-    if (fileUrl) {
-      window.open(fileUrl, "_blank")
-    } else {
-      console.error("No signed quotation file URL found")
-    }
-  }
+  const handleCreateCollectible = async (quotation: any) => {
+    let clientCompany = ""
+    let clientPersonName = ""
 
-  const handleCreateCollectible = (quotation: any) => {
+    // Try to fetch full client data if client_id exists
+    if (quotation.client_id) {
+      try {
+        const clientData = await getClientById(quotation.client_id)
+        if (clientData) {
+          clientCompany = clientData.company || ""
+          clientPersonName = clientData.name || ""
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    // Fallback to quotation client_name if no client data found
+    if (!clientCompany && !clientPersonName) {
+      clientPersonName = quotation.client_name || ""
+    }
+
+    // Create combined client name: "Company Name (Person Name)" or just one if the other is missing
+    let combinedClientName = ""
+    if (clientCompany && clientPersonName) {
+      combinedClientName = `${clientCompany} (${clientPersonName})`
+    } else if (clientCompany) {
+      combinedClientName = clientCompany
+    } else if (clientPersonName) {
+      combinedClientName = clientPersonName
+    }
+
     const params = new URLSearchParams({
       from_quotation: "true",
-      client_name: quotation.client_name || "",
+      client_name: combinedClientName,
       total_amount: quotation.total_amount?.toString() || "0",
       quotation_number: quotation.quotation_number || "",
       quotation_id: quotation.id || "",
@@ -91,9 +114,20 @@ export default function TreasuryQuotationsPage() {
       client_email: quotation.client_email || "",
       client_phone: quotation.client_phone || "",
       client_address: quotation.client_address || "",
+      client_company: clientCompany,
+      client_person_name: clientPersonName,
     })
 
     router.push(`/treasury/collectibles/create?${params.toString()}`)
+  }
+
+  const handleViewPDF = (quotation: any) => {
+    const fileUrl = quotation.projectCompliance?.signedQuotation?.fileUrl
+    if (fileUrl) {
+      window.open(fileUrl, "_blank")
+    } else {
+      console.error("No signed quotation file URL found")
+    }
   }
 
   return (

@@ -125,12 +125,23 @@ export default function CreateTreasuryCollectiblePage() {
     const fromQuotation = searchParams.get("from_quotation")
     if (fromQuotation === "true" && !hasLoadedQuotationData) {
       const clientName = searchParams.get("client_name") || ""
+      const clientCompany = searchParams.get("client_company") || ""
+      const clientPersonName = searchParams.get("client_person_name") || ""
       const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
       const quotationNumber = searchParams.get("quotation_number") || ""
 
+      let displayClientName = clientName
+      if (!displayClientName && (clientCompany || clientPersonName)) {
+        if (clientCompany && clientPersonName) {
+          displayClientName = `${clientCompany} (${clientPersonName})`
+        } else {
+          displayClientName = clientCompany || clientPersonName
+        }
+      }
+
       setFormData((prev) => ({
         ...prev,
-        client_name: clientName,
+        client_name: displayClientName,
         total_amount: totalAmount,
         net_amount: totalAmount, // Set net amount same as total initially
         invoice_no: quotationNumber,
@@ -138,8 +149,8 @@ export default function CreateTreasuryCollectiblePage() {
         status: "pending",
       }))
 
-      if (clientName) {
-        setClientSearchTerm(clientName)
+      if (displayClientName) {
+        setClientSearchTerm(displayClientName)
       }
 
       // Show success message
