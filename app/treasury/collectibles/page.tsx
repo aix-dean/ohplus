@@ -13,6 +13,7 @@ import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
+import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
 
 interface Collectible {
   id: string
@@ -144,6 +145,8 @@ export default function TreasuryCollectiblesPage() {
         status: "paid",
         updated: serverTimestamp(),
       })
+
+      await syncQuotationCollectionStatus(id)
 
       // Update local state
       setCollectibles((prev) =>

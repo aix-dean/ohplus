@@ -16,6 +16,7 @@ import { db, storage } from "@/lib/firebase" // Added storage import
 import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
+import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -292,6 +293,8 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
       }
 
       await updateDoc(collectibleRef, collectibleData)
+
+      await syncQuotationCollectionStatus(params.id)
 
       // Navigate back to collectibles list
       router.push("/finance/collectibles")

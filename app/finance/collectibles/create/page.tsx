@@ -19,6 +19,7 @@ import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { getQuotationById } from "@/lib/quotation-service"
 import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -373,6 +374,8 @@ export default function CreateCollectiblePage() {
 
       const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
       console.log("Collectible created with ID:", docRef.id)
+
+      await syncQuotationCollectionStatus(docRef.id)
 
       router.push("/finance/collectibles")
     } catch (error) {
