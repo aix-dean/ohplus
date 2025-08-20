@@ -130,6 +130,15 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
+  useEffect(() => {
+    console.log("[v0] Save button visibility check:", {
+      isEditing,
+      hasUnsavedChanges,
+      tempValuesCount: Object.keys(tempValues).length,
+      tempValues,
+    })
+  }, [isEditing, hasUnsavedChanges, tempValues])
+
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
     setTempValues({ ...tempValues, [fieldName]: currentValue })
@@ -162,7 +171,22 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }
 
   const handleSaveAllChanges = async () => {
-    if (!editableCostEstimate || Object.keys(tempValues).length === 0) {
+    console.log("[v0] handleSaveAllChanges called")
+    console.log("[v0] Current state:", {
+      editableCostEstimate: !!editableCostEstimate,
+      tempValuesCount: Object.keys(tempValues).length,
+      tempValues,
+    })
+
+    if (!editableCostEstimate) {
+      console.log("[v0] No editable cost estimate, returning")
+      toast.error("No cost estimate data available")
+      return
+    }
+
+    if (Object.keys(tempValues).length === 0) {
+      console.log("[v0] No temp values to save, returning")
+      toast.error("No changes to save")
       return
     }
 
@@ -247,24 +271,20 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       setTempValues({})
       setHasUnsavedChanges(false)
 
-      toast({
-        title: "Updated",
-        description: "All changes saved successfully!",
-      })
+      toast.success("Changes saved successfully")
+      console.log("[v0] Save completed successfully")
     } catch (error) {
-      console.error("Error updating cost estimate:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save changes.",
-        variant: "destructive",
-      })
+      console.error("[v0] Save failed:", error)
+      toast.error("Failed to save changes")
     }
   }
 
   const handleCancelAllChanges = () => {
+    console.log("[v0] handleCancelAllChanges called")
     setEditingField(null)
     setTempValues({})
     setHasUnsavedChanges(false)
+    toast.info("Changes cancelled")
   }
 
   const fetchCompanyData = async () => {
@@ -1138,6 +1158,13 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </div>
           </div>
         </div>
+        {process.env.NODE_ENV === "development" && (
+          <div className="text-xs text-gray-500 mt-2">
+            Debug: isEditing={isEditing.toString()}, hasUnsavedChanges={hasUnsavedChanges.toString()}, tempValues=
+            {Object.keys(tempValues).length}
+          </div>
+        )}
+
         {isEditing && hasUnsavedChanges && (
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
             <Button
@@ -1148,7 +1175,13 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
               <X className="h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSaveAllChanges} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={() => {
+                console.log("[v0] Save button clicked")
+                handleSaveAllChanges()
+              }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            >
               <Save className="h-4 w-4" />
               Save Changes
             </Button>
