@@ -9,13 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { getQuotationById } from "@/lib/quotation-service"
+import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 
 interface CollectibleFormData {
@@ -112,8 +114,8 @@ export default function CreateCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user } = useAuth()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -125,7 +127,6 @@ export default function CreateCollectiblePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
   const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
 
   useEffect(() => {
@@ -168,36 +169,73 @@ export default function CreateCollectiblePage() {
       const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
       const quotationNumber = searchParams.get("quotation_number") || ""
       const quotationId = searchParams.get("quotation_id") || ""
-      const startDate = searchParams.get("start_date") || ""
-      const endDate = searchParams.get("end_date") || ""
 
-      // Use start date as covered period
-      const coveredPeriod = startDate || ""
+      const loadQuotationData = async () => {
+        if (quotationId) {
+          try {
+            const quotationData = await getQuotationById(quotationId)
+            if (quotationData && quotationData.start_date && quotationData.end_date) {
+              const coveredPeriod = `${quotationData.start_date} - ${quotationData.end_date}`
+              setFormData((prev) => ({
+                ...prev,
+                client_name: clientName,
+                total_amount: totalAmount,
+                net_amount: totalAmount,
+                type: "sites",
+                status: "pending",
+                quotation_id: quotationId,
+                covered_period: coveredPeriod,
+              }))
+            } else {
+              setFormData((prev) => ({
+                ...prev,
+                client_name: clientName,
+                total_amount: totalAmount,
+                net_amount: totalAmount,
+                type: "sites",
+                status: "pending",
+                quotation_id: quotationId,
+              }))
+            }
+          } catch (error) {
+            console.error("Error fetching quotation data:", error)
+            setFormData((prev) => ({
+              ...prev,
+              client_name: clientName,
+              total_amount: totalAmount,
+              net_amount: totalAmount,
+              type: "sites",
+              status: "pending",
+              quotation_id: quotationId,
+            }))
+          }
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            client_name: clientName,
+            total_amount: totalAmount,
+            net_amount: totalAmount,
+            type: "sites",
+            status: "pending",
+            quotation_id: quotationId,
+          }))
+        }
 
-      setFormData((prev) => ({
-        ...prev,
-        client_name: clientName,
-        total_amount: totalAmount,
-        net_amount: totalAmount, // Set net amount same as total initially
-        type: "sites", // Default to sites for quotations
-        status: "pending",
-        quotation_id: quotationId,
-        covered_period: coveredPeriod, // Auto-fill covered period with start date
-      }))
+        if (clientName) {
+          setClientSearchTerm(clientName)
+        }
 
-      if (clientName) {
-        setClientSearchTerm(clientName)
+        toast({
+          title: "Quotation Data Loaded",
+          description: `Form has been pre-populated with data from quotation ${quotationNumber}`,
+        })
+
+        setHasLoadedQuotationData(true)
       }
 
-      // Show success message
-      toast({
-        title: "Quotation Data Loaded",
-        description: `Form has been pre-populated with data from quotation ${quotationNumber}${startDate ? ` (Period: ${startDate}${endDate ? ` to ${endDate}` : ""})` : ""}`,
-      })
-
-      setHasLoadedQuotationData(true)
+      loadQuotationData()
     }
-  }, [searchParams, hasLoadedQuotationData])
+  }, [searchParams, hasLoadedQuotationData, toast])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -219,7 +257,6 @@ export default function CreateCollectiblePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file type
       const allowedTypes = [
         "application/pdf",
         "application/msword",
@@ -264,13 +301,11 @@ export default function CreateCollectiblePage() {
     setSubmitError(null)
 
     try {
-      // Upload BIR 2307 file if present
       let bir2307Url = ""
       if (formData.bir_2307 && formData.bir_2307 instanceof File) {
         bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "collectibles/bir_2307/")
       }
 
-      // Upload Next Collection BIR 2307 file if present and proceed_next_collection is true
       let nextBir2307Url = ""
       if (
         formData.proceed_next_collection &&
@@ -306,7 +341,6 @@ export default function CreateCollectiblePage() {
         collectibleData.quotation_id = formData.quotation_id
       }
 
-      // Add type-specific fields
       if (formData.type === "sites") {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
@@ -323,18 +357,15 @@ export default function CreateCollectiblePage() {
         if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      // Add next collection fields only if proceed_next_collection is true
       if (formData.proceed_next_collection) {
         if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
         if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       }
 
-      // Save to Firebase
       const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
       console.log("Collectible created with ID:", docRef.id)
 
-      // Navigate back to collectibles list
       router.push("/finance/collectibles")
     } catch (error) {
       console.error("Error creating collectible:", error)
@@ -346,7 +377,6 @@ export default function CreateCollectiblePage() {
 
   const renderFormFields = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Base Fields */}
       <div className="space-y-2">
         <Label htmlFor="type">Type</Label>
         <Select value={formData.type} onValueChange={(value) => handleInputChange("type", value)}>
@@ -385,11 +415,9 @@ export default function CreateCollectiblePage() {
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
             )}
           </div>
-          {/* Results dropdown */}
           {isClientDropdownOpen && (
             <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
               <div className="p-2">
-                {/* Always show "Add New Client" option at the top */}
                 <div
                   className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
                   onClick={() => setIsNewClientDialogOpen(true)}
@@ -611,7 +639,6 @@ export default function CreateCollectiblePage() {
         </Select>
       </div>
 
-      {/* Conditional Fields based on type */}
       {formData.type === "sites" && (
         <>
           <div className="space-y-2">
@@ -630,9 +657,11 @@ export default function CreateCollectiblePage() {
             <Label htmlFor="covered_period">Covered Period</Label>
             <Input
               id="covered_period"
-              type="date"
+              type="text"
+              placeholder="YYYY-MM-DD - YYYY-MM-DD"
               value={formData.covered_period || ""}
               onChange={(e) => handleInputChange("covered_period", e.target.value)}
+              className="font-mono text-sm"
             />
           </div>
           <div className="space-y-2">
