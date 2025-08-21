@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Upload,
   ExternalLink,
+  ChevronLeft,
 } from "lucide-react"
 import {
   getQuotationById,
@@ -117,6 +118,9 @@ export default function QuotationDetailsPage() {
   const [expandedCompliance, setExpandedCompliance] = useState<{ [key: string]: boolean }>({})
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({})
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
+
+  const [currentProductPage, setCurrentProductPage] = useState(1)
+  const productsPerPage = 1 // Show one product per page
 
   useEffect(() => {
     async function fetchQuotationData() {
@@ -466,7 +470,24 @@ export default function QuotationDetailsPage() {
     setIsSendQuotationDialogOpen(true) // Open the SendQuotationDialog
   }
 
-  const currentQuotation = isEditing ? editableQuotation : quotation
+  const currentQuotation = editableQuotation || quotation
+  const totalProducts = currentQuotation?.items?.length || 0
+  const totalPages = Math.ceil(totalProducts / productsPerPage)
+  const startIndex = (currentProductPage - 1) * productsPerPage
+  const endIndex = startIndex + productsPerPage
+  const currentProducts = currentQuotation?.items?.slice(startIndex, endIndex) || []
+
+  const handleNextPage = () => {
+    if (currentProductPage < totalPages) {
+      setCurrentProductPage(currentProductPage + 1)
+    }
+  }
+
+  const handlePrevPage = () => {
+    if (currentProductPage > 1) {
+      setCurrentProductPage(currentProductPage - 1)
+    }
+  }
 
   const handleFileUpload = async (
     file: File,
@@ -902,94 +923,167 @@ export default function QuotationDetailsPage() {
 
             {/* Product & Services */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Product & Services
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 pb-1 border-b border-orange-200 font-[Calibri]">
+                  Product & Services
+                </h2>
+                {totalProducts > 1 && (
+                  <div className="text-sm text-gray-500">
+                    Product {currentProductPage} of {totalPages}
+                  </div>
+                )}
+              </div>
 
-              <div className="border border-gray-300 rounded-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300 w-[100px]">
-                        Image
-                      </th>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                        Product
-                      </th>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Type</th>
-                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                        Location
-                      </th>
-                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                        Price (Monthly)
-                      </th>
-                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                        Item Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentQuotation.items.map((item, index) => (
-                      <tr key={item.id || index} className="bg-white">
-                        <td className="py-3 px-4 border-b border-gray-200">
-                          <img
-                            src={
-                              item.media_url ||
-                              item.media?.[0]?.url ||
-                              "/placeholder.svg?height=64&width=64&query=product" ||
-                              "/placeholder.svg" ||
-                              "/placeholder.svg"
-                            }
-                            alt={item.name}
-                            className="w-16 h-16 object-cover rounded-sm"
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-b border-gray-200">
-                          <div className="font-medium text-gray-900">{safeString(item.name)}</div>
-                          {item.site_code && <div className="text-xs text-gray-500">Site: {item.site_code}</div>}
-                          {item.description && (
-                            <div className="text-xs text-gray-600 mt-1">{safeString(item.description)}</div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 border-b border-gray-200">
-                          <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+              {currentProducts.length > 0 ? (
+                <div className="space-y-6">
+                  {currentProducts.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="border border-orange-200 rounded-lg overflow-hidden bg-white shadow-sm"
+                    >
+                      {/* Product Header */}
+                      <div className="bg-orange-50 px-6 py-4 border-b border-orange-200">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-gray-900">{safeString(item.name)}</h3>
+                          <span className="inline-block px-3 py-1 text-sm font-medium bg-orange-100 text-orange-800 rounded-full">
                             {safeString(item.type)}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 border-b border-gray-200">{safeString(item.location)}</td>
-                        <td className="py-3 px-4 text-right border-b border-gray-200">
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              name={`product-price-${item.id}`}
-                              value={item.price || ""}
-                              onChange={(e) =>
-                                handleProductPriceChange(item.id, Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="w-full text-right"
-                              step="0.01"
-                            />
-                          ) : (
-                            <div className="font-medium text-gray-900">₱{safeString(item.price)}</div>
-                          )}
-                          <div className="text-xs text-gray-500">per month</div>
-                        </td>
-                        <td className="py-3 px-4 text-right border-b border-gray-200">
-                          <div className="font-medium text-gray-900">₱{safeString(item.item_total_amount)}</div>
-                          <div className="text-xs text-gray-500">{safeString(item.duration_days)} day(s)</div>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="bg-gray-50">
-                      <td colSpan={5} className="py-3 px-4 text-right font-medium">
-                        Total Amount:
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold text-blue-600">
-                        ₱{safeString(currentQuotation.total_amount)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        </div>
+                        {item.site_code && <p className="text-sm text-gray-600 mt-1">Site Code: {item.site_code}</p>}
+                      </div>
+
+                      {/* Product Content */}
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Product Image */}
+                          <div className="space-y-4">
+                            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                              <img
+                                src={
+                                  item.media_url ||
+                                  item.media?.[0]?.url ||
+                                  "/placeholder.svg?height=400&width=400&query=product" ||
+                                  "/placeholder.svg"
+                                }
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            {/* Additional media gallery if available */}
+                            {item.media && item.media.length > 1 && (
+                              <div className="grid grid-cols-4 gap-2">
+                                {item.media.slice(1, 5).map((media, mediaIndex) => (
+                                  <div key={mediaIndex} className="aspect-square bg-gray-100 rounded overflow-hidden">
+                                    <img
+                                      src={media.url || "/placeholder.svg"}
+                                      alt={`${item.name} ${mediaIndex + 2}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Product Details */}
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
+                              <p className="text-gray-900">
+                                {safeString(item.description) || "No description available"}
+                              </p>
+                            </div>
+
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-500 mb-2">Location</h4>
+                              <p className="text-gray-900">{safeString(item.location)}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-500 mb-2">Monthly Price</h4>
+                                {isEditing ? (
+                                  <Input
+                                    type="number"
+                                    name={`product-price-${item.id}`}
+                                    value={item.price || ""}
+                                    onChange={(e) =>
+                                      handleProductPriceChange(item.id, Number.parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-full"
+                                    step="0.01"
+                                  />
+                                ) : (
+                                  <p className="text-lg font-semibold text-orange-600">₱{safeString(item.price)}</p>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-500 mb-2">Duration</h4>
+                                <p className="text-gray-900">{safeString(item.duration_days)} day(s)</p>
+                              </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-500">Item Total:</span>
+                                <span className="text-xl font-bold text-orange-600">
+                                  ₱{safeString(item.item_total_amount)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No products available</div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                  <Button
+                    variant="outline"
+                    onClick={handlePrevPage}
+                    disabled={currentProductPage === 1}
+                    className="flex items-center space-x-2 bg-transparent"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span>Previous Product</span>
+                  </Button>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Page</span>
+                    <span className="text-sm font-medium">{currentProductPage}</span>
+                    <span className="text-sm text-gray-500">of</span>
+                    <span className="text-sm font-medium">{totalPages}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleNextPage}
+                    disabled={currentProductPage === totalPages}
+                    className="flex items-center space-x-2 bg-transparent"
+                  >
+                    <span>Next Product</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    Total Products: {totalProducts} | Duration: {safeString(currentQuotation?.duration_days)} day(s)
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-gray-500">Total Amount</div>
+                    <div className="text-2xl font-bold text-orange-600">
+                      ₱{safeString(currentQuotation?.total_amount)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
