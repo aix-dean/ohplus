@@ -190,9 +190,6 @@ export function SideNavigation() {
   if (pathname?.startsWith("/finance")) {
     currentSection = "finance"
   }
-  if (pathname?.startsWith("/treasury")) {
-    currentSection = "treasury"
-  }
   if (pathname?.startsWith("/accounting")) {
     currentSection = "accounting"
   }
@@ -209,7 +206,6 @@ export function SideNavigation() {
     currentSection !== "business" &&
     currentSection !== "it" &&
     currentSection !== "finance" &&
-    currentSection !== "treasury" &&
     currentSection !== "accounting"
   ) {
     return null
