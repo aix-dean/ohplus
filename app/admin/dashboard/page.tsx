@@ -198,7 +198,8 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-treasury-green",
       contentBgColor: "bg-card-content-treasury",
       members: [],
-      isAvailable: false,
+      href: "/treasury",
+      isAvailable: true,
     },
     {
       id: "it",
@@ -215,6 +216,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-fleet-gray",
       contentBgColor: "bg-card-content-fleet",
       members: [],
+      badgeCount: 1,
       isAvailable: false,
     },
     {
@@ -232,6 +234,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-media-lightblue",
       contentBgColor: "bg-card-content-media",
       members: [],
+      badgeCount: 2,
       isAvailable: false,
     },
     {
