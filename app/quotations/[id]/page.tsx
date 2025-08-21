@@ -1,18 +1,17 @@
 "use client"
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { parseISO } from "date-fns"
-import { CheckCircle, XCircle, FileText, Clock, Send, Eye, Download } from "lucide-react"
-import { getQuotationById, generateQuotationPDF, type Quotation } from "@/lib/quotation-service" // Import generateQuotationPDF
+import { CheckCircle, XCircle, FileText, Clock, Send, Eye, Download, ArrowLeft, Share2 } from "lucide-react"
+import { getQuotationById, generateQuotationPDF, type Quotation } from "@/lib/quotation-service"
 import { useToast } from "@/hooks/use-toast"
-import Image from "next/image"
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (quotationId: string) => {
-  const quotationViewUrl = `https://ohplus.aix.ph/quotations/${quotationId}`
-  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotationViewUrl)}`
+  const quotationViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotationId}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(quotationViewUrl)}`
 }
 
 // Helper function to safely convert any value to string
@@ -54,9 +53,12 @@ const getDateObject = (date: any): Date | undefined => {
 
 export default function PublicQuotationPage() {
   const params = useParams()
+  const router = useRouter()
   const { toast } = useToast()
   const [quotation, setQuotation] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [currentProductPage, setCurrentProductPage] = useState(0)
 
   useEffect(() => {
     async function fetchQuotationData() {
@@ -203,6 +205,18 @@ export default function PublicQuotationPage() {
     }
   }
 
+  const copyLinkToClipboard = () => {
+    if (!quotation) return
+
+    const url = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}`
+    navigator.clipboard.writeText(url)
+
+    toast({
+      title: "Link copied",
+      description: "Quotation link copied to clipboard",
+    })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -218,354 +232,447 @@ export default function PublicQuotationPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
-          <div className="mb-6">
-            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={80} height={80} className="mx-auto mb-4" />
-            <div className="flex items-center justify-center mb-4">
-              <FileText className="h-8 w-8 text-red-500 mr-2" />
-              <h1 className="text-2xl font-bold text-gray-900">Quotation Not Found</h1>
-            </div>
-            <p className="text-gray-600 mb-4">
-              The quotation you're looking for doesn't exist or may have been removed.
-            </p>
-            <div className="mt-4">
-              <Button onClick={() => window.location.reload()} variant="outline" className="text-sm">
-                Try Again
-              </Button>
-            </div>
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <FileText className="h-8 w-8 text-gray-400" />
           </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quotation Not Found</h1>
+          <p className="text-gray-600">The quotation you're looking for doesn't exist or may have been removed.</p>
         </div>
       </div>
     )
   }
 
   const statusConfig = getStatusConfig(quotation.status || "")
+  const items = quotation.items || []
+  const currentItem = items[currentProductPage]
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6">
-      {/* Custom Header for Public View */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={40} height={40} />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">OH Plus</h1>
-              <p className="text-sm text-gray-600">Professional Advertising Solutions</p>
-            </div>
+    <>
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="max-w-[850px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" className="text-gray-600" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <Badge
+              className={`${
+                quotation.status === "accepted"
+                  ? "bg-green-100 text-green-800 border-green-200"
+                  : quotation.status === "rejected"
+                    ? "bg-red-100 text-red-800 border-red-200"
+                    : "bg-blue-100 text-blue-800 border-blue-200"
+              } border font-medium px-3 py-1`}
+            >
+              {quotation.status === "accepted" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+              {quotation.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+              <span className="capitalize">{quotation.status}</span>
+            </Badge>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="flex flex-col items-center space-y-1">
-              <div className="bg-white p-1 rounded border border-gray-200">
-                <img src={generateQRCodeUrl(quotation.id) || "/placeholder.svg"} alt="QR Code" className="w-12 h-12" />
-              </div>
-              <span className="text-xs text-gray-500">Share</span>
-            </div>
-            <Badge className={`${getStatusColor(quotation.status)} text-white border-0`}>
-              {getStatusIcon(quotation.status)}
-              <span className="ml-1 capitalize">{quotation.status}</span>
-            </Badge>
-            <Button onClick={handleDownloadPdf} size="sm" className="bg-blue-600 hover:bg-blue-700">
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-gray-600 bg-transparent"
+              onClick={() => setShowQRModal(true)}
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+            <Button variant="outline" size="sm" className="text-gray-600 bg-transparent" onClick={handleDownloadPdf}>
+              <Download className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Download</span>
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Document Container */}
-      <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
-        {/* Document Header */}
-        <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">QUOTATION</h1>
-              <p className="text-sm text-gray-500">{quotation.quotation_number}</p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <Image src="/oh-plus-logo.png" alt="Company Logo" width={40} height={40} />
-            </div>
-          </div>
-        </div>
-
-        {/* Document Content */}
-        <div className="p-6 sm:p-8">
-          {/* Quotation Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Quotation Information
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 pt-16">
+        <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
+          <div className="border-b-2 border-orange-600 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Quotation Number</h3>
-                <p className="text-base font-medium text-gray-900">{quotation.quotation_number}</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">QUOTATION</h1>
+                <p className="text-sm text-gray-500">{quotation.quotation_number}</p>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                <p className="text-base text-gray-900">{formatDate(quotation.created)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Start Date</h3>
-                <p className="text-base text-gray-900">{formatDate(quotation.start_date)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">End Date</h3>
-                <p className="text-base text-gray-900">{formatDate(quotation.end_date)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
-                <p className="text-base text-gray-900">{formatDate(quotation.valid_until)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                <p className="text-base font-semibold text-green-600">₱{safeString(quotation.total_amount)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Client Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Client Information
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Client Name</h3>
-                <p className="text-base font-medium text-gray-900">{safeString(quotation.client_name)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Client Email</h3>
-                <p className="text-base text-gray-900">{safeString(quotation.client_email)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Product & Services */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Product & Services
-            </h2>
-
-            <div className="border border-gray-300 rounded-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300 w-[100px]">
-                      Image
-                    </th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Product</th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Type</th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Location</th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                      Price (Monthly)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotation.products.map((product, index) => (
-                    <tr key={product.id || index} className="bg-white">
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <img
-                          src={product.media?.[0]?.url || "/placeholder.svg?height=64&width=64&query=product"}
-                          alt={product.name}
-                          className="w-16 h-16 object-cover rounded-sm"
-                        />
-                      </td>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <div className="font-medium text-gray-900">{safeString(product.name)}</div>
-                        {product.site_code && <div className="text-xs text-gray-500">Site: {product.site_code}</div>}
-                        {product.description && (
-                          <div className="text-xs text-gray-600 mt-1">{safeString(product.description)}</div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                          {safeString(product.type)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 border-b border-gray-200">{safeString(product.location)}</td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        <div className="font-medium text-gray-900">₱{safeString(product.price)}</div>
-                        <div className="text-xs text-gray-500">per month</div>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={4} className="py-3 px-4 text-right font-medium">
-                      Total Amount:
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-green-600">
-                      ₱{safeString(quotation.total_amount)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Product Details */}
-          {quotation.products.map((product, index) => (
-            <div key={product.id || index} className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                {safeString(product.name)} Details
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                {product.specs_rental?.width && product.specs_rental?.height && (
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
-                    <p className="text-sm text-gray-900">
-                      {safeString(product.specs_rental.width)}m x {safeString(product.specs_rental.height)}m
-                    </p>
-                  </div>
-                )}
-                {product.specs_rental?.elevation && (
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 uppercase">Elevation</h4>
-                    <p className="text-sm text-gray-900">{safeString(product.specs_rental.elevation)}m</p>
-                  </div>
-                )}
-                {product.specs_rental?.traffic_count && (
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
-                    <p className="text-sm text-gray-900">{safeString(product.specs_rental.traffic_count)}</p>
-                  </div>
-                )}
-                {product.specs_rental?.audience_type && (
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
-                    <p className="text-sm text-gray-900">{safeString(product.specs_rental.audience_type)}</p>
-                  </div>
-                )}
-                {product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Types</h4>
-                    <p className="text-sm text-gray-900">{product.specs_rental.audience_types.join(", ")}</p>
-                  </div>
-                )}
-              </div>
-
-              {product.description && (
-                <div className="mb-4">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase mb-1">Description</h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">{safeString(product.description)}</p>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                <div className="text-center">
+                  <img
+                    src={generateQRCodeUrl(quotation.id) || "/placeholder.svg"}
+                    alt="QR Code"
+                    className="w-16 h-16 border border-gray-300 bg-white p-1 rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
                 </div>
-              )}
+                <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
+              </div>
+            </div>
+          </div>
 
-              {product.media && product.media.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Media</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {product.media.map((mediaItem, mediaIndex) => (
-                      <div
-                        key={mediaIndex}
-                        className="relative aspect-video bg-gray-100 rounded border border-gray-200 overflow-hidden"
-                      >
-                        {mediaItem.isVideo ? (
-                          <video
-                            src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=video"}
-                            controls
-                            className="w-full h-full object-cover"
-                          >
-                            Your browser does not support the video tag.
-                          </video>
-                        ) : (
+          {/* Document Content */}
+          <div className="p-6 sm:p-8">
+            <div className="mb-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">{formatDate(quotation.created)}</p>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-gray-900">{safeString(quotation.client_name)}</p>
+                    <p className="text-gray-700">{safeString(quotation.client_email)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Quotation No.</p>
+                  <p className="font-semibold text-gray-900">{quotation.quotation_number}</p>
+                </div>
+              </div>
+
+              <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                <p className="text-gray-800 leading-relaxed font-medium">
+                  Good Day! Thank you for considering OH+ Outdoor Advertising for your business needs. We are pleased to
+                  submit our quotation for your requirements:
+                </p>
+              </div>
+
+              {/* Details Section */}
+              <div className="mb-4">
+                <p className="font-semibold text-gray-900">Details as follows:</p>
+              </div>
+
+              {/* Quotation Information */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Quotation Details
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Quotation Number</h3>
+                    <p className="text-base font-medium text-gray-900">{quotation.quotation_number}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
+                    <p className="text-base text-gray-900">{formatDate(quotation.created)}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Start Date</h3>
+                    <p className="text-base text-gray-900">{formatDate(quotation.start_date)}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">End Date</h3>
+                    <p className="text-base text-gray-900">{formatDate(quotation.end_date)}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
+                    <p className="text-base text-gray-900">{formatDate(quotation.valid_until)}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Status</h3>
+                    <Badge
+                      className={`${
+                        quotation.status === "accepted"
+                          ? "bg-green-100 text-green-800 border-green-200"
+                          : quotation.status === "rejected"
+                            ? "bg-red-100 text-red-800 border-red-200"
+                            : "bg-blue-100 text-blue-800 border-blue-200"
+                      } border font-medium px-3 py-1`}
+                    >
+                      {quotation.status === "accepted" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                      {quotation.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+                      <span className="capitalize">{quotation.status}</span>
+                    </Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Duration</h3>
+                    <p className="text-base text-gray-900">{quotation.duration_days} day(s)</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
+                    <p className="text-base font-semibold text-orange-600">₱{safeString(quotation.total_amount)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {items.length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900 pb-1 border-b border-gray-200 font-[Calibri]">
+                      Product & Services {items.length > 1 && `(${currentProductPage + 1} of ${items.length})`}
+                    </h2>
+                    {items.length > 1 && (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentProductPage(Math.max(0, currentProductPage - 1))}
+                          disabled={currentProductPage === 0}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-gray-600">
+                          {currentProductPage + 1} / {items.length}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentProductPage(Math.min(items.length - 1, currentProductPage + 1))}
+                          disabled={currentProductPage === items.length - 1}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {currentItem && (
+                    <div className="border border-gray-300 rounded-sm overflow-hidden mb-6">
+                      <div className="bg-gray-100 p-4 border-b border-gray-300">
+                        <div className="flex items-center space-x-4">
                           <img
-                            src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=image"}
-                            alt={mediaItem.name || `Product media ${mediaIndex + 1}`}
-                            className="w-full h-full object-cover"
+                            src={currentItem.media_url || "/placeholder.svg?height=80&width=80&query=product"}
+                            alt={currentItem.name}
+                            className="w-20 h-20 object-cover rounded-sm border border-gray-200"
                           />
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900">{safeString(currentItem.name)}</h3>
+                            {currentItem.site_code && (
+                              <p className="text-sm text-gray-600">Site Code: {currentItem.site_code}</p>
+                            )}
+                            <p className="text-sm text-gray-600">{safeString(currentItem.location)}</p>
+                            <span className="inline-block mt-1 px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">
+                              {safeString(currentItem.type)}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-orange-600">₱{safeString(currentItem.price)}</p>
+                            <p className="text-sm text-gray-500">per month</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4">
+                        {currentItem.description && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
+                            <p className="text-sm text-gray-700 leading-relaxed">
+                              {safeString(currentItem.description)}
+                            </p>
+                          </div>
+                        )}
+
+                        {currentItem.specs_rental && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Specifications</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {currentItem.specs_rental.width && currentItem.specs_rental.height && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500">Dimensions</p>
+                                  <p className="text-sm text-gray-900">
+                                    {safeString(currentItem.specs_rental.width)}m x{" "}
+                                    {safeString(currentItem.specs_rental.height)}m
+                                  </p>
+                                </div>
+                              )}
+                              {currentItem.specs_rental.elevation && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500">Elevation</p>
+                                  <p className="text-sm text-gray-900">
+                                    {safeString(currentItem.specs_rental.elevation)}m
+                                  </p>
+                                </div>
+                              )}
+                              {currentItem.specs_rental.traffic_count && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500">Traffic Count</p>
+                                  <p className="text-sm text-gray-900">
+                                    {safeString(currentItem.specs_rental.traffic_count)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {currentItem.media && currentItem.media.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Media Gallery</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {currentItem.media.map((mediaItem, mediaIndex) => (
+                                <div
+                                  key={mediaIndex}
+                                  className="relative aspect-video bg-gray-100 rounded border border-gray-200 overflow-hidden"
+                                >
+                                  {mediaItem.isVideo ? (
+                                    <video
+                                      src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=video"}
+                                      controls
+                                      className="w-full h-full object-cover"
+                                    >
+                                      Your browser does not support the video tag.
+                                    </video>
+                                  ) : (
+                                    <img
+                                      src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=image"}
+                                      alt={mediaItem.name || `Product media ${mediaIndex + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    ))}
+                    </div>
+                  )}
+
+                  <div className="border border-gray-300 rounded-sm overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                            Product
+                          </th>
+                          <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                            Location
+                          </th>
+                          <th className="py-2 px-4 text-center font-medium text-gray-700 border-b border-gray-300">
+                            Duration
+                          </th>
+                          <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                            Monthly Rate
+                          </th>
+                          <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item, index) => (
+                          <tr key={item.product_id || index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <td className="py-3 px-4 border-b border-gray-200">
+                              <div className="font-medium text-gray-900">{safeString(item.name)}</div>
+                              {item.site_code && <div className="text-xs text-gray-500">Site: {item.site_code}</div>}
+                            </td>
+                            <td className="py-3 px-4 border-b border-gray-200">{safeString(item.location)}</td>
+                            <td className="py-3 px-4 text-center border-b border-gray-200">
+                              {item.duration_days} days
+                            </td>
+                            <td className="py-3 px-4 text-right border-b border-gray-200">₱{safeString(item.price)}</td>
+                            <td className="py-3 px-4 text-right border-b border-gray-200">
+                              <div className="font-medium text-gray-900">₱{safeString(item.item_total_amount)}</div>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-orange-50">
+                          <td colSpan={4} className="py-3 px-4 text-right font-bold">
+                            Total Amount:
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-orange-600">
+                            ₱{safeString(quotation.total_amount)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
-            </div>
-          ))}
 
-          {/* Action Buttons for Public View */}
-          {quotation.status?.toLowerCase() === "sent" && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Next Steps
-              </h2>
-              <div className="space-y-4">
-                <p className="text-gray-600 mb-4">
-                  We're excited about the opportunity to work with you. Please review our quotation and let us know your
-                  decision.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Button
-                    onClick={() => (window.location.href = `/quotations/${quotation.id}/accept`)}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Accept Quotation
-                  </Button>
-                  <Button
-                    onClick={() => (window.location.href = `/quotations/${quotation.id}/decline`)}
-                    variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-50"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Decline Quotation
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Contact Information */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-              Contact Information
-            </h2>
-
-            <div className="bg-gray-50 border border-gray-200 rounded-sm p-6">
-              <p className="text-sm text-gray-600 mb-4">
-                Have questions about this quotation? We'd love to discuss it with you.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-3">
-                  <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Email</p>
-                    <p className="text-sm text-blue-600">sales@oohoperator.com</p>
+              {quotation.notes && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                    Notes
+                  </h2>
+                  <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                    <p className="text-sm text-gray-700 leading-relaxed">{quotation.notes}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Phone</p>
-                    <p className="text-sm text-blue-600">+63 123 456 7890</p>
+              )}
+
+              {quotation.status === "sent" || quotation.status === "viewed" ? (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                    Your Response
+                  </h2>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <p className="text-gray-700 mb-4">
+                      Please review the quotation above and let us know if you approve or need any modifications.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        onClick={() => (window.location.href = `/quotations/${quotation.id}/accept`)}
+                        className="bg-green-600 hover:bg-green-700 flex-1"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Accept Quotation
+                      </Button>
+                      <Button
+                        onClick={() => (window.location.href = `/quotations/${quotation.id}/decline`)}
+                        variant="outline"
+                        className="border-red-300 text-red-700 hover:bg-red-50 flex-1 bg-transparent"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Request Changes
+                      </Button>
+                    </div>
                   </div>
                 </div>
+              ) : quotation.status === "accepted" ? (
+                <div className="mb-8">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                    <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-green-900 mb-2">Quotation Accepted</h3>
+                    <p className="text-green-700">
+                      Thank you for accepting this quotation. We will proceed with the next steps and contact you soon.
+                    </p>
+                  </div>
+                </div>
+              ) : quotation.status === "rejected" ? (
+                <div className="mb-8">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                    <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-red-900 mb-2">Changes Requested</h3>
+                    <p className="text-red-700">
+                      We have received your feedback. Our team will review your requirements and contact you with a
+                      revised quotation.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Document Footer */}
+              <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+                <p>This quotation is subject to final approval and may be revised based on project requirements.</p>
+                <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
               </div>
             </div>
-          </div>
-
-          {/* Document Footer */}
-          <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-            <p>This quotation is valid until {formatDate(quotation.valid_until)}</p>
-            <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
           </div>
         </div>
       </div>
-    </div>
+
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-4">Share Quotation</h3>
+            <div className="flex flex-col items-center mb-4">
+              <img
+                src={generateQRCodeUrl(quotation.id) || "/placeholder.svg"}
+                alt="QR Code"
+                className="w-48 h-48 border border-gray-300 p-2 mb-2"
+              />
+              <p className="text-sm text-gray-600">Scan to view this quotation</p>
+            </div>
+            <div className="flex flex-col space-y-3">
+              <Button onClick={copyLinkToClipboard} className="w-full">
+                <Share2 className="h-4 w-4 mr-2" />
+                Copy Link
+              </Button>
+              <Button variant="outline" onClick={() => setShowQRModal(false)} className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
