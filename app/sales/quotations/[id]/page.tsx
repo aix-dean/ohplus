@@ -21,8 +21,6 @@ import {
   Save,
   X,
   Clock,
-  ChevronRight,
-  ChevronLeft,
 } from "lucide-react"
 import {
   getQuotationById,
@@ -728,7 +726,7 @@ export default function QuotationDetailsPage() {
                 <div className="text-left">
                   <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
                   <p className="text-sm">
-                    {safeString(currentQuotation.client_company) || "JMCL MEDIA & MARKETING SERVICES INC."}
+                    {safeString(currentQuotation.client_company_name) || "JMCL MEDIA & MARKETING SERVICES INC."}
                   </p>
                 </div>
                 <div className="text-right">
@@ -778,7 +776,8 @@ export default function QuotationDetailsPage() {
                         <div className="flex">
                           <span className="font-medium w-32">● Proposal to:</span>
                           <span className="font-bold">
-                            {safeString(currentQuotation.client_company) || safeString(currentQuotation.client_name)}
+                            {safeString(currentQuotation.client_company_name) ||
+                              safeString(currentQuotation.client_name)}
                           </span>
                         </div>
                         <div className="flex">
@@ -852,37 +851,6 @@ export default function QuotationDetailsPage() {
                     {index < currentProducts.length - 1 && <div className="page-break-after"></div>}
                   </div>
                 ))}
-
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                    <Button
-                      variant="outline"
-                      onClick={handlePrevPage}
-                      disabled={currentProductPage === 1}
-                      className="flex items-center space-x-2 bg-transparent"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      <span>Previous Product</span>
-                    </Button>
-
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">
-                        Product {currentProductPage} of {totalPages}
-                      </span>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      onClick={handleNextPage}
-                      disabled={currentProductPage === totalPages}
-                      className="flex items-center space-x-2 bg-transparent"
-                    >
-                      <span>Next Product</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">No products available</div>
@@ -921,7 +889,7 @@ export default function QuotationDetailsPage() {
                   <div className="border-b border-gray-400 mb-2"></div>
                   <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
                   <p className="text-sm">
-                    {safeString(currentQuotation.client_company) || "JMCL MEDIA & MARKETING SERVICES INC."}
+                    {safeString(currentQuotation.client_company_name) || "JMCL MEDIA & MARKETING SERVICES INC."}
                   </p>
                   <p className="text-xs mt-4 italic">
                     This signed Quotation serves as an
