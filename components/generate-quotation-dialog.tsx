@@ -169,9 +169,7 @@ export function GenerateQuotationDialog({
         client_designation: selectedClient.designation || "", // Include designation
         client_address: selectedClient.address || "", // Include address
         client_phone: selectedClient.phone || "", // Include phone
-        client_company: selectedClient.company || "", // Include company name
-        client_company_id: selectedClient.company_id || "", // Include company ID if available
-        client_industry: selectedClient.industry || "", // Include industry information
+        client_company_name: selectedClient.company || "", // Store company name in correct field
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         valid_until: validUntil.toISOString(),
