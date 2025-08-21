@@ -1,135 +1,133 @@
-'use client';
+"use client"
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { collection, doc, onSnapshot, query, updateDoc, where, serverTimestamp } from 'firebase/firestore';
-import { useAuth } from '@/contexts/auth-context';
-import type { FinanceRequest } from '@/lib/types/finance-request';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useToast } from '@/hooks/use-toast';
-import { Calendar, CheckSquare, Clock, FileText, Search, User } from 'lucide-react';
-import { format } from 'date-fns';
+import { useEffect, useMemo, useState, useCallback } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { db } from "@/lib/firebase"
+import { collection, doc, onSnapshot, query, updateDoc, where, serverTimestamp } from "firebase/firestore"
+import { useAuth } from "@/contexts/auth-context"
+import type { FinanceRequest } from "@/lib/types/finance-request"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/hooks/use-toast"
+import { Calendar, CheckSquare, Clock, FileText, Search, User, Edit, Trash2 } from "lucide-react"
+import { format } from "date-fns"
 
 type ExpenseDoc = FinanceRequest & {
-  expense_done?: boolean;
-  expense_done_at?: unknown;
-  expense_done_by?: string;
-};
+  expense_done?: boolean
+  expense_done_at?: unknown
+  expense_done_by?: string
+}
 
 const currencyMap: Record<string, string> = {
-  PHP: '₱',
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  JPY: '¥',
-  AUD: 'A$',
-  CAD: 'C$',
-  CHF: 'CHF',
-  CNY: '¥',
-  SGD: 'S$',
-  HKD: 'HK$',
-  KRW: '₩',
-  THB: '฿',
-  MYR: 'RM',
-  IDR: 'Rp',
-  VND: '₫',
-};
+  PHP: "₱",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "CHF",
+  CNY: "¥",
+  SGD: "S$",
+  HKD: "HK$",
+  KRW: "₩",
+  THB: "฿",
+  MYR: "RM",
+  IDR: "Rp",
+  VND: "₫",
+}
 
 function getCurrencySymbol(code?: string) {
-  if (!code) return '';
-  return currencyMap[code] ?? code;
+  if (!code) return ""
+  return currencyMap[code] ?? code
 }
 
 function formatAmount(amount: number, currency?: string) {
-  const symbol = getCurrencySymbol(currency);
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const symbol = getCurrencySymbol(currency)
+  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function typeBadgeVariant(type: string) {
-  return type === 'reimbursement' ? 'outline' : 'secondary';
+  return type === "reimbursement" ? "outline" : "secondary"
 }
 
 export default function ExpensesPage() {
-  const router = useRouter();
-  const { user, userData } = useAuth();
-  const { toast } = useToast();
+  const router = useRouter()
+  const { user, userData } = useAuth()
+  const { toast } = useToast()
 
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [items, setItems] = useState<ExpenseDoc[]>([]);
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [items, setItems] = useState<ExpenseDoc[]>([])
 
-  // Fetch expenses from the same "request" collection and consider both reimbursement and requisition as expenses
   useEffect(() => {
-    const companyIdentifier = user?.company_id || userData?.project_id || user?.uid;
+    const companyIdentifier = user?.company_id || userData?.project_id || user?.uid
 
     if (!companyIdentifier) {
-      setLoading(false);
-      return;
+      setLoading(false)
+      return
     }
 
     const q = query(
-      collection(db, 'request'),
-      where('company_id', '==', companyIdentifier),
-      where('deleted', '==', false)
-    );
+      collection(db, "request"),
+      where("company_id", "==", companyIdentifier),
+      where("deleted", "==", false),
+    )
 
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const data: ExpenseDoc[] = [];
+        const data: ExpenseDoc[] = []
         snap.forEach((d) => {
-          const docData = d.data() as ExpenseDoc;
-          // Only keep reimbursement/requisition
-          if (docData.request_type === 'reimbursement' || docData.request_type === 'requisition') {
-            data.push({ id: d.id, ...docData } as ExpenseDoc);
+          const docData = d.data() as ExpenseDoc
+          if (docData.request_type === "reimbursement" || docData.request_type === "requisition") {
+            data.push({ id: d.id, ...docData } as ExpenseDoc)
           }
-        });
+        })
 
-        // Newest first by created
         data.sort((a, b) => {
-          const aTime = a.created?.toDate?.() ? a.created.toDate() : new Date(0);
-          const bTime = b.created?.toDate?.() ? b.created.toDate() : new Date(0);
-          return bTime.getTime() - aTime.getTime();
-        });
+          const aTime = a.created?.toDate?.() ? a.created.toDate() : new Date(0)
+          const bTime = b.created?.toDate?.() ? b.created.toDate() : new Date(0)
+          return bTime.getTime() - aTime.getTime()
+        })
 
-        setItems(data);
-        setLoading(false);
+        setItems(data)
+        setLoading(false)
       },
       (err) => {
-        console.error('Error loading expenses:', err);
+        console.error("Error loading expenses:", err)
         toast({
-          title: 'Error',
-          description: 'Failed to load expenses. Please try again.',
-          variant: 'destructive',
-        });
-        setLoading(false);
-      }
-    );
+          title: "Error",
+          description: "Failed to load expenses. Please try again.",
+          variant: "destructive",
+        })
+        setLoading(false)
+      },
+    )
 
-    return () => unsub();
-  }, [user, userData, toast]);
+    return () => unsub()
+  }, [user, userData, toast])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
+    const q = search.trim().toLowerCase()
+    if (!q) return items
 
     return items.filter((it) => {
-      const requestNo = it['Request No.']?.toString()?.toLowerCase?.() ?? '';
-      const type = it.request_type?.toLowerCase?.() ?? '';
-      const requestor = it.Requestor?.toLowerCase?.() ?? '';
-      const itemName = it['Requested Item']?.toLowerCase?.() ?? '';
-      const amount = it.Amount?.toString?.() ?? '';
-      const status = (it.expense_done ? 'done' : 'pending');
-      const dateStr = it.created?.toDate?.() ? format(it.created.toDate(), 'MMM dd, yyyy').toLowerCase() : '';
-      const currency = (it.Currency || '').toLowerCase();
+      const requestNo = it["Request No."]?.toString()?.toLowerCase?.() ?? ""
+      const type = it.request_type?.toLowerCase?.() ?? ""
+      const requestor = it.Requestor?.toLowerCase?.() ?? ""
+      const itemName = it["Requested Item"]?.toLowerCase?.() ?? ""
+      const amount = it.Amount?.toString?.() ?? ""
+      const status = it.expense_done ? "done" : "pending"
+      const dateStr = it.created?.toDate?.() ? format(it.created.toDate(), "MMM dd, yyyy").toLowerCase() : ""
+      const currency = (it.Currency || "").toLowerCase()
 
       return (
         requestNo.includes(q) ||
@@ -140,43 +138,85 @@ export default function ExpensesPage() {
         currency.includes(q) ||
         status.includes(q) ||
         dateStr.includes(q)
-      );
-    });
-  }, [items, search]);
+      )
+    })
+  }, [items, search])
 
-  const ongoing = useMemo(() => filtered.filter((it) => !it.expense_done), [filtered]);
-  const history = useMemo(() => filtered.filter((it) => it.expense_done), [filtered]);
+  const ongoing = useMemo(() => filtered.filter((it) => !it.expense_done), [filtered])
+  const history = useMemo(() => filtered.filter((it) => it.expense_done), [filtered])
 
   const toggleDone = useCallback(
     async (id: string, next: boolean) => {
       try {
-        setUpdatingId(id);
-        const ref = doc(db, 'request', id);
+        setUpdatingId(id)
+        const ref = doc(db, "request", id)
         await updateDoc(ref, {
           expense_done: next,
           expense_done_at: serverTimestamp(),
-          expense_done_by: user?.uid ?? 'system',
-        });
+          expense_done_by: user?.uid ?? "system",
+        })
 
         toast({
-          title: next ? 'Marked as Done' : 'Marked as Pending',
+          title: next ? "Marked as Done" : "Marked as Pending",
           description: next
-            ? 'This expense has been moved to History.'
-            : 'This expense has been moved back to Ongoing.',
-        });
+            ? "This expense has been moved to History."
+            : "This expense has been moved back to Ongoing.",
+        })
       } catch (e) {
-        console.error('Failed to update expense status', e);
+        console.error("Failed to update expense status", e)
         toast({
-          title: 'Error',
-          description: 'Could not update the expense status.',
-          variant: 'destructive',
-        });
+          title: "Error",
+          description: "Could not update the expense status.",
+          variant: "destructive",
+        })
       } finally {
-        setUpdatingId(null);
+        setUpdatingId(null)
       }
     },
-    [toast, user?.uid]
-  );
+    [toast, user?.uid],
+  )
+
+  const deleteExpense = useCallback(
+    async (id: string, requestNo: string) => {
+      const confirmed = window.confirm(
+        `Are you sure you want to delete expense #${requestNo}? This action cannot be undone.`,
+      )
+
+      if (!confirmed) return
+
+      try {
+        setDeletingId(id)
+        const ref = doc(db, "request", id)
+        await updateDoc(ref, {
+          deleted: true,
+          deleted_at: serverTimestamp(),
+          deleted_by: user?.uid ?? "system",
+        })
+
+        toast({
+          title: "Expense Deleted",
+          description: `Expense #${requestNo} has been successfully deleted.`,
+        })
+      } catch (e) {
+        console.error("Failed to delete expense", e)
+        toast({
+          title: "Error",
+          description: "Could not delete the expense. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [toast, user?.uid],
+  )
+
+  const editExpense = useCallback(
+    (id: string) => {
+      router.push(`/finance/requests/edit/${id}`)
+    },
+    [router],
+  )
 
   const renderTable = (rows: ExpenseDoc[]) => {
     if (rows.length === 0) {
@@ -184,14 +224,12 @@ export default function ExpensesPage() {
         <div className="text-center py-12">
           <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">No records found</h3>
-          <p className="mt-2 text-muted-foreground">
-            Adjust your search or check back later.
-          </p>
+          <p className="mt-2 text-muted-foreground">Adjust your search or check back later.</p>
           <Link href="/finance/requests/create">
             <Button className="mt-4">Create Request</Button>
           </Link>
         </div>
-      );
+      )
     }
 
     return (
@@ -212,11 +250,9 @@ export default function ExpensesPage() {
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">#{r['Request No.']}</TableCell>
+                <TableCell className="font-medium">#{r["Request No."]}</TableCell>
                 <TableCell>
-                  <Badge variant={typeBadgeVariant(r.request_type)}>
-                    {r.request_type}
-                  </Badge>
+                  <Badge variant={typeBadgeVariant(r.request_type)}>{r.request_type}</Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -224,16 +260,14 @@ export default function ExpensesPage() {
                     {r.Requestor}
                   </div>
                 </TableCell>
-                <TableCell className="max-w-xs truncate">{r['Requested Item']}</TableCell>
+                <TableCell className="max-w-xs truncate">{r["Requested Item"]}</TableCell>
                 <TableCell>
-                  <span className="font-medium">
-                    {formatAmount(r.Amount, r.Currency)}
-                  </span>
+                  <span className="font-medium">{formatAmount(r.Amount, r.Currency)}</span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    {r.created?.toDate?.() ? format(r.created.toDate(), 'MMM dd, yyyy') : '—'}
+                    {r.created?.toDate?.() ? format(r.created.toDate(), "MMM dd, yyyy") : "—"}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -255,10 +289,10 @@ export default function ExpensesPage() {
                       <Checkbox
                         id={`done-${r.id}`}
                         checked={!!r.expense_done}
-                        disabled={updatingId === r.id}
+                        disabled={updatingId === r.id || deletingId === r.id}
                         onCheckedChange={(checked) => {
-                          const next = Boolean(checked);
-                          toggleDone(r.id, next);
+                          const next = Boolean(checked)
+                          toggleDone(r.id, next)
                         }}
                       />
                       <label
@@ -271,9 +305,31 @@ export default function ExpensesPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => editExpense(r.id)}
+                      disabled={deletingId === r.id}
+                      className="gap-1"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => router.push(`/finance/requests/details/${r.id}`)}
+                      disabled={deletingId === r.id}
+                      className="gap-1"
                     >
                       View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteExpense(r.id, r["Request No."]?.toString() || "Unknown")}
+                      disabled={updatingId === r.id || deletingId === r.id}
+                      className="gap-1 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {deletingId === r.id ? "Deleting..." : "Delete"}
                     </Button>
                   </div>
                 </TableCell>
@@ -282,8 +338,8 @@ export default function ExpensesPage() {
           </TableBody>
         </Table>
       </div>
-    );
-  };
+    )
+  }
 
   if (loading) {
     return (
@@ -308,7 +364,7 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   return (
@@ -321,13 +377,10 @@ export default function ExpensesPage() {
           </p>
         </div>
         <Link href="/finance/requests/create">
-          <Button>
-            Create Expense
-          </Button>
+          <Button>Create Expense</Button>
         </Link>
       </div>
 
-      {/* Search Box */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -341,7 +394,7 @@ export default function ExpensesPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSearch('')}
+            onClick={() => setSearch("")}
             className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
             aria-label="Clear search"
           >
@@ -350,14 +403,13 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      {/* Ongoing */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-muted-foreground" />
             Ongoing
             <span className="text-sm font-normal text-muted-foreground">
-              ({ongoing.length} {ongoing.length === 1 ? 'item' : 'items'})
+              ({ongoing.length} {ongoing.length === 1 ? "item" : "items"})
             </span>
           </CardTitle>
           <CardDescription>Pending expenses awaiting completion</CardDescription>
@@ -365,14 +417,13 @@ export default function ExpensesPage() {
         <CardContent>{renderTable(ongoing)}</CardContent>
       </Card>
 
-      {/* History */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckSquare className="h-5 w-5 text-muted-foreground" />
             History
             <span className="text-sm font-normal text-muted-foreground">
-              ({history.length} {history.length === 1 ? 'item' : 'items'})
+              ({history.length} {history.length === 1 ? "item" : "items"})
             </span>
           </CardTitle>
           <CardDescription>Completed expenses</CardDescription>
@@ -380,5 +431,5 @@ export default function ExpensesPage() {
         <CardContent>{renderTable(history)}</CardContent>
       </Card>
     </div>
-  );
+  )
 }
