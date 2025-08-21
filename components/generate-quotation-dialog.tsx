@@ -169,6 +169,9 @@ export function GenerateQuotationDialog({
         client_designation: selectedClient.designation || "", // Include designation
         client_address: selectedClient.address || "", // Include address
         client_phone: selectedClient.phone || "", // Include phone
+        client_company: selectedClient.company || "", // Include company name
+        client_company_id: selectedClient.company_id || "", // Include company ID if available
+        client_industry: selectedClient.industry || "", // Include industry information
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         valid_until: validUntil.toISOString(),
@@ -224,12 +227,41 @@ export function GenerateQuotationDialog({
               <SelectContent>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.company} ({client.name})
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{client.company}</span>
+                      <span className="text-sm text-gray-600">
+                        {client.name} - {client.designation || "Contact Person"}
+                      </span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {selectedClient && (
+            <div className="grid grid-cols-4 items-start gap-4 p-4 bg-gray-50 rounded-lg">
+              <Label className="text-right font-semibold">Company Info</Label>
+              <div className="col-span-3 space-y-2">
+                <div className="flex flex-col">
+                  <span className="font-semibold text-lg">{selectedClient.company}</span>
+                  <span className="text-sm text-gray-600">
+                    {selectedClient.name} - {selectedClient.designation || "Contact Person"}
+                  </span>
+                  {selectedClient.address && <span className="text-sm text-gray-600">{selectedClient.address}</span>}
+                  <div className="flex gap-4 mt-1">
+                    <span className="text-sm text-gray-600">{selectedClient.email}</span>
+                    <span className="text-sm text-gray-600">{selectedClient.phone}</span>
+                  </div>
+                  {selectedClient.industry && (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full w-fit mt-1">
+                      {selectedClient.industry}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="products" className="text-right">
