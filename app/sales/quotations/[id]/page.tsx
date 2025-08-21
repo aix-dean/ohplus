@@ -5,12 +5,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format, parseISO } from "date-fns"
-import { cn } from "@/lib/utils"
+import { parseISO } from "date-fns"
 import {
   ArrowLeft,
   DownloadIcon,
@@ -23,14 +18,10 @@ import {
   History,
   LayoutGrid,
   Pencil,
-  CalendarIcon,
   Save,
   X,
   Clock,
-  ChevronDown,
   ChevronRight,
-  Upload,
-  ExternalLink,
   ChevronLeft,
 } from "lucide-react"
 import {
@@ -46,7 +37,6 @@ import { SendQuotationDialog } from "@/components/send-quotation-dialog"
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog"
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
 import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
-import { Input } from "@/components/ui/input"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 
@@ -732,528 +722,226 @@ export default function QuotationDetailsPage() {
 
           {/* Document Content */}
           <div className="p-6 sm:p-8">
-            {/* Quotation Information */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Quotation Information
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="quotation_number" className="text-sm font-medium text-gray-500 mb-2">
-                    Quotation Number
-                  </Label>
-                  <p className="text-base font-medium text-gray-900">{currentQuotation.quotation_number}</p>
+            {/* Company Header Section */}
+            <div className="text-center mb-6 border-b-2 border-gray-300 pb-4">
+              <div className="flex justify-between items-start mb-4">
+                <div className="text-left">
+                  <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
+                  <p className="text-sm">
+                    {safeString(currentQuotation.client_company) || "JMCL MEDIA & MARKETING SERVICES INC."}
+                  </p>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                  <p className="text-base text-gray-900">{formatDate(currentQuotation.created)}</p>
-                </div>
-                <div>
-                  <Label htmlFor="start_date" className="text-sm font-medium text-gray-500 mb-2">
-                    Start Date
-                  </Label>
-                  {isEditing ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal mt-1",
-                            !editableQuotation.start_date && "text-muted-foreground",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editableQuotation.start_date ? (
-                            format(getDateObject(editableQuotation.start_date)!, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={getDateObject(editableQuotation.start_date)}
-                          onSelect={(date) => handleDateChange(date, "start_date")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <p className="text-base text-gray-900">{formatDate(currentQuotation.start_date)}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="end_date" className="text-sm font-medium text-gray-500 mb-2">
-                    End Date
-                  </Label>
-                  {isEditing ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal mt-1",
-                            !editableQuotation.end_date && "text-muted-foreground",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editableQuotation.end_date ? (
-                            format(getDateObject(editableQuotation.end_date)!, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={getDateObject(editableQuotation.end_date)}
-                          onSelect={(date) => handleDateChange(date, "end_date")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <p className="text-base text-gray-900">{formatDate(currentQuotation.end_date)}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="valid_until" className="text-sm font-medium text-gray-500 mb-2">
-                    Valid Until
-                  </Label>
-                  {isEditing ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal mt-1",
-                            !editableQuotation.valid_until && "text-muted-foreground",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editableQuotation.valid_until ? (
-                            format(getDateObject(editableQuotation.valid_until)!, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={getDateObject(editableQuotation.valid_until)}
-                          onSelect={(date) => handleDateChange(date, "valid_until")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <p className="text-base text-gray-900">{formatDate(currentQuotation.valid_until)}</p>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                  <p className="text-base font-semibold text-gray-900">₱{safeString(currentQuotation.total_amount)}</p>
+                <div className="text-right">
+                  <p className="text-sm">RFQ. No. {currentQuotation.quotation_number}</p>
                 </div>
               </div>
+
+              <h1 className="text-2xl font-bold text-center mb-2">GOLDEN TOUCH IMAGING SPECIALIST</h1>
+              <p className="text-sm text-center mb-4">
+                Good Day! Thank you for considering Golden Touch for your business needs.
+                <br />
+                We are pleased to submit our quotation for your requirements:
+              </p>
+              <p className="text-sm font-semibold">Details as follows:</p>
             </div>
 
-            {/* Client Information */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Client Information
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="client_name" className="text-sm font-medium text-gray-500 mb-2">
-                    Client Name
-                  </Label>
-                  <p className="text-base font-medium text-gray-900">{safeString(currentQuotation.client_name)}</p>
-                </div>
-                <div>
-                  <Label htmlFor="client_email" className="text-sm font-medium text-gray-500 mb-2">
-                    Client Email
-                  </Label>
-                  <p className="text-base text-gray-900">{safeString(currentQuotation.client_email)}</p>
-                </div>
-                {currentQuotation.client_designation && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Designation</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_designation)}</p>
-                  </div>
-                )}
-                {currentQuotation.client_phone && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_phone)}</p>
-                  </div>
-                )}
-                {currentQuotation.client_address && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Address</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_address)}</p>
-                  </div>
-                )}
-                {currentQuotation.quotation_request_id && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
-                    <p className="text-base text-gray-900 font-mono">
-                      {safeString(currentQuotation.quotation_request_id)}
-                    </p>
-                  </div>
-                )}
-                {currentQuotation.proposalId && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Proposal ID</Label>
-                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.proposalId)}</p>
-                  </div>
-                )}
-                {currentQuotation.campaignId && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Campaign ID</Label>
-                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.campaignId)}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Product & Services */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 pb-1 border-b border-orange-200 font-[Calibri]">
-                  Product & Services
-                </h2>
-                {totalProducts > 1 && (
-                  <div className="text-sm text-gray-500">
-                    Product {currentProductPage} of {totalPages}
-                  </div>
-                )}
-              </div>
-
-              {currentProducts.length > 0 ? (
-                <div className="space-y-6">
-                  {currentProducts.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="border border-orange-200 rounded-lg overflow-hidden bg-white shadow-sm"
-                    >
-                      {/* Product Header */}
-                      <div className="bg-orange-50 px-6 py-4 border-b border-orange-200">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-900">{safeString(item.name)}</h3>
-                          <span className="inline-block px-3 py-1 text-sm font-medium bg-orange-100 text-orange-800 rounded-full">
-                            {safeString(item.type)}
+            {/* Product Details Section - Per Page Display */}
+            {currentProducts.length > 0 ? (
+              <div className="space-y-8">
+                {currentProducts.map((item, index) => (
+                  <div key={item.id || index} className="page-break-before">
+                    {/* Site/Product Information */}
+                    <div className="mb-6">
+                      <div className="grid grid-cols-1 gap-2 text-sm">
+                        <div className="flex">
+                          <span className="font-medium w-32">● Site Location:</span>
+                          <span className="font-bold">{safeString(item.location)}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Type:</span>
+                          <span className="font-bold">{safeString(item.type)}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Size:</span>
+                          <span className="font-bold">{safeString(item.dimensions) || "100ft (H) x 60ft (W)"}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Contract Duration:</span>
+                          <span className="font-bold">{safeString(item.duration_days)} DAYS</span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Contract Period:</span>
+                          <span className="font-bold">
+                            {formatDate(currentQuotation.start_date)} - {formatDate(currentQuotation.end_date)}
                           </span>
                         </div>
-                        {item.site_code && <p className="text-sm text-gray-600 mt-1">Site Code: {item.site_code}</p>}
-                      </div>
-
-                      {/* Product Content */}
-                      <div className="p-6">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {/* Product Image */}
-                          <div className="space-y-4">
-                            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                              <img
-                                src={
-                                  item.media_url ||
-                                  item.media?.[0]?.url ||
-                                  "/placeholder.svg?height=400&width=400&query=product" ||
-                                  "/placeholder.svg"
-                                }
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            {/* Additional media gallery if available */}
-                            {item.media && item.media.length > 1 && (
-                              <div className="grid grid-cols-4 gap-2">
-                                {item.media.slice(1, 5).map((media, mediaIndex) => (
-                                  <div key={mediaIndex} className="aspect-square bg-gray-100 rounded overflow-hidden">
-                                    <img
-                                      src={media.url || "/placeholder.svg"}
-                                      alt={`${item.name} ${mediaIndex + 2}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Product Details */}
-                          <div className="space-y-4">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
-                              <p className="text-gray-900">
-                                {safeString(item.description) || "No description available"}
-                              </p>
-                            </div>
-
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-500 mb-2">Location</h4>
-                              <p className="text-gray-900">{safeString(item.location)}</p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-500 mb-2">Monthly Price</h4>
-                                {isEditing ? (
-                                  <Input
-                                    type="number"
-                                    name={`product-price-${item.id}`}
-                                    value={item.price || ""}
-                                    onChange={(e) =>
-                                      handleProductPriceChange(item.id, Number.parseFloat(e.target.value) || 0)
-                                    }
-                                    className="w-full"
-                                    step="0.01"
-                                  />
-                                ) : (
-                                  <p className="text-lg font-semibold text-orange-600">₱{safeString(item.price)}</p>
-                                )}
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-500 mb-2">Duration</h4>
-                                <p className="text-gray-900">{safeString(item.duration_days)} day(s)</p>
-                              </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-gray-200">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-500">Item Total:</span>
-                                <span className="text-xl font-bold text-orange-600">
-                                  ₱{safeString(item.item_total_amount)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Proposal to:</span>
+                          <span className="font-bold">
+                            {safeString(currentQuotation.client_company) || safeString(currentQuotation.client_name)}
+                          </span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Illumination:</span>
+                          <span className="font-bold">
+                            {safeString(item.illumination) || "10 units of 1000 watts metal Halide"}
+                          </span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Lease Rate/Month:</span>
+                          <span className="font-bold">(Exclusive of VAT)</span>
+                        </div>
+                        <div className="flex">
+                          <span className="font-medium w-32">● Total Lease:</span>
+                          <span className="font-bold">(Exclusive of VAT)</span>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">No products available</div>
-              )}
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                  <Button
-                    variant="outline"
-                    onClick={handlePrevPage}
-                    disabled={currentProductPage === 1}
-                    className="flex items-center space-x-2 bg-transparent"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span>Previous Product</span>
-                  </Button>
-
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-500">Page</span>
-                    <span className="text-sm font-medium">{currentProductPage}</span>
-                    <span className="text-sm text-gray-500">of</span>
-                    <span className="text-sm font-medium">{totalPages}</span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    onClick={handleNextPage}
-                    disabled={currentProductPage === totalPages}
-                    className="flex items-center space-x-2 bg-transparent"
-                  >
-                    <span>Next Product</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-600">
-                    Total Products: {totalProducts} | Duration: {safeString(currentQuotation?.duration_days)} day(s)
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500">Total Amount</div>
-                    <div className="text-2xl font-bold text-orange-600">
-                      ₱{safeString(currentQuotation?.total_amount)}
+                    {/* Pricing Table */}
+                    <div className="mb-6">
+                      <table className="w-full border-collapse border border-gray-400">
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-400 p-2 font-medium">Lease rate per month</td>
+                            <td className="border border-gray-400 p-2 text-right font-bold">
+                              ₱{Number(item.price || 0).toLocaleString()}.00
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border border-gray-400 p-2 font-medium">
+                              x {Math.ceil((Number(item.duration_days) || 30) / 30)} months
+                            </td>
+                            <td className="border border-gray-400 p-2 text-right font-bold">
+                              ₱{Number(item.item_total_amount || 0).toLocaleString()}.00
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border border-gray-400 p-2 font-medium">12% VAT</td>
+                            <td className="border border-gray-400 p-2 text-right font-bold">
+                              ₱{(Number(item.item_total_amount || 0) * 0.12).toLocaleString()}.00
+                            </td>
+                          </tr>
+                          <tr className="bg-gray-100">
+                            <td className="border border-gray-400 p-2 font-bold">TOTAL</td>
+                            <td className="border border-gray-400 p-2 text-right font-bold">
+                              ₱{(Number(item.item_total_amount || 0) * 1.12).toLocaleString()}.00
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <p className="text-sm mt-2 italic">
+                        Note: free two (2) change material for {Math.ceil((Number(item.duration_days) || 30) / 30)}{" "}
+                        month rental
+                      </p>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Additional Information (Notes) */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Additional Information
-              </h2>
-
-              {/* Internal Notes */}
-              {(currentQuotation.notes || isEditing) && ( // Show if exists or if editing to allow adding
-                <div>
-                  <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
-                    Internal Notes
-                  </Label>
-                  {isEditing ? (
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      value={editableQuotation.notes || ""}
-                      onChange={handleChange}
-                      className="mt-1"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                      <p className="text-sm text-gray-700 leading-relaxed">{currentQuotation.notes || "N/A"}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Project Compliance
-              </h2>
-
-              <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                <div
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => handleComplianceToggle(currentQuotation.id || "")}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {getComplianceCount(currentQuotation.projectCompliance).completed}/
-                      {getComplianceCount(currentQuotation.projectCompliance).total}
-                    </span>
-                    <div className="flex space-x-1">
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-2 h-2 rounded-full ${
-                            i < getComplianceCount(currentQuotation.projectCompliance).completed
-                              ? "bg-green-500"
-                              : "bg-gray-300"
-                          }`}
+                    {/* Product Image if available */}
+                    {item.media_url && (
+                      <div className="mb-6 text-center">
+                        <img
+                          src={item.media_url || "/placeholder.svg"}
+                          alt={item.name}
+                          className="max-w-full h-64 object-contain mx-auto border border-gray-300 rounded"
                         />
-                      ))}
-                    </div>
-                  </div>
-                  {expandedCompliance[currentQuotation.id || ""] ? (
-                    <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-500 transition-transform duration-200" />
-                  )}
-                </div>
-
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    expandedCompliance[currentQuotation.id || ""] ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <div className="mt-4 space-y-3">
-                    {[
-                      { key: "signedQuotation", label: "Signed Quotation" },
-                      { key: "signedContract", label: "Signed Contract" },
-                      { key: "poMo", label: "PO/MO" },
-                      { key: "finalArtwork", label: "Final Artwork" },
-                      { key: "paymentAsDeposit", label: "Payment as Deposit" },
-                    ].map((item, index) => {
-                      const complianceItem =
-                        currentQuotation.projectCompliance?.[
-                          item.key as keyof NonNullable<Quotation["projectCompliance"]>
-                        ]
-                      const isCompleted = complianceItem?.status === "completed"
-                      const isUploading = uploadingFiles[item.key]
-                      const progress = uploadProgress[item.key] || 0
-
-                      return (
-                        <div
-                          key={item.key}
-                          className={`flex items-center justify-between p-2 rounded transition-all duration-200 ${
-                            index < getComplianceCount(currentQuotation.projectCompliance).completed
-                              ? "animate-in slide-in-from-left-2"
-                              : ""
-                          }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                isCompleted ? "bg-green-500" : "bg-gray-300"
-                              }`}
-                            >
-                              {isCompleted && <CheckCircle className="w-3 h-3 text-white" />}
-                            </div>
-                            <span className="text-sm text-gray-700">{item.label}</span>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            {isCompleted && complianceItem?.fileUrl ? (
-                              <a
-                                href={complianceItem.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 text-sm flex items-center space-x-1"
-                              >
-                                <span>{complianceItem.fileName || "View File"}</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            ) : isUploading ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-16 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-gray-500">{Math.round(progress)}%</span>
-                              </div>
-                            ) : (
-                              <label className="cursor-pointer">
-                                <input
-                                  type="file"
-                                  accept=".pdf"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    if (file && currentQuotation.id) {
-                                      handleFileUpload(
-                                        file,
-                                        currentQuotation.id,
-                                        item.key as keyof NonNullable<Quotation["projectCompliance"]>,
-                                      )
-                                    }
-                                  }}
-                                />
-                                <Button variant="outline" size="sm" className="text-xs px-3 py-1 h-7 bg-transparent">
-                                  <Upload className="w-3 h-3 mr-1" />
-                                  Upload
-                                </Button>
-                              </label>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-
-                    {currentQuotation.projectCompliance?.paymentAsDeposit?.status === "completed" && (
-                      <div className="mt-2 text-xs text-blue-600 italic">For Treasury's confirmation</div>
+                        <p className="text-sm text-gray-600 mt-2">{safeString(item.name)}</p>
+                      </div>
                     )}
+
+                    {/* Page break for multiple products */}
+                    {index < currentProducts.length - 1 && <div className="page-break-after"></div>}
                   </div>
+                ))}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                    <Button
+                      variant="outline"
+                      onClick={handlePrevPage}
+                      disabled={currentProductPage === 1}
+                      className="flex items-center space-x-2 bg-transparent"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span>Previous Product</span>
+                    </Button>
+
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-500">
+                        Product {currentProductPage} of {totalPages}
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={handleNextPage}
+                      disabled={currentProductPage === totalPages}
+                      className="flex items-center space-x-2 bg-transparent"
+                    >
+                      <span>Next Product</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">No products available</div>
+            )}
+
+            {/* Terms and Conditions */}
+            <div className="mt-8 mb-6">
+              <h3 className="font-bold text-sm mb-3">Terms and Conditions:</h3>
+              <div className="text-sm space-y-1">
+                <p>1. Quotation validity: 5 working days.</p>
+                <p>
+                  2. Availability of the site is on first-come-first-served-basis only. Only official documents such as
+                  P.O's,
+                </p>
+                <p className="ml-4">
+                  Media Orders, signed quotation, & contracts are accepted in order to book the site.
+                </p>
+                <p>3. To book the site, one (1) month advance and one (2) months security deposit</p>
+                <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
+                <p>4. Final artwork should be approved ten (10) days before the contract period</p>
+                <p>5. Print is exclusively for Golden Touch Imaging Specialist Only.</p>
+              </div>
+            </div>
+
+            {/* Signature Section */}
+            <div className="mt-8 mb-6">
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <p className="text-sm mb-8">Very truly yours,</p>
+                  <div className="border-b border-gray-400 mb-2"></div>
+                  <p className="text-sm font-medium">Mathew Espanto</p>
+                  <p className="text-sm">Account Management</p>
+                </div>
+                <div>
+                  <p className="text-sm mb-8">C o n f o r m e:</p>
+                  <div className="border-b border-gray-400 mb-2"></div>
+                  <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
+                  <p className="text-sm">
+                    {safeString(currentQuotation.client_company) || "JMCL MEDIA & MARKETING SERVICES INC."}
+                  </p>
+                  <p className="text-xs mt-4 italic">
+                    This signed Quotation serves as an
+                    <br />
+                    official document for billing purposes
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Document Footer */}
-            <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-              <p>This quotation is valid until {formatDate(currentQuotation.valid_until)}</p>
-              <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
+            {/* Footer */}
+            <div className="mt-8 pt-4 border-t border-gray-300 text-center">
+              <p className="text-xs text-gray-600">
+                No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53
+              </p>
+              <p className="text-xs text-gray-600 mt-1">email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
+              <p className="text-xs text-gray-600 mt-2 font-medium">{formatDate(new Date())}</p>
+              <p className="text-xs text-gray-600 font-bold">
+                {currentProducts[0]?.location || "SITE LOCATION"} QUOTATION
+              </p>
             </div>
           </div>
         </div>
