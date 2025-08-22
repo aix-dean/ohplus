@@ -485,16 +485,15 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const headerRowHeight = 8
   const dataRowHeight = 25 // Increased for better spacing and images
 
-  // Column widths including image column - Adjusted to match image proportions
+  // Column widths without image column - Removed image column and redistributed widths
   const colWidths = [
-    contentWidth * 0.12, // Image
-    contentWidth * 0.38, // Product
-    contentWidth * 0.12, // Type
-    contentWidth * 0.23, // Location
+    contentWidth * 0.45, // Product (increased)
+    contentWidth * 0.15, // Type
+    contentWidth * 0.25, // Location
     contentWidth * 0.15, // Price
   ]
 
-  // Table Headers without borders
+  // Table Headers without borders and without image column
   pdf.setFillColor(243, 244, 246) // bg-gray-100
   pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
 
@@ -503,15 +502,13 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(0, 0, 0) // Changed to black text for headers
 
   let currentX = margin
-  pdf.text("Image", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[0]
   pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[1]
+  currentX += colWidths[0]
   pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[2]
+  currentX += colWidths[1]
   pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[3]
-  pdf.text("Price", currentX + colWidths[4] - cellPadding, yPosition + headerRowHeight / 2, {
+  currentX += colWidths[2]
+  pdf.text("Price", currentX + colWidths[3] - cellPadding, yPosition + headerRowHeight / 2, {
     baseline: "middle",
     align: "right",
   })
@@ -524,59 +521,17 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
     currentX = margin
 
-    // Image column - uniform size for all images
-    const imageSize = 16 // Adjusted image size for better visibility
-    const imageX = currentX + cellPadding + (colWidths[0] - imageSize) / 2 // Center image in column
-    const imageY = yPosition + (dataRowHeight - imageSize) / 2
-
-    // Use media_url if available, otherwise fallback to media[0].url
-    const imageUrlToUse = item.media_url || (item.media && item.media.length > 0 ? item.media[0].url : undefined)
-
-    if (imageUrlToUse) {
-      try {
-        const imageBase64 = await loadImageAsBase64(imageUrlToUse)
-        if (imageBase64) {
-          pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
-        }
-      } catch (error) {
-        // Add placeholder if image fails to load
-        pdf.setFillColor(240, 240, 240)
-        pdf.rect(imageX, imageY, imageSize, imageSize, "F")
-        pdf.setFontSize(6)
-        pdf.setTextColor(150, 150, 150)
-        pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
-          align: "center",
-          baseline: "middle",
-        })
-        pdf.setTextColor(0, 0, 0)
-        pdf.setFontSize(9)
-      }
-    } else {
-      // Add placeholder for missing image
-      pdf.setFillColor(240, 240, 240)
-      pdf.rect(imageX, imageY, imageSize, imageSize, "F")
-      pdf.setFontSize(6)
-      pdf.setTextColor(150, 150, 150)
-      pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
-        align: "center",
-        baseline: "middle",
-      })
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(9)
-    }
-    currentX += colWidths[0]
-
-    // Product column
+    // Product column (now starts from margin)
     let productY = yPosition + cellPadding
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "bold")
-    productY = addText(safeString(item.name), currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 9)
+    productY = addText(safeString(item.name), currentX + cellPadding, productY, colWidths[0] - 2 * cellPadding, 9)
 
     if (item.site_code) {
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "normal")
       pdf.setTextColor(100, 100, 100) // Gray for site code
-      productY = addText(`Site: ${item.site_code}`, currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 8)
+      productY = addText(`Site: ${item.site_code}`, currentX + cellPadding, productY, colWidths[0] - 2 * cellPadding, 8)
       pdf.setTextColor(0, 0, 0)
     }
     if (item.description) {
@@ -587,12 +542,12 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         safeString(item.description),
         currentX + cellPadding,
         productY,
-        colWidths[1] - 2 * cellPadding,
+        colWidths[0] - 2 * cellPadding,
         8,
       )
       pdf.setTextColor(0, 0, 0)
     }
-    currentX += colWidths[1]
+    currentX += colWidths[0]
 
     // Type column
     pdf.setFontSize(9)
@@ -600,21 +555,21 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.text(safeString(item.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
       baseline: "middle",
     })
-    currentX += colWidths[2]
+    currentX += colWidths[1]
 
     // Location column
     const locationText = safeString(item.location)
-    const locationTextHeight = calculateTextHeight(locationText, colWidths[3] - 2 * cellPadding, 9)
+    const locationTextHeight = calculateTextHeight(locationText, colWidths[2] - 2 * cellPadding, 9)
     const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
-    addText(locationText, currentX + cellPadding, locationTextY, colWidths[3] - 2 * cellPadding, 9)
-    currentX += colWidths[3]
+    addText(locationText, currentX + cellPadding, locationTextY, colWidths[2] - 2 * cellPadding, 9)
+    currentX += colWidths[2]
 
     // Price column
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "bold")
     pdf.text(
       `PHP${safeString(item.price)}`,
-      currentX + colWidths[4] - cellPadding,
+      currentX + colWidths[3] - cellPadding,
       yPosition + dataRowHeight / 2 - 3, // Adjusted for "per month"
       {
         baseline: "middle",
@@ -626,7 +581,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setTextColor(100, 100, 100) // Gray for "per month"
     pdf.text(
       `/month`,
-      currentX + colWidths[4] - cellPadding,
+      currentX + colWidths[3] - cellPadding,
       yPosition + dataRowHeight / 2 + 3, // Adjusted for "per month"
       {
         baseline: "middle",
@@ -647,7 +602,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(0, 0, 0) // Black for "Total Amount:" label
 
   // Position "Total Amount:" to span most columns
-  const totalLabelX = margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - 5
+  const totalLabelX = margin + colWidths[0] + colWidths[1] + colWidths[2] - 5
   pdf.text("Total Amount:", totalLabelX, yPosition + headerRowHeight / 2, {
     baseline: "middle",
     align: "right",

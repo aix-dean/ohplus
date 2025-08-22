@@ -746,6 +746,32 @@ export default function QuotationDetailsPage() {
             {/* Product Details Section - Per Page Display */}
             {currentProducts.length > 0 ? (
               <div className="space-y-8">
+                {/* Pagination controls for multiple products */}
+                {totalProducts > 1 && (
+                  <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={handlePrevPage}
+                        disabled={currentProductPage === 1}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ← Previous
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        Product {currentProductPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={handleNextPage}
+                        disabled={currentProductPage === totalPages}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                    <div className="text-sm text-gray-500">Total Products: {totalProducts}</div>
+                  </div>
+                )}
+
                 {currentProducts.map((item, index) => (
                   <div key={item.id || index} className="page-break-before">
                     {/* Site/Product Information */}
@@ -832,18 +858,6 @@ export default function QuotationDetailsPage() {
                         month rental
                       </p>
                     </div>
-
-                    {/* Product Image if available */}
-                    {item.media_url && (
-                      <div className="mb-6 text-center">
-                        <img
-                          src={item.media_url || "/placeholder.svg"}
-                          alt={item.name}
-                          className="max-w-full h-64 object-contain mx-auto border border-gray-300 rounded"
-                        />
-                        <p className="text-sm text-gray-600 mt-2">{safeString(item.name)}</p>
-                      </div>
-                    )}
 
                     {/* Page break for multiple products */}
                     {index < currentProducts.length - 1 && <div className="page-break-after"></div>}
