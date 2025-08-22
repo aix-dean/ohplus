@@ -479,7 +479,7 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent min-h-[600px]">
+      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px]">
         {selectedTemplateBackground ? (
           <div className="w-full h-full min-h-[544px] overflow-hidden">
             <img
