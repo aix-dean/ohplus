@@ -17,6 +17,9 @@ import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useParams } from "next/navigation"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -37,6 +40,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
+  covered_period_range?: DateRange
   bir_2307?: File | null
   collection_date?: string
   // Supplies specific fields
@@ -102,7 +106,17 @@ export default function EditTreasuryCollectiblePage() {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data()
 
-          // Convert data to form format
+          let coveredPeriodRange: DateRange | undefined
+          if (data.covered_period) {
+            const parts = data.covered_period.split(" - ")
+            if (parts.length === 2) {
+              coveredPeriodRange = {
+                from: new Date(parts[0]),
+                to: new Date(parts[1]),
+              }
+            }
+          }
+
           const collectibleData: CollectibleFormData = {
             type: data.type || "sites",
             client_name: data.client_name || "",
@@ -117,12 +131,11 @@ export default function EditTreasuryCollectiblePage() {
             status: data.status || "pending",
             proceed_next_collection: !!data.next_collection_date,
             next_collection_status: data.next_status || "pending",
-            // Sites specific fields
             booking_no: data.booking_no || "",
             site: data.site || "",
             covered_period: data.covered_period || "",
+            covered_period_range: coveredPeriodRange,
             collection_date: data.collection_date || "",
-            // Supplies specific fields
             date: data.date || "",
             product: data.product || "",
             transfer_date: data.transfer_date || "",
@@ -133,7 +146,6 @@ export default function EditTreasuryCollectiblePage() {
             vendor_name: data.vendor_name || "",
             tin_no: data.tin_no || "",
             business_address: data.business_address || "",
-            // Store existing file URLs
             existing_bir_2307: data.bir_2307 || "",
             existing_next_collection_bir_2307: data.next_bir_2307 || "",
           }
@@ -206,7 +218,6 @@ export default function EditTreasuryCollectiblePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file type
       const allowedTypes = [
         "application/pdf",
         "application/msword",
@@ -251,13 +262,11 @@ export default function EditTreasuryCollectiblePage() {
     setSubmitError(null)
 
     try {
-      // Upload BIR 2307 file if a new one is selected
       let bir2307Url = formData.existing_bir_2307 || ""
       if (formData.bir_2307 && formData.bir_2307 instanceof File) {
         bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "treasury_collectibles/bir_2307/")
       }
 
-      // Upload Next Collection BIR 2307 file if a new one is selected
       let nextBir2307Url = formData.existing_next_collection_bir_2307 || ""
       if (
         formData.proceed_next_collection &&
@@ -287,11 +296,12 @@ export default function EditTreasuryCollectiblePage() {
         updated: serverTimestamp(),
       }
 
-      // Add type-specific fields
       if (formData.type === "sites") {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
-        if (formData.covered_period) collectibleData.covered_period = formData.covered_period
+        if (formData.covered_period_range?.from && formData.covered_period_range?.to) {
+          collectibleData.covered_period = `${format(formData.covered_period_range.from, "yyyy-MM-dd")} - ${format(formData.covered_period_range.to, "yyyy-MM-dd")}`
+        }
         if (bir2307Url) collectibleData.bir_2307 = bir2307Url
         if (formData.collection_date) collectibleData.collection_date = formData.collection_date
       } else if (formData.type === "supplies") {
@@ -304,13 +314,11 @@ export default function EditTreasuryCollectiblePage() {
         if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      // Add next collection fields only if proceed_next_collection is true
       if (formData.proceed_next_collection) {
         if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
         if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       } else {
-        // Clear next collection fields if not proceeding
         collectibleData.next_collection_date = ""
         collectibleData.next_bir_2307 = ""
         collectibleData.next_status = ""
@@ -321,7 +329,6 @@ export default function EditTreasuryCollectiblePage() {
 
       console.log("Treasury collectible updated successfully")
 
-      // Navigate back to treasury collectibles list
       router.push("/treasury/collectibles")
     } catch (error) {
       console.error("Error updating treasury collectible:", error)
@@ -333,7 +340,6 @@ export default function EditTreasuryCollectiblePage() {
 
   const renderFormFields = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Base Fields */}
       <div className="space-y-2">
         <Label htmlFor="type">Type</Label>
         <Select value={formData.type} onValueChange={(value) => handleInputChange("type", value)}>
@@ -372,11 +378,9 @@ export default function EditTreasuryCollectiblePage() {
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
             )}
           </div>
-          {/* Results dropdown */}
           {isClientDropdownOpen && (
             <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
               <div className="p-2">
-                {/* Always show "Add New Client" option at the top */}
                 <div
                   className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
                   onClick={() => setIsNewClientDialogOpen(true)}
@@ -505,7 +509,6 @@ export default function EditTreasuryCollectiblePage() {
         </Select>
       </div>
 
-      {/* Conditional Fields based on type */}
       {formData.type === "sites" && (
         <>
           <div className="space-y-2">
@@ -522,11 +525,10 @@ export default function EditTreasuryCollectiblePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
-            <Input
-              id="covered_period"
-              type="date"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
+            <DateRangePicker
+              value={formData.covered_period_range}
+              onChange={(range) => handleInputChange("covered_period_range", range)}
+              placeholder="Select date range"
             />
           </div>
           <div className="space-y-2">
@@ -840,7 +842,6 @@ export default function EditTreasuryCollectiblePage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Form fields would go here - similar to create page */}
             {renderFormFields()}
             {submitError && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{submitError}</div>
