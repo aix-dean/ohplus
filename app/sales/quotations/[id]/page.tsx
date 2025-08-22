@@ -184,6 +184,21 @@ export default function QuotationPage() {
         editableQuotation.items,
       )
 
+      // Recalculate individual item totals based on new duration
+      const updatedItems = editableQuotation.items.map((item) => {
+        const monthlyRate = Number(item.price) || 0
+        const months = Math.floor(durationDays / 30)
+        const remainingDays = durationDays % 30
+        const dailyRate = monthlyRate / 30
+        const itemTotalAmount = months * monthlyRate + remainingDays * dailyRate
+
+        return {
+          ...item,
+          duration_days: durationDays,
+          item_total_amount: itemTotalAmount,
+        }
+      })
+
       // Only update if there's an actual change to prevent infinite loops
       if (editableQuotation.duration_days !== durationDays || editableQuotation.total_amount !== totalAmount) {
         setEditableQuotation((prev) => {
@@ -192,11 +207,12 @@ export default function QuotationPage() {
             ...prev,
             duration_days: durationDays,
             total_amount: totalAmount,
+            items: updatedItems,
           }
         })
       }
     }
-  }, [editableQuotation]) // Updated to depend on the entire editableQuotation object
+  }, [editableQuotation])
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -350,7 +366,23 @@ export default function QuotationPage() {
   const handleProductPriceChange = (productId: string, newPrice: number) => {
     setEditableQuotation((prev) => {
       if (!prev) return null
-      const updatedItems = prev.items.map((p) => (p.id === productId ? { ...p, price: newPrice } : p))
+      const updatedItems = prev.items.map((p) => {
+        if (p.id === productId) {
+          const durationDays = Number(p.duration_days) || Number(prev.duration_days) || 40
+          const monthlyRate = newPrice
+          const months = Math.floor(durationDays / 30)
+          const remainingDays = durationDays % 30
+          const dailyRate = monthlyRate / 30
+          const itemTotalAmount = months * monthlyRate + remainingDays * dailyRate
+
+          return {
+            ...p,
+            price: newPrice,
+            item_total_amount: itemTotalAmount,
+          }
+        }
+        return p
+      })
       return { ...prev, items: updatedItems }
     })
   }
