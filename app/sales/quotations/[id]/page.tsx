@@ -84,6 +84,21 @@ const getDateObject = (date: any): Date | undefined => {
   return undefined
 }
 
+const formatDuration = (days: number) => {
+  if (days <= 30) {
+    return `${days} days`
+  }
+
+  const months = Math.floor(days / 30)
+  const remainingDays = days % 30
+
+  if (remainingDays === 0) {
+    return `${months} ${months === 1 ? "month" : "months"}`
+  }
+
+  return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
+}
+
 export default function QuotationDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -802,7 +817,7 @@ export default function QuotationDetailsPage() {
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Contract Duration:</span>
-                          <span className="font-bold">{safeString(item.duration_days)} DAYS</span>
+                          <span className="font-bold">{formatDuration(Number(item.duration_days) || 40)}</span>
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Contract Period:</span>
@@ -813,8 +828,7 @@ export default function QuotationDetailsPage() {
                         <div className="flex">
                           <span className="font-medium w-32">● Proposal to:</span>
                           <span className="font-bold">
-                            {safeString(currentQuotation.client_company_name) ||
-                              safeString(currentQuotation.client_name)}
+                            {safeString(currentQuotation.client_company_name) || "CLIENT COMPANY NAME"}
                           </span>
                         </div>
                         <div className="flex">
@@ -825,11 +839,15 @@ export default function QuotationDetailsPage() {
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Lease Rate/Month:</span>
-                          <span className="font-bold">(Exclusive of VAT)</span>
+                          <span className="font-bold">
+                            ₱{Number(item.price || 0).toLocaleString()}.00 (Exclusive of VAT)
+                          </span>
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Total Lease:</span>
-                          <span className="font-bold">(Exclusive of VAT)</span>
+                          <span className="font-bold">
+                            ₱{Number(item.item_total_amount || 0).toLocaleString()}.00 (Exclusive of VAT)
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -843,9 +861,7 @@ export default function QuotationDetailsPage() {
                             <td className="p-2 text-right font-bold">₱{Number(item.price || 0).toLocaleString()}.00</td>
                           </tr>
                           <tr>
-                            <td className="p-2 font-medium">
-                              x {Math.ceil((Number(item.duration_days) || 30) / 30)} months
-                            </td>
+                            <td className="p-2 font-medium">x {formatDuration(Number(item.duration_days) || 40)}</td>
                             <td className="p-2 text-right font-bold">
                               ₱{Number(item.item_total_amount || 0).toLocaleString()}.00
                             </td>
@@ -865,8 +881,7 @@ export default function QuotationDetailsPage() {
                         </tbody>
                       </table>
                       <p className="text-sm mt-2 italic">
-                        Note: free two (2) change material for {Math.ceil((Number(item.duration_days) || 30) / 30)}{" "}
-                        month rental
+                        Note: free two (2) change material for {formatDuration(Number(item.duration_days) || 40)} rental
                       </p>
                     </div>
 
