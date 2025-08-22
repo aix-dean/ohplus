@@ -259,7 +259,7 @@ export default function ProposalDetailsPage() {
               </Button>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
               {showCreateForm ? (
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div className="space-y-2">
