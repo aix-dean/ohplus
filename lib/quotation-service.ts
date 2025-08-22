@@ -260,18 +260,41 @@ const calculateTextHeight = (text: string, maxWidth: number, fontSize = 10): num
   return lines.length * fontSize * 0.35 // Adjusted multiplier for better estimation
 }
 
+// Helper function to format duration
+const formatDuration = (days: number): string => {
+  if (days <= 40) {
+    const months = Math.floor(days / 30)
+    const remainingDays = days % 30
+    if (months === 0) {
+      return `${days} days`
+    } else if (remainingDays === 0) {
+      return `${months} month${months > 1 ? "s" : ""}`
+    } else {
+      return `${months} month${months > 1 ? "s" : ""} and ${remainingDays} day${remainingDays > 1 ? "s" : ""}`
+    }
+  } else {
+    const months = Math.floor(days / 30)
+    const remainingDays = days % 30
+    if (remainingDays === 0) {
+      return `${months} month${months > 1 ? "s" : ""}`
+    } else {
+      return `${months} month${months > 1 ? "s" : ""} and ${remainingDays} day${remainingDays > 1 ? "s" : ""}`
+    }
+  }
+}
+
 // Generate separate PDF files for each product in a quotation
 export async function generateSeparateQuotationPDFs(
   quotation: Quotation,
   selectedPages?: string[],
-  userData?: { first_name?: string; last_name?: string; email?: string },
+  userData?: { first_name?: string; last_name?: string; email?: string; company?: { name?: string } },
 ): Promise<void> {
   try {
     const products = quotation.items || []
 
     if (products.length <= 1) {
       // If only one product, generate regular PDF
-      await generateQuotationPDF(quotation)
+      await generateQuotationPDF(quotation, userData)
       return
     }
 
@@ -320,7 +343,7 @@ export async function generateSeparateQuotationPDFs(
 // Generate PDF for quotation
 export async function generateQuotationPDF(
   quotation: Quotation,
-  userData?: { first_name?: string; last_name?: string; email?: string },
+  userData?: { first_name?: string; last_name?: string; email?: string; company?: { name?: string } },
 ): Promise<void> {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
@@ -356,10 +379,17 @@ export async function generateQuotationPDF(
     yPosition - 10,
   )
 
+  pdf.setFontSize(16)
+  pdf.setFont("helvetica", "bold")
+  const companyName = (userData?.company?.name || "GOLDEN TOUCH IMAGING SPECIALIST").toUpperCase()
+  const companyNameWidth = pdf.getTextWidth(companyName)
+  pdf.text(companyName, (pageWidth - companyNameWidth) / 2, yPosition)
+  yPosition += 10
+
   // Greeting message - positioned prominently at top
   pdf.setFontSize(11)
   pdf.setFont("helvetica", "normal")
-  const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
+  const greetingLine1 = `Good Day! Thank you for considering ${userData?.company?.name || "Golden Touch"} for your business needs.`
   const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
 
   // Calculate center position for each line
@@ -390,15 +420,15 @@ export async function generateQuotationPDF(
 
     const bulletPoints = [
       { label: "Site Location", value: item.location || "N/A" },
-      { label: "Type", value: "Billboard" },
-      { label: "Size", value: item.description || "100ft (H) x 60ft (W)" },
-      { label: "Contract Duration", value: `${quotation.duration_days || 30} days` },
+      { label: "Type", value: item.type || "Billboard" },
+      { label: "Size", value: item.dimensions || "100ft (H) x 60ft (W)" }, // Use dimensions instead of description
+      { label: "Contract Duration", value: formatDuration(Number(item.duration_days) || 40) }, // Use formatDuration function
       {
         label: "Contract Period",
         value: `${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
       },
       { label: "Proposal to", value: quotation.client_company_name || "Client Company" },
-      { label: "Illumination", value: "10 units of 1000 watts metal Halide" },
+      { label: "Illumination", value: item.illumination || "10 units of 1000 watts metal Halide" }, // Use item.illumination
       { label: "Lease Rate/Month", value: "(Exclusive of VAT)" },
       { label: "Total Lease", value: "(Exclusive of VAT)" },
     ]
@@ -412,13 +442,13 @@ export async function generateQuotationPDF(
       // Special handling for lease rate values
       if (point.label === "Lease Rate/Month") {
         pdf.text(
-          `${(item.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+          `₱${(item.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
           margin + 65,
           yPosition,
         )
       } else if (point.label === "Total Lease") {
         pdf.text(
-          `${(item.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+          `₱${(item.item_total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
           margin + 65,
           yPosition,
         )
@@ -431,40 +461,35 @@ export async function generateQuotationPDF(
     yPosition += 5
 
     const monthlyRate = item.price || 0
-    const durationInMonths = (quotation.duration_days || 30) / 30
-    const calculatedTotal = monthlyRate * durationInMonths
-    const vatAmount = calculatedTotal * 0.12
-    const totalWithVat = calculatedTotal + vatAmount
+    const itemTotalAmount = item.item_total_amount || 0
+    const vatAmount = itemTotalAmount * 0.12
+    const totalWithVat = itemTotalAmount + vatAmount
 
     pdf.text("Lease rate per month", margin + 5, yPosition)
     pdf.text(
-      `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+      `₱${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       pageWidth - margin - 40,
       yPosition,
     )
     yPosition += 6
 
-    pdf.text(`x ${Math.ceil(durationInMonths)} months`, margin + 5, yPosition)
+    pdf.text(`x ${formatDuration(Number(item.duration_days) || 40)}`, margin + 5, yPosition)
     pdf.text(
-      `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+      `₱${itemTotalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       pageWidth - margin - 40,
       yPosition,
     )
     yPosition += 6
 
-    pdf.text("12 % VAT", margin + 5, yPosition)
-    pdf.text(
-      `${vatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
+    pdf.text("12% VAT", margin + 5, yPosition)
+    pdf.text(`₱${vatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, pageWidth - margin - 40, yPosition)
     yPosition += 8
 
     // Total line
     pdf.setFont("helvetica", "bold")
     pdf.text("TOTAL", margin + 5, yPosition)
     pdf.text(
-      `${totalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+      `₱${totalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       pageWidth - margin - 40,
       yPosition,
     )
@@ -473,11 +498,12 @@ export async function generateQuotationPDF(
     // Note about free material changes
     pdf.setFont("helvetica", "normal")
     pdf.setFontSize(9)
-    pdf.text(`Note: free two (2) change material for ${Math.ceil(durationInMonths)} month rental`, margin, yPosition)
+    const durationText = formatDuration(Number(item.duration_days) || 40)
+    pdf.text(`Note: free two (2) change material for ${durationText} rental`, margin, yPosition)
     yPosition += 10
 
-    pdf.setFont("helvetica", "bold")
     pdf.setFontSize(11)
+    pdf.setFont("helvetica", "bold")
     pdf.text("Terms and Conditions:", margin, yPosition)
     yPosition += 8
 
@@ -513,14 +539,16 @@ export async function generateQuotationPDF(
     const userFullName =
       quotation.created_by_first_name && quotation.created_by_last_name
         ? `${quotation.created_by_first_name} ${quotation.created_by_last_name}`
-        : "Account Manager"
+        : userData?.first_name && userData?.last_name
+          ? `${userData.first_name} ${userData.last_name}`
+          : "Account Manager"
     pdf.text(userFullName, margin, yPosition)
     pdf.text(quotation.client_name || "Client Name", margin + contentWidth / 2, yPosition)
     yPosition += 6
 
     // Titles/Companies
     pdf.setFont("helvetica", "normal")
-    pdf.text(quotation.position || "Position", margin, yPosition)
+    pdf.text(quotation.position || "Position", margin, yPosition) // Use quotation.position field
     pdf.text(quotation.client_company_name || "Client Company", margin + contentWidth / 2, yPosition)
     yPosition += 10
 
