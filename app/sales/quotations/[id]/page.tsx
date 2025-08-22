@@ -748,7 +748,7 @@ export default function QuotationDetailsPage() {
               <div className="space-y-8">
                 {/* Pagination controls for multiple products */}
                 {totalProducts > 1 && (
-                  <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center justify-center p-4 bg-white border border-gray-300 rounded-lg shadow-lg">
                     <div className="flex items-center space-x-4">
                       <button
                         onClick={handlePrevPage}
@@ -768,7 +768,6 @@ export default function QuotationDetailsPage() {
                         Next →
                       </button>
                     </div>
-                    <div className="text-sm text-gray-500">Total Products: {totalProducts}</div>
                   </div>
                 )}
 
