@@ -188,7 +188,7 @@ export default function QuotationPage() {
         })
       }
     }
-  }, [editableQuotation]) // Updated to use the entire editableQuotation object as a dependency
+  }, [editableQuotation]) // Updated to depend on the entire editableQuotation object
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
