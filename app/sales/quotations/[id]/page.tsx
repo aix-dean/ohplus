@@ -178,47 +178,41 @@ export default function QuotationPage() {
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
     if (editableQuotation && editableQuotation.items && editableQuotation.start_date && editableQuotation.end_date) {
-      const startDateStr =
-        typeof editableQuotation.start_date === "string"
-          ? editableQuotation.start_date
-          : editableQuotation.start_date.toISOString?.() || new Date(editableQuotation.start_date).toISOString()
+      // Use safe date conversion instead of direct Date constructor
+      const startDateObj = getDateObject(editableQuotation.start_date)
+      const endDateObj = getDateObject(editableQuotation.end_date)
 
-      const endDateStr =
-        typeof editableQuotation.end_date === "string"
-          ? editableQuotation.end_date
-          : editableQuotation.end_date.toISOString?.() || new Date(editableQuotation.end_date).toISOString()
+      // Only proceed if both dates are valid
+      if (startDateObj && endDateObj && !isNaN(startDateObj.getTime()) && !isNaN(endDateObj.getTime())) {
+        const startDateStr = startDateObj.toISOString()
+        const endDateStr = endDateObj.toISOString()
 
-      const { durationDays, totalAmount } = calculateTotal(startDateStr, endDateStr, editableQuotation.items)
+        const { durationDays, totalAmount } = calculateTotal(startDateStr, endDateStr, editableQuotation.items)
 
-      // Recalculate individual item totals based on new duration
-      const updatedItems = editableQuotation.items.map((item) => {
-        const monthlyRate = Number(item.price) || 0
-        const months = Math.floor(durationDays / 30)
-        const remainingDays = durationDays % 30
-        const dailyRate = monthlyRate / 30
-        const itemTotalAmount = months * monthlyRate + remainingDays * dailyRate
-
-        return {
-          ...item,
-          duration_days: durationDays,
-          item_total_amount: itemTotalAmount,
-        }
-      })
-
-      // Only update if there's an actual change to prevent infinite loops
-      if (editableQuotation.duration_days !== durationDays || editableQuotation.total_amount !== totalAmount) {
-        setEditableQuotation((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
+        // Only update if values have actually changed to prevent infinite loops
+        if (editableQuotation.duration_days !== durationDays || editableQuotation.total_amount !== totalAmount) {
+          setEditableQuotation((prev) => ({
+            ...prev!,
             duration_days: durationDays,
             total_amount: totalAmount,
-            items: updatedItems,
-          }
-        })
+            items: prev!.items.map((item) => ({
+              ...item,
+              item_total_amount: (item.price * durationDays) / 30, // Calculate based on daily rate
+            })),
+          }))
+        }
+      } else {
+        console.warn("[v0] Invalid start or end date detected, skipping calculation")
       }
     }
-  }, [editableQuotation, editableQuotation?.start_date, editableQuotation?.end_date, calculateTotal])
+  }, [
+    editableQuotation,
+    editableQuotation?.start_date,
+    editableQuotation?.end_date,
+    editableQuotation?.items
+      ?.map((item) => item.price)
+      .join(","), // Watch for price changes
+  ])
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -366,6 +360,25 @@ export default function QuotationPage() {
         ...prev!,
         [field]: null,
       }))
+    }
+  }
+
+  const handleDateInputChange = (dateValue: string, field: "start_date" | "end_date") => {
+    if (dateValue) {
+      try {
+        const newDate = new Date(dateValue + "T00:00:00")
+        if (!isNaN(newDate.getTime())) {
+          handleDateChange(newDate, field)
+        } else {
+          console.warn("[v0] Invalid date value:", dateValue)
+          handleDateChange(undefined, field)
+        }
+      } catch (error) {
+        console.error("[v0] Error parsing date:", error)
+        handleDateChange(undefined, field)
+      }
+    } else {
+      handleDateChange(undefined, field)
     }
   }
 
@@ -929,34 +942,14 @@ export default function QuotationPage() {
                               <input
                                 type="date"
                                 value={getDateInputValue(editableQuotation?.start_date)}
-                                onChange={(e) => {
-                                  const dateValue = e.target.value
-                                  if (dateValue) {
-                                    const newDate = new Date(dateValue + "T00:00:00")
-                                    if (!isNaN(newDate.getTime())) {
-                                      handleDateChange(newDate, "start_date")
-                                    }
-                                  } else {
-                                    handleDateChange(undefined, "start_date")
-                                  }
-                                }}
+                                onChange={(e) => handleDateInputChange(e.target.value, "start_date")}
                                 className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
                               />
                               <span>-</span>
                               <input
                                 type="date"
                                 value={getDateInputValue(editableQuotation?.end_date)}
-                                onChange={(e) => {
-                                  const dateValue = e.target.value
-                                  if (dateValue) {
-                                    const newDate = new Date(dateValue + "T00:00:00")
-                                    if (!isNaN(newDate.getTime())) {
-                                      handleDateChange(newDate, "end_date")
-                                    }
-                                  } else {
-                                    handleDateChange(undefined, "end_date")
-                                  }
-                                }}
+                                onChange={(e) => handleDateInputChange(e.target.value, "end_date")}
                                 className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
                               />
                             </div>
