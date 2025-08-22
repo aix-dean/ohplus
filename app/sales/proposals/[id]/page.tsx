@@ -89,7 +89,7 @@ export default function ProposalDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
-      <div className="fixed left-65 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-10">
+      <div className="fixed left-60 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-10">
         <div className="flex flex-col items-center">
           <Button
             onClick={handleTemplates}
