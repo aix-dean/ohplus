@@ -799,31 +799,29 @@ export default function QuotationDetailsPage() {
 
                     {/* Pricing Table */}
                     <div className="mb-6">
-                      <table className="w-full border-collapse border border-gray-400">
+                      <table className="w-full">
                         <tbody>
                           <tr>
-                            <td className="border border-gray-400 p-2 font-medium">Lease rate per month</td>
-                            <td className="border border-gray-400 p-2 text-right font-bold">
-                              ₱{Number(item.price || 0).toLocaleString()}.00
-                            </td>
+                            <td className="p-2 font-medium">Lease rate per month</td>
+                            <td className="p-2 text-right font-bold">₱{Number(item.price || 0).toLocaleString()}.00</td>
                           </tr>
                           <tr>
-                            <td className="border border-gray-400 p-2 font-medium">
+                            <td className="p-2 font-medium">
                               x {Math.ceil((Number(item.duration_days) || 30) / 30)} months
                             </td>
-                            <td className="border border-gray-400 p-2 text-right font-bold">
+                            <td className="p-2 text-right font-bold">
                               ₱{Number(item.item_total_amount || 0).toLocaleString()}.00
                             </td>
                           </tr>
                           <tr>
-                            <td className="border border-gray-400 p-2 font-medium">12% VAT</td>
-                            <td className="border border-gray-400 p-2 text-right font-bold">
+                            <td className="p-2 font-medium">12% VAT</td>
+                            <td className="p-2 text-right font-bold">
                               ₱{(Number(item.item_total_amount || 0) * 0.12).toLocaleString()}.00
                             </td>
                           </tr>
                           <tr className="bg-gray-100">
-                            <td className="border border-gray-400 p-2 font-bold">TOTAL</td>
-                            <td className="border border-gray-400 p-2 text-right font-bold">
+                            <td className="p-2 font-bold">TOTAL</td>
+                            <td className="p-2 text-right font-bold">
                               ₱{(Number(item.item_total_amount || 0) * 1.12).toLocaleString()}.00
                             </td>
                           </tr>
