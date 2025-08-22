@@ -629,65 +629,6 @@ export default function ProposalDetailsPage() {
 
             {/* Additional Proposal Information */}
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Client Information</h4>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <p>
-                      <span className="font-medium">Company:</span> {proposal.client.company}
-                    </p>
-                    <p>
-                      <span className="font-medium">Contact:</span> {proposal.client.contactPerson}
-                    </p>
-                    {proposal.client.designation && (
-                      <p>
-                        <span className="font-medium">Position:</span> {proposal.client.designation}
-                      </p>
-                    )}
-                    <p>
-                      <span className="font-medium">Email:</span> {proposal.client.email}
-                    </p>
-                    <p>
-                      <span className="font-medium">Phone:</span> {proposal.client.phone}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Proposal Details</h4>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <p>
-                      <span className="font-medium">Proposal #:</span> {proposal.proposalNumber || proposal.id}
-                    </p>
-                    <p>
-                      <span className="font-medium">Status:</span>
-                      <span
-                        className={`ml-1 px-2 py-1 rounded-full text-xs ${
-                          proposal.status === "accepted"
-                            ? "bg-green-100 text-green-800"
-                            : proposal.status === "declined"
-                              ? "bg-red-100 text-red-800"
-                              : proposal.status === "sent"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="font-medium">Created:</span> {proposal.createdAt.toLocaleDateString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">Valid Until:</span> {proposal.validUntil.toLocaleDateString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">Total Amount:</span> ₱
-                      {proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               {proposal.notes && (
                 <div className="mt-6">
                   <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
