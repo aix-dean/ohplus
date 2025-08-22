@@ -141,38 +141,6 @@ function ProposalsPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="fixed left-4 top-1/2 transform -translate-y-1/2 z-10 flex flex-col gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          className="w-12 h-12 bg-white shadow-lg border-gray-200 hover:bg-gray-50 flex flex-col items-center justify-center p-2"
-          title="Templates"
-        >
-          <FileText className="h-5 w-5 text-gray-600" />
-          <span className="text-xs text-gray-600 mt-1">Templates</span>
-        </Button>
-
-        <Button
-          variant="outline"
-          size="icon"
-          className="w-12 h-12 bg-white shadow-lg border-gray-200 hover:bg-gray-50 flex flex-col items-center justify-center p-2"
-          title="Edit"
-        >
-          <MoreVertical className="h-5 w-5 text-gray-600" />
-          <span className="text-xs text-gray-600 mt-1">Edit</span>
-        </Button>
-
-        <Button
-          variant="outline"
-          size="icon"
-          className="w-12 h-12 bg-white shadow-lg border-gray-200 hover:bg-gray-50 flex flex-col items-center justify-center p-2"
-          title="Download"
-        >
-          <Download className="h-5 w-5 text-gray-600" />
-          <span className="text-xs text-gray-600 mt-1">Download</span>
-        </Button>
-      </div>
-
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         {/* Header Section */}
         <div className="mb-6">

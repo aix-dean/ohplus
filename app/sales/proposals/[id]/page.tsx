@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, FileText, Layout, Edit, Download } from "lucide-react"
+import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download } from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useToast } from "@/hooks/use-toast"
@@ -37,6 +37,27 @@ export default function ProposalDetailsPage() {
     fetchProposal()
   }, [params.id, toast])
 
+  const handleTemplates = () => {
+    toast({
+      title: "Templates",
+      description: "Opening templates panel...",
+    })
+  }
+
+  const handleEdit = () => {
+    toast({
+      title: "Edit Mode",
+      description: "Entering edit mode...",
+    })
+  }
+
+  const handleDownload = () => {
+    toast({
+      title: "Download",
+      description: "Downloading proposal...",
+    })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
@@ -67,27 +88,42 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8 relative">
+    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
       <div className="fixed left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-10">
-        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
-          <Layout className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
-          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
-            Templates
-          </span>
+        <div className="flex flex-col items-center">
+          <Button
+            onClick={handleTemplates}
+            variant="outline"
+            size="lg"
+            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+          >
+            <Grid3X3 className="h-6 w-6 text-gray-600" />
+          </Button>
+          <span className="text-xs text-gray-600 mt-2 font-medium">Templates</span>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
-          <Edit className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
-          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
-            Edit
-          </span>
+        <div className="flex flex-col items-center">
+          <Button
+            onClick={handleEdit}
+            variant="outline"
+            size="lg"
+            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+          >
+            <Edit className="h-6 w-6 text-gray-600" />
+          </Button>
+          <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
-          <Download className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
-          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
-            Download
-          </span>
+        <div className="flex flex-col items-center">
+          <Button
+            onClick={handleDownload}
+            variant="outline"
+            size="lg"
+            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+          >
+            <Download className="h-6 w-6 text-gray-600" />
+          </Button>
+          <span className="text-xs text-gray-600 mt-2 font-medium">Download</span>
         </div>
       </div>
 
