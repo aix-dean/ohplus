@@ -178,11 +178,17 @@ export default function QuotationPage() {
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
     if (editableQuotation && editableQuotation.items && editableQuotation.start_date && editableQuotation.end_date) {
-      const { durationDays, totalAmount } = calculateTotal(
-        editableQuotation.start_date,
-        editableQuotation.end_date,
-        editableQuotation.items,
-      )
+      const startDateStr =
+        typeof editableQuotation.start_date === "string"
+          ? editableQuotation.start_date
+          : editableQuotation.start_date.toISOString?.() || new Date(editableQuotation.start_date).toISOString()
+
+      const endDateStr =
+        typeof editableQuotation.end_date === "string"
+          ? editableQuotation.end_date
+          : editableQuotation.end_date.toISOString?.() || new Date(editableQuotation.end_date).toISOString()
+
+      const { durationDays, totalAmount } = calculateTotal(startDateStr, endDateStr, editableQuotation.items)
 
       // Recalculate individual item totals based on new duration
       const updatedItems = editableQuotation.items.map((item) => {
@@ -212,7 +218,7 @@ export default function QuotationPage() {
         })
       }
     }
-  }, [editableQuotation])
+  }, [editableQuotation, editableQuotation?.start_date, editableQuotation?.end_date, calculateTotal])
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -363,27 +369,36 @@ export default function QuotationPage() {
     }
   }
 
-  const handleProductPriceChange = (productId: string, newPrice: number) => {
+  const handleProductPriceChange = (productIndex: number, newPrice: number) => {
     setEditableQuotation((prev) => {
-      if (!prev) return null
-      const updatedItems = prev.items.map((p) => {
-        if (p.id === productId) {
-          const durationDays = Number(p.duration_days) || Number(prev.duration_days) || 40
-          const monthlyRate = newPrice
-          const months = Math.floor(durationDays / 30)
-          const remainingDays = durationDays % 30
-          const dailyRate = monthlyRate / 30
-          const itemTotalAmount = months * monthlyRate + remainingDays * dailyRate
+      if (!prev || !prev.items) return prev
 
-          return {
-            ...p,
-            price: newPrice,
-            item_total_amount: itemTotalAmount,
-          }
-        }
-        return p
-      })
-      return { ...prev, items: updatedItems }
+      const updatedItems = [...prev.items]
+      const item = updatedItems[productIndex]
+
+      // Update the price
+      updatedItems[productIndex] = {
+        ...item,
+        price: newPrice,
+      }
+
+      // Recalculate item total amount based on duration and new price
+      const durationDays = prev.duration_days || 30
+      const months = Math.floor(durationDays / 30)
+      const remainingDays = durationDays % 30
+      const dailyRate = newPrice / 30
+      const itemTotalAmount = months * newPrice + remainingDays * dailyRate
+
+      updatedItems[productIndex].item_total_amount = itemTotalAmount
+
+      // Recalculate total quotation amount
+      const newTotalAmount = updatedItems.reduce((sum, item) => sum + (item.item_total_amount || 0), 0)
+
+      return {
+        ...prev,
+        items: updatedItems,
+        total_amount: newTotalAmount,
+      }
     })
   }
 
@@ -990,7 +1005,7 @@ export default function QuotationPage() {
                                 value={item.price || 0}
                                 onChange={(e) => {
                                   const newPrice = Number.parseFloat(e.target.value) || 0
-                                  handleProductPriceChange(item.id, newPrice)
+                                  handleProductPriceChange(index, newPrice)
                                 }}
                                 className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1 w-32"
                               />
