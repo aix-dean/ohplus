@@ -1,8 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon } from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
 import { getProposalTemplatesByCompanyId, createProposalTemplate } from "@/lib/firebase-service"
@@ -17,6 +21,12 @@ export default function ProposalDetailsPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [formData, setFormData] = useState({
+    name: "",
+    background_url: "",
+  })
+  const [formLoading, setFormLoading] = useState(false)
   const [templates, setTemplates] = useState<ProposalTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
 
@@ -61,20 +71,39 @@ export default function ProposalDetailsPage() {
 
   const handleTemplates = () => {
     setShowTemplatesPanel(true)
+    setShowCreateForm(false)
     fetchTemplates()
   }
 
-  const handleCreateTemplate = async () => {
+  const handleCreateTemplate = () => {
+    setShowCreateForm(true)
+    setFormData({ name: "", background_url: "" })
+  }
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Template name is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setFormLoading(true)
     try {
-      const newTemplate = await createProposalTemplate({
-        name: "New Template",
-        background_url: "",
+      await createProposalTemplate({
+        name: formData.name.trim(),
+        background_url: formData.background_url.trim(),
         company_id: "company_123", // Replace with actual company_id
       })
       toast({
         title: "Success",
         description: "Template created successfully",
       })
+      setShowCreateForm(false)
+      setFormData({ name: "", background_url: "" })
       fetchTemplates() // Refresh the list
     } catch (error) {
       console.error("Error creating template:", error)
@@ -83,7 +112,18 @@ export default function ProposalDetailsPage() {
         description: "Failed to create template",
         variant: "destructive",
       })
+    } finally {
+      setFormLoading(false)
     }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleBackToList = () => {
+    setShowCreateForm(false)
+    setFormData({ name: "", background_url: "" })
   }
 
   const handleEdit = () => {
@@ -135,72 +175,138 @@ export default function ProposalDetailsPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">Proposal Templates</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {showCreateForm ? "Create New Template" : "Proposal Templates"}
+              </h2>
               <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-gray-600">Choose a template or create a new one</p>
-                <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Template
-                </Button>
-              </div>
-
-              <div className="max-h-96 overflow-y-auto">
-                {templatesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                    <span className="ml-2 text-gray-600">Loading templates...</span>
+              {showCreateForm ? (
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="template-name">Template Name</Label>
+                    <Input
+                      id="template-name"
+                      type="text"
+                      placeholder="Enter template name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      required
+                    />
                   </div>
-                ) : templates.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                      <Grid3X3 className="h-8 w-8 text-gray-400" />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="background-url">Background Image URL (Optional)</Label>
+                    <Input
+                      id="background-url"
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      value={formData.background_url}
+                      onChange={(e) => handleInputChange("background_url", e.target.value)}
+                    />
+                  </div>
+
+                  {formData.background_url && (
+                    <div className="space-y-2">
+                      <Label>Preview</Label>
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={formData.background_url || "/placeholder.svg"}
+                          alt="Background preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none"
+                          }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-gray-600 mb-4">No templates found</p>
-                    <Button onClick={handleCreateTemplate} variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Template
+                  )}
+
+                  <div className="flex gap-3 pt-4">
+                    <Button type="button" variant="outline" onClick={handleBackToList} disabled={formLoading}>
+                      Back to Templates
+                    </Button>
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading}>
+                      {formLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Template
+                        </>
+                      )}
                     </Button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {templates.map((template) => (
-                      <div
-                        key={template.id}
-                        className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => {
-                          toast({
-                            title: "Template Selected",
-                            description: `Using template: ${template.name}`,
-                          })
-                          setShowTemplatesPanel(false)
-                        }}
-                      >
-                        <div className="aspect-video bg-gray-100 rounded-md mb-3 flex items-center justify-center">
-                          {template.background_url ? (
-                            <img
-                              src={template.background_url || "/placeholder.svg"}
-                              alt={template.name}
-                              className="w-full h-full object-cover rounded-md"
-                            />
-                          ) : (
-                            <ImageIcon className="h-8 w-8 text-gray-400" />
-                          )}
-                        </div>
-                        <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Created {template.created?.toDate().toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
+                </form>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-gray-600">Choose a template or create a new one</p>
+                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Template
+                    </Button>
                   </div>
-                )}
-              </div>
+
+                  <div className="max-h-96 overflow-y-auto">
+                    {templatesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                        <span className="ml-2 text-gray-600">Loading templates...</span>
+                      </div>
+                    ) : templates.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                          <Grid3X3 className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 mb-4">No templates found</p>
+                        <Button onClick={handleCreateTemplate} variant="outline">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Your First Template
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {templates.map((template) => (
+                          <div
+                            key={template.id}
+                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => {
+                              toast({
+                                title: "Template Selected",
+                                description: `Using template: ${template.name}`,
+                              })
+                              setShowTemplatesPanel(false)
+                            }}
+                          >
+                            <div className="aspect-video bg-gray-100 rounded-md mb-3 flex items-center justify-center">
+                              {template.background_url ? (
+                                <img
+                                  src={template.background_url || "/placeholder.svg"}
+                                  alt={template.name}
+                                  className="w-full h-full object-cover rounded-md"
+                                />
+                              ) : (
+                                <ImageIcon className="h-8 w-8 text-gray-400" />
+                              )}
+                            </div>
+                            <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Created {template.created?.toDate().toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
