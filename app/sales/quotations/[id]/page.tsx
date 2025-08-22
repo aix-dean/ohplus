@@ -749,9 +749,7 @@ export default function QuotationDetailsPage() {
               <div className="flex justify-between items-start mb-4">
                 <div className="text-left">
                   <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
-                  <p className="text-sm">
-                    {safeString(currentQuotation.client_company_name) || "JMCL MEDIA & MARKETING SERVICES INC."}
-                  </p>
+                  <p className="text-sm">{currentQuotation.client_company_name || "N/A"}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm">RFQ. No. {currentQuotation.quotation_number}</p>
@@ -828,7 +826,7 @@ export default function QuotationDetailsPage() {
                         <div className="flex">
                           <span className="font-medium w-32">● Proposal to:</span>
                           <span className="font-bold">
-                            {safeString(currentQuotation.client_company_name) || "CLIENT COMPANY NAME"}
+                            {currentQuotation.client_company_name || "CLIENT COMPANY NAME"}
                           </span>
                         </div>
                         <div className="flex">
@@ -926,9 +924,7 @@ export default function QuotationDetailsPage() {
                   <p className="text-sm mb-8">C o n f o r m e:</p>
                   <div className="border-b border-gray-400 mb-2"></div>
                   <p className="text-sm font-medium">{safeString(currentQuotation.client_name)}</p>
-                  <p className="text-sm">
-                    {safeString(currentQuotation.client_company_name) || "JMCL MEDIA & MARKETING SERVICES INC."}
-                  </p>
+                  <p className="text-sm">{currentQuotation.client_company_name || "N/A"}</p>
                   <p className="text-xs mt-4 italic">
                     This signed Quotation serves as an
                     <br />
