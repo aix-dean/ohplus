@@ -267,7 +267,7 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
+    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
       {showTemplatesPanel && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
@@ -479,9 +479,9 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent p-8 min-h-[600px]">
+      <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent min-h-[600px]">
         {selectedTemplateBackground ? (
-          <div className="w-full h-full min-h-[544px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+          <div className="w-full h-full min-h-[544px] overflow-hidden">
             <img
               src={selectedTemplateBackground || "/placeholder.svg"}
               alt="Selected template background"
@@ -494,7 +494,7 @@ export default function ProposalDetailsPage() {
             />
           </div>
         ) : (
-          <div className="w-full h-full min-h-[544px] flex items-center justify-center text-gray-400">
+          <div className="w-full h-full min-h-[544px] flex items-center justify-center text-gray-400 p-8">
             <div className="text-center">
               <Grid3X3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
               <p className="text-lg">Select a template to display background</p>
