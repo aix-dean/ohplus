@@ -922,7 +922,7 @@ export default function QuotationPage() {
                   <p className="text-sm font-medium">
                     {currentQuotation.created_by_first_name} {currentQuotation.created_by_last_name}
                   </p>
-                  <p className="text-sm">Account Management</p>
+                  <p className="text-sm">{currentQuotation.position || "Position"}</p>
                 </div>
                 <div>
                   <p className="text-sm mb-8">C o n f o r m e:</p>
