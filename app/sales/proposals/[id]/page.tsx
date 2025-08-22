@@ -38,6 +38,7 @@ export default function ProposalDetailsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [filePreview, setFilePreview] = useState<string>("")
   const [uploading, setUploading] = useState(false)
+  const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
 
   useEffect(() => {
     async function fetchProposal() {
@@ -392,6 +393,8 @@ export default function ProposalDetailsPage() {
                           key={template.id}
                           className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
                           onClick={() => {
+                            setSelectedTemplateBackground(template.background_url || "")
+                            setShowTemplatesPanel(false)
                             toast({
                               title: "Template Selected",
                               description: `Selected template: ${template.name}`,
@@ -477,7 +480,28 @@ export default function ProposalDetailsPage() {
       </div>
 
       <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent p-8 min-h-[600px]">
-        {/* Container content will go here */}
+        {selectedTemplateBackground ? (
+          <div className="w-full h-full min-h-[544px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+            <img
+              src={selectedTemplateBackground || "/placeholder.svg"}
+              alt="Selected template background"
+              className="max-w-full max-h-full object-contain"
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "100%",
+                maxHeight: "100%",
+              }}
+            />
+          </div>
+        ) : (
+          <div className="w-full h-full min-h-[544px] flex items-center justify-center text-gray-400">
+            <div className="text-center">
+              <Grid3X3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg">Select a template to display background</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
