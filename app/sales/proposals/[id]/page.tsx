@@ -494,10 +494,85 @@ export default function ProposalDetailsPage() {
             />
           </div>
         ) : (
-          <div className="w-full h-full min-h-[544px] flex items-center justify-center text-gray-400 p-8">
-            <div className="text-center">
-              <Grid3X3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">Select a template to display background</p>
+          <div className="w-full h-full min-h-[544px] p-8 bg-white">
+            {/* Header Section */}
+            <div className="flex justify-between items-start mb-8">
+              {/* GTS Logo */}
+              <div className="flex-shrink-0">
+                <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                  <span className="text-white font-bold text-xl tracking-wider">GTS</span>
+                </div>
+              </div>
+
+              {/* Title and Price */}
+              <div className="text-right">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Petplans Tower Southbound</h1>
+                <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
+                  Php 2,000,000.00
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Section */}
+            <div className="flex gap-8 mb-6">
+              {/* Left Side - Building Image */}
+              <div className="flex-shrink-0">
+                <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                  <img
+                    src="/placeholder.svg?height=320&width=256"
+                    alt="Building with billboard"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side - Location Map and Details */}
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+
+                {/* Map Section */}
+                <div className="w-full h-32 bg-gray-600 rounded-lg mb-6 relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-white text-sm space-y-1 text-center">
+                      <div className="flex items-center justify-center space-x-4">
+                        <span>← To Manila</span>
+                        <span className="bg-gray-800 px-2 py-1 rounded">Osmeña Highway</span>
+                        <span>Skyway 3 →</span>
+                      </div>
+                      <div className="flex items-center justify-center space-x-2 mt-2">
+                        <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
+                        <span className="text-xs">To Makati</span>
+                        <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
+                        <span className="text-xs">Off Ramp To Buendia</span>
+                      </div>
+                      <div className="flex justify-center space-x-1 mt-2">
+                        <div className="w-8 h-4 bg-red-500 rounded-sm"></div>
+                        <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
+                        <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location Details */}
+                <div className="space-y-2 text-sm text-gray-800">
+                  <p>
+                    <span className="font-semibold">Location:</span> 444 Edsa, Guadalupe Viejo, Makati City
+                  </p>
+                  <p>
+                    <span className="font-semibold">Average Daily Traffic Count:</span> 405, 882 vehicles
+                  </p>
+                  <p>
+                    <span className="font-semibold">Location Visibility:</span> 500 meters
+                  </p>
+                  <p>
+                    <span className="font-semibold">Dimension:</span> 150ft (H) x 83ft (W)
+                  </p>
+                  <p>
+                    <span className="font-semibold">Type:</span> Building Wrap
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
