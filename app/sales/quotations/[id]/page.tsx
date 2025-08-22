@@ -811,19 +811,81 @@ export default function QuotationPage() {
                           <span className="font-medium w-32">● Type:</span>
                           <span className="font-bold">{safeString(item.type)}</span>
                         </div>
-                        <div className="flex">
+                        <div className="flex items-center">
                           <span className="font-medium w-32">● Size:</span>
-                          <span className="font-bold">{safeString(item.dimensions) || "100ft (H) x 60ft (W)"}</span>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={item.dimensions || "100ft (H) x 60ft (W)"}
+                              onChange={(e) => {
+                                setEditableQuotation((prev) => {
+                                  if (!prev) return null
+                                  const updatedItems = prev.items.map((p) =>
+                                    p.id === item.id ? { ...p, dimensions: e.target.value } : p,
+                                  )
+                                  return { ...prev, items: updatedItems }
+                                })
+                              }}
+                              className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1 flex-1"
+                            />
+                          ) : (
+                            <span className="font-bold">{safeString(item.dimensions) || "100ft (H) x 60ft (W)"}</span>
+                          )}
                         </div>
-                        <div className="flex">
+                        <div className="flex items-center">
                           <span className="font-medium w-32">● Contract Duration:</span>
-                          <span className="font-bold">{formatDuration(Number(item.duration_days) || 40)}</span>
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={item.duration_days || 40}
+                              onChange={(e) => {
+                                const newDuration = Number.parseInt(e.target.value) || 40
+                                setEditableQuotation((prev) => {
+                                  if (!prev) return null
+                                  const updatedItems = prev.items.map((p) =>
+                                    p.id === item.id ? { ...p, duration_days: newDuration } : p,
+                                  )
+                                  return { ...prev, items: updatedItems }
+                                })
+                              }}
+                              className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1 w-20 mr-2"
+                            />
+                          ) : (
+                            <span className="font-bold">{formatDuration(Number(item.duration_days) || 40)}</span>
+                          )}
+                          {isEditing && <span className="text-sm text-gray-500">days</span>}
                         </div>
-                        <div className="flex">
+                        <div className="flex items-center">
                           <span className="font-medium w-32">● Contract Period:</span>
-                          <span className="font-bold">
-                            {formatDate(currentQuotation.start_date)} - {formatDate(currentQuotation.end_date)}
-                          </span>
+                          {isEditing ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="date"
+                                value={
+                                  editableQuotation?.start_date
+                                    ? new Date(editableQuotation.start_date).toISOString().split("T")[0]
+                                    : ""
+                                }
+                                onChange={(e) => handleDateChange(new Date(e.target.value), "start_date")}
+                                className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
+                              />
+                              <span>-</span>
+                              <input
+                                type="date"
+                                value={
+                                  editableQuotation?.end_date
+                                    ? new Date(editableQuotation.end_date).toISOString().split("T")[0]
+                                    : ""
+                                }
+                                onChange={(e) => handleDateChange(new Date(e.target.value), "end_date")}
+                                className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
+                              />
+                            </div>
+                          ) : (
+                            <span className="font-bold">
+                              {formatDate(currentQuotation.start_date)} - {formatDate(currentQuotation.end_date)}
+                            </span>
+                          )}
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Proposal to:</span>
@@ -831,17 +893,50 @@ export default function QuotationPage() {
                             {currentQuotation.client_company_name || "CLIENT COMPANY NAME"}
                           </span>
                         </div>
-                        <div className="flex">
+                        <div className="flex items-center">
                           <span className="font-medium w-32">● Illumination:</span>
-                          <span className="font-bold">
-                            {safeString(item.illumination) || "10 units of 1000 watts metal Halide"}
-                          </span>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={item.illumination || "10 units of 1000 watts metal Halide"}
+                              onChange={(e) => {
+                                setEditableQuotation((prev) => {
+                                  if (!prev) return null
+                                  const updatedItems = prev.items.map((p) =>
+                                    p.id === item.id ? { ...p, illumination: e.target.value } : p,
+                                  )
+                                  return { ...prev, items: updatedItems }
+                                })
+                              }}
+                              className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1 flex-1"
+                            />
+                          ) : (
+                            <span className="font-bold">
+                              {safeString(item.illumination) || "10 units of 1000 watts metal Halide"}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex">
+                        <div className="flex items-center">
                           <span className="font-medium w-32">● Lease Rate/Month:</span>
-                          <span className="font-bold">
-                            ₱{Number(item.price || 0).toLocaleString()}.00 (Exclusive of VAT)
-                          </span>
+                          {isEditing ? (
+                            <div className="flex items-center">
+                              <span className="font-bold mr-1">₱</span>
+                              <input
+                                type="number"
+                                value={item.price || 0}
+                                onChange={(e) => {
+                                  const newPrice = Number.parseFloat(e.target.value) || 0
+                                  handleProductPriceChange(item.id, newPrice)
+                                }}
+                                className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1 w-32"
+                              />
+                              <span className="font-bold ml-1">.00 (Exclusive of VAT)</span>
+                            </div>
+                          ) : (
+                            <span className="font-bold">
+                              ₱{Number(item.price || 0).toLocaleString()}.00 (Exclusive of VAT)
+                            </span>
+                          )}
                         </div>
                         <div className="flex">
                           <span className="font-medium w-32">● Total Lease:</span>
@@ -920,9 +1015,49 @@ export default function QuotationPage() {
                   <p className="text-sm mb-8">Very truly yours,</p>
                   <div className="border-b border-gray-400 mb-2"></div>
                   <p className="text-sm font-medium">
-                    {currentQuotation.created_by_first_name} {currentQuotation.created_by_last_name}
+                    {isEditing ? (
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={editableQuotation?.created_by_first_name || ""}
+                          onChange={(e) =>
+                            setEditableQuotation((prev) =>
+                              prev ? { ...prev, created_by_first_name: e.target.value } : null,
+                            )
+                          }
+                          placeholder="First Name"
+                          className="bg-yellow-50 border border-yellow-300 rounded px-2 py-1 text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={editableQuotation?.created_by_last_name || ""}
+                          onChange={(e) =>
+                            setEditableQuotation((prev) =>
+                              prev ? { ...prev, created_by_last_name: e.target.value } : null,
+                            )
+                          }
+                          placeholder="Last Name"
+                          className="bg-yellow-50 border border-yellow-300 rounded px-2 py-1 text-sm"
+                        />
+                      </div>
+                    ) : (
+                      `${currentQuotation.created_by_first_name || ""} ${currentQuotation.created_by_last_name || ""}`
+                    )}
                   </p>
-                  <p className="text-sm">{currentQuotation.position || "Position"}</p>
+                  <p className="text-sm">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editableQuotation?.position || "Position"}
+                        onChange={(e) =>
+                          setEditableQuotation((prev) => (prev ? { ...prev, position: e.target.value } : null))
+                        }
+                        className="bg-yellow-50 border border-yellow-300 rounded px-2 py-1 text-sm w-full"
+                      />
+                    ) : (
+                      currentQuotation.position || "Position"
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm mb-8">C o n f o r m e:</p>
