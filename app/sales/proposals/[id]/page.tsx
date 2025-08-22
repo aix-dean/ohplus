@@ -622,16 +622,6 @@ export default function ProposalDetailsPage() {
                 </div>
               </div>
             )}
-
-            {/* Additional Proposal Information */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              {proposal.notes && (
-                <div className="mt-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{proposal.notes}</p>
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
