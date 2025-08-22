@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -128,6 +128,10 @@ export default function QuotationPage() {
   const [currentProductPage, setCurrentProductPage] = useState(1)
   const productsPerPage = 1 // Show one product per page
 
+  const calculateTotal = useCallback((startDate: string, endDate: string, items: any[]) => {
+    return calculateQuotationTotal(startDate, endDate, items)
+  }, [])
+
   useEffect(() => {
     async function fetchQuotationData() {
       if (params.id) {
@@ -166,25 +170,25 @@ export default function QuotationPage() {
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
     if (editableQuotation && editableQuotation.items && editableQuotation.start_date && editableQuotation.end_date) {
-      const { durationDays, totalAmount } = calculateQuotationTotal(
+      const { durationDays, totalAmount } = calculateTotal(
         editableQuotation.start_date,
         editableQuotation.end_date,
         editableQuotation.items,
       )
 
-      setEditableQuotation((prev) => {
-        // Only update if there's an actual change to prevent infinite loops
-        if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
+      // Only update if there's an actual change to prevent infinite loops
+      if (editableQuotation.duration_days !== durationDays || editableQuotation.total_amount !== totalAmount) {
+        setEditableQuotation((prev) => {
+          if (!prev) return prev
           return {
             ...prev,
             duration_days: durationDays,
             total_amount: totalAmount,
           }
-        }
-        return prev // Return previous state if no change
-      })
+        })
+      }
     }
-  }, [editableQuotation]) // Dependencies for recalculation [^3]
+  }, [editableQuotation]) // Updated to use the entire editableQuotation object as a dependency
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -268,7 +272,7 @@ export default function QuotationPage() {
       }
 
       // Recalculate total amount based on current editable state
-      const { durationDays, totalAmount } = calculateQuotationTotal(
+      const { durationDays, totalAmount } = calculateTotal(
         startDateObj.toISOString(),
         endDateObj.toISOString(),
         editableQuotation.items,
