@@ -623,7 +623,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
-                  { title: "Hardwares", href: "/it/inventory", icon: Package },
+                  { title: "Assets", href: "/it/inventory", icon: Package },
                   { title: "User Management", href: "/it/user-management", icon: Users },
                 ].map((item) => {
                   const Icon = item.icon
