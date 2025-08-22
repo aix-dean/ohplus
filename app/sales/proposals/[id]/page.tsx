@@ -633,7 +633,18 @@ export default function ProposalDetailsPage() {
               {/* Title and Price */}
               <div className="text-right">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {proposal.title || `Proposal for ${proposal.client.company}`}
+                  Proposal for{" "}
+                  {proposal.products && proposal.products.length > 0
+                    ? proposal.products[0].specs_rental?.site_code ||
+                      proposal.products[0].name.split(" ")[0] ||
+                      proposal.client.company.substring(0, 3).toUpperCase()
+                    : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
+                  -{" "}
+                  {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </h1>
                 <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
                   ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
