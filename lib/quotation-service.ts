@@ -511,7 +511,9 @@ export async function generateQuotationPDF(
     // Names
     pdf.setFont("helvetica", "normal")
     const userFullName =
-      userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
+      quotation.created_by_first_name && quotation.created_by_last_name
+        ? `${quotation.created_by_first_name} ${quotation.created_by_last_name}`
+        : "Account Manager"
     pdf.text(userFullName, margin, yPosition)
     pdf.text(quotation.client_name || "Client Name", margin + contentWidth / 2, yPosition)
     yPosition += 6
