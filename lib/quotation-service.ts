@@ -520,7 +520,7 @@ export async function generateQuotationPDF(
 
     // Titles/Companies
     pdf.setFont("helvetica", "normal")
-    pdf.text("Account Management", margin, yPosition)
+    pdf.text(quotation.position || "Position", margin, yPosition)
     pdf.text(quotation.client_company_name || "Client Company", margin + contentWidth / 2, yPosition)
     yPosition += 10
 

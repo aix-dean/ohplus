@@ -39,8 +39,6 @@ import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase 
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useAuth } from "@/contexts/auth-context" // Added import for user authentication
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 // Helper function to generate QR code URL - Updated to point to public quotation page
 const generateQRCodeUrl = (quotationId: string) => {
@@ -113,7 +111,6 @@ export default function QuotationPage() {
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [companyData, setCompanyData] = useState<any>(null)
 
   // State for the shared SendQuotationDialog
   const [isSendQuotationDialogOpen, setIsSendQuotationDialogOpen] = useState(false)
@@ -165,23 +162,6 @@ export default function QuotationPage() {
 
     fetchQuotationData()
   }, [params.id, toast, router])
-
-  useEffect(() => {
-    async function fetchCompanyData() {
-      if (user?.company_id) {
-        try {
-          const companyDoc = await getDoc(doc(db, "companies", user.company_id))
-          if (companyDoc.exists()) {
-            setCompanyData(companyDoc.data())
-          }
-        } catch (error) {
-          console.error("Error fetching company data:", error)
-        }
-      }
-    }
-
-    fetchCompanyData()
-  }, [user?.company_id])
 
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
@@ -778,10 +758,7 @@ export default function QuotationPage() {
                 </div>
               </div>
 
-              <h1 className="text-2xl font-bold text-center mb-2">
-                {companyData?.name?.toUpperCase() || "COMPANY NAME"}
-              </h1>
-
+              <h1 className="text-2xl font-bold text-center mb-2">GOLDEN TOUCH IMAGING SPECIALIST</h1>
               <p className="text-sm text-center mb-4">
                 Good Day! Thank you for considering Golden Touch for your business needs.
                 <br />
