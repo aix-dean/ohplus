@@ -24,8 +24,6 @@ import {
   CloudRain,
   Cog,
   Monitor,
-  Wifi,
-  HardDrive,
   DollarSign,
   Receipt,
   CreditCard,
@@ -625,11 +623,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
-                  { title: "Network Management", href: "/it/network", icon: Wifi },
-                  { title: "Security Center", href: "/it/security", icon: ShieldCheck },
                   { title: "Hardwares", href: "/it/inventory", icon: Package },
-                  { title: "Server Management", href: "/it/servers", icon: Monitor },
-                  { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                   { title: "User Management", href: "/it/user-management", icon: Users },
                 ].map((item) => {
                   const Icon = item.icon
@@ -691,6 +685,22 @@ export function SideNavigation() {
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
