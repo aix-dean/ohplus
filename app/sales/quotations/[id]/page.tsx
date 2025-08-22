@@ -898,17 +898,18 @@ export default function QuotationPage() {
                               type="text"
                               value={item.dimensions || "100ft (H) x 60ft (W)"}
                               onChange={(e) => {
+                                const itemIndex = currentProductPage - 1
                                 console.log(
                                   "[v0] Updating dimensions for item at index:",
-                                  currentProductPage,
+                                  itemIndex,
                                   "New value:",
                                   e.target.value,
                                 )
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = [...prev.items]
-                                  updatedItems[currentProductPage] = {
-                                    ...updatedItems[currentProductPage],
+                                  updatedItems[itemIndex] = {
+                                    ...updatedItems[itemIndex],
                                     dimensions: String(e.target.value),
                                   }
                                   console.log("[v0] Updated items array:", updatedItems)
@@ -981,17 +982,18 @@ export default function QuotationPage() {
                               type="text"
                               value={item.illumination || "10 units of 1000 watts metal Halide"}
                               onChange={(e) => {
+                                const itemIndex = currentProductPage - 1
                                 console.log(
                                   "[v0] Updating illumination for item at index:",
-                                  currentProductPage,
+                                  itemIndex,
                                   "New value:",
                                   e.target.value,
                                 )
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = [...prev.items]
-                                  updatedItems[currentProductPage] = {
-                                    ...updatedItems[currentProductPage],
+                                  updatedItems[itemIndex] = {
+                                    ...updatedItems[itemIndex],
                                     illumination: String(e.target.value),
                                   }
                                   console.log("[v0] Updated items array:", updatedItems)
