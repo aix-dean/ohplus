@@ -898,11 +898,13 @@ export default function QuotationPage() {
                               type="text"
                               value={item.dimensions || "100ft (H) x 60ft (W)"}
                               onChange={(e) => {
+                                console.log("[v0] Updating dimensions for item:", item.id, "New value:", e.target.value)
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = prev.items.map((p) =>
                                     p.id === item.id ? { ...p, dimensions: String(e.target.value) } : p,
                                   )
+                                  console.log("[v0] Updated items array:", updatedItems)
                                   return { ...prev, items: updatedItems }
                                 })
                               }}
@@ -972,11 +974,18 @@ export default function QuotationPage() {
                               type="text"
                               value={item.illumination || "10 units of 1000 watts metal Halide"}
                               onChange={(e) => {
+                                console.log(
+                                  "[v0] Updating illumination for item:",
+                                  item.id,
+                                  "New value:",
+                                  e.target.value,
+                                )
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = prev.items.map((p) =>
                                     p.id === item.id ? { ...p, illumination: String(e.target.value) } : p,
                                   )
+                                  console.log("[v0] Updated items array:", updatedItems)
                                   return { ...prev, items: updatedItems }
                                 })
                               }}
