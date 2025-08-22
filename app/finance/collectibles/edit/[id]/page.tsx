@@ -16,6 +16,9 @@ import { db, storage } from "@/lib/firebase" // Added storage import
 import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
+import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -36,6 +39,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
+  covered_period_range?: DateRange
   bir_2307?: File | string | null // Changed to support both File and existing file reference
   collection_date?: string
   // Supplies specific fields
@@ -116,6 +120,19 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
             booking_no: data.booking_no || "",
             site: data.site || "",
             covered_period: data.covered_period || "",
+            covered_period_range: data.covered_period
+              ? (() => {
+                  const parts = data.covered_period.split(" - ")
+                  if (parts.length === 2) {
+                    const fromDate = new Date(parts[0])
+                    const toDate = new Date(parts[1])
+                    if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
+                      return { from: fromDate, to: toDate }
+                    }
+                  }
+                  return undefined
+                })()
+              : undefined,
             bir_2307: data.bir_2307 || null,
             collection_date: data.collection_date || "",
             // Supplies specific fields
@@ -292,6 +309,8 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
       }
 
       await updateDoc(collectibleRef, collectibleData)
+
+      await syncQuotationCollectionStatus(params.id)
 
       // Navigate back to collectibles list
       router.push("/finance/collectibles")
@@ -651,10 +670,20 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
           </div>
           <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
-            <Input
-              id="covered_period"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
+            <DateRangePicker
+              value={formData.covered_period_range}
+              onChange={(range) => {
+                handleInputChange("covered_period_range", range)
+                // Convert range to string format for backward compatibility
+                if (range?.from && range?.to) {
+                  const fromStr = range.from.toISOString().split("T")[0]
+                  const toStr = range.to.toISOString().split("T")[0]
+                  handleInputChange("covered_period", `${fromStr} - ${toStr}`)
+                } else {
+                  handleInputChange("covered_period", "")
+                }
+              }}
+              placeholder="Select date range"
             />
           </div>
           <div className="space-y-2">
@@ -848,7 +877,7 @@ export default function EditCollectiblePage({ params }: { params: { id: string }
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/finance/collectibles">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" type="button">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>

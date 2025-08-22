@@ -30,7 +30,7 @@ interface Collectible {
   or_no: string
   invoice_no: string
   next_collection_date: string
-  status: "pending" | "collected" | "overdue"
+  status: "pending" | "collected" | "overdue" | "paid"
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -142,7 +142,12 @@ export default function CollectiblesPage() {
       pending: "secondary",
       collected: "default",
       overdue: "destructive",
+      paid: "default",
     } as const
+
+    if (status === "paid") {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{status}</Badge>
+    }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
   }
@@ -218,6 +223,7 @@ export default function CollectiblesPage() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="collected">Collected</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>

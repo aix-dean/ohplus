@@ -129,6 +129,8 @@ function SalesDashboardContent() {
 
   // CE/Quote mode states
   const [ceQuoteMode, setCeQuoteMode] = useState(false)
+  const [ceMode, setCeMode] = useState(false)
+  const [quoteMode, setQuoteMode] = useState(false)
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
@@ -620,6 +622,28 @@ function SalesDashboardContent() {
     setSelectedProducts([]) // Clear any previously selected products
   }
 
+  const handleCeMode = () => {
+    setCeMode(true)
+    setQuoteMode(false)
+    setCeQuoteMode(true)
+    setProposalCreationMode(false)
+    setSelectedSites([])
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+    setSelectedProducts([])
+  }
+
+  const handleQuoteMode = () => {
+    setQuoteMode(true)
+    setCeMode(false)
+    setCeQuoteMode(true)
+    setProposalCreationMode(false)
+    setSelectedSites([])
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+    setSelectedProducts([])
+  }
+
   const handleSiteSelect = (product: Product) => {
     setSelectedSites((prev) => {
       const isSelected = prev.some((p) => p.id === product.id)
@@ -976,8 +1000,11 @@ function SalesDashboardContent() {
                     <Button onClick={handleInitiateProposalFlow} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
                       Planning & Proposals
                     </Button>
-                    <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      CE/Quote
+                    <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                      CE
+                    </Button>
+                    <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                      Quote
                     </Button>
                     <Button
                       className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
@@ -1482,67 +1509,47 @@ function SalesDashboardContent() {
         </div>
       )}
 
-      {/* Floating Action Buttons for CE/Quote and Proposal */}
-      {(ceQuoteMode || proposalCreationMode) && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-4 p-4 bg-white border rounded-lg shadow-lg z-50">
-          {proposalCreationMode && (
-            <Button
-              onClick={handleConfirmProposalCreation}
-              className="gap-2 bg-green-600 text-white hover:bg-green-700"
-              disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-            >
-              {isCreatingProposal ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4" />
-                  Create Proposal
-                </>
-              )}
-            </Button>
-          )}
+      {ceMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+          <Button
+            onClick={openCreateCostEstimateDateDialog}
+            className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+          >
+            {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Calculator className="h-4 w-4" />
+                Create Cost Estimate
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
-          {ceQuoteMode && (
-            <>
-              <Button
-                onClick={openCreateCostEstimateDateDialog}
-                className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
-                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-              >
-                {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="h-4 w-4" />
-                    Create Cost Estimate
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={openCreateQuotationDateDialog}
-                className="gap-2 bg-green-600 text-white hover:bg-green-700"
-                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-              >
-                {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Create Quotation
-                  </>
-                )}
-              </Button>
-            </>
-          )}
+      {quoteMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+          <Button
+            onClick={openCreateQuotationDateDialog}
+            className="gap-2 bg-green-600 text-white hover:bg-green-700"
+            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+          >
+            {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                Create Quotation
+              </>
+            )}
+          </Button>
         </div>
       )}
 

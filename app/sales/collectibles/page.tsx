@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, Eye, MoreHorizontal } from "lucide-react"
+import { Search, Eye, MoreHorizontal, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
+import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
 
 interface Collectible {
   id: string
@@ -30,7 +31,7 @@ interface Collectible {
   or_no: string
   invoice_no: string
   next_collection_date: string
-  status: "pending" | "collected" | "overdue"
+  status: "pending" | "collected" | "overdue" | "paid"
   // Sites specific fields
   booking_no?: string
   site?: string
@@ -137,12 +138,38 @@ export default function SalesCollectiblesPage() {
     }
   }
 
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      const collectibleRef = doc(db, "collectibles", id)
+      await updateDoc(collectibleRef, {
+        status: "paid",
+        updated: serverTimestamp(),
+      })
+
+      await syncQuotationCollectionStatus(id)
+
+      // Update local state
+      setCollectibles((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
+        ),
+      )
+    } catch (error) {
+      console.error("Error marking collectible as paid:", error)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const variants = {
       pending: "secondary",
       collected: "default",
       overdue: "destructive",
+      paid: "default", // Added paid status with green styling
     } as const
+
+    if (status === "paid") {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{status}</Badge>
+    }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
   }
@@ -212,6 +239,7 @@ export default function SalesCollectiblesPage() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="collected">Collected</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem> {/* Added paid filter option */}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -289,6 +317,12 @@ export default function SalesCollectiblesPage() {
                                 View Details
                               </Link>
                             </DropdownMenuItem>
+                            {collectible.status !== "paid" && (
+                              <DropdownMenuItem onClick={() => handleMarkAsPaid(collectible.id)}>
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                Mark As Paid
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
