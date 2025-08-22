@@ -901,7 +901,7 @@ export default function QuotationPage() {
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = prev.items.map((p) =>
-                                    p.id === item.id ? { ...p, dimensions: e.target.value } : p,
+                                    p.id === item.id ? { ...p, dimensions: String(e.target.value) } : p,
                                   )
                                   return { ...prev, items: updatedItems }
                                 })
@@ -975,7 +975,7 @@ export default function QuotationPage() {
                                 setEditableQuotation((prev) => {
                                   if (!prev) return null
                                   const updatedItems = prev.items.map((p) =>
-                                    p.id === item.id ? { ...p, illumination: e.target.value } : p,
+                                    p.id === item.id ? { ...p, illumination: String(e.target.value) } : p,
                                   )
                                   return { ...prev, items: updatedItems }
                                 })
