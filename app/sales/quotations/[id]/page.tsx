@@ -920,7 +920,7 @@ export default function QuotationPage() {
                   <p className="text-sm mb-8">Very truly yours,</p>
                   <div className="border-b border-gray-400 mb-2"></div>
                   <p className="text-sm font-medium">
-                    {user?.first_name} {user?.last_name}
+                    {currentQuotation.created_by_first_name} {currentQuotation.created_by_last_name}
                   </p>
                   <p className="text-sm">Account Management</p>
                 </div>
