@@ -100,6 +100,14 @@ const formatDuration = (days: number) => {
   return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
 }
 
+const getDateInputValue = (date: any): string => {
+  const dateObj = getDateObject(date)
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    return ""
+  }
+  return dateObj.toISOString().split("T")[0]
+}
+
 export default function QuotationPage() {
   const { user } = useAuth() // Added user authentication hook
   const params = useParams()
@@ -324,11 +332,19 @@ export default function QuotationPage() {
     }))
   }
 
+  // Updated handleDateChange to include validation
   const handleDateChange = (date: Date | undefined, field: "start_date" | "end_date" | "valid_until") => {
-    setEditableQuotation((prev) => ({
-      ...prev!,
-      [field]: date ? date.toISOString() : null, // Store as ISO string
-    }))
+    if (date && !isNaN(date.getTime())) {
+      setEditableQuotation((prev) => ({
+        ...prev!,
+        [field]: date.toISOString(),
+      }))
+    } else {
+      setEditableQuotation((prev) => ({
+        ...prev!,
+        [field]: null,
+      }))
+    }
   }
 
   const handleProductPriceChange = (productId: string, newPrice: number) => {
@@ -865,23 +881,35 @@ export default function QuotationPage() {
                             <div className="flex items-center space-x-2">
                               <input
                                 type="date"
-                                value={
-                                  editableQuotation?.start_date
-                                    ? new Date(editableQuotation.start_date).toISOString().split("T")[0]
-                                    : ""
-                                }
-                                onChange={(e) => handleDateChange(new Date(e.target.value), "start_date")}
+                                value={getDateInputValue(editableQuotation?.start_date)}
+                                onChange={(e) => {
+                                  const dateValue = e.target.value
+                                  if (dateValue) {
+                                    const newDate = new Date(dateValue + "T00:00:00")
+                                    if (!isNaN(newDate.getTime())) {
+                                      handleDateChange(newDate, "start_date")
+                                    }
+                                  } else {
+                                    handleDateChange(undefined, "start_date")
+                                  }
+                                }}
                                 className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
                               />
                               <span>-</span>
                               <input
                                 type="date"
-                                value={
-                                  editableQuotation?.end_date
-                                    ? new Date(editableQuotation.end_date).toISOString().split("T")[0]
-                                    : ""
-                                }
-                                onChange={(e) => handleDateChange(new Date(e.target.value), "end_date")}
+                                value={getDateInputValue(editableQuotation?.end_date)}
+                                onChange={(e) => {
+                                  const dateValue = e.target.value
+                                  if (dateValue) {
+                                    const newDate = new Date(dateValue + "T00:00:00")
+                                    if (!isNaN(newDate.getTime())) {
+                                      handleDateChange(newDate, "end_date")
+                                    }
+                                  } else {
+                                    handleDateChange(undefined, "end_date")
+                                  }
+                                }}
                                 className="font-bold bg-yellow-50 border border-yellow-300 rounded px-2 py-1"
                               />
                             </div>
