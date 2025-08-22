@@ -17,11 +17,13 @@ import {
 import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ProposalDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { userData } = useAuth()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
@@ -60,9 +62,18 @@ export default function ProposalDetailsPage() {
   }, [params.id, toast])
 
   const fetchTemplates = async () => {
+    if (!userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "Company information not available",
+        variant: "destructive",
+      })
+      return
+    }
+
     setTemplatesLoading(true)
     try {
-      const templatesData = await getProposalTemplatesByCompanyId("company_123") // Replace with actual company_id
+      const templatesData = await getProposalTemplatesByCompanyId(userData.company_id)
       setTemplates(templatesData)
     } catch (error) {
       console.error("Error fetching templates:", error)
@@ -139,6 +150,15 @@ export default function ProposalDetailsPage() {
       return
     }
 
+    if (!userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "Company information not available",
+        variant: "destructive",
+      })
+      return
+    }
+
     setFormLoading(true)
     try {
       let backgroundUrl = formData.background_url
@@ -168,7 +188,7 @@ export default function ProposalDetailsPage() {
       await createProposalTemplate({
         name: formData.name.trim(),
         background_url: backgroundUrl,
-        company_id: "company_123", // Replace with actual company_id
+        company_id: userData.company_id,
       })
       toast({
         title: "Success",
