@@ -26,6 +26,7 @@ import {
   getQuotationById,
   updateQuotationStatus,
   generateQuotationPDF,
+  generateSeparateQuotationPDFs, // Added import for separate PDF generation
   updateQuotation,
   calculateQuotationTotal,
   type Quotation,
@@ -194,11 +195,19 @@ export default function QuotationDetailsPage() {
 
     setDownloadingPDF(true)
     try {
-      await generateQuotationPDF(quotation)
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
+      if (quotation.items && quotation.items.length > 1) {
+        await generateSeparateQuotationPDFs(quotation)
+        toast({
+          title: "Success",
+          description: `${quotation.items.length} separate PDFs downloaded successfully`,
+        })
+      } else {
+        await generateQuotationPDF(quotation)
+        toast({
+          title: "Success",
+          description: "PDF downloaded successfully",
+        })
+      }
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
