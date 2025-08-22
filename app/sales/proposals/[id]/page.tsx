@@ -497,82 +497,203 @@ export default function ProposalDetailsPage() {
           <div className="w-full h-full min-h-[544px] p-8 bg-white">
             {/* Header Section */}
             <div className="flex justify-between items-start mb-8">
-              {/* GTS Logo */}
+              {/* Company Logo or GTS Logo */}
               <div className="flex-shrink-0">
-                <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                  <span className="text-white font-bold text-xl tracking-wider">GTS</span>
-                </div>
+                {proposal.client.companyLogoUrl ? (
+                  <img
+                    src={proposal.client.companyLogoUrl || "/placeholder.svg"}
+                    alt={`${proposal.client.company} logo`}
+                    className="w-32 h-16 object-contain"
+                  />
+                ) : (
+                  <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                    <span className="text-white font-bold text-xl tracking-wider">
+                      {proposal.client.company.substring(0, 3).toUpperCase()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Title and Price */}
               <div className="text-right">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">Petplans Tower Southbound</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  {proposal.title || `Proposal for ${proposal.client.company}`}
+                </h1>
                 <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
-                  Php 2,000,000.00
+                  ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
             {/* Main Content Section */}
-            <div className="flex gap-8 mb-6">
-              {/* Left Side - Building Image */}
-              <div className="flex-shrink-0">
-                <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
-                  <img
-                    src="/placeholder.svg?height=320&width=256"
-                    alt="Building with billboard"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Right Side - Location Map and Details */}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
-
-                {/* Map Section */}
-                <div className="w-full h-32 bg-gray-600 rounded-lg mb-6 relative overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-white text-sm space-y-1 text-center">
-                      <div className="flex items-center justify-center space-x-4">
-                        <span>← To Manila</span>
-                        <span className="bg-gray-800 px-2 py-1 rounded">Osmeña Highway</span>
-                        <span>Skyway 3 →</span>
+            {proposal.products && proposal.products.length > 0 ? (
+              <div className="flex gap-8 mb-6">
+                {/* Left Side - Product Image */}
+                <div className="flex-shrink-0">
+                  <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                    {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
+                      <img
+                        src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
+                        alt={proposal.products[0].name || "Product image"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="h-16 w-16 text-gray-400" />
                       </div>
-                      <div className="flex items-center justify-center space-x-2 mt-2">
-                        <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
-                        <span className="text-xs">To Makati</span>
-                        <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
-                        <span className="text-xs">Off Ramp To Buendia</span>
-                      </div>
-                      <div className="flex justify-center space-x-1 mt-2">
-                        <div className="w-8 h-4 bg-red-500 rounded-sm"></div>
-                        <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
-                        <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Location Details */}
-                <div className="space-y-2 text-sm text-gray-800">
-                  <p>
-                    <span className="font-semibold">Location:</span> 444 Edsa, Guadalupe Viejo, Makati City
-                  </p>
-                  <p>
-                    <span className="font-semibold">Average Daily Traffic Count:</span> 405, 882 vehicles
-                  </p>
-                  <p>
-                    <span className="font-semibold">Location Visibility:</span> 500 meters
-                  </p>
-                  <p>
-                    <span className="font-semibold">Dimension:</span> 150ft (H) x 83ft (W)
-                  </p>
-                  <p>
-                    <span className="font-semibold">Type:</span> Building Wrap
-                  </p>
+                {/* Right Side - Location Map and Details */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+
+                  {/* Map Section - Static for now, could be enhanced with actual map integration */}
+                  <div className="w-full h-32 bg-gray-600 rounded-lg mb-6 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-white text-sm space-y-1 text-center">
+                        <div className="flex items-center justify-center space-x-4">
+                          <span>← To Manila</span>
+                          <span className="bg-gray-800 px-2 py-1 rounded">
+                            {proposal.products[0].specs_rental?.location?.includes("Highway") ? "Highway" : "Main Road"}
+                          </span>
+                          <span>Direction →</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2 mt-2">
+                          <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
+                          <span className="text-xs">Access Road</span>
+                          <div className="w-4 h-6 bg-blue-500 rounded-sm"></div>
+                          <span className="text-xs">Main Route</span>
+                        </div>
+                        <div className="flex justify-center space-x-1 mt-2">
+                          <div className="w-8 h-4 bg-red-500 rounded-sm"></div>
+                          <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
+                          <div className="w-8 h-4 bg-gray-700 rounded-sm"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Location Details */}
+                  <div className="space-y-2 text-sm text-gray-800">
+                    <p>
+                      <span className="font-semibold">Product:</span> {proposal.products[0].name}
+                    </p>
+                    {proposal.products[0].specs_rental?.location && (
+                      <p>
+                        <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
+                      </p>
+                    )}
+                    {proposal.products[0].specs_rental?.traffic_count && (
+                      <p>
+                        <span className="font-semibold">Average Daily Traffic Count:</span>{" "}
+                        {proposal.products[0].specs_rental.traffic_count.toLocaleString()} vehicles
+                      </p>
+                    )}
+                    {proposal.products[0].specs_rental?.elevation !== undefined && (
+                      <p>
+                        <span className="font-semibold">Location Visibility:</span>{" "}
+                        {proposal.products[0].specs_rental.elevation} meters
+                      </p>
+                    )}
+                    {proposal.products[0].specs_rental?.height && proposal.products[0].specs_rental?.width && (
+                      <p>
+                        <span className="font-semibold">Dimension:</span> {proposal.products[0].specs_rental.height}ft
+                        (H) x {proposal.products[0].specs_rental.width}ft (W)
+                      </p>
+                    )}
+                    <p>
+                      <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
+                    </p>
+                    {proposal.products[0].description && (
+                      <p>
+                        <span className="font-semibold">Description:</span> {proposal.products[0].description}
+                      </p>
+                    )}
+                    <p>
+                      <span className="font-semibold">Price:</span> ₱
+                      {proposal.products[0].price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No products found in this proposal</p>
+                </div>
+              </div>
+            )}
+
+            {/* Additional Proposal Information */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Client Information</h4>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p>
+                      <span className="font-medium">Company:</span> {proposal.client.company}
+                    </p>
+                    <p>
+                      <span className="font-medium">Contact:</span> {proposal.client.contactPerson}
+                    </p>
+                    {proposal.client.designation && (
+                      <p>
+                        <span className="font-medium">Position:</span> {proposal.client.designation}
+                      </p>
+                    )}
+                    <p>
+                      <span className="font-medium">Email:</span> {proposal.client.email}
+                    </p>
+                    <p>
+                      <span className="font-medium">Phone:</span> {proposal.client.phone}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Proposal Details</h4>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p>
+                      <span className="font-medium">Proposal #:</span> {proposal.proposalNumber || proposal.id}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>
+                      <span
+                        className={`ml-1 px-2 py-1 rounded-full text-xs ${
+                          proposal.status === "accepted"
+                            ? "bg-green-100 text-green-800"
+                            : proposal.status === "declined"
+                              ? "bg-red-100 text-red-800"
+                              : proposal.status === "sent"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="font-medium">Created:</span> {proposal.createdAt.toLocaleDateString()}
+                    </p>
+                    <p>
+                      <span className="font-medium">Valid Until:</span> {proposal.validUntil.toLocaleDateString()}
+                    </p>
+                    <p>
+                      <span className="font-medium">Total Amount:</span> ₱
+                      {proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {proposal.notes && (
+                <div className="mt-6">
+                  <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{proposal.notes}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
