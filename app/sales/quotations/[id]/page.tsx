@@ -748,24 +748,27 @@ export default function QuotationDetailsPage() {
               <div className="space-y-8">
                 {/* Pagination controls for multiple products */}
                 {totalProducts > 1 && (
-                  <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center justify-center p-4 bg-white border border-gray-300 rounded-lg shadow-lg">
-                    <div className="flex items-center space-x-4">
+                  <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center justify-center p-4 bg-white rounded-lg shadow-lg">
+                    <div className="flex items-center space-x-6">
                       <button
                         onClick={handlePrevPage}
                         disabled={currentProductPage === 1}
-                        className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        ← Previous
+                        Previous
                       </button>
-                      <span className="text-sm text-gray-600">
-                        Product {currentProductPage} of {totalPages}
-                      </span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-sm font-medium text-gray-900">
+                          {currentProductPage} of {totalPages}
+                        </span>
+                        <div className="w-full h-0.5 bg-orange-500 mt-1"></div>
+                      </div>
                       <button
                         onClick={handleNextPage}
                         disabled={currentProductPage === totalPages}
-                        className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        Next →
+                        Next
                       </button>
                     </div>
                   </div>
