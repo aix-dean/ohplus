@@ -29,8 +29,8 @@ import {
   generateSeparateQuotationPDFs, // Added import for separate PDF generation
   updateQuotation,
   calculateQuotationTotal,
-  type Quotation,
 } from "@/lib/quotation-service"
+import type { Quotation } from "@/lib/types/quotation"
 import { useToast } from "@/hooks/use-toast"
 import { SendQuotationDialog } from "@/components/send-quotation-dialog"
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog"
