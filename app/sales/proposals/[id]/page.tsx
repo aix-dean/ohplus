@@ -611,10 +611,6 @@ export default function ProposalDetailsPage() {
                         <span className="font-semibold">Description:</span> {proposal.products[0].description}
                       </p>
                     )}
-                    <p>
-                      <span className="font-semibold">Price:</span> ₱
-                      {proposal.products[0].price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                    </p>
                   </div>
                 </div>
               </div>
