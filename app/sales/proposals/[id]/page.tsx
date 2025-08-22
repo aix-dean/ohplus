@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, FileText } from "lucide-react"
+import { ArrowLeft, Loader2, FileText, Layout, Edit, Download } from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useToast } from "@/hooks/use-toast"
@@ -67,7 +67,30 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8">
+    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-8 relative">
+      <div className="fixed left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-10">
+        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
+          <Layout className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
+          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
+            Templates
+          </span>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
+          <Edit className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
+          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
+            Edit
+          </span>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-3 hover:shadow-xl transition-shadow cursor-pointer group">
+          <Download className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors mx-auto mb-1" />
+          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors block text-center font-medium">
+            Download
+          </span>
+        </div>
+      </div>
+
       <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg border-transparent p-8 min-h-[600px]">
         {/* Container content will go here */}
       </div>
