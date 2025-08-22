@@ -758,7 +758,10 @@ export default function QuotationPage() {
                 </div>
               </div>
 
-              <h1 className="text-2xl font-bold text-center mb-2">GOLDEN TOUCH IMAGING SPECIALIST</h1>
+              <h1 className="text-2xl font-bold text-center mb-2">
+                {user?.company?.name?.toUpperCase() || "COMPANY NAME"}
+              </h1>
+
               <p className="text-sm text-center mb-4">
                 Good Day! Thank you for considering Golden Touch for your business needs.
                 <br />
