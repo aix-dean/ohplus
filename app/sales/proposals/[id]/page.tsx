@@ -704,11 +704,6 @@ export default function ProposalDetailsPage() {
                     <p>
                       <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
                     </p>
-                    {proposal.products[0].description && (
-                      <p>
-                        <span className="font-semibold">Description:</span> {proposal.products[0].description}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
