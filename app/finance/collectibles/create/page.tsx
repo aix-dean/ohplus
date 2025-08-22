@@ -20,6 +20,8 @@ import { getQuotationById } from "@/lib/quotation-service"
 import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -41,6 +43,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
+  covered_period_range?: DateRange
   bir_2307?: File | null
   collection_date?: string
   // Supplies specific fields
@@ -666,13 +669,20 @@ export default function CreateCollectiblePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
-            <Input
-              id="covered_period"
-              type="text"
-              placeholder="YYYY-MM-DD - YYYY-MM-DD"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
-              className="font-mono text-sm"
+            <DateRangePicker
+              value={formData.covered_period_range}
+              onChange={(range) => {
+                handleInputChange("covered_period_range", range)
+                // Convert range to string format for backward compatibility
+                if (range?.from && range?.to) {
+                  const fromStr = range.from.toISOString().split("T")[0]
+                  const toStr = range.to.toISOString().split("T")[0]
+                  handleInputChange("covered_period", `${fromStr} - ${toStr}`)
+                } else {
+                  handleInputChange("covered_period", "")
+                }
+              }}
+              placeholder="Select date range"
             />
           </div>
           <div className="space-y-2">
