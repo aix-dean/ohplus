@@ -38,6 +38,7 @@ import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-
 import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
+import { useAuth } from "@/contexts/auth-context" // Added import for user authentication
 
 // Helper function to generate QR code URL - Updated to point to public quotation page
 const generateQRCodeUrl = (quotationId: string) => {
@@ -99,7 +100,8 @@ const formatDuration = (days: number) => {
   return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
 }
 
-export default function QuotationDetailsPage() {
+export default function QuotationPage() {
+  const { user } = useAuth() // Added user authentication hook
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
@@ -284,8 +286,8 @@ export default function QuotationDetailsPage() {
       }
 
       // Assuming a fixed user ID and name for now, replace with actual user context
-      const currentUserId = "current_user_id"
-      const currentUserName = "Current User"
+      const currentUserId = user?.id || "current_user_id"
+      const currentUserName = user?.first_name + " " + user?.last_name || "Current User"
 
       await updateQuotation(dataToSave.id, dataToSave, currentUserId, currentUserName)
 
@@ -917,7 +919,9 @@ export default function QuotationDetailsPage() {
                 <div>
                   <p className="text-sm mb-8">Very truly yours,</p>
                   <div className="border-b border-gray-400 mb-2"></div>
-                  <p className="text-sm font-medium">Mathew Espanto</p>
+                  <p className="text-sm font-medium">
+                    {user?.first_name} {user?.last_name}
+                  </p>
                   <p className="text-sm">Account Management</p>
                 </div>
                 <div>
