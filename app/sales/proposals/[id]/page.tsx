@@ -485,12 +485,11 @@ export default function ProposalDetailsPage() {
             <img
               src={selectedTemplateBackground || "/placeholder.svg"}
               alt="Selected template background"
-              className="max-w-full max-h-full object-contain"
+              className="w-full h-full object-cover"
               style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "100%",
-                maxHeight: "100%",
+                width: "100%",
+                height: "100%",
+                minHeight: "544px",
               }}
             />
           </div>
