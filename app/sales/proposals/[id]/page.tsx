@@ -7,9 +7,13 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon } from "lucide-react"
+import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon, Upload } from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
-import { getProposalTemplatesByCompanyId, createProposalTemplate } from "@/lib/firebase-service"
+import {
+  getProposalTemplatesByCompanyId,
+  createProposalTemplate,
+  uploadFileToFirebaseStorage,
+} from "@/lib/firebase-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
@@ -29,6 +33,9 @@ export default function ProposalDetailsPage() {
   const [formLoading, setFormLoading] = useState(false)
   const [templates, setTemplates] = useState<ProposalTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string>("")
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -78,6 +85,47 @@ export default function ProposalDetailsPage() {
   const handleCreateTemplate = () => {
     setShowCreateForm(true)
     setFormData({ name: "", background_url: "" })
+    setSelectedFile(null)
+    setFilePreview("")
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload only image files (JPEG, PNG, GIF, WebP)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedFile(file)
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setFilePreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null)
+    setFilePreview("")
+    setFormData((prev) => ({ ...prev, background_url: "" }))
   }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -93,9 +141,33 @@ export default function ProposalDetailsPage() {
 
     setFormLoading(true)
     try {
+      let backgroundUrl = formData.background_url
+
+      if (selectedFile) {
+        setUploading(true)
+        try {
+          const uploadPath = `templates/backgrounds/${Date.now()}_${selectedFile.name}`
+          backgroundUrl = await uploadFileToFirebaseStorage(selectedFile, uploadPath)
+          toast({
+            title: "Success",
+            description: "Background image uploaded successfully",
+          })
+        } catch (uploadError) {
+          console.error("Error uploading file:", uploadError)
+          toast({
+            title: "Error",
+            description: "Failed to upload background image",
+            variant: "destructive",
+          })
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
+
       await createProposalTemplate({
         name: formData.name.trim(),
-        background_url: formData.background_url.trim(),
+        background_url: backgroundUrl,
         company_id: "company_123", // Replace with actual company_id
       })
       toast({
@@ -104,7 +176,9 @@ export default function ProposalDetailsPage() {
       })
       setShowCreateForm(false)
       setFormData({ name: "", background_url: "" })
-      fetchTemplates() // Refresh the list
+      setSelectedFile(null)
+      setFilePreview("")
+      fetchTemplates()
     } catch (error) {
       console.error("Error creating template:", error)
       toast({
@@ -124,6 +198,8 @@ export default function ProposalDetailsPage() {
   const handleBackToList = () => {
     setShowCreateForm(false)
     setFormData({ name: "", background_url: "" })
+    setSelectedFile(null)
+    setFilePreview("")
   }
 
   const handleEdit = () => {
@@ -199,41 +275,71 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="background-url">Background Image URL (Optional)</Label>
-                    <Input
-                      id="background-url"
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      value={formData.background_url}
-                      onChange={(e) => handleInputChange("background_url", e.target.value)}
-                    />
+                    <Label>Background Image (Optional)</Label>
+                    {!selectedFile ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="background-upload"
+                          disabled={uploading}
+                        />
+                        <label htmlFor="background-upload" className="cursor-pointer">
+                          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <ImageIcon className="h-8 w-8 text-blue-500" />
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                              <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveFile}
+                            className="text-gray-400 hover:text-gray-600"
+                            disabled={uploading}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {filePreview && (
+                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                            <img
+                              src={filePreview || "/placeholder.svg"}
+                              alt="Background preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {formData.background_url && (
-                    <div className="space-y-2">
-                      <Label>Preview</Label>
-                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                        <img
-                          src={formData.background_url || "/placeholder.svg"}
-                          alt="Background preview"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none"
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex gap-3 pt-4">
-                    <Button type="button" variant="outline" onClick={handleBackToList} disabled={formLoading}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBackToList}
+                      disabled={formLoading || uploading}
+                    >
                       Back to Templates
                     </Button>
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading}>
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading || uploading}>
                       {formLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Creating...
+                          {uploading ? "Uploading..." : "Creating..."}
                         </>
                       ) : (
                         <>
@@ -245,67 +351,13 @@ export default function ProposalDetailsPage() {
                   </div>
                 </form>
               ) : (
-                <>
-                  <div className="flex justify-between items-center mb-4">
-                    <p className="text-gray-600">Choose a template or create a new one</p>
-                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Template
-                    </Button>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto">
-                    {templatesLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                        <span className="ml-2 text-gray-600">Loading templates...</span>
-                      </div>
-                    ) : templates.length === 0 ? (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                          <Grid3X3 className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <p className="text-gray-600 mb-4">No templates found</p>
-                        <Button onClick={handleCreateTemplate} variant="outline">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Your First Template
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {templates.map((template) => (
-                          <div
-                            key={template.id}
-                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => {
-                              toast({
-                                title: "Template Selected",
-                                description: `Using template: ${template.name}`,
-                              })
-                              setShowTemplatesPanel(false)
-                            }}
-                          >
-                            <div className="aspect-video bg-gray-100 rounded-md mb-3 flex items-center justify-center">
-                              {template.background_url ? (
-                                <img
-                                  src={template.background_url || "/placeholder.svg"}
-                                  alt={template.name}
-                                  className="w-full h-full object-cover rounded-md"
-                                />
-                              ) : (
-                                <ImageIcon className="h-8 w-8 text-gray-400" />
-                              )}
-                            </div>
-                            <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                              Created {template.created?.toDate().toLocaleDateString()}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-gray-600">Choose a template or create a new one</p>
+                  <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Template
+                  </Button>
+                </div>
               )}
             </div>
           </div>
