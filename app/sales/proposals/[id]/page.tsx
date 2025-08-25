@@ -227,6 +227,7 @@ export default function ProposalDetailsPage() {
   const [selectedLayout, setSelectedLayout] = useState<string>("1")
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
+  const [isApplying, setIsApplying] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -304,13 +305,41 @@ export default function ProposalDetailsPage() {
     setShowCreateForm(false)
   }
 
-  const handleApplyTemplate = () => {
-    saveTemplateSettings()
-    setShowTemplatesPanel(false)
-    toast({
-      title: "Template Applied",
-      description: "Template settings have been applied and saved",
-    })
+  const handleApplyTemplate = async () => {
+    if (!proposal || !userData) return
+
+    setIsApplying(true)
+    try {
+      // Only include templateBackground in update if it has been explicitly changed
+      const updateData: any = {
+        templateSize: selectedSize,
+        templateOrientation: selectedOrientation,
+        templateLayout: selectedLayout,
+      }
+
+      // Only update templateBackground if it's been explicitly changed
+      if (selectedTemplateBackground !== "") {
+        updateData.templateBackground = selectedTemplateBackground
+      }
+
+      console.log("[v0] Updating proposal with data:", updateData)
+
+      await updateProposal(proposal.id, updateData, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Template Applied",
+        description: "Template settings have been applied and saved",
+      })
+    } catch (error) {
+      console.error("Error updating price:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update price",
+        variant: "destructive",
+      })
+    } finally {
+      setIsApplying(false)
+    }
   }
 
   const handleCreateTemplate = () => {
@@ -537,6 +566,36 @@ export default function ProposalDetailsPage() {
       title: "Download",
       description: "Downloading proposal...",
     })
+  }
+
+  const handleTemplateSelect = async (template: any) => {
+    if (!proposal || !userData) return
+
+    const newBackground = template.background_url || ""
+    setSelectedTemplateBackground(newBackground)
+    setShowTemplatesPanel(false)
+
+    // Save the background template immediately to Firestore
+    try {
+      await updateProposal(
+        proposal.id,
+        { templateBackground: newBackground },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      toast({
+        title: "Template Selected",
+        description: `Selected template: ${template.name}`,
+      })
+    } catch (error) {
+      console.error("[v0] Error saving background template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save background template",
+        variant: "destructive",
+      })
+    }
   }
 
   // Helper functions to calculate container styles based on template settings
@@ -817,14 +876,7 @@ export default function ProposalDetailsPage() {
                         <div
                           key={template.id}
                           className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                          onClick={() => {
-                            setSelectedTemplateBackground(template.background_url || "")
-                            setShowTemplatesPanel(false)
-                            toast({
-                              title: "Template Selected",
-                              description: `Selected template: ${template.name}`,
-                            })
-                          }}
+                          onClick={() => handleTemplateSelect(template)}
                         >
                           {template.background_url ? (
                             <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
