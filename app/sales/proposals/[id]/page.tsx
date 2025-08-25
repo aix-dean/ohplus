@@ -197,16 +197,20 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
   }
 
   return (
-    <img
-      src={companyLogo || "/placeholder.svg"}
-      alt="Company logo"
-      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
-      onError={(e) => {
-        // Fallback to default logo if image fails to load
-        const target = e.target as HTMLImageElement
-        target.src = "/ohplus-new-logo.png"
-      }}
-    />
+    <div
+      className={`bg-white rounded-lg border border-gray-200 shadow-sm p-2 flex items-center justify-center ${className}`}
+    >
+      <img
+        src={companyLogo || "/placeholder.svg"}
+        alt="Company logo"
+        className="w-full h-full object-contain"
+        onError={(e) => {
+          // Fallback to default logo if image fails to load
+          const target = e.target as HTMLImageElement
+          target.src = "/ohplus-new-logo.png"
+        }}
+      />
+    </div>
   )
 }
 
