@@ -32,6 +32,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
+import { useResponsive } from "@/hooks/use-responsive"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -165,6 +166,7 @@ export default function ProposalDetailsPage() {
   const [filePreview, setFilePreview] = useState<string>("")
   const [uploading, setUploading] = useState(false)
   const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
+  const { isMobile } = useResponsive()
 
   useEffect(() => {
     async function fetchProposal() {
@@ -545,40 +547,48 @@ export default function ProposalDetailsPage() {
               </h1>
             </div>
 
-            <div className="flex items-center space-x-4 mb-6">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTemplates}
-                className="flex flex-col items-center p-3 h-auto bg-transparent"
-              >
-                <Grid3X3 className="h-5 w-5 mb-1" />
-                <span className="text-xs">Templates</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEdit}
-                className="flex flex-col items-center p-3 h-auto bg-transparent"
-              >
-                <Edit className="h-5 w-5 mb-1" />
-                <span className="text-xs">Edit</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownload}
-                className="flex flex-col items-center p-3 h-auto bg-transparent"
-              >
-                <Download className="h-5 w-5 mb-1" />
-                <span className="text-xs">Download</span>
-              </Button>
+            <div
+              className={`${isMobile ? "fixed top-20 left-4 right-4 z-10 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg p-3 shadow-lg" : "flex items-center space-x-4 mb-6"}`}
+            >
+              <div className={`${isMobile ? "flex justify-center space-x-2" : "contents"}`}>
+                <Button
+                  variant="outline"
+                  size={isMobile ? "sm" : "sm"}
+                  onClick={handleTemplates}
+                  className={`${isMobile ? "flex-1 max-w-[80px]" : ""} flex flex-col items-center p-3 h-auto bg-transparent`}
+                >
+                  <Grid3X3 className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Templates</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size={isMobile ? "sm" : "sm"}
+                  onClick={handleEdit}
+                  className={`${isMobile ? "flex-1 max-w-[80px]" : ""} flex flex-col items-center p-3 h-auto bg-transparent`}
+                >
+                  <Edit className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Edit</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size={isMobile ? "sm" : "sm"}
+                  onClick={handleDownload}
+                  className={`${isMobile ? "flex-1 max-w-[80px]" : ""} flex flex-col items-center p-3 h-auto bg-transparent`}
+                >
+                  <Download className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Download</span>
+                </Button>
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <div className={`bg-white rounded-lg shadow-sm border overflow-hidden ${isMobile ? "mt-20" : ""}`}>
               {/* Cityscape Header */}
               <div className="h-20 bg-gradient-to-r from-blue-400 via-green-400 to-yellow-400 relative">
-                <img src="/colorful-cityscape-skyline-with-buildings.png" alt="Cityscape header" className="w-full h-full object-cover" />
+                <img
+                  src="/colorful-cityscape-skyline-with-buildings.png"
+                  alt="Cityscape header"
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               <div className="p-6">
@@ -600,10 +610,12 @@ export default function ProposalDetailsPage() {
                 </div>
 
                 {/* Content Section */}
-                <div className="flex gap-6">
+                <div className={`${isMobile ? "flex flex-col gap-4" : "flex gap-6"}`}>
                   {/* Left Side - Building Image */}
-                  <div className="flex-shrink-0">
-                    <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 relative">
+                  <div className={`${isMobile ? "w-full" : "flex-shrink-0"}`}>
+                    <div
+                      className={`${isMobile ? "w-full h-64" : "w-64 h-80"} border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 relative`}
+                    >
                       {proposal.products &&
                       proposal.products.length > 0 &&
                       proposal.products[0].media &&
@@ -611,13 +623,19 @@ export default function ProposalDetailsPage() {
                         <img
                           src={
                             proposal.products[0].media[0].url ||
-                            "/placeholder.svg?height=320&width=256&query=tall building with advertising space"
+                            "/placeholder.svg?height=320&width=256&query=tall building with advertising space" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg"
                           }
                           alt={proposal.products[0].name || "Building"}
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <img src="/tall-building-with-advertising-space.png" alt="Building" className="w-full h-full object-cover" />
+                        <img
+                          src="/tall-building-with-advertising-space.png"
+                          alt="Building"
+                          className="w-full h-full object-cover"
+                        />
                       )}
                       {/* Number overlay */}
                       <div className="absolute top-4 right-4 w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
@@ -633,9 +651,14 @@ export default function ProposalDetailsPage() {
                     {proposal.products &&
                     proposal.products.length > 0 &&
                     proposal.products[0].specs_rental?.location ? (
-                      <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-4" />
+                      <GoogleMap
+                        location={proposal.products[0].specs_rental.location}
+                        className={`w-full ${isMobile ? "h-40" : "h-32"} mb-4`}
+                      />
                     ) : (
-                      <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                      <div
+                        className={`w-full ${isMobile ? "h-40" : "h-32"} bg-gray-100 rounded-lg mb-4 flex items-center justify-center`}
+                      >
                         <img
                           src="/street-map-with-location-markers.png"
                           alt="Location map"
@@ -667,25 +690,39 @@ export default function ProposalDetailsPage() {
 
               {/* Cityscape Footer */}
               <div className="h-20 bg-gradient-to-r from-blue-400 via-green-400 to-yellow-400 relative">
-                <img src="/colorful-cityscape-skyline-with-buildings.png" alt="Cityscape footer" className="w-full h-full object-cover" />
+                <img
+                  src="/colorful-cityscape-skyline-with-buildings.png"
+                  alt="Cityscape footer"
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               {/* Bottom Action Buttons */}
-              <div className="p-6 bg-gray-50 flex items-center justify-between">
+              <div
+                className={`${isMobile ? "fixed bottom-4 left-4 right-4 z-10 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg p-4 shadow-lg" : "p-6 bg-gray-50"} flex items-center justify-between`}
+              >
                 <div className="w-20 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
                   <span className="text-white font-bold text-lg tracking-wider">GTS</span>
                 </div>
 
-                <div className="flex items-center space-x-4">
-                  <Button variant="outline" onClick={handleSaveAsDraft} className="px-6 py-2 bg-transparent">
+                <div className={`${isMobile ? "flex flex-col gap-2 flex-1 ml-4" : "flex items-center space-x-4"}`}>
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveAsDraft}
+                    className={`${isMobile ? "w-full" : "px-6 py-2"} bg-transparent`}
+                  >
                     Save as Draft
                   </Button>
-                  <Button onClick={handleSend} className="bg-green-500 hover:bg-green-600 text-white px-8 py-2">
+                  <Button
+                    onClick={handleSend}
+                    className={`${isMobile ? "w-full" : "px-8 py-2"} bg-green-500 hover:bg-green-600 text-white`}
+                  >
                     Send
                   </Button>
                 </div>
               </div>
             </div>
+            {isMobile && <div className="h-24" />}
           </div>
 
           <aside className="w-64 bg-white border-l border-gray-200 p-4">

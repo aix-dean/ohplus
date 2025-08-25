@@ -151,7 +151,7 @@ function ProposalsPageContent() {
           {/* Filters */}
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-5">
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -161,10 +161,10 @@ function ProposalsPageContent() {
                     className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:flex-shrink-0">
                   <Filter className="h-4 w-4 text-gray-400" />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40 border-gray-200 rounded-lg">
+                    <SelectTrigger className="w-full sm:w-40 border-gray-200 rounded-lg">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -258,7 +258,7 @@ function ProposalsPageContent() {
                   {!searchTerm && statusFilter === "all" && (
                     <Button
                       onClick={() => router.push("/sales/proposals/create")}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Create Proposal
@@ -269,103 +269,105 @@ function ProposalsPageContent() {
             ) : (
               // Desktop Table View
               <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 border-b border-gray-200">
-                      <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
-                      <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                      <TableHead className="font-semibold text-gray-900">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-900">Products</TableHead>
-                      <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                      <TableHead className="font-semibold text-gray-900">Created</TableHead>
-                      <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProposals.map((proposal) => {
-                      const statusConfig = getStatusConfig(proposal.status)
-                      const StatusIcon = statusConfig.icon
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 border-b border-gray-200">
+                        <TableHead className="font-semibold text-gray-900 min-w-[200px]">Proposal</TableHead>
+                        <TableHead className="font-semibold text-gray-900 min-w-[180px]">Client</TableHead>
+                        <TableHead className="font-semibold text-gray-900 min-w-[100px]">Status</TableHead>
+                        <TableHead className="font-semibold text-gray-900 min-w-[80px]">Products</TableHead>
+                        <TableHead className="font-semibold text-gray-900 min-w-[120px]">Amount</TableHead>
+                        <TableHead className="font-semibold text-gray-900 min-w-[120px]">Created</TableHead>
+                        <TableHead className="text-right font-semibold text-gray-900 min-w-[80px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProposals.map((proposal) => {
+                        const statusConfig = getStatusConfig(proposal.status)
+                        const StatusIcon = statusConfig.icon
 
-                      return (
-                        <TableRow
-                          key={proposal.id}
-                          className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                          onClick={() => handleViewProposal(proposal.id)}
-                        >
-                          <TableCell className="py-3">
-                            <div>
-                              <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
-                              <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-gray-600" />
-                              </div>
+                        return (
+                          <TableRow
+                            key={proposal.id}
+                            className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                            onClick={() => handleViewProposal(proposal.id)}
+                          >
+                            <TableCell className="py-3">
                               <div>
-                                <div className="font-medium text-gray-900">{proposal.client.company}</div>
-                                <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
+                                <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
+                                <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
-                              <StatusIcon className="mr-1 h-3 w-3" />
-                              {statusConfig.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-center">
-                              <div className="font-semibold text-gray-900">{proposal.products.length}</div>
-                              <div className="text-xs text-gray-500">
-                                product{proposal.products.length !== 1 ? "s" : ""}
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <Building2 className="h-4 w-4 text-gray-600" />
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900">{proposal.client.company}</div>
+                                  <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-gray-600 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {format(proposal.createdAt, "MMM d, yyyy")}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => router.push(`/sales/proposals/${proposal.id}/cost-estimates`)}
-                                >
-                                  <Calculator className="mr-2 h-4 w-4" />
-                                  Cost Estimates
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Download PDF
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                                <StatusIcon className="mr-1 h-3 w-3" />
+                                {statusConfig.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="text-center">
+                                <div className="font-semibold text-gray-900">{proposal.products.length}</div>
+                                <div className="text-xs text-gray-500">
+                                  product{proposal.products.length !== 1 ? "s" : ""}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="text-sm text-gray-600 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {format(proposal.createdAt, "MMM d, yyyy")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/sales/proposals/${proposal.id}/cost-estimates`)}
+                                  >
+                                    <Calculator className="mr-2 h-4 w-4" />
+                                    Cost Estimates
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download PDF
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </Card>
             )}
           </TabsContent>
