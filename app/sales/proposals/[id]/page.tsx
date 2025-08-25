@@ -1,13 +1,27 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon, Upload } from "lucide-react"
+import {
+  ArrowLeft,
+  Loader2,
+  FileText,
+  Grid3X3,
+  Edit,
+  Download,
+  Plus,
+  X,
+  ImageIcon,
+  Upload,
+  MessageSquare,
+  User,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 import { getProposalById } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
@@ -27,13 +41,11 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   useEffect(() => {
     const loadGoogleMaps = async () => {
       try {
-        // Check if Google Maps is already loaded
         if (window.google && window.google.maps) {
           initializeMap()
           return
         }
 
-        // Load Google Maps script
         const script = document.createElement("script")
         script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
         script.async = true
@@ -53,14 +65,13 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
       try {
         const geocoder = new window.google.maps.Geocoder()
 
-        // Geocode the location
         geocoder.geocode({ address: location }, (results, status) => {
           if (status === "OK" && results && results[0]) {
             const map = new window.google.maps.Map(mapRef.current!, {
               center: results[0].geometry.location,
               zoom: 15,
-              disableDefaultUI: true, // Remove all controls
-              gestureHandling: "none", // Disable all gestures
+              disableDefaultUI: true,
+              gestureHandling: "none",
               zoomControl: false,
               mapTypeControl: false,
               scaleControl: false,
@@ -76,7 +87,6 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
               ],
             })
 
-            // Add marker
             new window.google.maps.Marker({
               position: results[0].geometry.location,
               map: map,
@@ -177,6 +187,7 @@ export default function ProposalDetailsPage() {
 
     fetchProposal()
   }, [params.id, toast])
+
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
       toast({
@@ -352,9 +363,23 @@ export default function ProposalDetailsPage() {
     })
   }
 
+  const handleSaveAsDraft = () => {
+    toast({
+      title: "Draft Saved",
+      description: "Proposal saved as draft",
+    })
+  }
+
+  const handleSend = () => {
+    toast({
+      title: "Proposal Sent",
+      description: "Proposal has been sent successfully",
+    })
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-gray-600">Loading proposal...</p>
@@ -365,7 +390,7 @@ export default function ProposalDetailsPage() {
 
   if (!proposal) {
     return (
-      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <FileText className="h-8 w-8 text-gray-400" />
@@ -382,7 +407,314 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-gradient-to-r from-red-500 to-pink-400 text-white px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-sm">
+            <span>Sales</span>
+            <span>&gt;</span>
+            <span>Dashboard</span>
+            <span>&gt;</span>
+            <span>Planning and Proposal</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+              <User className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex min-h-[calc(100vh-72px)]">
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          {/* Notification Section */}
+          <div className="bg-blue-400 text-white p-4 rounded-lg m-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">Notification</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 p-2 bg-white/20 rounded">
+                <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                <div className="flex-1">
+                  <div className="h-2 bg-white/40 rounded mb-1"></div>
+                  <div className="h-2 bg-white/30 rounded w-3/4"></div>
+                </div>
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              </div>
+              <div className="flex items-center space-x-3 p-2 bg-white/20 rounded">
+                <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                <div className="flex-1">
+                  <div className="h-2 bg-white/40 rounded mb-1"></div>
+                  <div className="h-2 bg-white/30 rounded w-2/3"></div>
+                </div>
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              </div>
+            </div>
+            <div className="text-center mt-3">
+              <button className="text-xs text-white/80 hover:text-white">See All</button>
+            </div>
+          </div>
+
+          {/* Navigation Sections */}
+          <div className="flex-1 px-4 py-2">
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">To Go</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Dashboard
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Bulletin Board
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Project Tracker
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">To Do</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Proposals
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Bookings
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    JOs
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Billings
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-gray-600 hover:text-gray-900">
+                    Clients
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Intelligence Section */}
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg m-4 mt-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center">
+                Intelligence <span className="ml-2">✨</span>
+              </h3>
+            </div>
+            <div className="flex items-center justify-between">
+              <ChevronLeft className="h-6 w-6 text-white/60" />
+              <div className="flex-1 mx-3">
+                <div className="h-16 bg-white/20 rounded"></div>
+              </div>
+              <ChevronRight className="h-6 w-6 text-white/60" />
+            </div>
+            <div className="text-center mt-3">
+              <button className="text-xs text-white/80 hover:text-white">See All</button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 flex">
+          <div className="flex-1 p-6">
+            <div className="flex items-center mb-6">
+              <Button variant="ghost" size="sm" onClick={() => router.push("/sales/proposals")} className="mr-4">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-xl font-semibold text-gray-900">
+                Finalize Proposal <span className="font-mono">SUM00821</span>
+              </h1>
+            </div>
+
+            <div className="flex items-center space-x-4 mb-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTemplates}
+                className="flex flex-col items-center p-3 h-auto bg-transparent"
+              >
+                <Grid3X3 className="h-5 w-5 mb-1" />
+                <span className="text-xs">Templates</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEdit}
+                className="flex flex-col items-center p-3 h-auto bg-transparent"
+              >
+                <Edit className="h-5 w-5 mb-1" />
+                <span className="text-xs">Edit</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                className="flex flex-col items-center p-3 h-auto bg-transparent"
+              >
+                <Download className="h-5 w-5 mb-1" />
+                <span className="text-xs">Download</span>
+              </Button>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              {/* Cityscape Header */}
+              <div className="h-20 bg-gradient-to-r from-blue-400 via-green-400 to-yellow-400 relative">
+                <img src="/colorful-cityscape-skyline-with-buildings.png" alt="Cityscape header" className="w-full h-full object-cover" />
+              </div>
+
+              <div className="p-6">
+                {/* Company Logo and Title Section */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center space-x-4">
+                    {/* GTS Logo */}
+                    <div className="w-20 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                      <span className="text-white font-bold text-lg tracking-wider">GTS</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Petplans Tower Southbound</h2>
+                    <div className="inline-block bg-green-500 text-white px-4 py-2 rounded-md font-semibold">
+                      Php 2,000,000.00
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content Section */}
+                <div className="flex gap-6">
+                  {/* Left Side - Building Image */}
+                  <div className="flex-shrink-0">
+                    <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 relative">
+                      {proposal.products &&
+                      proposal.products.length > 0 &&
+                      proposal.products[0].media &&
+                      proposal.products[0].media.length > 0 ? (
+                        <img
+                          src={
+                            proposal.products[0].media[0].url ||
+                            "/placeholder.svg?height=320&width=256&query=tall building with advertising space"
+                          }
+                          alt={proposal.products[0].name || "Building"}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img src="/tall-building-with-advertising-space.png" alt="Building" className="w-full h-full object-cover" />
+                      )}
+                      {/* Number overlay */}
+                      <div className="absolute top-4 right-4 w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
+                        20
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side - Location Details */}
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+
+                    {proposal.products &&
+                    proposal.products.length > 0 &&
+                    proposal.products[0].specs_rental?.location ? (
+                      <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-4" />
+                    ) : (
+                      <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                        <img
+                          src="/street-map-with-location-markers.png"
+                          alt="Location map"
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2 text-sm text-gray-800">
+                      <p>
+                        <span className="font-semibold">Location:</span> 444 Edsa, Guadalupe Viejo, Makati City
+                      </p>
+                      <p>
+                        <span className="font-semibold">Average Daily Traffic Count:</span> 405,882 vehicles
+                      </p>
+                      <p>
+                        <span className="font-semibold">Location Visibility:</span> 500 meters
+                      </p>
+                      <p>
+                        <span className="font-semibold">Dimension:</span> 150ft (H) x 83ft (W)
+                      </p>
+                      <p>
+                        <span className="font-semibold">Type:</span> Building Wrap
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cityscape Footer */}
+              <div className="h-20 bg-gradient-to-r from-blue-400 via-green-400 to-yellow-400 relative">
+                <img src="/colorful-cityscape-skyline-with-buildings.png" alt="Cityscape footer" className="w-full h-full object-cover" />
+              </div>
+
+              {/* Bottom Action Buttons */}
+              <div className="p-6 bg-gray-50 flex items-center justify-between">
+                <div className="w-20 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                  <span className="text-white font-bold text-lg tracking-wider">GTS</span>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <Button variant="outline" onClick={handleSaveAsDraft} className="px-6 py-2 bg-transparent">
+                    Save as Draft
+                  </Button>
+                  <Button onClick={handleSend} className="bg-green-500 hover:bg-green-600 text-white px-8 py-2">
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside className="w-64 bg-white border-l border-gray-200 p-4">
+            <h3 className="font-semibold text-gray-900 mb-4">Proposal History</h3>
+            <div className="space-y-3">
+              {/* History items */}
+              {Array.from({ length: 10 }, (_, i) => (
+                <div key={i} className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    {i === 0 ? (
+                      <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold">
+                        44
+                      </div>
+                    ) : (
+                      <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="h-2 bg-gray-200 rounded mb-1"></div>
+                    <div className="h-2 bg-gray-100 rounded w-3/4"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </main>
+      </div>
+
+      {/* Template Panel Modal - keeping existing functionality */}
       {showTemplatesPanel && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] md:max-h-[80vh] overflow-hidden">
@@ -398,6 +730,7 @@ export default function ProposalDetailsPage() {
             <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(90vh-80px)] md:max-h-[calc(80vh-80px)]">
               {showCreateForm ? (
                 <form onSubmit={handleFormSubmit} className="space-y-4">
+                  {/* ... existing form code ... */}
                   <div className="space-y-2">
                     <Label htmlFor="template-name">Template Name</Label>
                     <Input
@@ -560,243 +893,6 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
       )}
-
-      {/* Desktop Floating Buttons - Only show on extra large screens with sufficient space */}
-      <div className="hidden 2xl:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10 transition-all duration-300 ease-in-out">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleTemplates}
-              variant="outline"
-              size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
-            >
-              <Grid3X3 className="h-6 w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Templates</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleEdit}
-              variant="outline"
-              size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
-            >
-              <Edit className="h-6 w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleDownload}
-              variant="outline"
-              size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
-            >
-              <Download className="h-6 w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Download</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden xl:block 2xl:hidden w-full max-w-6xl mx-auto mb-4">
-        <div className="flex justify-end gap-2 px-4">
-          <Button
-            onClick={handleTemplates}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-md hover:shadow-lg border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2 transition-all duration-200"
-          >
-            <Grid3X3 className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Templates</span>
-          </Button>
-          <Button
-            onClick={handleEdit}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-md hover:shadow-lg border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2 transition-all duration-200"
-          >
-            <Edit className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Edit</span>
-          </Button>
-          <Button
-            onClick={handleDownload}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-md hover:shadow-lg border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2 transition-all duration-200"
-          >
-            <Download className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Download</span>
-          </Button>
-        </div>
-      </div>
-
-      <div className="xl:hidden fixed bottom-4 right-4 z-10">
-        <div className="flex flex-col gap-2 items-end">
-          <Button
-            onClick={handleTemplates}
-            variant="outline"
-            size="sm"
-            className="w-12 h-12 rounded-full bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center justify-center transition-all duration-200 hover:scale-105"
-          >
-            <Grid3X3 className="h-5 w-5 text-gray-600" />
-          </Button>
-          <Button
-            onClick={handleEdit}
-            variant="outline"
-            size="sm"
-            className="w-12 h-12 rounded-full bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center justify-center transition-all duration-200 hover:scale-105"
-          >
-            <Edit className="h-5 w-5 text-gray-600" />
-          </Button>
-          <Button
-            onClick={handleDownload}
-            variant="outline"
-            size="sm"
-            className="w-12 h-12 rounded-full bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center justify-center transition-all duration-200 hover:scale-105"
-          >
-            <Download className="h-5 w-5 text-gray-600" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-4 xl:mb-0 2xl:mr-24">
-        {selectedTemplateBackground ? (
-          <div className="w-full h-full min-h-[400px] md:min-h-[544px] overflow-hidden">
-            <img
-              src={selectedTemplateBackground || "/placeholder.svg"}
-              alt="Selected template background"
-              className="w-full h-full object-cover"
-              style={{
-                width: "100%",
-                height: "100%",
-                minHeight: "400px",
-              }}
-            />
-          </div>
-        ) : (
-          <div className="w-full h-full min-h-[400px] md:min-h-[544px] p-4 md:p-8 bg-white">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-0 mb-6 md:mb-8">
-              {/* Company Logo or GTS Logo */}
-              <div className="flex-shrink-0">
-                {proposal.client.companyLogoUrl ? (
-                  <img
-                    src={proposal.client.companyLogoUrl || "/placeholder.svg"}
-                    alt={`${proposal.client.company} logo`}
-                    className="w-24 h-12 md:w-32 md:h-16 object-contain"
-                  />
-                ) : (
-                  <div className="w-24 h-12 md:w-32 md:h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                    <span className="text-white font-bold text-sm md:text-xl tracking-wider">
-                      {proposal.client.company.substring(0, 3).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Title and Price */}
-              <div className="text-left md:text-right w-full md:w-auto">
-                <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                  Proposal for{" "}
-                  {proposal.products && proposal.products.length > 0
-                    ? proposal.products[0].specs_rental?.site_code ||
-                      proposal.products[0].name.split(" ")[0] ||
-                      proposal.client.company.substring(0, 3).toUpperCase()
-                    : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
-                  -{" "}
-                  {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </h1>
-                <div className="inline-block bg-green-500 text-white px-3 md:px-4 py-1 rounded-md font-semibold text-sm md:text-base">
-                  ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </div>
-              </div>
-            </div>
-
-            {proposal.products && proposal.products.length > 0 ? (
-              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mb-6">
-                {/* Left Side - Product Image */}
-                <div className="flex-shrink-0 w-full lg:w-auto">
-                  <div className="w-full lg:w-64 h-64 lg:h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
-                    {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
-                      <img
-                        src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
-                        alt={proposal.products[0].name || "Product image"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="h-12 md:h-16 w-12 md:w-16 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Side - Location Map and Details */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
-
-                  {proposal.products[0].specs_rental?.location ? (
-                    <GoogleMap
-                      location={proposal.products[0].specs_rental.location}
-                      className="w-full h-32 md:h-32 mb-4 md:mb-6"
-                    />
-                  ) : (
-                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 md:mb-6 flex items-center justify-center">
-                      <p className="text-gray-500 text-sm">Location not specified</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 text-xs md:text-sm text-gray-800">
-                    <p className="break-words">
-                      <span className="font-semibold">Product:</span> {proposal.products[0].name}
-                    </p>
-                    {proposal.products[0].specs_rental?.location && (
-                      <p className="break-words">
-                        <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.traffic_count && (
-                      <p>
-                        <span className="font-semibold">Average Daily Traffic Count:</span>{" "}
-                        {proposal.products[0].specs_rental.traffic_count.toLocaleString()} vehicles
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.elevation !== undefined && (
-                      <p>
-                        <span className="font-semibold">Location Visibility:</span>{" "}
-                        {proposal.products[0].specs_rental.elevation} meters
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.height && proposal.products[0].specs_rental?.width && (
-                      <p>
-                        <span className="font-semibold">Dimension:</span> {proposal.products[0].specs_rental.height}ft
-                        (H) x {proposal.products[0].specs_rental.width}ft (W)
-                      </p>
-                    )}
-                    <p>
-                      <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <FileText className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 text-sm md:text-base">No products found in this proposal</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
