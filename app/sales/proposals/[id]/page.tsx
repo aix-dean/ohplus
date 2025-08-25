@@ -178,28 +178,34 @@ export default function ProposalDetailsPage() {
 
   useEffect(() => {
     async function fetchProposal() {
-      if (params.id) {
-        try {
-          const proposalData = await getProposalById(params.id as string)
+      if (!params.id) return
+
+      setLoading(true)
+      try {
+        const proposalData = await getProposalById(params.id as string)
+        if (proposalData) {
           setProposal(proposalData)
-          if (proposalData) {
-            setEditablePrice(proposalData.totalAmount.toString())
-          }
-        } catch (error) {
-          console.error("Error fetching proposal:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load proposal details",
-            variant: "destructive",
-          })
-        } finally {
-          setLoading(false)
+          setEditablePrice(proposalData.totalAmount.toString())
+
+          if (proposalData.templateSize) setSelectedSize(proposalData.templateSize)
+          if (proposalData.templateOrientation) setSelectedOrientation(proposalData.templateOrientation)
+          if (proposalData.templateLayout) setSelectedLayout(proposalData.templateLayout)
+          if (proposalData.templateBackground) setSelectedTemplateBackground(proposalData.templateBackground)
         }
+      } catch (error) {
+        console.error("Error fetching proposal:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load proposal",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
       }
     }
 
     fetchProposal()
-  }, [params.id, toast])
+  }, [params.id])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -247,16 +253,12 @@ export default function ProposalDetailsPage() {
   }
 
   const handleApplyTemplate = () => {
-    const numberOfSites = proposal?.products?.length || 1
-    const sitesPerPage = Number.parseInt(selectedLayout)
-    const totalPages = Math.ceil(numberOfSites / sitesPerPage)
-
+    saveTemplateSettings()
+    setShowTemplatesPanel(false)
     toast({
       title: "Template Applied",
-      description: `Applied ${selectedSize} ${selectedOrientation} template with ${selectedLayout} site(s) per page. Total pages: ${totalPages}`,
+      description: "Template settings have been applied and saved",
     })
-
-    setShowTemplatesPanel(false)
   }
 
   const handleCreateTemplate = () => {
@@ -527,6 +529,36 @@ export default function ProposalDetailsPage() {
         return "grid-cols-2"
       default:
         return "grid-cols-1"
+    }
+  }
+
+  const saveTemplateSettings = async () => {
+    if (!proposal || !userData) return
+
+    try {
+      await updateProposal(
+        proposal.id,
+        {
+          templateSize: selectedSize,
+          templateOrientation: selectedOrientation,
+          templateLayout: selectedLayout,
+          templateBackground: selectedTemplateBackground,
+        },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      toast({
+        title: "Success",
+        description: "Template settings saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving template settings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save template settings",
+        variant: "destructive",
+      })
     }
   }
 
@@ -820,7 +852,10 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   <div className="flex justify-end pt-4 border-t">
-                    <Button onClick={handleApplyTemplate} className="bg-green-600 hover:bg-green-700 text-white px-6">
+                    <Button
+                      onClick={handleApplyTemplate}
+                      className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
+                    >
                       Apply
                     </Button>
                   </div>

@@ -407,6 +407,11 @@ export async function updateProposal(
     if (data.proposalNumber !== undefined) updateData.proposalNumber = data.proposalNumber // Add update for proposalNumber
     if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount
 
+    if (data.templateSize !== undefined) updateData.templateSize = data.templateSize
+    if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
+    if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
+    if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
+
     // Handle client object updates
     if (data.client) {
       if (data.client.company !== undefined) updateData["client.company"] = data.client.company
