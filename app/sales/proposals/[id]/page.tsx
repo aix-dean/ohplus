@@ -31,6 +31,8 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -145,6 +147,66 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
         </div>
       )}
     </div>
+  )
+}
+
+const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
+  const { userData } = useAuth()
+  const [companyLogo, setCompanyLogo] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompanyLogo = async () => {
+      if (!userData?.company_id) {
+        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+        setLoading(false)
+        return
+      }
+
+      try {
+        const companyDocRef = doc(db, "companies", userData.company_id)
+        const companyDocSnap = await getDoc(companyDocRef)
+
+        if (companyDocSnap.exists()) {
+          const companyData = companyDocSnap.data()
+          if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+            setCompanyLogo(companyData.photo_url)
+          } else {
+            setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+          }
+        } else {
+          setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+        }
+      } catch (error) {
+        console.error("Error fetching company logo:", error)
+        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompanyLogo()
+  }, [userData?.company_id])
+
+  if (loading) {
+    return (
+      <div className={`bg-gray-100 rounded flex items-center justify-center ${className}`}>
+        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={companyLogo || "/placeholder.svg"}
+      alt="Company logo"
+      className={`object-contain ${className}`}
+      onError={(e) => {
+        // Fallback to default logo if image fails to load
+        const target = e.target as HTMLImageElement
+        target.src = "/ohplus-new-logo.png"
+      }}
+    />
   )
 }
 
@@ -923,29 +985,15 @@ export default function ProposalDetailsPage() {
               <div className="relative z-10 w-full h-full p-4 md:p-8 bg-transparent">
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-shrink-0">
-                    {proposal.client.companyLogoUrl ? (
-                      <img
-                        src={proposal.client.companyLogoUrl || "/placeholder.svg"}
-                        alt={`${proposal.client.company} logo`}
-                        className="w-24 h-12 md:w-32 md:h-16 object-contain"
-                      />
-                    ) : (
-                      <div className="w-24 h-12 md:w-32 md:h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                        <span className="text-white font-bold text-sm md:text-xl tracking-wider">
-                          {proposal.client.company.substring(0, 3).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
+                    <CompanyLogo className="w-24 h-12 md:w-32 md:h-16" />
                   </div>
 
                   <div className="text-right">
                     <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
                       Proposal for{" "}
                       {pageContent.length > 0
-                        ? pageContent[0].specs_rental?.site_code ||
-                          pageContent[0].name.split(" ")[0] ||
-                          proposal.client.company.substring(0, 3).toUpperCase()
-                        : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
+                        ? pageContent[0].specs_rental?.site_code || pageContent[0].name.split(" ")[0] || "Company Name"
+                        : "Company Name"}{" "}
                       -{" "}
                       {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
                         month: "numeric",
