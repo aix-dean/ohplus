@@ -985,17 +985,17 @@ export default function ProposalDetailsPage() {
               <div className="relative z-10 w-full h-full p-4 md:p-8 bg-transparent">
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-shrink-0">
-                    <CompanyLogo className="w-24 h-12 md:w-32 md:h-16" />
+                    <CompanyLogo className="w-16 h-10 md:w-20 md:h-12 mb-2 md:mb-0" />
                   </div>
 
                   <div className="text-right">
                     <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                      {proposal.products && proposal.products.length > 0
-                        ? proposal.products.length === 1
-                          ? proposal.products[0].site_code
-                          : proposal.products.length === 2
-                            ? `${proposal.products[0].site_code} & ${proposal.products[1].site_code}`
-                            : `${proposal.products[0].site_code} & ${proposal.products.length - 1} more sites`
+                      {pageContent && pageContent.length > 0
+                        ? pageContent.length === 1
+                          ? pageContent[0].site_code
+                          : pageContent.length === 2
+                            ? `${pageContent[0].site_code} & ${pageContent[1].site_code}`
+                            : `${pageContent[0].site_code} & ${pageContent.length - 1} more sites`
                         : "Company Name"}
                     </h1>
 
