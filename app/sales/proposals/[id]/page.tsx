@@ -670,13 +670,13 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px] ml-12 sm:ml-16 md:ml-20 lg:ml-0">
-        {selectedTemplateBackground ? (
-          <div className="w-full h-full min-h-[544px] overflow-hidden">
+      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px] ml-12 sm:ml-16 md:ml-20 lg:ml-0 relative">
+        {selectedTemplateBackground && (
+          <div className="absolute inset-0 z-0 overflow-hidden">
             <img
               src={selectedTemplateBackground || "/placeholder.svg"}
               alt="Selected template background"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover opacity-90"
               style={{
                 width: "100%",
                 height: "100%",
@@ -684,152 +684,152 @@ export default function ProposalDetailsPage() {
               }}
             />
           </div>
-        ) : (
-          <div className="w-full h-full min-h-[544px] p-8 bg-white">
-            <div className="flex justify-between items-start mb-8">
-              <div className="flex-shrink-0">
-                {proposal.client.companyLogoUrl ? (
-                  <img
-                    src={proposal.client.companyLogoUrl || "/placeholder.svg"}
-                    alt={`${proposal.client.company} logo`}
-                    className="w-32 h-16 object-contain"
-                  />
-                ) : (
-                  <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                    <span className="text-white font-bold text-xl tracking-wider">
-                      {proposal.client.company.substring(0, 3).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
+        )}
 
-              <div className="text-right">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  Proposal for{" "}
-                  {proposal.products && proposal.products.length > 0
-                    ? proposal.products[0].specs_rental?.site_code ||
-                      proposal.products[0].name.split(" ")[0] ||
-                      proposal.client.company.substring(0, 3).toUpperCase()
-                    : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
-                  -{" "}
-                  {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </h1>
-                {isEditingPrice ? (
-                  <div className="flex items-center gap-2 justify-end">
-                    <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
-                      <span className="text-gray-600 mr-1">₱</span>
-                      <Input
-                        type="number"
-                        value={editablePrice}
-                        onChange={(e) => setEditablePrice(e.target.value)}
-                        className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
-                        min="0"
-                        step="0.01"
-                        disabled={savingPrice}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleSavePrice}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
-                      disabled={savingPrice}
-                    >
-                      {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                    </Button>
-                    <Button
-                      onClick={handleCancelPriceEdit}
-                      size="sm"
-                      variant="outline"
-                      className="p-1 h-8 w-8 bg-transparent"
-                      disabled={savingPrice}
-                    >
-                      <XIcon className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
-                    ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                  </div>
-                )}
-              </div>
+        <div className="relative z-10 w-full h-full min-h-[544px] p-8 bg-transparent">
+          <div className="flex justify-between items-start mb-8">
+            <div className="flex-shrink-0">
+              {proposal.client.companyLogoUrl ? (
+                <img
+                  src={proposal.client.companyLogoUrl || "/placeholder.svg"}
+                  alt={`${proposal.client.company} logo`}
+                  className="w-32 h-16 object-contain"
+                />
+              ) : (
+                <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                  <span className="text-white font-bold text-xl tracking-wider">
+                    {proposal.client.company.substring(0, 3).toUpperCase()}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {proposal.products && proposal.products.length > 0 ? (
-              <div className="flex gap-8 mb-6">
-                <div className="flex-shrink-0">
-                  <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
-                    {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
-                      <img
-                        src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
-                        alt={proposal.products[0].name || "Product image"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="h-16 w-16 text-gray-400" />
-                      </div>
-                    )}
+            <div className="text-right">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Proposal for{" "}
+                {proposal.products && proposal.products.length > 0
+                  ? proposal.products[0].specs_rental?.site_code ||
+                    proposal.products[0].name.split(" ")[0] ||
+                    proposal.client.company.substring(0, 3).toUpperCase()
+                  : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
+                -{" "}
+                {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
+                  month: "numeric",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </h1>
+              {isEditingPrice ? (
+                <div className="flex items-center gap-2 justify-end">
+                  <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                    <span className="text-gray-600 mr-1">₱</span>
+                    <Input
+                      type="number"
+                      value={editablePrice}
+                      onChange={(e) => setEditablePrice(e.target.value)}
+                      className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                      min="0"
+                      step="0.01"
+                      disabled={savingPrice}
+                    />
                   </div>
+                  <Button
+                    onClick={handleSavePrice}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
+                    disabled={savingPrice}
+                  >
+                    {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                  </Button>
+                  <Button
+                    onClick={handleCancelPriceEdit}
+                    size="sm"
+                    variant="outline"
+                    className="p-1 h-8 w-8 bg-transparent"
+                    disabled={savingPrice}
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </Button>
                 </div>
+              ) : (
+                <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
+                  ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
+          </div>
 
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
-
-                  {proposal.products[0].specs_rental?.location ? (
-                    <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-6" />
+          {proposal.products && proposal.products.length > 0 ? (
+            <div className="flex gap-8 mb-6">
+              <div className="flex-shrink-0">
+                <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                  {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
+                    <img
+                      src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
+                      alt={proposal.products[0].name || "Product image"}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
-                      <p className="text-gray-500 text-sm">Location not specified</p>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="h-16 w-16 text-gray-400" />
                     </div>
                   )}
+                </div>
+              </div>
 
-                  <div className="space-y-2 text-sm text-gray-800">
-                    <p>
-                      <span className="font-semibold">Product:</span> {proposal.products[0].name}
-                    </p>
-                    {proposal.products[0].specs_rental?.location && (
-                      <p>
-                        <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.traffic_count && (
-                      <p>
-                        <span className="font-semibold">Average Daily Traffic Count:</span>{" "}
-                        {proposal.products[0].specs_rental.traffic_count.toLocaleString()} vehicles
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.elevation !== undefined && (
-                      <p>
-                        <span className="font-semibold">Location Visibility:</span>{" "}
-                        {proposal.products[0].specs_rental.elevation} meters
-                      </p>
-                    )}
-                    {proposal.products[0].specs_rental?.height && proposal.products[0].specs_rental?.width && (
-                      <p>
-                        <span className="font-semibold">Dimension:</span> {proposal.products[0].specs_rental.height}ft
-                        (H) x {proposal.products[0].specs_rental.width}ft (W)
-                      </p>
-                    )}
-                    <p>
-                      <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
-                    </p>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+
+                {proposal.products[0].specs_rental?.location ? (
+                  <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-6" />
+                ) : (
+                  <div className="w-full h-32 bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
+                    <p className="text-gray-500 text-sm">Location not specified</p>
                   </div>
+                )}
+
+                <div className="space-y-2 text-sm text-gray-800">
+                  <p>
+                    <span className="font-semibold">Product:</span> {proposal.products[0].name}
+                  </p>
+                  {proposal.products[0].specs_rental?.location && (
+                    <p>
+                      <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
+                    </p>
+                  )}
+                  {proposal.products[0].specs_rental?.traffic_count && (
+                    <p>
+                      <span className="font-semibold">Average Daily Traffic Count:</span>{" "}
+                      {proposal.products[0].specs_rental.traffic_count.toLocaleString()} vehicles
+                    </p>
+                  )}
+                  {proposal.products[0].specs_rental?.elevation !== undefined && (
+                    <p>
+                      <span className="font-semibold">Location Visibility:</span>{" "}
+                      {proposal.products[0].specs_rental.elevation} meters
+                    </p>
+                  )}
+                  {proposal.products[0].specs_rental?.height && proposal.products[0].specs_rental?.width && (
+                    <p>
+                      <span className="font-semibold">Dimension:</span> {proposal.products[0].specs_rental.height}ft (H)
+                      x {proposal.products[0].specs_rental.width}ft (W)
+                    </p>
+                  )}
+                  <p>
+                    <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No products found in this proposal</p>
-                </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No products found in this proposal</p>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
