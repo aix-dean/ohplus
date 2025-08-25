@@ -177,7 +177,6 @@ export default function ProposalDetailsPage() {
 
     fetchProposal()
   }, [params.id, toast])
-
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
       toast({
