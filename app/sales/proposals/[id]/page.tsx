@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -40,22 +41,10 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   const [mapError, setMapError] = useState(false)
 
   useEffect(() => {
-    const loadGoogleMaps = async () => {
+    const initializeMaps = async () => {
       try {
-        // Check if Google Maps is already loaded
-        if (window.google && window.google.maps) {
-          initializeMap()
-          return
-        }
-
-        // Load Google Maps script
-        const script = document.createElement("script")
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
-        script.async = true
-        script.defer = true
-        script.onload = initializeMap
-        script.onerror = () => setMapError(true)
-        document.head.appendChild(script)
+        await loadGoogleMaps()
+        await initializeMap()
       } catch (error) {
         console.error("Error loading Google Maps:", error)
         setMapError(true)
@@ -74,8 +63,8 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
             const map = new window.google.maps.Map(mapRef.current!, {
               center: results[0].geometry.location,
               zoom: 15,
-              disableDefaultUI: true, // Remove all controls
-              gestureHandling: "none", // Disable all gestures
+              disableDefaultUI: true,
+              gestureHandling: "none",
               zoomControl: false,
               mapTypeControl: false,
               scaleControl: false,
@@ -121,7 +110,7 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
       }
     }
 
-    loadGoogleMaps()
+    initializeMaps()
   }, [location])
 
   if (mapError) {
@@ -690,7 +679,7 @@ export default function ProposalDetailsPage() {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+          <div className="w-16 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <FileText className="h-8 w-8 text-gray-400" />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Proposal Not Found</h1>
