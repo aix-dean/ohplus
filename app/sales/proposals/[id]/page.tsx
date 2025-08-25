@@ -990,26 +990,13 @@ export default function ProposalDetailsPage() {
 
                   <div className="text-right">
                     <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                      Proposal for{" "}
                       {proposal.products && proposal.products.length > 0
                         ? proposal.products.length === 1
                           ? proposal.products[0].name
                           : proposal.products.length === 2
                             ? `${proposal.products[0].name} & ${proposal.products[1].name}`
                             : `${proposal.products[0].name} & ${proposal.products.length - 1} more sites`
-                        : "Company Name"}{" "}
-                      -{" "}
-                      {proposal.createdAt?.seconds
-                        ? new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
-                            month: "numeric",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : new Date().toLocaleDateString("en-US", {
-                            month: "numeric",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
+                        : "Company Name"}
                     </h1>
 
                     {pageNumber === 1 && (
