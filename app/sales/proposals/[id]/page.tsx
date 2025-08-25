@@ -562,79 +562,85 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      <div className="hidden xl:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10">
+      {/* Desktop Floating Buttons - Only show on very large screens with enough space */}
+      <div className="hidden 2xl:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10 transition-all duration-300 ease-in-out">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center group">
             <Button
               onClick={handleTemplates}
               variant="outline"
               size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200 hover:scale-105"
             >
-              <Grid3X3 className="h-6 w-6 text-gray-600" />
+              <Grid3X3 className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
             </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Templates</span>
+            <span className="text-xs text-gray-600 mt-2 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              Templates
+            </span>
           </div>
 
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center group">
             <Button
               onClick={handleEdit}
               variant="outline"
               size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200 hover:scale-105"
             >
-              <Edit className="h-6 w-6 text-gray-600" />
+              <Edit className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
             </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
+            <span className="text-xs text-gray-600 mt-2 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              Edit
+            </span>
           </div>
 
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center group">
             <Button
               onClick={handleDownload}
               variant="outline"
               size="lg"
-              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200 hover:scale-105"
             >
-              <Download className="h-6 w-6 text-gray-600" />
+              <Download className="h-6 w-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
             </Button>
-            <span className="text-xs text-gray-600 mt-2 font-medium">Download</span>
+            <span className="text-xs text-gray-600 mt-2 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              Download
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="xl:hidden fixed bottom-4 left-4 right-4 z-10">
-        <div className="flex justify-center gap-2">
-          <Button
-            onClick={handleTemplates}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
-          >
-            <Grid3X3 className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Templates</span>
-          </Button>
-          <Button
-            onClick={handleEdit}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
-          >
-            <Edit className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Edit</span>
-          </Button>
-          <Button
-            onClick={handleDownload}
-            variant="outline"
-            size="sm"
-            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
-          >
-            <Download className="h-4 w-4 text-gray-600" />
-            <span className="text-xs font-medium">Download</span>
-          </Button>
+      <div className="2xl:hidden fixed bottom-6 right-6 z-10">
+        <div className="flex flex-col-reverse gap-3">
+          {/* Main FAB Buttons */}
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={handleDownload}
+              size="lg"
+              className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+            >
+              <Download className="h-5 w-5 text-white" />
+            </Button>
+
+            <Button
+              onClick={handleEdit}
+              size="lg"
+              className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+            >
+              <Edit className="h-5 w-5 text-white" />
+            </Button>
+
+            <Button
+              onClick={handleTemplates}
+              size="lg"
+              className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+            >
+              <Grid3X3 className="h-5 w-5 text-white" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-20 xl:mb-0 xl:mr-24">
+      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-24 2xl:mb-0 2xl:mr-32 transition-all duration-300 ease-in-out">
         {selectedTemplateBackground ? (
           <div className="w-full h-full min-h-[400px] md:min-h-[544px] overflow-hidden">
             <img
