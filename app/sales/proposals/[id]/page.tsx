@@ -778,12 +778,12 @@ export default function ProposalDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col">
-      <div className="bg-red-400 px-4 py-3 flex items-center gap-3">
+      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push("/sales/proposals")}
-          className="text-black hover:bg-red-300 p-1 h-8 w-8"
+          className="text-black hover:bg-gray-100 p-1 h-8 w-8"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
