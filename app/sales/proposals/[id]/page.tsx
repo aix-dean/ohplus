@@ -6,21 +6,7 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  ArrowLeft,
-  Loader2,
-  FileText,
-  Grid3X3,
-  Edit,
-  Download,
-  Plus,
-  X,
-  ImageIcon,
-  Upload,
-  Check,
-  XIcon,
-} from "lucide-react"
+import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, X, ImageIcon, Check, XIcon } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
@@ -160,6 +146,9 @@ export default function ProposalDetailsPage() {
   const [savingPrice, setSavingPrice] = useState(false)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [selectedSize, setSelectedSize] = useState<"A4" | "Letter" | "Legal">("A4")
+  const [selectedOrientation, setSelectedOrientation] = useState<"Square" | "Landscape" | "Portrait">("Portrait")
+  const [selectedLayout, setSelectedLayout] = useState<"1" | "2" | "4">("1")
   const [formData, setFormData] = useState({
     name: "",
     background_url: "",
@@ -427,6 +416,14 @@ export default function ProposalDetailsPage() {
     })
   }
 
+  const handleApplyTemplate = () => {
+    toast({
+      title: "Template Applied",
+      description: `Applied ${selectedSize} ${selectedOrientation} template with ${selectedLayout} per page layout`,
+    })
+    setShowTemplatesPanel(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
@@ -460,172 +457,95 @@ export default function ProposalDetailsPage() {
     <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
       {showTemplatesPanel && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {showCreateForm ? "Create New Template" : "Proposal Templates"}
-              </h2>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Choose a Template</h2>
               <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
-              {showCreateForm ? (
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="template-name">Template Name</Label>
-                    <Input
-                      id="template-name"
-                      type="text"
-                      placeholder="Enter template name"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Background Image (Optional)</Label>
-                    {!selectedFile ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                          id="background-upload"
-                          disabled={uploading}
-                        />
-                        <label htmlFor="background-upload" className="cursor-pointer">
-                          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                          <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                          <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
-                        </label>
-                      </div>
-                    ) : (
-                      <div className="border rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <ImageIcon className="h-8 w-8 text-blue-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                              <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleRemoveFile}
-                            className="text-gray-400 hover:text-gray-600"
-                            disabled={uploading}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {filePreview && (
-                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                            <img
-                              src={filePreview || "/placeholder.svg"}
-                              alt="Background preview"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
+            <div className="p-4 space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Size:</h3>
+                <div className="flex gap-2">
+                  {["A4", "Letter size", "Legal size"].map((size) => (
                     <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBackToList}
-                      disabled={formLoading || uploading}
+                      key={size}
+                      variant={selectedSize === size.split(" ")[0] ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedSize(size.split(" ")[0] as "A4" | "Letter" | "Legal")}
+                      className="text-xs"
                     >
-                      Back to Templates
+                      {size}
                     </Button>
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading || uploading}>
-                      {formLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {uploading ? "Uploading..." : "Creating..."}
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Template
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <p className="text-gray-600">Choose a template or create a new one</p>
-                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Template
-                    </Button>
-                  </div>
-
-                  {templatesLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                      <span className="ml-2 text-gray-600">Loading templates...</span>
-                    </div>
-                  ) : templates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {templates.map((template) => (
-                        <div
-                          key={template.id}
-                          className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                          onClick={() => {
-                            setSelectedTemplateBackground(template.background_url || "")
-                            setShowTemplatesPanel(false)
-                            toast({
-                              title: "Template Selected",
-                              description: `Selected template: ${template.name}`,
-                            })
-                          }}
-                        >
-                          {template.background_url ? (
-                            <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
-                              <img
-                                src={template.background_url || "/placeholder.svg"}
-                                alt={template.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                            </div>
-                          ) : (
-                            <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
-                              <ImageIcon className="h-12 w-12 text-gray-400" />
-                            </div>
-                          )}
-                          <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Grid3X3 className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
-                      <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
-                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Your First Template
-                      </Button>
-                    </div>
-                  )}
+                  ))}
                 </div>
-              )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Orientation:</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { name: "Square", aspect: "aspect-square" },
+                    { name: "Landscape", aspect: "aspect-[4/3]" },
+                    { name: "Portrait", aspect: "aspect-[3/4]" },
+                  ].map((orientation) => (
+                    <div
+                      key={orientation.name}
+                      className={`cursor-pointer text-center ${
+                        selectedOrientation === orientation.name ? "text-blue-600" : "text-gray-600"
+                      }`}
+                      onClick={() => setSelectedOrientation(orientation.name as "Square" | "Landscape" | "Portrait")}
+                    >
+                      <div
+                        className={`w-full ${orientation.aspect} bg-gray-200 rounded border-2 mb-2 ${
+                          selectedOrientation === orientation.name ? "border-blue-500" : "border-gray-300"
+                        }`}
+                      />
+                      <span className="text-xs font-medium">{orientation.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Layout:</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { name: "1", label: "1 per page", grid: "grid-cols-1" },
+                    { name: "2", label: "2 per page", grid: "grid-cols-2" },
+                    { name: "4", label: "4 per page", grid: "grid-cols-2" },
+                  ].map((layout) => (
+                    <div
+                      key={layout.name}
+                      className={`cursor-pointer text-center ${
+                        selectedLayout === layout.name ? "text-blue-600" : "text-gray-600"
+                      }`}
+                      onClick={() => setSelectedLayout(layout.name as "1" | "2" | "4")}
+                    >
+                      <div
+                        className={`w-full aspect-[3/4] bg-gray-200 rounded border-2 mb-2 p-1 ${
+                          selectedLayout === layout.name ? "border-blue-500" : "border-gray-300"
+                        }`}
+                      >
+                        <div className={`grid ${layout.grid} gap-1 h-full`}>
+                          {Array.from({ length: Number.parseInt(layout.name) }, (_, i) => (
+                            <div key={i} className="bg-white rounded border border-gray-300" />
+                          ))}
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium">{layout.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleApplyTemplate} className="bg-green-500 hover:bg-green-600 text-white px-6">
+                  Apply
+                </Button>
+              </div>
             </div>
           </div>
         </div>
