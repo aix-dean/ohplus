@@ -190,7 +190,7 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
 
   if (loading) {
     return (
-      <div className={`bg-gray-100 rounded flex items-center justify-center ${className}`}>
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
         <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
       </div>
     )
@@ -200,7 +200,7 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
     <img
       src={companyLogo || "/placeholder.svg"}
       alt="Company logo"
-      className={`object-contain ${className}`}
+      className={`object-contain rounded-lg border border-gray-200 shadow-sm bg-white p-2 ${className}`}
       onError={(e) => {
         // Fallback to default logo if image fails to load
         const target = e.target as HTMLImageElement
