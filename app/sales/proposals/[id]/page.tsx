@@ -557,17 +557,17 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      <div className="fixed left-4 sm:left-20 md:left-80 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-50">
+      <div className="fixed left-2 sm:left-4 md:left-20 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 sm:gap-4 z-50">
         <div className="flex flex-col items-center">
           <Button
             onClick={handleTemplates}
             variant="outline"
             size="lg"
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
+            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
           >
-            <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-600" />
+            <Grid3X3 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
           </Button>
-          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden sm:block">Templates</span>
+          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Templates</span>
         </div>
 
         <div className="flex flex-col items-center">
@@ -575,11 +575,11 @@ export default function ProposalDetailsPage() {
             onClick={handleEdit}
             variant="outline"
             size="lg"
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
+            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
           >
-            <Edit className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-600" />
+            <Edit className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
           </Button>
-          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden sm:block">Edit</span>
+          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Edit</span>
         </div>
 
         <div className="flex flex-col items-center">
@@ -587,15 +587,15 @@ export default function ProposalDetailsPage() {
             onClick={handleDownload}
             variant="outline"
             size="lg"
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2 transition-all duration-200"
+            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
           >
-            <Download className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-600" />
+            <Download className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
           </Button>
-          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden sm:block">Download</span>
+          <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Download</span>
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px] ml-16 sm:ml-20 md:ml-0">
+      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px] ml-12 sm:ml-16 md:ml-20 lg:ml-0">
         {selectedTemplateBackground ? (
           <div className="w-full h-full min-h-[544px] overflow-hidden">
             <img
