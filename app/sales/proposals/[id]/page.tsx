@@ -598,6 +598,30 @@ export default function ProposalDetailsPage() {
     }
   }
 
+  const handleRemoveBackground = async () => {
+    if (!proposal || !userData) return
+
+    setSelectedTemplateBackground("")
+    setShowTemplatesPanel(false)
+
+    // Remove the background template from Firestore
+    try {
+      await updateProposal(proposal.id, { templateBackground: "" }, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Background Removed",
+        description: "Background template has been removed",
+      })
+    } catch (error) {
+      console.error("[v0] Error removing background template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove background template",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Helper functions to calculate container styles based on template settings
   const getContainerDimensions = () => {
     const baseStyles = "bg-white shadow-lg border-transparent relative"
@@ -870,45 +894,58 @@ export default function ProposalDetailsPage() {
                       <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                       <span className="ml-2 text-gray-600">Loading templates...</span>
                     </div>
-                  ) : templates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {templates.map((template) => (
-                        <div
-                          key={template.id}
-                          className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                          onClick={() => handleTemplateSelect(template)}
-                        >
-                          {template.background_url ? (
-                            <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
-                              <img
-                                src={template.background_url || "/placeholder.svg"}
-                                alt={template.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                            </div>
-                          ) : (
-                            <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
-                              <ImageIcon className="h-12 w-12 text-gray-400" />
-                            </div>
-                          )}
-                          <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Grid3X3 className="h-8 w-8 text-gray-400" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group border-red-200 hover:border-red-300"
+                        onClick={handleRemoveBackground}
+                      >
+                        <div className="aspect-video bg-red-50 rounded-md flex items-center justify-center mb-3 group-hover:bg-red-100 transition-colors">
+                          <X className="h-12 w-12 text-red-400" />
+                        </div>
+                        <h3 className="font-medium text-red-600 truncate">Remove Background</h3>
+                        <p className="text-xs text-red-500 mt-1">Clear current background template</p>
                       </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
-                      <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
-                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Your First Template
-                      </Button>
+
+                      {templates.length > 0 ? (
+                        templates.map((template) => (
+                          <div
+                            key={template.id}
+                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                            onClick={() => handleTemplateSelect(template)}
+                          >
+                            {template.background_url ? (
+                              <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
+                                <img
+                                  src={template.background_url || "/placeholder.svg"}
+                                  alt={template.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                              </div>
+                            ) : (
+                              <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
+                                <ImageIcon className="h-12 w-12 text-gray-400" />
+                              </div>
+                            )}
+                            <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center py-8">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                            <Grid3X3 className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
+                          <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
+                          <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Your First Template
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
