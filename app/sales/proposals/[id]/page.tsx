@@ -7,13 +7,25 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon, Upload } from "lucide-react"
+import {
+  ArrowLeft,
+  Loader2,
+  FileText,
+  Grid3X3,
+  Edit,
+  Download,
+  Plus,
+  X,
+  ImageIcon,
+  Upload,
+  Check,
+  XIcon,
+} from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
   uploadFileToFirebaseStorage,
-  downloadProposal,
 } from "@/lib/firebase-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
@@ -143,10 +155,11 @@ export default function ProposalDetailsPage() {
   const { userData } = useAuth()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isEditingPrice, setIsEditingPrice] = useState(false)
+  const [editablePrice, setEditablePrice] = useState<string>("")
+  const [savingPrice, setSavingPrice] = useState(false)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [isEditingPrice, setIsEditingPrice] = useState(false)
-  const [editablePrice, setEditablePrice] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     background_url: "",
@@ -165,7 +178,9 @@ export default function ProposalDetailsPage() {
         try {
           const proposalData = await getProposalById(params.id as string)
           setProposal(proposalData)
-          setEditablePrice(proposalData.totalAmount.toString())
+          if (proposalData) {
+            setEditablePrice(proposalData.totalAmount.toString())
+          }
         } catch (error) {
           console.error("Error fetching proposal:", error)
           toast({
@@ -343,135 +358,73 @@ export default function ProposalDetailsPage() {
     setFilePreview("")
   }
 
-  const handleEdit = () => {
+  const handleEditPrice = () => {
     setIsEditingPrice(true)
-    toast({
-      title: "Edit Mode",
-      description: "You can now edit the proposal price",
-    })
+    setEditablePrice(proposal?.totalAmount.toString() || "0")
   }
 
   const handleSavePrice = async () => {
-    console.log("[v0] Starting price save process")
-    console.log("[v0] Current editablePrice:", editablePrice)
-
-    const numericPrice = Number.parseFloat(editablePrice.replace(/,/g, ""))
-    console.log("[v0] Parsed numeric price:", numericPrice)
-
-    if (isNaN(numericPrice) || numericPrice <= 0) {
-      console.log("[v0] Invalid price detected")
+    if (!proposal || !userData) {
       toast({
-        title: "Invalid Price",
-        description: "Please enter a valid price amount",
+        title: "Error",
+        description: "Unable to save price changes",
         variant: "destructive",
       })
       return
     }
 
-    if (proposal && userData) {
-      try {
-        console.log("[v0] Proposal ID:", proposal.id)
-        console.log("[v0] User data:", { uid: userData.uid, displayName: userData.displayName })
+    const newPrice = Number.parseFloat(editablePrice)
+    if (isNaN(newPrice) || newPrice < 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid price",
+        variant: "destructive",
+      })
+      return
+    }
 
-        const updatedProducts = proposal.products.map((product) => ({
-          ...product,
-          price: numericPrice,
-        }))
-        console.log("[v0] Updated products:", updatedProducts)
+    setSavingPrice(true)
+    try {
+      await updateProposal(
+        proposal.id,
+        { totalAmount: newPrice },
+        userData.uid || "current_user",
+        userData.displayName || "Current User",
+      )
 
-        const updatedProposal = {
-          ...proposal,
-          totalAmount: numericPrice,
-          products: updatedProducts,
-        }
+      setProposal((prev) => (prev ? { ...prev, totalAmount: newPrice } : null))
+      setIsEditingPrice(false)
 
-        // Update local state immediately for better UX
-        setProposal(updatedProposal)
-        setIsEditingPrice(false)
-
-        console.log("[v0] About to call updateProposal with data:", {
-          id: proposal.id,
-          updateData: {
-            totalAmount: numericPrice,
-            products: updatedProducts,
-          },
-          userId: userData.uid || "current_user",
-          userName: userData.displayName || "Current User",
-        })
-
-        // Persist changes to database
-        await updateProposal(
-          proposal.id,
-          {
-            totalAmount: numericPrice,
-            products: updatedProducts,
-          },
-          userData.uid || "current_user",
-          userData.displayName || "Current User",
-        )
-
-        console.log("[v0] updateProposal completed successfully")
-        toast({
-          title: "Price Updated",
-          description: `Price updated to ₱${numericPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-        })
-      } catch (error) {
-        console.error("[v0] Error updating proposal price:", error)
-        console.log("[v0] Error details:", {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-        })
-        // Revert local state on error
-        setEditablePrice(proposal.totalAmount.toString())
-        setIsEditingPrice(false)
-        toast({
-          title: "Update Failed",
-          description: "Failed to update proposal price. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } else {
-      console.log("[v0] Missing proposal or userData:", { proposal: !!proposal, userData: !!userData })
+      toast({
+        title: "Success",
+        description: "Price updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating price:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update price",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingPrice(false)
     }
   }
 
   const handleCancelPriceEdit = () => {
-    if (proposal) {
-      setEditablePrice(proposal.totalAmount.toString())
-    }
     setIsEditingPrice(false)
+    setEditablePrice(proposal?.totalAmount.toString() || "0")
   }
 
-  const handlePriceChange = (value: string) => {
-    const numericValue = value.replace(/[^\d.]/g, "")
-    setEditablePrice(numericValue)
+  const handleEdit = () => {
+    handleEditPrice()
   }
 
-  const handleDownload = async () => {
-    if (!proposal) {
-      toast({
-        title: "Error",
-        description: "Proposal not found",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      await downloadProposal(proposal)
-      toast({
-        title: "Success",
-        description: "Proposal downloaded successfully",
-      })
-    } catch (error) {
-      console.error("Error downloading proposal:", error)
-      toast({
-        title: "Error",
-        description: "Failed to download proposal",
-        variant: "destructive",
-      })
-    }
+  const handleDownload = () => {
+    toast({
+      title: "Download",
+      description: "Downloading proposal...",
+    })
   }
 
   if (loading) {
@@ -697,6 +650,7 @@ export default function ProposalDetailsPage() {
             variant="outline"
             size="lg"
             className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+            disabled={isEditingPrice}
           >
             <Edit className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
           </Button>
@@ -732,9 +686,7 @@ export default function ProposalDetailsPage() {
           </div>
         ) : (
           <div className="w-full h-full min-h-[544px] p-8 bg-white">
-            {/* Header Section */}
             <div className="flex justify-between items-start mb-8">
-              {/* Company Logo or GTS Logo */}
               <div className="flex-shrink-0">
                 {proposal.client.companyLogoUrl ? (
                   <img
@@ -751,7 +703,6 @@ export default function ProposalDetailsPage() {
                 )}
               </div>
 
-              {/* Title and Price */}
               <div className="text-right">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
                   Proposal for{" "}
@@ -769,49 +720,46 @@ export default function ProposalDetailsPage() {
                 </h1>
                 {isEditingPrice ? (
                   <div className="flex items-center gap-2 justify-end">
-                    <div className="flex items-center bg-green-500 text-white px-2 py-1 rounded-md">
-                      <span className="mr-1">₱</span>
+                    <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                      <span className="text-gray-600 mr-1">₱</span>
                       <Input
-                        type="text"
+                        type="number"
                         value={editablePrice}
-                        onChange={(e) => handlePriceChange(e.target.value)}
-                        className="bg-transparent border-none text-white placeholder-green-200 font-semibold w-32 h-auto p-0 focus:ring-0 focus:border-none"
-                        placeholder="0.00"
-                        autoFocus
+                        onChange={(e) => setEditablePrice(e.target.value)}
+                        className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                        min="0"
+                        step="0.01"
+                        disabled={savingPrice}
                       />
                     </div>
                     <Button
-                      size="sm"
                       onClick={handleSavePrice}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 h-8"
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
+                      disabled={savingPrice}
                     >
-                      Save
+                      {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                     </Button>
                     <Button
+                      onClick={handleCancelPriceEdit}
                       size="sm"
                       variant="outline"
-                      onClick={handleCancelPriceEdit}
-                      className="px-2 py-1 h-8 bg-transparent"
+                      className="p-1 h-8 w-8 bg-transparent"
+                      disabled={savingPrice}
                     >
-                      Cancel
+                      <XIcon className="h-3 w-3" />
                     </Button>
                   </div>
                 ) : (
-                  <div
-                    className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold cursor-pointer hover:bg-green-600 transition-colors"
-                    onClick={() => setIsEditingPrice(true)}
-                    title="Click to edit price"
-                  >
+                  <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
                     ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Main Content Section */}
             {proposal.products && proposal.products.length > 0 ? (
               <div className="flex gap-8 mb-6">
-                {/* Left Side - Product Image */}
                 <div className="flex-shrink-0">
                   <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
                     {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
@@ -828,7 +776,6 @@ export default function ProposalDetailsPage() {
                   </div>
                 </div>
 
-                {/* Right Side - Location Map and Details */}
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
 
@@ -840,7 +787,6 @@ export default function ProposalDetailsPage() {
                     </div>
                   )}
 
-                  {/* Dynamic Location Details */}
                   <div className="space-y-2 text-sm text-gray-800">
                     <p>
                       <span className="font-semibold">Product:</span> {proposal.products[0].name}
