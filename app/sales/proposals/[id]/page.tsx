@@ -1073,11 +1073,6 @@ export default function ProposalDetailsPage() {
                 <div className={`grid gap-4 ${getLayoutGridClass()}`}>
                   {pageContent.map((product, productIndex) => (
                     <div key={product.id} className="space-y-4">
-                      {/* Individual product price tag */}
-                      <div className="mb-2">
-                        <h3 className="text-sm font-medium text-gray-700">{product.site_code || product.name}</h3>
-                      </div>
-
                       {/* Rest of product content */}
                       <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                         <div className="flex-shrink-0">
@@ -1123,9 +1118,6 @@ export default function ProposalDetailsPage() {
                           )}
 
                           <div className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}>
-                            <p>
-                              <span className="font-semibold">Product:</span> {product.name}
-                            </p>
                             {product.specs_rental?.location && (
                               <p>
                                 <span className="font-semibold">Location:</span> {product.specs_rental.location}
