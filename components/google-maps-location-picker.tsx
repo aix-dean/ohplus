@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Map, Search, MapPin, Loader2 } from "lucide-react"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
 
 interface Location {
   lat: number
@@ -169,33 +170,19 @@ export function GoogleMapsLocationPicker({
   useEffect(() => {
     if (!isOpen) return
 
-    const loadGoogleMaps = async () => {
-      if (window.google) {
-        await initializeMap()
-        return
-      }
-
-      setIsLoading(true)
-
-      const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGoogleMaps`
-      script.async = true
-      script.defer = true
-
-      window.initGoogleMaps = async () => {
+    const initializeMaps = async () => {
+      try {
+        setIsLoading(true)
+        await loadGoogleMaps()
         await initializeMap()
         setIsLoading(false)
-      }
-
-      document.head.appendChild(script)
-
-      return () => {
-        document.head.removeChild(script)
-        delete window.initGoogleMaps
+      } catch (error) {
+        console.error("Failed to load Google Maps:", error)
+        setIsLoading(false)
       }
     }
 
-    loadGoogleMaps()
+    initializeMaps()
   }, [isOpen, initializeMap])
 
   // Handle search
