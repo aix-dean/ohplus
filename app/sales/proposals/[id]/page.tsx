@@ -352,9 +352,14 @@ export default function ProposalDetailsPage() {
   }
 
   const handleSavePrice = async () => {
+    console.log("[v0] Starting price save process")
+    console.log("[v0] Current editablePrice:", editablePrice)
+
     const numericPrice = Number.parseFloat(editablePrice.replace(/,/g, ""))
+    console.log("[v0] Parsed numeric price:", numericPrice)
 
     if (isNaN(numericPrice) || numericPrice <= 0) {
+      console.log("[v0] Invalid price detected")
       toast({
         title: "Invalid Price",
         description: "Please enter a valid price amount",
@@ -365,10 +370,14 @@ export default function ProposalDetailsPage() {
 
     if (proposal && userData) {
       try {
+        console.log("[v0] Proposal ID:", proposal.id)
+        console.log("[v0] User data:", { uid: userData.uid, displayName: userData.displayName })
+
         const updatedProducts = proposal.products.map((product) => ({
           ...product,
           price: numericPrice,
         }))
+        console.log("[v0] Updated products:", updatedProducts)
 
         const updatedProposal = {
           ...proposal,
@@ -379,6 +388,16 @@ export default function ProposalDetailsPage() {
         // Update local state immediately for better UX
         setProposal(updatedProposal)
         setIsEditingPrice(false)
+
+        console.log("[v0] About to call updateProposal with data:", {
+          id: proposal.id,
+          updateData: {
+            totalAmount: numericPrice,
+            products: updatedProducts,
+          },
+          userId: userData.uid || "current_user",
+          userName: userData.displayName || "Current User",
+        })
 
         // Persist changes to database
         await updateProposal(
@@ -391,12 +410,18 @@ export default function ProposalDetailsPage() {
           userData.displayName || "Current User",
         )
 
+        console.log("[v0] updateProposal completed successfully")
         toast({
           title: "Price Updated",
           description: `Price updated to ₱${numericPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
         })
       } catch (error) {
-        console.error("Error updating proposal price:", error)
+        console.error("[v0] Error updating proposal price:", error)
+        console.log("[v0] Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        })
         // Revert local state on error
         setEditablePrice(proposal.totalAmount.toString())
         setIsEditingPrice(false)
@@ -406,6 +431,8 @@ export default function ProposalDetailsPage() {
           variant: "destructive",
         })
       }
+    } else {
+      console.log("[v0] Missing proposal or userData:", { proposal: !!proposal, userData: !!userData })
     }
   }
 
