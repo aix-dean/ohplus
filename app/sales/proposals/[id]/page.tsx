@@ -461,46 +461,35 @@ export default function ProposalDetailsPage() {
   const getContainerDimensions = () => {
     const baseStyles = "bg-white shadow-lg border-transparent relative"
 
-    // Size-based dimensions with orientation considerations
+    // Size-based dimensions
     let sizeStyles = ""
-    let orientationStyles = ""
-
     switch (selectedSize) {
       case "A4":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 landscape
-        } else {
-          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 portrait
-        }
+        sizeStyles = "w-[210mm] min-h-[297mm]" // A4 dimensions
         break
       case "Letter size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter portrait
-        }
+        sizeStyles = "w-[8.5in] min-h-[11in]" // US Letter dimensions
         break
       case "Legal size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal portrait
-        }
+        sizeStyles = "w-[8.5in] min-h-[14in]" // US Legal dimensions
         break
       default:
         sizeStyles = "w-full max-w-4xl min-h-[600px]"
     }
 
-    // Additional orientation-based adjustments for aspect ratio
+    let orientationStyles = ""
     switch (selectedOrientation) {
       case "Square":
-        orientationStyles = "aspect-square max-h-[80vh] max-w-[80vh]"
+        // Make container square-shaped but allow content to flow naturally
+        orientationStyles = "max-w-[600px] min-h-[600px]"
         break
       case "Landscape":
-        orientationStyles = "max-h-[70vh]"
+        // Make container wider than tall
+        orientationStyles = "max-w-[800px] min-h-[500px]"
         break
       case "Portrait":
-        orientationStyles = "max-h-[90vh]"
+        // Make container taller than wide (default behavior)
+        orientationStyles = "max-w-[600px] min-h-[800px]"
         break
       default:
         orientationStyles = ""
@@ -529,68 +518,15 @@ export default function ProposalDetailsPage() {
 
   const getLayoutGridClass = () => {
     const sitesPerPage = getSitesPerPage()
-
-    // Adjust grid based on orientation
-    if (selectedOrientation === "Landscape") {
-      switch (sitesPerPage) {
-        case 1:
-          return "grid-cols-1"
-        case 2:
-          return "grid-cols-2"
-        case 4:
-          return "grid-cols-2 lg:grid-cols-4"
-        default:
-          return "grid-cols-1"
-      }
-    } else if (selectedOrientation === "Portrait") {
-      switch (sitesPerPage) {
-        case 1:
-          return "grid-cols-1"
-        case 2:
-          return "grid-cols-1 md:grid-cols-2"
-        case 4:
-          return "grid-cols-2"
-        default:
-          return "grid-cols-1"
-      }
-    } else {
-      // Square
-      switch (sitesPerPage) {
-        case 1:
-          return "grid-cols-1"
-        case 2:
-          return "grid-cols-2"
-        case 4:
-          return "grid-cols-2"
-        default:
-          return "grid-cols-1"
-      }
-    }
-  }
-
-  const getContentLayoutStyles = () => {
-    switch (selectedOrientation) {
-      case "Landscape":
-        return "flex-row gap-6" // Horizontal layout for landscape
-      case "Portrait":
-        return "flex-col gap-4" // Vertical layout for portrait
-      case "Square":
-        return "flex-col gap-4" // Balanced layout for square
+    switch (sitesPerPage) {
+      case 1:
+        return "grid-cols-1"
+      case 2:
+        return "grid-cols-1 md:grid-cols-2"
+      case 4:
+        return "grid-cols-2"
       default:
-        return "flex-col md:flex-row gap-4 md:gap-6"
-    }
-  }
-
-  const getImageDimensions = () => {
-    const sitesPerPage = getSitesPerPage()
-
-    if (selectedOrientation === "Landscape") {
-      return sitesPerPage === 1 ? "w-64 h-48 md:w-80 md:h-60" : "w-40 h-30 md:w-48 md:h-36"
-    } else if (selectedOrientation === "Portrait") {
-      return sitesPerPage === 1 ? "w-48 h-64 md:w-60 md:h-80" : "w-32 h-42 md:w-40 md:h-52"
-    } else {
-      // Square
-      return sitesPerPage === 1 ? "w-56 h-56 md:w-72 md:h-72" : "w-36 h-36 md:w-44 md:h-44"
+        return "grid-cols-1"
     }
   }
 
@@ -1043,10 +979,12 @@ export default function ProposalDetailsPage() {
                   <div className={`grid ${getLayoutGridClass()} gap-4 md:gap-6`}>
                     {pageContent.map((product, productIndex) => (
                       <div key={productIndex} className="space-y-4">
-                        <div className={`flex ${getContentLayoutStyles()}`}>
+                        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                           <div className="flex-shrink-0">
                             <div
-                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${getImageDimensions()}`}
+                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
+                                getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
+                              }`}
                             >
                               {product.media && product.media.length > 0 ? (
                                 <img
@@ -1056,15 +994,17 @@ export default function ProposalDetailsPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <ImageIcon className={`text-gray-400 ${getImageDimensions()}`} />
+                                  <ImageIcon
+                                    className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                  />
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className={`flex-1 space-y-3 ${selectedOrientation === "Landscape" ? "min-w-0" : ""}`}>
+                          <div className="flex-1 min-w-0">
                             <h3
-                              className={`font-semibold text-gray-900 mb-3 ${getImageDimensions().includes("w-48") ? "text-lg" : "text-sm md:text-base"}`}
+                              className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
                             >
                               Location Map:
                             </h3>
@@ -1072,18 +1012,18 @@ export default function ProposalDetailsPage() {
                             {product.specs_rental?.location ? (
                               <GoogleMap
                                 location={product.specs_rental.location}
-                                className={`w-full rounded-lg mb-4 ${getImageDimensions().includes("w-48") ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
                               />
                             ) : (
                               <div
-                                className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getImageDimensions().includes("w-48") ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
                               >
                                 <p className="text-gray-500 text-xs">Location not specified</p>
                               </div>
                             )}
 
                             <div
-                              className={`space-y-1 text-gray-800 ${getImageDimensions().includes("w-48") ? "text-sm" : "text-xs"}`}
+                              className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
                             >
                               <p>
                                 <span className="font-semibold">Product:</span> {product.name}
