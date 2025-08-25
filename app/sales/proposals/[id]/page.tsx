@@ -383,12 +383,12 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8">
       {showTemplatesPanel && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] md:max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 md:p-6 border-b">
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">
                 {showCreateForm ? "Create New Template" : "Proposal Templates"}
               </h2>
               <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
@@ -396,7 +396,7 @@ export default function ProposalDetailsPage() {
               </Button>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
+            <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(90vh-80px)] md:max-h-[calc(80vh-80px)]">
               {showCreateForm ? (
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -414,7 +414,7 @@ export default function ProposalDetailsPage() {
                   <div className="space-y-2">
                     <Label>Background Image (Optional)</Label>
                     {!selectedFile ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 text-center hover:border-gray-400 transition-colors">
                         <input
                           type="file"
                           accept="image/*"
@@ -424,7 +424,7 @@ export default function ProposalDetailsPage() {
                           disabled={uploading}
                         />
                         <label htmlFor="background-upload" className="cursor-pointer">
-                          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                          <Upload className="mx-auto h-8 md:h-12 w-8 md:w-12 text-gray-400 mb-2" />
                           <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
                           <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
                         </label>
@@ -433,9 +433,9 @@ export default function ProposalDetailsPage() {
                       <div className="border rounded-lg p-4 bg-gray-50">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <ImageIcon className="h-8 w-8 text-blue-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                            <ImageIcon className="h-6 md:h-8 w-6 md:w-8 text-blue-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 truncate">{selectedFile.name}</p>
                               <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                             </div>
                           </div>
@@ -444,7 +444,7 @@ export default function ProposalDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={handleRemoveFile}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                             disabled={uploading}
                           >
                             <X className="h-4 w-4" />
@@ -463,16 +463,21 @@ export default function ProposalDetailsPage() {
                     )}
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleBackToList}
                       disabled={formLoading || uploading}
+                      className="w-full sm:w-auto bg-transparent"
                     >
                       Back to Templates
                     </Button>
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading || uploading}>
+                    <Button
+                      type="submit"
+                      className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                      disabled={formLoading || uploading}
+                    >
                       {formLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -489,9 +494,9 @@ export default function ProposalDetailsPage() {
                 </form>
               ) : (
                 <div>
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <p className="text-gray-600">Choose a template or create a new one</p>
-                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Template
                     </Button>
@@ -503,7 +508,7 @@ export default function ProposalDetailsPage() {
                       <span className="ml-2 text-gray-600">Loading templates...</span>
                     </div>
                   ) : templates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {templates.map((template) => (
                         <div
                           key={template.id}
@@ -544,7 +549,7 @@ export default function ProposalDetailsPage() {
                       </div>
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
                       <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
-                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                         <Plus className="h-4 w-4 mr-2" />
                         Create Your First Template
                       </Button>
@@ -557,47 +562,81 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      <div className="fixed left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-4 z-10">
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleTemplates}
-            variant="outline"
-            size="lg"
-            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
-          >
-            <Grid3X3 className="h-6 w-6 text-gray-600" />
-          </Button>
-          <span className="text-xs text-gray-600 mt-2 font-medium">Templates</span>
-        </div>
+      <div className="hidden lg:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleTemplates}
+              variant="outline"
+              size="lg"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+            >
+              <Grid3X3 className="h-6 w-6 text-gray-600" />
+            </Button>
+            <span className="text-xs text-gray-600 mt-2 font-medium">Templates</span>
+          </div>
 
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleEdit}
-            variant="outline"
-            size="lg"
-            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
-          >
-            <Edit className="h-6 w-6 text-gray-600" />
-          </Button>
-          <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
-        </div>
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleEdit}
+              variant="outline"
+              size="lg"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+            >
+              <Edit className="h-6 w-6 text-gray-600" />
+            </Button>
+            <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
+          </div>
 
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleDownload}
-            variant="outline"
-            size="lg"
-            className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
-          >
-            <Download className="h-6 w-6 text-gray-600" />
-          </Button>
-          <span className="text-xs text-gray-600 mt-2 font-medium">Download</span>
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleDownload}
+              variant="outline"
+              size="lg"
+              className="w-16 h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-2"
+            >
+              <Download className="h-6 w-6 text-gray-600" />
+            </Button>
+            <span className="text-xs text-gray-600 mt-2 font-medium">Download</span>
+          </div>
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px]">
+      <div className="lg:hidden fixed bottom-4 left-4 right-4 z-10">
+        <div className="flex justify-center gap-2">
+          <Button
+            onClick={handleTemplates}
+            variant="outline"
+            size="sm"
+            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
+          >
+            <Grid3X3 className="h-4 w-4 text-gray-600" />
+            <span className="text-xs font-medium">Templates</span>
+          </Button>
+          <Button
+            onClick={handleEdit}
+            variant="outline"
+            size="sm"
+            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
+          >
+            <Edit className="h-4 w-4 text-gray-600" />
+            <span className="text-xs font-medium">Edit</span>
+          </Button>
+          <Button
+            onClick={handleDownload}
+            variant="outline"
+            size="sm"
+            className="bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex items-center gap-2 px-3 py-2"
+          >
+            <Download className="h-4 w-4 text-gray-600" />
+            <span className="text-xs font-medium">Download</span>
+          </Button>
+        </div>
+      </div>
+
+      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-20 lg:mb-0">
         {selectedTemplateBackground ? (
-          <div className="w-full h-full min-h-[544px] overflow-hidden">
+          <div className="w-full h-full min-h-[400px] md:min-h-[544px] overflow-hidden">
             <img
               src={selectedTemplateBackground || "/placeholder.svg"}
               alt="Selected template background"
@@ -605,25 +644,24 @@ export default function ProposalDetailsPage() {
               style={{
                 width: "100%",
                 height: "100%",
-                minHeight: "544px",
+                minHeight: "400px",
               }}
             />
           </div>
         ) : (
-          <div className="w-full h-full min-h-[544px] p-8 bg-white">
-            {/* Header Section */}
-            <div className="flex justify-between items-start mb-8">
+          <div className="w-full h-full min-h-[400px] md:min-h-[544px] p-4 md:p-8 bg-white">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-0 mb-6 md:mb-8">
               {/* Company Logo or GTS Logo */}
               <div className="flex-shrink-0">
                 {proposal.client.companyLogoUrl ? (
                   <img
                     src={proposal.client.companyLogoUrl || "/placeholder.svg"}
                     alt={`${proposal.client.company} logo`}
-                    className="w-32 h-16 object-contain"
+                    className="w-24 h-12 md:w-32 md:h-16 object-contain"
                   />
                 ) : (
-                  <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                    <span className="text-white font-bold text-xl tracking-wider">
+                  <div className="w-24 h-12 md:w-32 md:h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                    <span className="text-white font-bold text-sm md:text-xl tracking-wider">
                       {proposal.client.company.substring(0, 3).toUpperCase()}
                     </span>
                   </div>
@@ -631,8 +669,8 @@ export default function ProposalDetailsPage() {
               </div>
 
               {/* Title and Price */}
-              <div className="text-right">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              <div className="text-left md:text-right w-full md:w-auto">
+                <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
                   Proposal for{" "}
                   {proposal.products && proposal.products.length > 0
                     ? proposal.products[0].specs_rental?.site_code ||
@@ -646,18 +684,17 @@ export default function ProposalDetailsPage() {
                     year: "numeric",
                   })}
                 </h1>
-                <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
+                <div className="inline-block bg-green-500 text-white px-3 md:px-4 py-1 rounded-md font-semibold text-sm md:text-base">
                   ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
-            {/* Main Content Section */}
             {proposal.products && proposal.products.length > 0 ? (
-              <div className="flex gap-8 mb-6">
+              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mb-6">
                 {/* Left Side - Product Image */}
-                <div className="flex-shrink-0">
-                  <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                <div className="flex-shrink-0 w-full lg:w-auto">
+                  <div className="w-full lg:w-64 h-64 lg:h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
                     {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
                       <img
                         src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
@@ -666,31 +703,33 @@ export default function ProposalDetailsPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="h-16 w-16 text-gray-400" />
+                        <ImageIcon className="h-12 md:h-16 w-12 md:w-16 text-gray-400" />
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Right Side - Location Map and Details */}
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
 
                   {proposal.products[0].specs_rental?.location ? (
-                    <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-6" />
+                    <GoogleMap
+                      location={proposal.products[0].specs_rental.location}
+                      className="w-full h-32 md:h-32 mb-4 md:mb-6"
+                    />
                   ) : (
-                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
+                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 md:mb-6 flex items-center justify-center">
                       <p className="text-gray-500 text-sm">Location not specified</p>
                     </div>
                   )}
 
-                  {/* Dynamic Location Details */}
-                  <div className="space-y-2 text-sm text-gray-800">
-                    <p>
+                  <div className="space-y-2 text-xs md:text-sm text-gray-800">
+                    <p className="break-words">
                       <span className="font-semibold">Product:</span> {proposal.products[0].name}
                     </p>
                     {proposal.products[0].specs_rental?.location && (
-                      <p>
+                      <p className="break-words">
                         <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
                       </p>
                     )}
@@ -721,8 +760,8 @@ export default function ProposalDetailsPage() {
             ) : (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No products found in this proposal</p>
+                  <FileText className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 text-sm md:text-base">No products found in this proposal</p>
                 </div>
               </div>
             )}
