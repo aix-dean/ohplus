@@ -204,6 +204,17 @@ export interface ProjectData {
   tenant_id?: string
 }
 
+// ProposalTemplate interface
+export interface ProposalTemplate {
+  id?: string
+  name: string
+  background_url: string
+  company_id: string
+  created: any
+  updated: any
+  deleted?: boolean
+}
+
 // Get a single product by ID
 export async function getProductById(productId: string): Promise<Product | null> {
   try {
@@ -1313,5 +1324,192 @@ export const searchProductsByName = async (searchTerm: string): Promise<Product[
   } catch (error) {
     console.error("Error searching products:", error)
     throw error
+  }
+}
+
+// PROPOSAL TEMPLATE FUNCTIONS
+
+// Get all proposal templates for a company
+export async function getProposalTemplatesByCompanyId(companyId: string): Promise<ProposalTemplate[]> {
+  try {
+    const templatesRef = collection(db, "proposal_templates")
+    const q = query(
+      templatesRef,
+      where("company_id", "==", companyId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+
+    const templates: ProposalTemplate[] = []
+    querySnapshot.forEach((doc) => {
+      templates.push({ id: doc.id, ...doc.data() } as ProposalTemplate)
+    })
+
+    return templates
+  } catch (error) {
+    console.error("Error fetching proposal templates:", error)
+    return []
+  }
+}
+
+// Get paginated proposal templates for a company
+export async function getPaginatedProposalTemplates(
+  companyId: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  options: { searchTerm?: string } = {},
+): Promise<PaginatedResult<ProposalTemplate>> {
+  try {
+    const templatesRef = collection(db, "proposal_templates")
+    const { searchTerm = "" } = options
+
+    // Start with basic constraints
+    const constraints: any[] = [
+      where("company_id", "==", companyId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+      limit(itemsPerPage),
+    ]
+
+    // Create the query with all constraints
+    let q = query(templatesRef, ...constraints)
+
+    // If we have a last document, start after it for pagination
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    const querySnapshot = await getDocs(q)
+
+    // Get the last visible document for next pagination
+    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+
+    // Convert the documents to ProposalTemplate objects
+    const templates: ProposalTemplate[] = []
+    querySnapshot.forEach((doc) => {
+      const template = { id: doc.id, ...doc.data() } as ProposalTemplate
+
+      // If there's a search term, filter client-side
+      if (searchTerm && typeof searchTerm === "string") {
+        const searchLower = searchTerm.toLowerCase()
+        if (template.name?.toLowerCase().includes(searchLower)) {
+          templates.push(template)
+        }
+      } else {
+        templates.push(template)
+      }
+    })
+
+    return {
+      items: templates,
+      lastDoc: lastVisible,
+      hasMore: querySnapshot.docs.length === itemsPerPage,
+    }
+  } catch (error) {
+    console.error("Error fetching paginated proposal templates:", error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
+  }
+}
+
+// Get a single proposal template by ID
+export async function getProposalTemplateById(templateId: string): Promise<ProposalTemplate | null> {
+  try {
+    const templateDoc = await getDoc(doc(db, "proposal_templates", templateId))
+
+    if (templateDoc.exists()) {
+      return { id: templateDoc.id, ...templateDoc.data() } as ProposalTemplate
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching proposal template:", error)
+    return null
+  }
+}
+
+// Create a new proposal template
+export async function createProposalTemplate(templateData: Partial<ProposalTemplate>): Promise<string> {
+  try {
+    const newTemplate = {
+      ...templateData,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+      deleted: false,
+    }
+
+    const docRef = await addDoc(collection(db, "proposal_templates"), newTemplate)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating proposal template:", error)
+    throw error
+  }
+}
+
+// Update an existing proposal template
+export async function updateProposalTemplate(
+  templateId: string,
+  templateData: Partial<ProposalTemplate>,
+): Promise<void> {
+  try {
+    const templateRef = doc(db, "proposal_templates", templateId)
+
+    // Add updated timestamp
+    const updateData = {
+      ...templateData,
+      updated: serverTimestamp(),
+    }
+
+    await updateDoc(templateRef, updateData)
+  } catch (error) {
+    console.error("Error updating proposal template:", error)
+    throw error
+  }
+}
+
+// Soft delete a proposal template
+export async function softDeleteProposalTemplate(templateId: string): Promise<void> {
+  try {
+    const templateRef = doc(db, "proposal_templates", templateId)
+    await updateDoc(templateRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error soft deleting proposal template:", error)
+    throw error
+  }
+}
+
+// Get count of proposal templates for a company
+export async function getProposalTemplatesCount(companyId: string, searchTerm = ""): Promise<number> {
+  try {
+    const templatesRef = collection(db, "proposal_templates")
+    const q = query(templatesRef, where("company_id", "==", companyId), where("deleted", "==", false))
+
+    if (searchTerm && typeof searchTerm === "string") {
+      const querySnapshot = await getDocs(q)
+      const searchLower = searchTerm.toLowerCase()
+
+      let count = 0
+      querySnapshot.forEach((doc) => {
+        const template = doc.data() as ProposalTemplate
+        if (template.name?.toLowerCase().includes(searchLower)) {
+          count++
+        }
+      })
+
+      return count
+    } else {
+      const snapshot = await getCountFromServer(q)
+      return snapshot.data().count
+    }
+  } catch (error) {
+    console.error("Error getting proposal templates count:", error)
+    return 0
   }
 }
