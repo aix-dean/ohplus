@@ -457,6 +457,77 @@ export default function ProposalDetailsPage() {
     })
   }
 
+  // Helper functions to calculate container styles based on template settings
+  const getContainerDimensions = () => {
+    const baseStyles = "bg-white shadow-lg border-transparent relative"
+
+    // Size-based dimensions
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        sizeStyles = "w-[210mm] min-h-[297mm]" // A4 dimensions
+        break
+      case "Letter size":
+        sizeStyles = "w-[8.5in] min-h-[11in]" // US Letter dimensions
+        break
+      case "Legal size":
+        sizeStyles = "w-[8.5in] min-h-[14in]" // US Legal dimensions
+        break
+      default:
+        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+    }
+
+    // Orientation-based adjustments
+    let orientationStyles = ""
+    switch (selectedOrientation) {
+      case "Square":
+        orientationStyles = "aspect-square max-h-[80vh]"
+        break
+      case "Landscape":
+        orientationStyles = "aspect-[4/3] max-h-[80vh]"
+        break
+      case "Portrait":
+        orientationStyles = "aspect-[3/4] max-h-[90vh]"
+        break
+      default:
+        orientationStyles = ""
+    }
+
+    return `${baseStyles} ${sizeStyles} ${orientationStyles}`
+  }
+
+  const getSitesPerPage = () => Number.parseInt(selectedLayout)
+
+  const getTotalPages = () => {
+    const numberOfSites = proposal?.products?.length || 1
+    const sitesPerPage = getSitesPerPage()
+    return Math.ceil(numberOfSites / sitesPerPage)
+  }
+
+  const getPageContent = (pageNumber: number) => {
+    if (!proposal?.products) return []
+
+    const sitesPerPage = getSitesPerPage()
+    const startIndex = (pageNumber - 1) * sitesPerPage
+    const endIndex = startIndex + sitesPerPage
+
+    return proposal.products.slice(startIndex, endIndex)
+  }
+
+  const getLayoutGridClass = () => {
+    const sitesPerPage = getSitesPerPage()
+    switch (sitesPerPage) {
+      case 1:
+        return "grid-cols-1"
+      case 2:
+        return "grid-cols-1 md:grid-cols-2"
+      case 4:
+        return "grid-cols-2"
+      default:
+        return "grid-cols-1"
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
@@ -487,7 +558,7 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50/50 flex items-center justify-center p-4">
       {showTemplatesPanel && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -797,166 +868,208 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl bg-white shadow-lg border-transparent min-h-[600px] ml-12 sm:ml-16 md:ml-20 lg:ml-0 relative">
-        {selectedTemplateBackground && (
-          <div className="absolute inset-0 z-0 overflow-hidden">
-            <img
-              src={selectedTemplateBackground || "/placeholder.svg"}
-              alt="Selected template background"
-              className="w-full h-full object-cover opacity-90"
-              style={{
-                width: "100%",
-                height: "100%",
-                minHeight: "544px",
-              }}
-            />
-          </div>
-        )}
+      <div className="flex flex-col gap-8">
+        {Array.from({ length: getTotalPages() }).map((_, pageIndex) => {
+          const pageNumber = pageIndex + 1
+          const pageContent = getPageContent(pageNumber)
 
-        <div className="relative z-10 w-full h-full min-h-[544px] p-8 bg-transparent">
-          <div className="flex justify-between items-start mb-8">
-            <div className="flex-shrink-0">
-              {proposal.client.companyLogoUrl ? (
-                <img
-                  src={proposal.client.companyLogoUrl || "/placeholder.svg"}
-                  alt={`${proposal.client.company} logo`}
-                  className="w-32 h-16 object-contain"
-                />
-              ) : (
-                <div className="w-32 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
-                  <span className="text-white font-bold text-xl tracking-wider">
-                    {proposal.client.company.substring(0, 3).toUpperCase()}
-                  </span>
+          return (
+            <div key={pageNumber} className={getContainerDimensions()}>
+              {selectedTemplateBackground && (
+                <div className="absolute inset-0 z-0 overflow-hidden rounded-lg">
+                  <img
+                    src={selectedTemplateBackground || "/placeholder.svg"}
+                    alt="Selected template background"
+                    className="w-full h-full object-cover opacity-90"
+                  />
                 </div>
               )}
-            </div>
 
-            <div className="text-right">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Proposal for{" "}
-                {proposal.products && proposal.products.length > 0
-                  ? proposal.products[0].specs_rental?.site_code ||
-                    proposal.products[0].name.split(" ")[0] ||
-                    proposal.client.company.substring(0, 3).toUpperCase()
-                  : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
-                -{" "}
-                {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
-                  month: "numeric",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </h1>
-              {isEditingPrice ? (
-                <div className="flex items-center gap-2 justify-end">
-                  <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
-                    <span className="text-gray-600 mr-1">₱</span>
-                    <Input
-                      type="number"
-                      value={editablePrice}
-                      onChange={(e) => setEditablePrice(e.target.value)}
-                      className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
-                      min="0"
-                      step="0.01"
-                      disabled={savingPrice}
-                    />
+              <div className="relative z-10 w-full h-full p-4 md:p-8 bg-transparent">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex-shrink-0">
+                    {proposal.client.companyLogoUrl ? (
+                      <img
+                        src={proposal.client.companyLogoUrl || "/placeholder.svg"}
+                        alt={`${proposal.client.company} logo`}
+                        className="w-24 h-12 md:w-32 md:h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="w-24 h-12 md:w-32 md:h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-yellow-600">
+                        <span className="text-white font-bold text-sm md:text-xl tracking-wider">
+                          {proposal.client.company.substring(0, 3).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    onClick={handleSavePrice}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
-                    disabled={savingPrice}
-                  >
-                    {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                  </Button>
-                  <Button
-                    onClick={handleCancelPriceEdit}
-                    size="sm"
-                    variant="outline"
-                    className="p-1 h-8 w-8 bg-transparent"
-                    disabled={savingPrice}
-                  >
-                    <XIcon className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
-                  ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </div>
-              )}
-            </div>
-          </div>
 
-          {proposal.products && proposal.products.length > 0 ? (
-            <div className="flex gap-8 mb-6">
-              <div className="flex-shrink-0">
-                <div className="w-64 h-80 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
-                  {proposal.products[0].media && proposal.products[0].media.length > 0 ? (
-                    <img
-                      src={proposal.products[0].media[0].url || "/placeholder.svg?height=320&width=256"}
-                      alt={proposal.products[0].name || "Product image"}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="h-16 w-16 text-gray-400" />
-                    </div>
-                  )}
+                  <div className="text-right">
+                    <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
+                      Proposal for{" "}
+                      {pageContent.length > 0
+                        ? pageContent[0].specs_rental?.site_code ||
+                          pageContent[0].name.split(" ")[0] ||
+                          proposal.client.company.substring(0, 3).toUpperCase()
+                        : proposal.client.company.substring(0, 3).toUpperCase()}{" "}
+                      -{" "}
+                      {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
+                        month: "numeric",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </h1>
+
+                    {pageNumber === 1 && (
+                      <>
+                        {isEditingPrice ? (
+                          <div className="flex items-center gap-2 justify-end">
+                            <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                              <span className="text-gray-600 mr-1">₱</span>
+                              <Input
+                                type="number"
+                                value={editablePrice}
+                                onChange={(e) => setEditablePrice(e.target.value)}
+                                className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                                min="0"
+                                step="0.01"
+                                disabled={savingPrice}
+                              />
+                            </div>
+                            <Button
+                              onClick={handleSavePrice}
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
+                              disabled={savingPrice}
+                            >
+                              {savingPrice ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Check className="h-3 w-3" />
+                              )}
+                            </Button>
+                            <Button
+                              onClick={handleCancelPriceEdit}
+                              size="sm"
+                              variant="outline"
+                              className="p-1 h-8 w-8 bg-transparent"
+                              disabled={savingPrice}
+                            >
+                              <XIcon className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
+                            ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {getTotalPages() > 1 && (
+                      <div className="text-sm text-gray-500 mt-2">
+                        Page {pageNumber} of {getTotalPages()}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Map:</h3>
+                {pageContent.length > 0 ? (
+                  <div className={`grid ${getLayoutGridClass()} gap-4 md:gap-6`}>
+                    {pageContent.map((product, productIndex) => (
+                      <div key={productIndex} className="space-y-4">
+                        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                          <div className="flex-shrink-0">
+                            <div
+                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
+                                getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
+                              }`}
+                            >
+                              {product.media && product.media.length > 0 ? (
+                                <img
+                                  src={product.media[0].url || "/placeholder.svg"}
+                                  alt={product.name || "Product image"}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ImageIcon
+                                    className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                {proposal.products[0].specs_rental?.location ? (
-                  <GoogleMap location={proposal.products[0].specs_rental.location} className="w-full h-32 mb-6" />
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
+                            >
+                              Location Map:
+                            </h3>
+
+                            {product.specs_rental?.location ? (
+                              <GoogleMap
+                                location={product.specs_rental.location}
+                                className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                              />
+                            ) : (
+                              <div
+                                className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                              >
+                                <p className="text-gray-500 text-xs">Location not specified</p>
+                              </div>
+                            )}
+
+                            <div
+                              className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
+                            >
+                              <p>
+                                <span className="font-semibold">Product:</span> {product.name}
+                              </p>
+                              {product.specs_rental?.location && (
+                                <p>
+                                  <span className="font-semibold">Location:</span> {product.specs_rental.location}
+                                </p>
+                              )}
+                              {product.specs_rental?.traffic_count && (
+                                <p>
+                                  <span className="font-semibold">Traffic Count:</span>{" "}
+                                  {product.specs_rental.traffic_count.toLocaleString()} vehicles
+                                </p>
+                              )}
+                              {product.specs_rental?.elevation !== undefined && (
+                                <p>
+                                  <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
+                                  meters
+                                </p>
+                              )}
+                              {product.specs_rental?.height && product.specs_rental?.width && (
+                                <p>
+                                  <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
+                                  {product.specs_rental.width}ft
+                                </p>
+                              )}
+                              <p>
+                                <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="w-full h-32 bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
-                    <p className="text-gray-500 text-sm">Location not specified</p>
+                  <div className="flex items-center justify-center h-32 md:h-64">
+                    <div className="text-center">
+                      <FileText className="h-12 w-12 md:h-16 md:w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 text-sm md:text-base">No products found on this page</p>
+                    </div>
                   </div>
                 )}
-
-                <div className="space-y-2 text-sm text-gray-800">
-                  <p>
-                    <span className="font-semibold">Product:</span> {proposal.products[0].name}
-                  </p>
-                  {proposal.products[0].specs_rental?.location && (
-                    <p>
-                      <span className="font-semibold">Location:</span> {proposal.products[0].specs_rental.location}
-                    </p>
-                  )}
-                  {proposal.products[0].specs_rental?.traffic_count && (
-                    <p>
-                      <span className="font-semibold">Average Daily Traffic Count:</span>{" "}
-                      {proposal.products[0].specs_rental.traffic_count.toLocaleString()} vehicles
-                    </p>
-                  )}
-                  {proposal.products[0].specs_rental?.elevation !== undefined && (
-                    <p>
-                      <span className="font-semibold">Location Visibility:</span>{" "}
-                      {proposal.products[0].specs_rental.elevation} meters
-                    </p>
-                  )}
-                  {proposal.products[0].specs_rental?.height && proposal.products[0].specs_rental?.width && (
-                    <p>
-                      <span className="font-semibold">Dimension:</span> {proposal.products[0].specs_rental.height}ft (H)
-                      x {proposal.products[0].specs_rental.width}ft (W)
-                    </p>
-                  )}
-                  <p>
-                    <span className="font-semibold">Type:</span> {proposal.products[0].type || "Advertising Space"}
-                  </p>
-                </div>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No products found in this proposal</p>
-              </div>
-            </div>
-          )}
-        </div>
+          )
+        })}
       </div>
     </div>
   )
