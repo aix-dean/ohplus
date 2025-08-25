@@ -237,9 +237,7 @@ export default function ProposalDetailsPage() {
     setShowTemplatesPanel(true)
     setShowCreateForm(false)
     setShowBackgroundTemplates(false)
-    setSelectedSize("A4")
-    setSelectedOrientation("Portrait")
-    setSelectedLayout("1")
+    // Don't reset template settings when opening dialog - preserve current values
   }
 
   const handleShowBackgroundTemplates = () => {
