@@ -197,20 +197,16 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
   }
 
   return (
-    <div
-      className={`bg-white rounded-lg border border-gray-200 shadow-sm p-2 flex items-center justify-center ${className}`}
-    >
-      <img
-        src={companyLogo || "/placeholder.svg"}
-        alt="Company logo"
-        className="w-full h-full object-contain"
-        onError={(e) => {
-          // Fallback to default logo if image fails to load
-          const target = e.target as HTMLImageElement
-          target.src = "/ohplus-new-logo.png"
-        }}
-      />
-    </div>
+    <img
+      src={companyLogo || "/placeholder.svg"}
+      alt="Company logo"
+      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
+      onError={(e) => {
+        // Fallback to default logo if image fails to load
+        const target = e.target as HTMLImageElement
+        target.src = "/ohplus-new-logo.png"
+      }}
+    />
   )
 }
 
@@ -995,15 +991,25 @@ export default function ProposalDetailsPage() {
                   <div className="text-right">
                     <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
                       Proposal for{" "}
-                      {pageContent.length > 0
-                        ? pageContent[0].specs_rental?.site_code || pageContent[0].name.split(" ")[0] || "Company Name"
+                      {proposal.products && proposal.products.length > 0
+                        ? proposal.products.length === 1
+                          ? proposal.products[0].name
+                          : proposal.products.length === 2
+                            ? `${proposal.products[0].name} & ${proposal.products[1].name}`
+                            : `${proposal.products[0].name} & ${proposal.products.length - 1} more sites`
                         : "Company Name"}{" "}
                       -{" "}
-                      {new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
-                        month: "numeric",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      {proposal.createdAt?.seconds
+                        ? new Date(proposal.createdAt.seconds * 1000).toLocaleDateString("en-US", {
+                            month: "numeric",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : new Date().toLocaleDateString("en-US", {
+                            month: "numeric",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                     </h1>
 
                     {pageNumber === 1 && (
