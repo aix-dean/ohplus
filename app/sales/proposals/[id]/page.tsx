@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, Plus, X, ImageIcon, Upload } from "lucide-react"
-import { getProposalById } from "@/lib/proposal-service"
+import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
@@ -351,7 +351,7 @@ export default function ProposalDetailsPage() {
     })
   }
 
-  const handleSavePrice = () => {
+  const handleSavePrice = async () => {
     const numericPrice = Number.parseFloat(editablePrice.replace(/,/g, ""))
 
     if (isNaN(numericPrice) || numericPrice <= 0) {
@@ -363,16 +363,49 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    if (proposal) {
-      setProposal({
-        ...proposal,
-        totalAmount: numericPrice,
-      })
-      setIsEditingPrice(false)
-      toast({
-        title: "Price Updated",
-        description: `Price updated to ₱${numericPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-      })
+    if (proposal && userData) {
+      try {
+        const updatedProducts = proposal.products.map((product) => ({
+          ...product,
+          price: numericPrice,
+        }))
+
+        const updatedProposal = {
+          ...proposal,
+          totalAmount: numericPrice,
+          products: updatedProducts,
+        }
+
+        // Update local state immediately for better UX
+        setProposal(updatedProposal)
+        setIsEditingPrice(false)
+
+        // Persist changes to database
+        await updateProposal(
+          proposal.id,
+          {
+            totalAmount: numericPrice,
+            products: updatedProducts,
+          },
+          userData.uid || "current_user",
+          userData.displayName || "Current User",
+        )
+
+        toast({
+          title: "Price Updated",
+          description: `Price updated to ₱${numericPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
+        })
+      } catch (error) {
+        console.error("Error updating proposal price:", error)
+        // Revert local state on error
+        setEditablePrice(proposal.totalAmount.toString())
+        setIsEditingPrice(false)
+        toast({
+          title: "Update Failed",
+          description: "Failed to update proposal price. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
