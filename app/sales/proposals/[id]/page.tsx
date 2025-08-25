@@ -1074,11 +1074,8 @@ export default function ProposalDetailsPage() {
                   {pageContent.map((product, productIndex) => (
                     <div key={product.id} className="space-y-4">
                       {/* Individual product price tag */}
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="mb-2">
                         <h3 className="text-sm font-medium text-gray-700">{product.site_code || product.name}</h3>
-                        <div className="inline-block bg-blue-500 text-white px-2 py-1 rounded-md font-semibold text-xs">
-                          ₱{(product.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </div>
                       </div>
 
                       {/* Rest of product content */}
