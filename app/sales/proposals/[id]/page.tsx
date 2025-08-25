@@ -6,7 +6,21 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Loader2, FileText, Grid3X3, Edit, Download, X, ImageIcon, Check, XIcon } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import {
+  ArrowLeft,
+  Loader2,
+  FileText,
+  Grid3X3,
+  Edit,
+  Download,
+  Plus,
+  X,
+  ImageIcon,
+  Upload,
+  Check,
+  XIcon,
+} from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
@@ -146,9 +160,6 @@ export default function ProposalDetailsPage() {
   const [savingPrice, setSavingPrice] = useState(false)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [selectedSize, setSelectedSize] = useState<"A4" | "Letter" | "Legal">("A4")
-  const [selectedOrientation, setSelectedOrientation] = useState<"Square" | "Landscape" | "Portrait">("Portrait")
-  const [selectedLayout, setSelectedLayout] = useState<"1" | "2" | "4">("1")
   const [formData, setFormData] = useState({
     name: "",
     background_url: "",
@@ -160,6 +171,10 @@ export default function ProposalDetailsPage() {
   const [filePreview, setFilePreview] = useState<string>("")
   const [uploading, setUploading] = useState(false)
   const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
+  const [selectedSize, setSelectedSize] = useState<string>("A4")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedLayout, setSelectedLayout] = useState<string>("1")
+  const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -215,7 +230,33 @@ export default function ProposalDetailsPage() {
   const handleTemplates = () => {
     setShowTemplatesPanel(true)
     setShowCreateForm(false)
+    setShowBackgroundTemplates(false)
+    setSelectedSize("A4")
+    setSelectedOrientation("Portrait")
+    setSelectedLayout("1")
+  }
+
+  const handleShowBackgroundTemplates = () => {
+    setShowBackgroundTemplates(true)
     fetchTemplates()
+  }
+
+  const handleBackToTemplateOptions = () => {
+    setShowBackgroundTemplates(false)
+    setShowCreateForm(false)
+  }
+
+  const handleApplyTemplate = () => {
+    const numberOfSites = proposal?.products?.length || 1
+    const sitesPerPage = Number.parseInt(selectedLayout)
+    const totalPages = Math.ceil(numberOfSites / sitesPerPage)
+
+    toast({
+      title: "Template Applied",
+      description: `Applied ${selectedSize} ${selectedOrientation} template with ${selectedLayout} site(s) per page. Total pages: ${totalPages}`,
+    })
+
+    setShowTemplatesPanel(false)
   }
 
   const handleCreateTemplate = () => {
@@ -416,14 +457,6 @@ export default function ProposalDetailsPage() {
     })
   }
 
-  const handleApplyTemplate = () => {
-    toast({
-      title: "Template Applied",
-      description: `Applied ${selectedSize} ${selectedOrientation} template with ${selectedLayout} per page layout`,
-    })
-    setShowTemplatesPanel(false)
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
@@ -465,87 +498,261 @@ export default function ProposalDetailsPage() {
               </Button>
             </div>
 
-            <div className="p-4 space-y-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Size:</h3>
-                <div className="flex gap-2">
-                  {["A4", "Letter size", "Legal size"].map((size) => (
-                    <Button
-                      key={size}
-                      variant={selectedSize === size.split(" ")[0] ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedSize(size.split(" ")[0] as "A4" | "Letter" | "Legal")}
-                      className="text-xs"
-                    >
-                      {size}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
+              {showCreateForm ? (
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="template-name">Template Name</Label>
+                    <Input
+                      id="template-name"
+                      type="text"
+                      placeholder="Enter template name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      required
+                    />
+                  </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Orientation:</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { name: "Square", aspect: "aspect-square" },
-                    { name: "Landscape", aspect: "aspect-[4/3]" },
-                    { name: "Portrait", aspect: "aspect-[3/4]" },
-                  ].map((orientation) => (
-                    <div
-                      key={orientation.name}
-                      className={`cursor-pointer text-center ${
-                        selectedOrientation === orientation.name ? "text-blue-600" : "text-gray-600"
-                      }`}
-                      onClick={() => setSelectedOrientation(orientation.name as "Square" | "Landscape" | "Portrait")}
-                    >
-                      <div
-                        className={`w-full ${orientation.aspect} bg-gray-200 rounded border-2 mb-2 ${
-                          selectedOrientation === orientation.name ? "border-blue-500" : "border-gray-300"
-                        }`}
-                      />
-                      <span className="text-xs font-medium">{orientation.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Layout:</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { name: "1", label: "1 per page", grid: "grid-cols-1" },
-                    { name: "2", label: "2 per page", grid: "grid-cols-2" },
-                    { name: "4", label: "4 per page", grid: "grid-cols-2" },
-                  ].map((layout) => (
-                    <div
-                      key={layout.name}
-                      className={`cursor-pointer text-center ${
-                        selectedLayout === layout.name ? "text-blue-600" : "text-gray-600"
-                      }`}
-                      onClick={() => setSelectedLayout(layout.name as "1" | "2" | "4")}
-                    >
-                      <div
-                        className={`w-full aspect-[3/4] bg-gray-200 rounded border-2 mb-2 p-1 ${
-                          selectedLayout === layout.name ? "border-blue-500" : "border-gray-300"
-                        }`}
-                      >
-                        <div className={`grid ${layout.grid} gap-1 h-full`}>
-                          {Array.from({ length: Number.parseInt(layout.name) }, (_, i) => (
-                            <div key={i} className="bg-white rounded border border-gray-300" />
-                          ))}
-                        </div>
+                  <div className="space-y-2">
+                    <Label>Background Image (Optional)</Label>
+                    {!selectedFile ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="background-upload"
+                          disabled={uploading}
+                        />
+                        <label htmlFor="background-upload" className="cursor-pointer">
+                          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                        </label>
                       </div>
-                      <span className="text-xs font-medium">{layout.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    ) : (
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <ImageIcon className="h-8 w-8 text-blue-500" />
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                              <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveFile}
+                            className="text-gray-400 hover:text-gray-600"
+                            disabled={uploading}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {filePreview && (
+                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                            <img
+                              src={filePreview || "/placeholder.svg"}
+                              alt="Background preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleApplyTemplate} className="bg-green-500 hover:bg-green-600 text-white px-6">
-                  Apply
-                </Button>
-              </div>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBackToList}
+                      disabled={formLoading || uploading}
+                    >
+                      Back to Templates
+                    </Button>
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={formLoading || uploading}>
+                      {formLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {uploading ? "Uploading..." : "Creating..."}
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Template
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              ) : showBackgroundTemplates ? (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <p className="text-gray-600">Choose a background template</p>
+                    <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Template
+                    </Button>
+                  </div>
+
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <span className="ml-2 text-gray-600">Loading templates...</span>
+                    </div>
+                  ) : templates.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {templates.map((template) => (
+                        <div
+                          key={template.id}
+                          className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                          onClick={() => {
+                            setSelectedTemplateBackground(template.background_url || "")
+                            setShowTemplatesPanel(false)
+                            toast({
+                              title: "Template Selected",
+                              description: `Selected template: ${template.name}`,
+                            })
+                          }}
+                        >
+                          {template.background_url ? (
+                            <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
+                              <img
+                                src={template.background_url || "/placeholder.svg"}
+                                alt={template.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
+                              <ImageIcon className="h-12 w-12 text-gray-400" />
+                            </div>
+                          )}
+                          <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                        <Grid3X3 className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
+                      <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
+                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Your First Template
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={handleBackToTemplateOptions}>
+                      Back to Options
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-900 mb-3 block">Size:</Label>
+                    <div className="flex gap-2">
+                      {["A4", "Letter size", "Legal size"].map((size) => (
+                        <Button
+                          key={size}
+                          variant={selectedSize === size ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedSize(size)}
+                          className={selectedSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
+                        >
+                          {size}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-900 mb-3 block">Orientation:</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { name: "Square", aspect: "aspect-square" },
+                        { name: "Landscape", aspect: "aspect-video" },
+                        { name: "Portrait", aspect: "aspect-[3/4]" },
+                      ].map((orientation) => (
+                        <div
+                          key={orientation.name}
+                          className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
+                            selectedOrientation === orientation.name
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                          onClick={() => setSelectedOrientation(orientation.name)}
+                        >
+                          <div className={`${orientation.aspect} bg-gray-100 rounded mb-2 mx-auto max-w-16`}></div>
+                          <span className="text-xs font-medium text-gray-700">{orientation.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { name: "1 per page", value: "1", layout: "grid-cols-1" },
+                        { name: "2 per page", value: "2", layout: "grid-cols-2" },
+                        { name: "4 per page", value: "4", layout: "grid-cols-2" },
+                      ].map((layout) => (
+                        <div
+                          key={layout.value}
+                          className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
+                            selectedLayout === layout.value
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                          onClick={() => setSelectedLayout(layout.value)}
+                        >
+                          <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
+                            <div className={`grid ${layout.layout} gap-0.5 h-full`}>
+                              {Array.from({ length: Number.parseInt(layout.value) }).map((_, i) => (
+                                <div key={i} className="bg-gray-200 rounded-sm"></div>
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-xs font-medium text-gray-700">{layout.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleShowBackgroundTemplates}
+                      className="w-full mb-3 bg-transparent"
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      Choose Background Template (Optional)
+                    </Button>
+                    {selectedTemplateBackground && (
+                      <div className="text-xs text-gray-600 text-center">Background template selected</div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t">
+                    <Button onClick={handleApplyTemplate} className="bg-green-600 hover:bg-green-700 text-white px-6">
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
