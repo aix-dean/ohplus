@@ -247,7 +247,9 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
-          setEditablePrice(proposalData.totalAmount.toString())
+          const currentPageContent = getPageContent(1)
+          const currentPagePrice = getPagePrice(currentPageContent)
+          setEditablePrice(currentPagePrice.toString())
 
           if (proposalData.templateSize) setSelectedSize(proposalData.templateSize)
           if (proposalData.templateOrientation) setSelectedOrientation(proposalData.templateOrientation)
@@ -450,9 +452,17 @@ export default function ProposalDetailsPage() {
     setFilePreview("")
   }
 
+  const getPagePrice = (pageContent: any[]) => {
+    return pageContent.reduce((total, product) => {
+      return total + (product.price || 0)
+    }, 0)
+  }
+
   const handleEditPrice = () => {
     setIsEditingPrice(true)
-    setEditablePrice(proposal?.totalAmount.toString() || "0")
+    const currentPageContent = getPageContent(1) // Default to first page for editing
+    const currentPagePrice = getPagePrice(currentPageContent)
+    setEditablePrice(currentPagePrice.toString())
   }
 
   const handleSavePrice = async () => {
@@ -477,14 +487,25 @@ export default function ProposalDetailsPage() {
 
     setSavingPrice(true)
     try {
-      await updateProposal(
-        proposal.id,
-        { totalAmount: newPrice },
-        userData.uid || "current_user",
-        userData.displayName || "Current User",
-      )
+      const currentPageContent = getPageContent(1)
+      if (currentPageContent.length > 0) {
+        const updatedProducts = proposal.products.map((product: any) => {
+          if (product.id === currentPageContent[0].id) {
+            return { ...product, price: newPrice }
+          }
+          return product
+        })
 
-      setProposal((prev) => (prev ? { ...prev, totalAmount: newPrice } : null))
+        await updateProposal(
+          proposal.id,
+          { products: updatedProducts },
+          userData.uid || "current_user",
+          userData.displayName || "Current User",
+        )
+
+        setProposal((prev) => (prev ? { ...prev, products: updatedProducts } : null))
+      }
+
       setIsEditingPrice(false)
 
       toast({
@@ -505,7 +526,9 @@ export default function ProposalDetailsPage() {
 
   const handleCancelPriceEdit = () => {
     setIsEditingPrice(false)
-    setEditablePrice(proposal?.totalAmount.toString() || "0")
+    const currentPageContent = getPageContent(1)
+    const currentPagePrice = getPagePrice(currentPageContent)
+    setEditablePrice(currentPagePrice.toString())
   }
 
   const handleEdit = () => {
@@ -1039,7 +1062,7 @@ export default function ProposalDetailsPage() {
                           </div>
                         ) : (
                           <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                            ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                           </div>
                         )}
                       </>
