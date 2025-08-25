@@ -562,7 +562,7 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      <div className="hidden lg:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10">
+      <div className="hidden xl:block fixed left-80 top-1/2 transform -translate-y-1/2 z-10">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col items-center">
             <Button
@@ -602,7 +602,7 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-4 left-4 right-4 z-10">
+      <div className="xl:hidden fixed bottom-4 left-4 right-4 z-10">
         <div className="flex justify-center gap-2">
           <Button
             onClick={handleTemplates}
@@ -634,7 +634,7 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-20 lg:mb-0">
+      <div className="w-full max-w-6xl mx-auto bg-white shadow-lg border-transparent min-h-[400px] md:min-h-[600px] mb-20 xl:mb-0 xl:mr-24">
         {selectedTemplateBackground ? (
           <div className="w-full h-full min-h-[400px] md:min-h-[544px] overflow-hidden">
             <img
