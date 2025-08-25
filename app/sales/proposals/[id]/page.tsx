@@ -237,6 +237,7 @@ export default function ProposalDetailsPage() {
   const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
   const [selectedLayout, setSelectedLayout] = useState<string>("1")
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
+  const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -458,11 +459,12 @@ export default function ProposalDetailsPage() {
     }, 0)
   }
 
-  const handleEditPrice = () => {
+  const handleEditPrice = (pageNum: number) => {
     setIsEditingPrice(true)
-    const currentPageContent = getPageContent(1) // Default to first page for editing
+    const currentPageContent = getPageContent(pageNum)
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
+    setCurrentEditingPage(pageNum)
   }
 
   const handleSavePrice = async () => {
@@ -487,11 +489,15 @@ export default function ProposalDetailsPage() {
 
     setSavingPrice(true)
     try {
-      const currentPageContent = getPageContent(1)
+      const currentPageContent = getPageContent(currentEditingPage || 1)
       if (currentPageContent.length > 0) {
         const updatedProducts = proposal.products.map((product: any) => {
-          if (product.id === currentPageContent[0].id) {
-            return { ...product, price: newPrice }
+          // Update price for all products on the current page
+          const productOnCurrentPage = currentPageContent.find((p) => p.id === product.id)
+          if (productOnCurrentPage) {
+            // If multiple products on page, distribute the price evenly
+            const pricePerProduct = newPrice / currentPageContent.length
+            return { ...product, price: pricePerProduct }
           }
           return product
         })
@@ -507,6 +513,7 @@ export default function ProposalDetailsPage() {
       }
 
       setIsEditingPrice(false)
+      setCurrentEditingPage(null)
 
       toast({
         title: "Success",
@@ -526,13 +533,14 @@ export default function ProposalDetailsPage() {
 
   const handleCancelPriceEdit = () => {
     setIsEditingPrice(false)
-    const currentPageContent = getPageContent(1)
+    setCurrentEditingPage(null)
+    const currentPageContent = getPageContent(currentEditingPage || 1)
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
   }
 
   const handleEdit = () => {
-    handleEditPrice()
+    handleEditPrice(1) // Default to first page, but this will be updated per page
   }
 
   const handleDownload = () => {
@@ -643,6 +651,28 @@ export default function ProposalDetailsPage() {
         variant: "destructive",
       })
     }
+  }
+
+  const getPageTitle = (pageContent: any[]): string => {
+    if (!pageContent || pageContent.length === 0) {
+      return "Company Name"
+    }
+
+    const siteCodes = pageContent.map((product) => product.site_code).filter(Boolean)
+
+    if (siteCodes.length === 0) {
+      return "Company Name"
+    }
+
+    if (siteCodes.length === 1) {
+      return siteCodes[0]
+    }
+
+    if (siteCodes.length === 2) {
+      return `${siteCodes[0]} & ${siteCodes[1]}`
+    }
+
+    return `${siteCodes[0]} & ${siteCodes.length - 1} more sites`
   }
 
   if (loading) {
@@ -989,186 +1019,159 @@ export default function ProposalDetailsPage() {
       </div>
 
       <div className="flex flex-col gap-8">
-        {Array.from({ length: getTotalPages() }).map((_, pageIndex) => {
-          const pageNumber = pageIndex + 1
+        {Array.from({ length: getTotalPages() }, (_, index) => {
+          const pageNumber = index + 1
           const pageContent = getPageContent(pageNumber)
 
           return (
             <div key={pageNumber} className={getContainerDimensions()}>
+              {/* Background template */}
               {selectedTemplateBackground && (
-                <div className="absolute inset-0 z-0 overflow-hidden rounded-lg">
-                  <img
-                    src={selectedTemplateBackground || "/placeholder.svg"}
-                    alt="Selected template background"
-                    className="w-full h-full object-cover opacity-90"
-                  />
-                </div>
+                <div
+                  className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
+                  style={{ backgroundImage: `url(${selectedTemplateBackground})` }}
+                />
               )}
 
-              <div className="relative z-10 w-full h-full p-4 md:p-8 bg-transparent">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex-shrink-0">
-                    <CompanyLogo className="w-16 h-10 md:w-20 md:h-12 mb-2 md:mb-0" />
-                  </div>
-
+              {/* Content */}
+              <div className="relative z-10 p-4 md:p-6 bg-transparent">
+                <div className="flex justify-between items-start mb-4 md:mb-6">
+                  <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
                   <div className="text-right">
-                    <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                      {pageContent && pageContent.length > 0
-                        ? pageContent.length === 1
-                          ? pageContent[0].site_code
-                          : pageContent.length === 2
-                            ? `${pageContent[0].site_code} & ${pageContent[1].site_code}`
-                            : `${pageContent[0].site_code} & ${pageContent.length - 1} more sites`
-                        : "Company Name"}
-                    </h1>
+                    <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">{getPageTitle(pageContent)}</h1>
 
-                    {pageNumber === 1 && (
-                      <>
-                        {isEditingPrice ? (
-                          <div className="flex items-center gap-2 justify-end">
-                            <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
-                              <span className="text-gray-600 mr-1">₱</span>
-                              <Input
-                                type="number"
-                                value={editablePrice}
-                                onChange={(e) => setEditablePrice(e.target.value)}
-                                className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
-                                min="0"
-                                step="0.01"
-                                disabled={savingPrice}
-                              />
-                            </div>
-                            <Button
-                              onClick={handleSavePrice}
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
-                              disabled={savingPrice}
-                            >
-                              {savingPrice ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Check className="h-3 w-3" />
-                              )}
-                            </Button>
-                            <Button
-                              onClick={handleCancelPriceEdit}
-                              size="sm"
-                              variant="outline"
-                              className="p-1 h-8 w-8 bg-transparent"
-                              disabled={savingPrice}
-                            >
-                              <XIcon className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {getTotalPages() > 1 && (
-                      <div className="text-sm text-gray-500 mt-2">
-                        Page {pageNumber} of {getTotalPages()}
+                    {isEditingPrice && currentEditingPage === pageNumber ? (
+                      <div className="flex items-center gap-2 justify-end">
+                        <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                          <span className="text-gray-600 mr-1">₱</span>
+                          <Input
+                            type="number"
+                            value={editablePrice}
+                            onChange={(e) => setEditablePrice(e.target.value)}
+                            className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                            min="0"
+                            step="0.01"
+                            disabled={savingPrice}
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSavePrice}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
+                          disabled={savingPrice}
+                        >
+                          {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          onClick={handleCancelPriceEdit}
+                          size="sm"
+                          variant="outline"
+                          className="p-1 h-8 w-8 bg-transparent"
+                          disabled={savingPrice}
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
+                        ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {pageContent.length > 0 ? (
-                  <div className={`grid ${getLayoutGridClass()} gap-4 md:gap-6`}>
-                    {pageContent.map((product, productIndex) => (
-                      <div key={productIndex} className="space-y-4">
-                        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-                          <div className="flex-shrink-0">
-                            <div
-                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
-                                getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
-                              }`}
-                            >
-                              {product.media && product.media.length > 0 ? (
-                                <img
-                                  src={product.media[0].url || "/placeholder.svg"}
-                                  alt={product.name || "Product image"}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <ImageIcon
-                                    className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                {/* Product content grid */}
+                <div className={`grid gap-4 ${getLayoutGridClass()}`}>
+                  {pageContent.map((product, productIndex) => (
+                    <div key={product.id} className="space-y-4">
+                      {/* Individual product price tag */}
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-medium text-gray-700">{product.site_code || product.name}</h3>
+                        <div className="inline-block bg-blue-500 text-white px-2 py-1 rounded-md font-semibold text-xs">
+                          ₱{(product.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
 
-                          <div className="flex-1 min-w-0">
-                            <h3
-                              className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
-                            >
-                              Location Map:
-                            </h3>
-
-                            {product.specs_rental?.location ? (
-                              <GoogleMap
-                                location={product.specs_rental.location}
-                                className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                      {/* Rest of product content */}
+                      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                        <div className="flex-shrink-0">
+                          <div
+                            className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
+                              getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
+                            }`}
+                          >
+                            {product.media && product.media.length > 0 ? (
+                              <img
+                                src={product.media[0].url || "/placeholder.svg"}
+                                alt={product.name || "Product image"}
+                                className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div
-                                className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
-                              >
-                                <p className="text-gray-500 text-xs">Location not specified</p>
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon
+                                  className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                />
                               </div>
                             )}
+                          </div>
+                        </div>
 
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
+                          >
+                            Location Map:
+                          </h3>
+
+                          {product.specs_rental?.location ? (
+                            <GoogleMap
+                              location={product.specs_rental.location}
+                              className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                            />
+                          ) : (
                             <div
-                              className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
+                              className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
                             >
-                              <p>
-                                <span className="font-semibold">Product:</span> {product.name}
-                              </p>
-                              {product.specs_rental?.location && (
-                                <p>
-                                  <span className="font-semibold">Location:</span> {product.specs_rental.location}
-                                </p>
-                              )}
-                              {product.specs_rental?.traffic_count && (
-                                <p>
-                                  <span className="font-semibold">Traffic Count:</span>{" "}
-                                  {product.specs_rental.traffic_count.toLocaleString()} vehicles
-                                </p>
-                              )}
-                              {product.specs_rental?.elevation !== undefined && (
-                                <p>
-                                  <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
-                                  meters
-                                </p>
-                              )}
-                              {product.specs_rental?.height && product.specs_rental?.width && (
-                                <p>
-                                  <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
-                                  {product.specs_rental.width}ft
-                                </p>
-                              )}
-                              <p>
-                                <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
-                              </p>
+                              <p className="text-gray-500 text-xs">Location not specified</p>
                             </div>
+                          )}
+
+                          <div className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}>
+                            <p>
+                              <span className="font-semibold">Product:</span> {product.name}
+                            </p>
+                            {product.specs_rental?.location && (
+                              <p>
+                                <span className="font-semibold">Location:</span> {product.specs_rental.location}
+                              </p>
+                            )}
+                            {product.specs_rental?.traffic_count && (
+                              <p>
+                                <span className="font-semibold">Traffic Count:</span>{" "}
+                                {product.specs_rental.traffic_count.toLocaleString()} vehicles
+                              </p>
+                            )}
+                            {product.specs_rental?.elevation !== undefined && (
+                              <p>
+                                <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
+                                meters
+                              </p>
+                            )}
+                            {product.specs_rental?.height && product.specs_rental?.width && (
+                              <p>
+                                <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
+                                {product.specs_rental.width}ft
+                              </p>
+                            )}
+                            <p>
+                              <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
+                            </p>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-32 md:h-64">
-                    <div className="text-center">
-                      <FileText className="h-12 w-12 md:h-16 md:w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600 text-sm md:text-base">No products found on this page</p>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             </div>
           )
