@@ -13,6 +13,7 @@ import {
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
   uploadFileToFirebaseStorage,
+  downloadProposal,
 } from "@/lib/firebase-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
@@ -144,6 +145,8 @@ export default function ProposalDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [isEditingPrice, setIsEditingPrice] = useState(false)
+  const [editablePrice, setEditablePrice] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     background_url: "",
@@ -162,6 +165,7 @@ export default function ProposalDetailsPage() {
         try {
           const proposalData = await getProposalById(params.id as string)
           setProposal(proposalData)
+          setEditablePrice(proposalData.totalAmount.toString())
         } catch (error) {
           console.error("Error fetching proposal:", error)
           toast({
@@ -340,17 +344,74 @@ export default function ProposalDetailsPage() {
   }
 
   const handleEdit = () => {
+    setIsEditingPrice(true)
     toast({
       title: "Edit Mode",
-      description: "Entering edit mode...",
+      description: "You can now edit the proposal price",
     })
   }
 
-  const handleDownload = () => {
-    toast({
-      title: "Download",
-      description: "Downloading proposal...",
-    })
+  const handleSavePrice = () => {
+    const numericPrice = Number.parseFloat(editablePrice.replace(/,/g, ""))
+
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+      toast({
+        title: "Invalid Price",
+        description: "Please enter a valid price amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (proposal) {
+      setProposal({
+        ...proposal,
+        totalAmount: numericPrice,
+      })
+      setIsEditingPrice(false)
+      toast({
+        title: "Price Updated",
+        description: `Price updated to ₱${numericPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
+      })
+    }
+  }
+
+  const handleCancelPriceEdit = () => {
+    if (proposal) {
+      setEditablePrice(proposal.totalAmount.toString())
+    }
+    setIsEditingPrice(false)
+  }
+
+  const handlePriceChange = (value: string) => {
+    const numericValue = value.replace(/[^\d.]/g, "")
+    setEditablePrice(numericValue)
+  }
+
+  const handleDownload = async () => {
+    if (!proposal) {
+      toast({
+        title: "Error",
+        description: "Proposal not found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await downloadProposal(proposal)
+      toast({
+        title: "Success",
+        description: "Proposal downloaded successfully",
+      })
+    } catch (error) {
+      console.error("Error downloading proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to download proposal",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -646,9 +707,44 @@ export default function ProposalDetailsPage() {
                     year: "numeric",
                   })}
                 </h1>
-                <div className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold">
-                  ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </div>
+                {isEditingPrice ? (
+                  <div className="flex items-center gap-2 justify-end">
+                    <div className="flex items-center bg-green-500 text-white px-2 py-1 rounded-md">
+                      <span className="mr-1">₱</span>
+                      <Input
+                        type="text"
+                        value={editablePrice}
+                        onChange={(e) => handlePriceChange(e.target.value)}
+                        className="bg-transparent border-none text-white placeholder-green-200 font-semibold w-32 h-auto p-0 focus:ring-0 focus:border-none"
+                        placeholder="0.00"
+                        autoFocus
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSavePrice}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 h-8"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancelPriceEdit}
+                      className="px-2 py-1 h-8 bg-transparent"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    className="inline-block bg-green-500 text-white px-4 py-1 rounded-md font-semibold cursor-pointer hover:bg-green-600 transition-colors"
+                    onClick={() => setIsEditingPrice(true)}
+                    title="Click to edit price"
+                  >
+                    ₱{proposal.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                  </div>
+                )}
               </div>
             </div>
 
