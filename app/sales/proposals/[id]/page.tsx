@@ -200,7 +200,7 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
     <img
       src={companyLogo || "/placeholder.svg"}
       alt="Company logo"
-      className={`object-contain rounded-lg border border-gray-200 shadow-sm bg-white p-2 ${className}`}
+      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
       onError={(e) => {
         // Fallback to default logo if image fails to load
         const target = e.target as HTMLImageElement
