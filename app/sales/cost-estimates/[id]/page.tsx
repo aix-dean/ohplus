@@ -18,46 +18,14 @@ import type {
   CostEstimateLineItem,
 } from "@/lib/types/cost-estimate"
 import { format } from "date-fns"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import {
-  ArrowLeft,
-  DownloadIcon,
-  Send,
-  CheckCircle,
-  XCircle,
-  FileText,
-  Loader2,
-  LayoutGrid,
-  Pencil,
-  Save,
-  X,
-  Building,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react"
+import { Send, CheckCircle, XCircle, FileText, Pencil, Save, X } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
-import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { getProposalActivities } from "@/lib/proposal-activity-service"
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import { generateCostEstimatePDF, generateSeparateCostEstimatePDFs } from "@/lib/cost-estimate-pdf-service"
-import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
-import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
-import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 
@@ -854,127 +822,62 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const handlePreviousPage = () => {
     if (currentPageIndex > 0) {
       const prevCostEstimate = relatedCostEstimates[currentPageIndex - 1]
-      router.push(`/sales/cost-estimates/${prevCostEstimate.id}`)
+      setCostEstimate(prevCostEstimate)
+      setEditableCostEstimate(prevCostEstimate)
+      setCurrentPageIndex(currentPageIndex - 1)
     }
   }
 
   const handleNextPage = () => {
     if (currentPageIndex < relatedCostEstimates.length - 1) {
       const nextCostEstimate = relatedCostEstimates[currentPageIndex + 1]
-      router.push(`/sales/cost-estimates/${nextCostEstimate.id}`)
+      setCostEstimate(nextCostEstimate)
+      setEditableCostEstimate(nextCostEstimate)
+      setCurrentPageIndex(currentPageIndex + 1)
     }
   }
 
   const handlePageSelect = (pageIndex: number) => {
     const selectedCostEstimate = relatedCostEstimates[pageIndex]
-    router.push(`/sales/cost-estimates/${selectedCostEstimate.id}`)
+    setCostEstimate(selectedCostEstimate)
+    setEditableCostEstimate(selectedCostEstimate)
+    setCurrentPageIndex(pageIndex)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50/50">
-        <div className="container mx-auto p-6 max-w-7xl">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="h-64 bg-gray-200 rounded-lg"></div>
-                <div className="h-48 bg-gray-200 rounded-lg"></div>
-              </div>
-              <div className="space-y-6">
-                <div className="h-32 bg-gray-200 rounded-lg"></div>
-                <div className="h-48 bg-gray-200 rounded-lg"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!costEstimate || !editableCostEstimate) {
-    return (
-      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-            <FileText className="h-8 w-8 text-gray-400" />
-          </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Cost Estimate Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            The cost estimate you're looking for doesn't exist or may have been removed.
-          </p>
-          <Button onClick={() => router.push("/sales/cost-estimates")} className="bg-blue-600 hover:bg-blue-700">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Cost Estimates
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
+  const statusConfig = getStatusConfig(costEstimate.status)
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
-    console.log("[v0] All line items:", lineItems)
-
-    const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
-
-    // Group line items by site based on the site rental items
-    lineItems.forEach((item) => {
-      if (item.category.includes("Billboard Rental")) {
-        // This is a site rental item - use its description as the site name
-        const siteName = item.description
-        if (!siteGroups[siteName]) {
-          siteGroups[siteName] = []
-        }
-        siteGroups[siteName].push(item)
-
-        // Find related production, installation, and maintenance items for this site
-        const siteId = item.id
-        const relatedItems = lineItems.filter(
-          (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
-        )
-        siteGroups[siteName].push(...relatedItems)
+    return lineItems.reduce((acc: { [key: string]: CostEstimateLineItem[] }, item) => {
+      const siteName = item.site || "Unknown Site"
+      if (!acc[siteName]) {
+        acc[siteName] = []
       }
-    })
-
-    if (Object.keys(siteGroups).length === 0) {
-      console.log("[v0] No billboard rental items found, treating as single site with all items")
-      siteGroups["Single Site"] = lineItems
-    } else {
-      // Check for orphaned items (items not associated with any site)
-      const groupedItemIds = new Set()
-      Object.values(siteGroups).forEach((items) => {
-        items.forEach((item) => groupedItemIds.add(item.id))
-      })
-
-      const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
-      if (orphanedItems.length > 0) {
-        console.log("[v0] Found orphaned items:", orphanedItems)
-        const siteNames = Object.keys(siteGroups)
-        siteNames.forEach((siteName) => {
-          // Create copies of orphaned items for each site to avoid reference issues
-          const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
-          siteGroups[siteName].push(...orphanedCopies)
-        })
-      }
-    }
-
-    console.log("[v0] Final site groups:", siteGroups)
-    return siteGroups
+      acc[siteName].push(item)
+      return acc
+    }, {})
   }
 
+  const hasMultipleSites = Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
   const siteGroups = groupLineItemsBySite(costEstimate?.lineItems || [])
   const siteNames = Object.keys(siteGroups)
-  const hasMultipleSites = siteNames.length > 1
-  const totalPages = hasMultipleSites ? siteNames.length : 1
+  const totalPages = siteNames.length
+  \
+            <Badge className=
+  {
+    ;`${statusConfig.color} border font-medium px-3 py-1\`}>
+              {statusConfig.icon}
+              <span className="ml-1.5">{statusConfig.label}</span>
+            </Badge>
+          </div>
+
 
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
+    const adjustedTitle = hasMultipleSites ? \`${siteName}\` : costEstimate?.title
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
-      ? `${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.
-      : baseCENumber
+      ? \`${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.\
+    : baseCENumber
 
     const rentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
     const monthlyRate = rentalItem
@@ -1332,530 +1235,280 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const statusConfig = getStatusConfig(costEstimate.status)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <style jsx>{`
-        @media print {
-          .page-break-before {
-            page-break-before: always;
-          }
-        }
-        @page {
-          margin: 0.5in;
-        }
-      `}</style>
+    
+      
+        @media print
+  .page-
+  break
+    ;
+  ;-before
+  \
+            page-
+  break
+      ;
+  ;-before
+  : always
+  \
+  \
+  @page
+  margin:
+  0.5in
+  \
 
-      {/* Word-style Toolbar */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
-            <Badge className={`${statusConfig.color} border font-medium px-3 py-1`}>
-              {statusConfig.icon}
-              <span className="ml-1.5">{statusConfig.label}</span>
-            </Badge>
-            {relatedCostEstimates.length > 1 && (
-              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePreviousPage}
-                  disabled={currentPageIndex === 0}
-                  className="h-8 px-2 bg-transparent"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex items-center gap-1">
-                  {relatedCostEstimates.map((_, index) => (
-                    <Button
-                      key={index}
-                      variant={index === currentPageIndex ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePageSelect(index)}
-                      className="h-8 w-8 p-0 text-xs"
-                    >
-                      {index + 1}
-                    </Button>
-                  ))}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNextPage}
-                  disabled={currentPageIndex === relatedCostEstimates.length - 1}
-                  className="h-8 px-2 bg-transparent"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-
-                <div className="text-sm text-gray-600 ml-2">
-                  Page {currentPageIndex + 1} of {relatedCostEstimates.length}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2"></div>
-        </div>
-      </div>
-
-      {/* New Wrapper for Sidebar + Document */}
-      <div className="flex justify-center items-start gap-6 mt-6">
-        {/* Left Panel (now part of flow) */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
-          <Button
-            variant="ghost"
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Templates</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleDownloadPDF}
-            disabled={downloadingPDF}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              {companyData?.photo_url ? (
-                <img
-                  src={companyData.photo_url || "/placeholder.svg"}
-                  alt="Company Logo"
-                  className="h-16 w-auto object-contain"
-                />
-              ) : (
-                <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Building className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
-          </div>
-
-          {hasMultipleSites ? (
-            <>
+  Back
+  costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""
+  companyData?.photo_url ? (
+                  
+                ) : (
+                  
+                    
+                  
+                )
+  companyData?.name
+  hasMultipleSites ? (
+            
               {renderCostEstimationBlock(
-                siteNames[currentProductIndex],
-                siteGroups[siteNames[currentProductIndex]],
-                currentProductIndex + 1,
+                siteNames[currentProductIndex],\
+                siteGroups[siteNames[currentProductIndex]],\
+                currentProductIndex + 1,\
               )}
-            </>
-          ) : (
+            \
+  ) : (\
             // Render single page for single site (original behavior)
             renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-          )}
-
-          {proposal && (
-            <div className="p-6 sm:p-8 border-t border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Linked Proposal
-              </h2>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-lg font-semibold">{proposal.title}</p>
-                  <p className="text-gray-600">
-                    Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                  </p>
-                  <Button
-                    variant="link"
-                    className="p-0 mt-2"
-                    onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                  >
-                    View Proposal
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Floating Action Buttons */}
-      {isEditing && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg shadow-lg z-50">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">✏️ Edit Mode Active</span>
-            <span className="text-xs">Click on highlighted fields to edit them</span>
-          </div>
-        </div>
-      )}
-      {isEditing ? (
-        <div className="fixed bottom-6 right-6 flex space-x-4">
-          <Button
-            onClick={handleCancelEdit}
-            variant="outline"
-            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-          >
-            <X className="h-5 w-5 mr-2" />
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveEdit}
-            disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-5 w-5 mr-2" /> Save Changes
-              </>
-            )}
-          </Button>
-        </div>
-      ) : null}
-
-      {relatedCostEstimates.length > 1 && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousPage}
-              disabled={currentPageIndex === 0}
-              className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
-            >
-              Previous
-            </Button>
-
-            <div className="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
-              {currentPageIndex + 1}/{relatedCostEstimates.length}
-            </div>
-
-            {currentPageIndex === relatedCostEstimates.length - 1 ? (
-              <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
-                disabled={costEstimate?.status !== "draft"}
-                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
-              >
-                Send
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={currentPageIndex === relatedCostEstimates.length - 1}
-                className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
-              >
-                Next
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {hasMultipleSites && relatedCostEstimates.length <= 1 && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Previous
-            </Button>
-            <div className="relative">
-              <span className="text-sm font-medium text-gray-700 px-4">
-                {currentProductIndex + 1} of {Object.keys(siteGroups).length}
-              </span>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Send Cost Estimate Options Dialog */}
-      {costEstimate && (
-        <SendCostEstimateOptionsDialog
-          isOpen={isSendOptionsDialogOpen}
-          onOpenChange={setIsSendOptionsDialogOpen}
-          costEstimate={costEstimate}
-          onEmailClick={() => {
-            setIsSendOptionsDialogOpen(false) // Close options dialog
-            setIsSendEmailDialogOpen(true) // Open email dialog
-          }}
-        />
-      )}
-
-      {/* Send Email Dialog (existing) */}
-      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Send Cost Estimate</DialogTitle>
-            <DialogDescription>
-              Review the email details before sending the cost estimate to{" "}
-              <span className="font-semibold text-gray-900">{costEstimate?.client?.email}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="to" className="text-right">
-                To
-              </Label>
-              <Input id="to" value={costEstimate?.client?.email || ""} readOnly className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cc" className="text-right">
-                CC
-              </Label>
-              <Input
-                id="cc"
-                value={ccEmail}
-                onChange={(e) => setCcEmail(e.target.value)}
-                placeholder="Optional: comma-separated emails"
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="from" className="text-right">
-                From
-              </Label>
-              <Input id="from" value="OH Plus &lt;noreply@resend.dev&gt;" readOnly className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="replyTo" className="text-right">
-                Reply-To
-              </Label>
-              <Input
-                id="replyTo"
-                value={user?.email || ""} // Use current user's email as default reply-to
-                readOnly // Make it read-only as it's derived from user data
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="subject" className="text-right">
-                Subject
-              </Label>
-              <Input
-                id="subject"
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., Cost Estimate for Your Advertising Campaign"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="body" className="text-right pt-2">
-                Body
-              </Label>
-              <Textarea
-                id="body"
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                className="col-span-3 min-h-[150px]"
-                placeholder="e.g., Dear [Client Name],\n\nPlease find our cost estimate attached...\n\nBest regards,\nThe OH Plus Team"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
+          )
+  proposal && (
+            
+              
+                Linked
+  Proposal
+  \
+  proposal.title
+  Created
+  on
+  format(proposal.createdAt, "PPP\")} by {proposal.createdBy}\
+                    
+                      View Proposal
+                    \
+                  
+                
+              
+            
+          )
+  isEditing && (
+        
+          
+            
+              Edit
+  Mode
+  Active
+  \
+              Click on highlighted fields to edit them
+            
+          
+        
+      )
+  isEditing ? (
+        
+          
+            
+              
               Cancel
-            </Button>
-            <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
-              {sendingEmail ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
+            
+            {isSaving ? (
+  \
+                \
+                 Saving...
+                
+              
+            ) : (
+              
+                
+                 Save Changes
+                
+              
+            )
+
+  ) : null
+  \
+  relatedCostEstimates.length > 1 && (
+        
+          
+            
+              Previous
+
+  \
+  currentPageIndex + 1
+  ;/.CEaadeeeeghillmnorsssttttt{}
+  currentPageIndex === relatedCostEstimates.length - 1 ? Send : Next
+
+  )
+  \
+  hasMultipleSites && relatedCostEstimates.length <= 1 && (
+        
+          
+            
+              Previous
+
+  \
+  currentProductIndex + 1
+  of
+  Object.keys(siteGroups).length
+  \
+              
+            
+            
+              Next
+            
+          
+        
+      )
+  costEstimate && (
+        
+      )
+
+  Send
+  Cost
+  Estimate
+  \
+                Review the email details before sending the cost estimate to
+  costEstimate?.client?.email
+  .
+              
+            \
+            
+              
+                To
+              
+              
+            
+            
+              
+                CC
+              
+              
+            
+            
+              
+                From
+              
+              
+            
+            
+              
+                Reply-To
+              
+              
+            
+            
+              
+                Subject
+              
+              
+            
+            
+              
+                Body
+              
+              
+            
+          
+          
+            
+              Cancel
+  sendingEmail ? (
+                
+                  
+                   Sending
+  ...
+    \
+                
               ) : (
                 "Send Email"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <CostEstimateSentSuccessDialog
-        isOpen={showSuccessDialog}
-        onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
-      />
-      {/* Timeline Sidebar */}
-      {timelineOpen && (
-        <>
+              )
+  timelineOpen && (
+        
           {/* Backdrop */}
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setTimelineOpen(false)} />
 
-          {/* Sidebar */}
-          <div className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTimelineOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <XCircle className="h-5 w-5" />
-              </Button>
-            </div>
+  Activity
+  Timeline
 
-            <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-              <ProposalActivityTimeline
-                proposalId={costEstimate.id}
-                currentUserId={user?.uid || "unknown_user"}
-                currentUserName={user?.displayName || "Unknown User"}
-              />
-            </div>
-          </div>
-        </>
-      )}
+  )
 
-      <Dialog open={showPageSelection} onOpenChange={setShowPageSelection}>
-        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <DialogTitle className="text-xl font-semibold">Select Pages for PDF Download</DialogTitle>
-              <p className="text-sm text-gray-500 mt-1">Choose which site pages to include in your PDF</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSelectAllPages}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
-              >
-                {selectedPages.length === Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
-                  ? "Deselect All"
-                  : "Select All"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowPageSelection(false)} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
+  Select
+  Pages
+  for PDF Download
+                Choose which
+  site
+  pages
+  to
+  include in your
+  PDF
+  selectedPages.length === Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
+    ? "Deselect All"
+    : "Select All"
+  costEstimate &&
+    // Updated page selection logic to use site names
+    Object.keys(siteGroups).map((siteName, index) => {
+      const siteItems = siteGroups[siteName]
+      const isSelected = selectedPages.includes(siteName)
+      const totalCost = siteItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+      const items = siteGroups[siteName]
 
-          <ScrollArea className="flex-1 pr-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {costEstimate &&
-                // Updated page selection logic to use site names
-                Object.keys(siteGroups).map((siteName, index) => {
-                  const siteItems = siteGroups[siteName]
-                  const isSelected = selectedPages.includes(siteName)
-                  const totalCost = siteItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-                  const items = siteGroups[siteName]
-
-                  return (
-                    <div
-                      key={siteName}
-                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
-                        isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
-                      }`}
-                      onClick={() => handlePageToggle(index)}
-                    >
-                      {/* Checkbox */}
-                      <div className="absolute top-3 left-3 z-10">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => handlePageToggle(index)}
-                          className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
-                        />
-                      </div>
+      return (
+                    
+                      
+                        
+                          
+                        
+                      
 
                       {/* Page Preview */}
-                      <div className="mt-6 space-y-3">
-                        <div className="text-sm font-semibold text-gray-900">Page {index + 1}</div>
-                        <div className="text-xs text-gray-600 font-medium">
-                          {costEstimate.costEstimateNumber || costEstimate.id}
-                          {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
-                            ? `-${String.fromCharCode(65 + index)}`
-                            : ""}
-                        </div>
-                        <div className="text-sm font-medium text-gray-800 line-clamp-2">
-                          Cost Estimate for {siteName}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {items.length} line item{items.length !== 1 ? "s" : ""}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Total: ₱
-                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-          </ScrollArea>
 
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="text-sm text-gray-500">
-              {selectedPages.length} of {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length} pages
-              selected
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowPageSelection(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleDownloadSelectedPages}
-                disabled={selectedPages.length === 0 || downloadingPDF}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {downloadingPDF ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <DownloadIcon className="h-4 w-4 mr-2" />
-                    Download PDF ({selectedPages.length})
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+      Page
+      index + 1
+      costEstimate.costEstimateNumber || costEstimate.id
+      Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
+        ? `-${String.fromCharCode(65 + index)}`
+        : ""
+
+      Cost
+      Estimate
+      for {siteName}
+                        
+                        
+                          {items.length} line
+      item
+      items.length !== 1 ? "s" : ""
+
+      Total:
+      ₱
+      items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()
+
+      )
+    })
+  selectedPages.length
+  of
+  Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
+  pages
+  selected
+
+  Cancel
+  downloadingPDF ? (
+                  
+                    
+                     Generating
+  ...
+
+    ) : (
+                  
+                    
+                     Download PDF (
+  selectedPages.length
+  )
+                    
+                  
+                )
+
   )
 }
