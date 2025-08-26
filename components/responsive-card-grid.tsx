@@ -12,8 +12,6 @@ interface ResponsiveCardGridProps {
   tabletColumns?: number
   desktopColumns?: number
   gap?: "none" | "sm" | "md" | "lg"
-  scrollable?: boolean
-  maxHeight?: string
 }
 
 export function ResponsiveCardGrid({
@@ -23,8 +21,6 @@ export function ResponsiveCardGrid({
   tabletColumns = 2,
   desktopColumns = 3,
   gap = "md",
-  scrollable = false,
-  maxHeight = "calc(100vh - 200px)",
 }: ResponsiveCardGridProps) {
   const { breakpoint } = useResponsive()
 
@@ -45,13 +41,5 @@ export function ResponsiveCardGrid({
     }
   }
 
-  const scrollableClasses = scrollable ? "overflow-y-auto overflow-x-hidden" : ""
-
-  const heightStyle = scrollable ? { maxHeight } : {}
-
-  return (
-    <div className={cn("grid", getGridCols(), gapClasses[gap], scrollableClasses, className)} style={heightStyle}>
-      {children}
-    </div>
-  )
+  return <div className={cn("grid", getGridCols(), gapClasses[gap], className)}>{children}</div>
 }

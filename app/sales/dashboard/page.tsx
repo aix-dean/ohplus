@@ -876,7 +876,7 @@ function SalesDashboardContent() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6">
+    <div className="flex-1 p-4 md:p-6 h-screen overflow-hidden">
       {loading ? (
         // Skeleton Loading State
         <div className="flex flex-col gap-5">
@@ -926,13 +926,13 @@ function SalesDashboardContent() {
         // Actual Dashboard Content
         <div
           className={cn(
-            "grid grid-cols-1 gap-6",
+            "grid grid-cols-1 gap-6 h-full",
             // Only apply two-column layout when proposalCreationMode is true
             proposalCreationMode && "lg:grid-cols-[1fr_300px]",
           )}
         >
           {/* Left Column: Main Dashboard Content */}
-          <div className="flex flex-col gap-4 md:gap-6">
+          <div className="flex flex-col gap-4 md:gap-6 h-full overflow-hidden">
             {/* Header with title, actions, and search box */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
@@ -1304,124 +1304,128 @@ function SalesDashboardContent() {
 
                 {/* Grid View */}
                 {!loading && products.length > 0 && viewMode === "grid" && (
-                  <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                    {products.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        hasOngoingBooking={productsWithBookings[product.id] || false}
-                        onView={() => handleViewDetails(product.id)}
-                        onEdit={(e) => handleEditClick(product, e)}
-                        onDelete={(e) => handleDeleteClick(product, e)}
-                        isSelected={
-                          proposalCreationMode
-                            ? selectedProducts.some((p) => p.id === product.id)
-                            : selectedSites.some((p) => p.id === product.id)
-                        }
-                        onSelect={() =>
-                          proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
-                        }
-                        selectionMode={proposalCreationMode || ceQuoteMode}
-                      />
-                    ))}
-                  </ResponsiveCardGrid>
+                  <div className="flex-1 overflow-y-auto">
+                    <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                      {products.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          hasOngoingBooking={productsWithBookings[product.id] || false}
+                          onView={() => handleViewDetails(product.id)}
+                          onEdit={(e) => handleEditClick(product, e)}
+                          onDelete={(e) => handleDeleteClick(product, e)}
+                          isSelected={
+                            proposalCreationMode
+                              ? selectedProducts.some((p) => p.id === product.id)
+                              : selectedSites.some((p) => p.id === product.id)
+                          }
+                          onSelect={() =>
+                            proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                          }
+                          selectionMode={proposalCreationMode || ceQuoteMode}
+                        />
+                      ))}
+                    </ResponsiveCardGrid>
+                  </div>
                 )}
 
                 {/* List View - Only show on tablet and desktop */}
                 {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[80px]">Image</TableHead>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead className="hidden md:table-cell">Location</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {products.map((product) => (
-                            <TableRow
-                              key={product.id}
-                              className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
-                              onClick={() => {
-                                if (proposalCreationMode) {
-                                  handleProductSelect(product)
-                                } else if (ceQuoteMode) {
-                                  handleSiteSelect(product)
-                                } else {
-                                  handleViewDetails(product.id)
-                                }
-                              }}
-                            >
-                              <TableCell>
-                                <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                                  {product.media && product.media.length > 0 ? (
-                                    <>
-                                      <Image
-                                        src={product.media[0].url || "/placeholder.svg"}
-                                        alt={product.name || "Product image"}
-                                        width={48}
-                                        height={48}
-                                        className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement
-                                          target.src = "/abstract-geometric-sculpture.png"
-                                          target.className = "opacity-50"
-                                        }}
-                                      />
-                                    </>
-                                  ) : (
-                                    <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                      <MapPin size={16} className="text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{product.name}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    product.type?.toLowerCase() === "rental"
-                                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                                      : "bg-purple-50 text-purple-700 border-purple-200"
-                                  }
-                                >
-                                  {product.type || "Unknown"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {product.specs_rental?.location || product.light?.location || "Unknown location"}
-                              </TableCell>
-                              <TableCell>
-                                {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
-                              <TableCell>
-                                {product.type?.toLowerCase() === "rental" &&
-                                  (productsWithBookings[product.id] ? (
-                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                      <CalendarIcon className="mr-1 h-3 w-3" /> Booked
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      <CheckCircle2 className="mr-1 h-3 w-3" /> Available
-                                    </Badge>
-                                  ))}
-                              </TableCell>
-                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                {/* Edit and delete buttons removed */}
-                              </TableCell>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[80px]">Image</TableHead>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead className="hidden md:table-cell">Location</TableHead>
+                              <TableHead>Price</TableHead>
+                              <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {products.map((product) => (
+                              <TableRow
+                                key={product.id}
+                                className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                                onClick={() => {
+                                  if (proposalCreationMode) {
+                                    handleProductSelect(product)
+                                  } else if (ceQuoteMode) {
+                                    handleSiteSelect(product)
+                                  } else {
+                                    handleViewDetails(product.id)
+                                  }
+                                }}
+                              >
+                                <TableCell>
+                                  <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                    {product.media && product.media.length > 0 ? (
+                                      <>
+                                        <Image
+                                          src={product.media[0].url || "/placeholder.svg"}
+                                          alt={product.name || "Product image"}
+                                          width={48}
+                                          height={48}
+                                          className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement
+                                            target.src = "/abstract-geometric-sculpture.png"
+                                            target.className = "opacity-50"
+                                          }}
+                                        />
+                                      </>
+                                    ) : (
+                                      <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                        <MapPin size={16} className="text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">{product.name}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      product.type?.toLowerCase() === "rental"
+                                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                                        : "bg-purple-50 text-purple-700 border-purple-200"
+                                    }
+                                  >
+                                    {product.type || "Unknown"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                  {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                                </TableCell>
+                                <TableCell>
+                                  {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
+                                <TableCell>
+                                  {product.type?.toLowerCase() === "rental" &&
+                                    (productsWithBookings[product.id] ? (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                        <CalendarIcon className="mr-1 h-3 w-3" /> Booked
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        <CheckCircle2 className="mr-1 h-3 w-3" /> Available
+                                      </Badge>
+                                    ))}
+                                </TableCell>
+                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                  {/* Edit and delete buttons removed */}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   </div>
                 )}
