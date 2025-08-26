@@ -781,7 +781,7 @@ function SalesDashboardContent() {
           client_email: selectedClientForProposal.email,
           client_id: selectedClientForProposal.id,
           client_designation: selectedClientForProposal.designation || "", // Add client designation
-          client_address: selectedClientForProposal.address || "", // Add client address
+          client_address: selectedClientForProposal.address || "", // Add client phone
           client_phone: selectedClientForProposal.phone || "", // Add client phone
         }
 
@@ -1538,7 +1538,7 @@ function SalesDashboardContent() {
 
             {/* Right Column: Proposal History - Conditionally rendered */}
             {proposalCreationMode && (
-              <div className="flex flex-col gap-4 pt-4 md:pt-6">
+              <div className="flex flex-col gap-4 pt-16">
                 <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
               </div>
             )}
@@ -1742,7 +1742,8 @@ function ProductCard({
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
-  // Format price if available
+  //
+  //Format price if available
   const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
 
   // Get site code
