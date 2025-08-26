@@ -666,32 +666,18 @@ export default function ProposalDetailsPage() {
 
   const getTotalPages = () => {
     const numberOfSites = proposal?.products?.length || 1
-    const sitesPerPage = getSitesPerPage()
-    return Math.ceil(numberOfSites / sitesPerPage)
+    return numberOfSites
   }
 
   const getPageContent = (pageNumber: number) => {
     if (!proposal?.products) return []
 
-    const sitesPerPage = getSitesPerPage()
-    const startIndex = (pageNumber - 1) * sitesPerPage
-    const endIndex = startIndex + sitesPerPage
-
-    return proposal.products.slice(startIndex, endIndex)
+    const siteIndex = pageNumber - 1
+    return proposal.products[siteIndex] ? [proposal.products[siteIndex]] : []
   }
 
   const getLayoutGridClass = () => {
-    const sitesPerPage = getSitesPerPage()
-    switch (sitesPerPage) {
-      case 1:
-        return "grid-cols-1"
-      case 2:
-        return "grid-cols-1 md:grid-cols-2"
-      case 4:
-        return "grid-cols-2"
-      default:
-        return "grid-cols-1"
-    }
+    return "grid-cols-1"
   }
 
   const saveTemplateSettings = async () => {
