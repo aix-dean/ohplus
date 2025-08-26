@@ -37,6 +37,8 @@ import {
   Save,
   X,
   Building,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -1353,6 +1355,47 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               {statusConfig.icon}
               <span className="ml-1.5">{statusConfig.label}</span>
             </Badge>
+            {relatedCostEstimates.length > 1 && (
+              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPageIndex === 0}
+                  className="h-8 px-2 bg-transparent"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {relatedCostEstimates.map((_, index) => (
+                    <Button
+                      key={index}
+                      variant={index === currentPageIndex ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageSelect(index)}
+                      className="h-8 w-8 p-0 text-xs"
+                    >
+                      {index + 1}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPageIndex === relatedCostEstimates.length - 1}
+                  className="h-8 px-2 bg-transparent"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                <div className="text-sm text-gray-600 ml-2">
+                  Page {currentPageIndex + 1} of {relatedCostEstimates.length}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2"></div>
