@@ -3,10 +3,28 @@
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { LayoutGrid, List, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react"
+import {
+  MapPin,
+  LayoutGrid,
+  List,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  CalendarIcon,
+  CheckCircle2,
+  ArrowLeft,
+  Filter,
+  AlertCircle,
+  Search,
+  PlusCircle,
+  Calculator,
+  FileText,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
@@ -22,20 +40,26 @@ import { collection, query, where, getDocs, Timestamp } from "firebase/firestore
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
 import type { SearchResult } from "@/lib/algolia-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { cn } from "@/lib/utils"
+import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
 import { Input } from "@/components/ui/input"
 import { useDebounce } from "@/hooks/use-debounce"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { createProposal } from "@/lib/proposal-service"
 import type { ProposalClient } from "@/lib/types/proposal"
+import { ProposalHistory } from "@/components/proposal-history"
+import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
+import { RouteProtection } from "@/components/route-protection"
 import type { QuotationProduct } from "@/lib/types/quotation"
+import { CheckCircle } from "lucide-react"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -929,9 +953,9 @@ function SalesDashboardContent() {
             )}
           >
             {/* Left Column: Main Dashboard Content */}
-            <div className="flex flex-col gap-4 md:gap-6 h-full overflow-hidden">
+            <div className="flex flex-col gap-2 md:gap-4 h-full overflow-hidden">
               {/* Header with title, actions, and search box */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div className="flex flex-col gap-2">
                   {!proposalCreationMode && (
                     <h1 className="text-xl md:text-2xl font-bold">
@@ -1048,7 +1072,7 @@ function SalesDashboardContent() {
 
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs mt-2" ref={clientSearchRef}>
+                <div className="relative w-full max-w-xs mt-4" ref={clientSearchRef}>
                   <div className="relative">
                     <Input
                       placeholder="Search or select client..."
@@ -1072,203 +1096,718 @@ function SalesDashboardContent() {
                         (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
                       )}
                     />
-                    {/* Dropdown for client search results */}
-                    {isClientDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-b-md shadow-lg max-h-48 overflow-y-auto">
-                        {dashboardClientSearchResults.map((client) => (
-                          <div
-                            key={client.id}
-                            className="p-2 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleClientSelectOnDashboard(client)}
-                          >
-                            {client.name} ({client.company})
-                          </div>
-                        ))}
-                      </div>
+                    {isSearchingDashboardClients && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
                     )}
                   </div>
+                  {/* Results dropdown */}
+                  {isClientDropdownOpen && (
+                    <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+                      <div className="p-2">
+                        {/* Always show "Add New Client" option at the top */}
+                        <div
+                          className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                          onClick={() => setIsNewClientDialogOpen(true)}
+                        >
+                          <PlusCircle className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium text-blue-700">Add New Client</span>
+                        </div>
+
+                        {dashboardClientSearchResults.length > 0 ? (
+                          dashboardClientSearchResults.map((result) => (
+                            <div
+                              key={result.id}
+                              className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                              onClick={() => handleClientSelectOnDashboard(result)}
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {result.name} ({result.company})
+                                </p>
+                                <p className="text-xs text-gray-500">{result.email}</p>
+                              </div>
+                              {selectedClientForProposal?.id === result.id && (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-2">
+                            {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                              ? `No clients found for "${dashboardClientSearchTerm}".`
+                              : "Start typing to search for clients."}
+                          </p>
+                        )}
+                      </div>
+                    </Card>
+                  )}
                 </div>
               )}
 
-              {/* Products Grid/List View */}
-              {viewMode === "grid" ? (
-                <ResponsiveCardGrid
-                  products={products}
-                  onEdit={handleEditClick}
-                  onDelete={handleDeleteClick}
-                  onViewDetails={handleViewDetails}
-                />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.specs_rental?.location || product.light?.location || "N/A"}</TableCell>
-                        <TableCell>${product.price}</TableCell>
-                        <TableCell>
-                          {productsWithBookings[product.id] ? (
-                            <Badge variant="destructive">Booked</Badge>
-                          ) : (
-                            <Badge variant="success">Available</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" onClick={() => handleEditClick(product)}>
-                            Edit
-                          </Button>
-                          <Button size="sm" onClick={(e) => handleDeleteClick(product, e)}>
-                            Delete
-                          </Button>
-                          <Button size="sm" onClick={() => handleViewDetails(product.id)}>
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-
-              {/* Pagination Controls */}
-              {!loading && totalPages > 1 && (
-                <div className="flex justify-center mt-4">
-                  <Button size="sm" onClick={goToPreviousPage} disabled={currentPage === 1}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  {getPageNumbers().map((pageNumber) => (
-                    <Button
-                      key={pageNumber}
-                      size="sm"
-                      onClick={() => goToPage(pageNumber as number)}
-                      className={cn(currentPage === pageNumber && "bg-blue-500 text-white")}
-                      disabled={typeof pageNumber === "string"}
-                    >
-                      {pageNumber}
+              {/* Search Results View */}
+              {isSearching && (
+                <div className="flex flex-col gap-4">
+                  {/* Search Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
+                        <ArrowLeft size={16} />
+                      </Button>
+                      <h2 className="text-base md:text-lg font-medium truncate">
+                        Results for "{searchQuery}" ({searchResults.length})
+                      </h2>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
+                      <Filter size={14} />
+                      <span>Filter</span>
                     </Button>
-                  ))}
-                  <Button size="sm" onClick={goToNextPage} disabled={currentPage === totalPages}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  </div>
+
+                  {/* Search Error */}
+                  {searchError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{searchError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 ? (
+                    <div>
+                      {viewMode === "grid" ? (
+                        // Grid View for Search Results
+                        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                          {searchResults.map((result) => (
+                            <Card
+                              key={result.objectID}
+                              className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                              onClick={() => handleSearchResultClick(result)}
+                            >
+                              <div className="h-48 bg-gray-200 relative">
+                                <Image
+                                  src={result.image_url || "/abstract-geometric-sculpture.png"}
+                                  alt={result.name || "Search result"}
+                                  fill
+                                  className="object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/abstract-geometric-sculpture.png"
+                                    target.className = "opacity-50 object-contain"
+                                  }}
+                                />
+                              </div>
+
+                              <CardContent className="p-4">
+                                <div className="flex flex-col">
+                                  {result.site_code && (
+                                    <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
+                                  )}
+
+                                  <h3 className="font-semibold line-clamp-1">{result.name}</h3>
+
+                                  {result.price && (
+                                    <div className="mt-2 text-sm font-medium text-green-700">
+                                      ₱{Number(result.price).toLocaleString()}
+                                    </div>
+                                  )}
+
+                                  {result.location && (
+                                    <div className="mt-1 text-xs text-gray-500 flex items-center">
+                                      <MapPin size={12} className="mr-1 flex-shrink-0" />
+                                      <span className="truncate">{result.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </ResponsiveCardGrid>
+                      ) : (
+                        // List View for Search Results - Only show on tablet and desktop
+                        !isMobile && (
+                          <div className="border rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[80px]">Image</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="hidden md:table-cell">Location</TableHead>
+                                    <TableHead>Price</TableHead>
+                                    <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {searchResults.map((result) => (
+                                    <TableRow
+                                      key={result.objectID}
+                                      className="cursor-pointer hover:bg-gray-50"
+                                      onClick={() => handleSearchResultClick(result)}
+                                    >
+                                      <TableCell>
+                                        <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                          {result.image_url ? (
+                                            <Image
+                                              src={result.image_url || "/placeholder.svg"}
+                                              alt={result.name || "Search result"}
+                                              width={48}
+                                              height={48}
+                                              className="h-full w-full object-cover"
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement
+                                                target.src = "/abstract-geometric-sculpture.png"
+                                                target.className = "opacity-50"
+                                              }}
+                                            />
+                                          ) : (
+                                            <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                              <MapPin size={16} className="text-gray-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-medium">{result.name}</TableCell>
+                                      <TableCell>
+                                        <Badge
+                                          variant="outline"
+                                          className={
+                                            result.type?.toLowerCase() === "product" ||
+                                            result.type?.toLowerCase() === "rental"
+                                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                                              : result.type?.toLowerCase() === "client"
+                                                ? "bg-green-50 text-green-700 border-green-200"
+                                                : "bg-purple-50 text-purple-700 border-purple-200"
+                                          }
+                                        >
+                                          {result.type || "Unknown"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="hidden md:table-cell">
+                                        {result.location || "Unknown location"}
+                                      </TableCell>
+                                      <TableCell>
+                                        {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
+                                      </TableCell>
+                                      <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    // No Search Results
+                    <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                      <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <Search size={24} className="text-gray-400" />
+                      </div>
+                      <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
+                      <p className="text-sm text-gray-500 mb-4 px-4">
+                        No items match your search for "{searchQuery}". Try using different keywords.
+                      </p>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* Regular Dashboard Content - Only show when not searching */}
+              {!isSearching && (
+                <>
+                  {/* Empty state */}
+                  {!loading && products.length === 0 && (
+                    <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                      <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <MapPin size={24} className="text-gray-400" />
+                      </div>
+                      <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
+                      <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
+                    </div>
+                  )}
+
+                  {/* Grid View */}
+                  {!loading && products.length > 0 && viewMode === "grid" && (
+                    <div className="flex-1 overflow-y-auto">
+                      <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                        {products.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            hasOngoingBooking={productsWithBookings[product.id] || false}
+                            onView={() => handleViewDetails(product.id)}
+                            onEdit={(e) => handleEditClick(product, e)}
+                            onDelete={(e) => handleDeleteClick(product, e)}
+                            isSelected={
+                              proposalCreationMode
+                                ? selectedProducts.some((p) => p.id === product.id)
+                                : selectedSites.some((p) => p.id === product.id)
+                            }
+                            onSelect={() =>
+                              proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                            }
+                            selectionMode={proposalCreationMode || ceQuoteMode}
+                          />
+                        ))}
+                      </ResponsiveCardGrid>
+                    </div>
+                  )}
+
+                  {/* List View - Only show on tablet and desktop */}
+                  {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[80px]">Image</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="hidden md:table-cell">Location</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {products.map((product) => (
+                                <TableRow
+                                  key={product.id}
+                                  className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                                  onClick={() => {
+                                    if (proposalCreationMode) {
+                                      handleProductSelect(product)
+                                    } else if (ceQuoteMode) {
+                                      handleSiteSelect(product)
+                                    } else {
+                                      handleViewDetails(product.id)
+                                    }
+                                  }}
+                                >
+                                  <TableCell>
+                                    <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                      {product.media && product.media.length > 0 ? (
+                                        <>
+                                          <Image
+                                            src={product.media[0].url || "/placeholder.svg"}
+                                            alt={product.name || "Product image"}
+                                            width={48}
+                                            height={48}
+                                            className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
+                                            onError={(e) => {
+                                              const target = e.target as HTMLImageElement
+                                              target.src = "/abstract-geometric-sculpture.png"
+                                              target.className = "opacity-50"
+                                            }}
+                                          />
+                                        </>
+                                      ) : (
+                                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                          <MapPin size={16} className="text-gray-400" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="font-medium">{product.name}</TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        product.type?.toLowerCase() === "rental"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : "bg-purple-50 text-purple-700 border-purple-200"
+                                      }
+                                    >
+                                      {product.type || "Unknown"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                                  </TableCell>
+                                  <TableCell>
+                                    {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
+                                  <TableCell>
+                                    {product.type?.toLowerCase() === "rental" &&
+                                      (productsWithBookings[product.id] ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-amber-50 text-amber-700 border-amber-200"
+                                        >
+                                          <CalendarIcon className="mr-1 h-3 w-3" /> Booked
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-green-50 text-green-700 border-green-200"
+                                        >
+                                          <CheckCircle2 className="mr-1 h-3 w-3" /> Available
+                                        </Badge>
+                                      ))}
+                                  </TableCell>
+                                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    {/* Edit and delete buttons removed */}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading More Indicator */}
+                  {loadingMore && (
+                    <div className="flex justify-center my-4">
+                      <div className="flex items-center gap-2">
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Loading more...</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pagination Controls */}
+                  {!loading && products.length > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                      <div className="text-sm text-gray-500 flex items-center">
+                        {loadingCount ? (
+                          <div className="flex items-center">
+                            <Loader2 size={14} className="animate-spin mr-2" />
+                            <span>Calculating pages...</span>
+                          </div>
+                        ) : (
+                          <span>
+                            Page {currentPage} of {totalPages} ({products.length} items)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={goToPreviousPage}
+                          disabled={currentPage === 1}
+                          className="h-8 w-8 p-0 bg-transparent"
+                        >
+                          <ChevronLeft size={16} />
+                        </Button>
+
+                        {/* Page numbers - Hide on mobile */}
+                        <div className="hidden sm:flex items-center gap-1">
+                          {getPageNumbers().map((page, index) =>
+                            page === "..." ? (
+                              <span key={`ellipsis-${index}`} className="px-2">
+                                ...
+                              </span>
+                            ) : (
+                              <Button
+                                key={`page-${page}`}
+                                variant={currentPage === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => goToPage(page as number)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {page}
+                              </Button>
+                            ),
+                          )}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={goToNextPage}
+                          disabled={currentPage >= totalPages}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ChevronRight size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Right Column: Proposal/CE/Quote Selection */}
+            {/* Right Column: Proposal History - Conditionally rendered */}
             {proposalCreationMode && (
-              <div className="hidden lg:block">
-                {/* Proposal Selection UI */}
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-lg font-semibold">Select Products</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {products.map((product) => (
-                      <div key={product.id} className="border rounded-lg p-4 flex items-center gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-sm font-semibold">{product.name}</h3>
-                          <p className="text-sm text-gray-500">${product.price}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => handleProductSelect(product)}
-                          className={cn(selectedProducts.some((p) => p.id === product.id) && "bg-blue-500 text-white")}
-                        >
-                          {selectedProducts.some((p) => p.id === product.id) ? "Selected" : "Select"}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-green-500 text-white hover:bg-green-600"
-                    onClick={handleConfirmProposalCreation}
-                    disabled={selectedProducts.length === 0 || !selectedClientForProposal}
-                  >
-                    Create Proposal
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {ceQuoteMode && (
-              <div className="hidden lg:block">
-                {/* CE/Quote Selection UI */}
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-lg font-semibold">Select Sites</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {products.map((product) => (
-                      <div key={product.id} className="border rounded-lg p-4 flex items-center gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-sm font-semibold">{product.name}</h3>
-                          <p className="text-sm text-gray-500">${product.price}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => handleSiteSelect(product)}
-                          className={cn(selectedSites.some((p) => p.id === product.id) && "bg-blue-500 text-white")}
-                        >
-                          {selectedSites.some((p) => p.id === product.id) ? "Selected" : "Select"}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-green-500 text-white hover:bg-green-600"
-                    onClick={openCreateCostEstimateDateDialog}
-                    disabled={selectedSites.length === 0 || !selectedClientForProposal}
-                  >
-                    Create Cost Estimate
-                  </Button>
-                  <Button
-                    size="lg"
-                    className="bg-green-500 text-white hover:bg-green-600"
-                    onClick={openCreateQuotationDateDialog}
-                    disabled={selectedSites.length === 0 || !selectedClientForProposal}
-                  >
-                    Create Quotation
-                  </Button>
-                </div>
+              <div className="flex flex-col gap-4 pt-4 md:pt-6">
+                <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
               </div>
             )}
           </div>
         )}
-      </div>
 
-      {/* Delete Confirmation Dialog */}
-      {deleteDialogOpen && (
+        {/* Create Proposal Button - Fixed position when in proposal mode */}
+        {proposalCreationMode && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            <Button
+              onClick={handleConfirmProposalCreation}
+              disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+              className={`px-8 py-3 text-lg font-semibold transition-all duration-200 ${
+                selectedClientForProposal && selectedProducts.length > 0
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-gray-400 text-gray-600 cursor-not-allowed"
+              }`}
+            >
+              {isCreatingProposal ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Proposal"
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* CE/Quote Button - Fixed position when in CE mode */}
+        {ceQuoteMode && selectedSites.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            {ceMode && (
+              <Button
+                onClick={openCreateCostEstimateDateDialog}
+                className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-4 w-4" />
+                    Create Cost Estimate
+                  </>
+                )}
+              </Button>
+            )}
+            {quoteMode && (
+              <Button
+                onClick={openCreateQuotationDateDialog}
+                className="gap-2 bg-green-600 text-white hover:bg-green-700"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Create Quotation
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {ceMode && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+            <Button
+              onClick={openCreateCostEstimateDateDialog}
+              className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Calculator className="h-4 w-4" />
+                  Create Cost Estimate
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {quoteMode && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+            <Button
+              onClick={openCreateQuotationDateDialog}
+              className="gap-2 bg-green-600 text-white hover:bg-green-700"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Create Quotation
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Date Range Selection Dialog */}
+        <DateRangeCalendarDialog
+          isOpen={isDateRangeDialogOpen}
+          onClose={() => setIsDateRangeDialogOpen(false)}
+          onSelectDates={handleDatesSelected}
+          onSkipDates={handleSkipDates}
+          selectedSiteIds={selectedSites.map((site) => site.id)}
+          selectedClientId={selectedClientForProposal?.id}
+          showSkipButton={actionAfterDateSelection === "cost_estimate"}
+        />
+
+        {/* Delete Confirmation Dialog */}
         <DeleteConfirmationDialog
           isOpen={deleteDialogOpen}
           onClose={() => setDeleteDialogOpen(false)}
           onConfirm={handleDeleteConfirm}
-          product={productToDelete}
+          title="Delete Product"
+          description="This product will be removed from your dashboard. This action cannot be undone."
+          itemName={productToDelete?.name}
         />
-      )}
 
-      {/* Date Range Calendar Dialog */}
-      {isDateRangeDialogOpen && (
-        <DateRangeCalendarDialog
-          isOpen={isDateRangeDialogOpen}
-          onClose={() => setIsDateRangeDialogOpen(false)}
-          onDatesSelected={handleDatesSelected}
-          onSkipDates={handleSkipDates}
-        />
-      )}
-
-      {/* Collab Partner Dialog */}
-      {isCollabPartnerDialogOpen && (
+        {/* Collab Partner Selection Dialog */}
         <CollabPartnerDialog isOpen={isCollabPartnerDialogOpen} onClose={() => setIsCollabPartnerDialogOpen(false)} />
-      )}
+
+        {/* New Client Dialog (now using ClientDialog) */}
+        <ClientDialog
+          open={isNewClientDialogOpen}
+          onOpenChange={setIsNewClientDialogOpen}
+          onSuccess={(newClient) => {
+            setIsNewClientDialogOpen(false)
+            handleClientSelectOnDashboard(newClient)
+            toast({
+              title: "Client Added",
+              description: `${newClient.name} (${newClient.company}) has been added.`,
+              variant: "success",
+            })
+          }}
+        />
+      </div>
     </div>
   )
 }
 
-export default SalesDashboardContent
+export default function SalesDashboardPage() {
+  const { user } = useAuth()
+
+  return (
+    <RouteProtection requiredRoles="sales">
+      <div className="h-screen overflow-hidden">
+        <SalesDashboardContent />
+
+        {/* Render SalesChatWidget without the floating button */}
+        <SalesChatWidget />
+      </div>
+    </RouteProtection>
+  )
+}
+
+// Product Card Component for Grid View
+function ProductCard({
+  product,
+  hasOngoingBooking,
+  onView,
+  onEdit,
+  onDelete,
+  isSelected = false,
+  onSelect,
+  selectionMode = false,
+}: {
+  product: Product
+  hasOngoingBooking: boolean
+  onView: () => void
+  onEdit: (e: React.MouseEvent) => void
+  onDelete: (e: React.MouseEvent) => void
+  isSelected?: boolean
+  onSelect?: () => void
+  selectionMode?: boolean
+}) {
+  // Get the first media item for the thumbnail
+  const thumbnailUrl =
+    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
+
+  // Determine location based on product type
+  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+
+  // Format price if available
+  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
+
+  // Get site code
+  const siteCode = getSiteCode(product)
+
+  const handleClick = () => {
+    if (selectionMode && onSelect) {
+      onSelect()
+    } else {
+      onView()
+    }
+  }
+
+  return (
+    <Card
+      className={cn(
+        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
+      )}
+      onClick={handleClick}
+    >
+      <div className="h-48 bg-gray-200 relative">
+        <Image
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "Product image"}
+          fill
+          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+          }}
+        />
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-2 left-2 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+              )}
+            >
+              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <CardContent className="p-4">
+        <div className="flex flex-col">
+          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+
+          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+
+          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
