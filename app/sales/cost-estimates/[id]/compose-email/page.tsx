@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
+import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 
@@ -92,8 +93,8 @@ export default function ComposeEmailPage() {
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
 
-  // Email form fields
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
   const [subject, setSubject] = useState("")
@@ -111,21 +112,18 @@ export default function ComposeEmailPage() {
           const related = await getCostEstimatesByPageId(estimate.page_id)
           setRelatedCostEstimates(related)
 
-          // Generate attachment names for all related cost estimates
           const attachmentNames = related.map(
             (est, index) =>
               `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
           )
           setAttachments(attachmentNames)
         } else {
-          // Single cost estimate
           setRelatedCostEstimates([estimate])
           setAttachments([
             `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
           ])
         }
 
-        // Set default email values
         setToEmail(estimate.client?.email || "")
         setCcEmail(user?.email || "")
         setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
@@ -237,6 +235,37 @@ ${user?.email || ""}`)
     }
   }
 
+  const handleDownloadAttachment = async (attachment: string, index: number) => {
+    if (!costEstimate || !relatedCostEstimates[index]) return
+
+    const targetEstimate = relatedCostEstimates[index]
+    const userDataForPDF = user
+      ? {
+          first_name: user.displayName?.split(" ")[0] || "",
+          last_name: user.displayName?.split(" ").slice(1).join(" ") || "",
+          email: user.email || "",
+        }
+      : undefined
+
+    setDownloadingPDF(index)
+    try {
+      await generateCostEstimatePDF(targetEstimate, undefined, false, userDataForPDF)
+      toast({
+        title: "PDF Downloaded",
+        description: `${attachment} has been downloaded successfully.`,
+      })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to download PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingPDF(null)
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
@@ -308,15 +337,10 @@ ${user?.email || ""}`)
                       <Paperclip className="h-4 w-4 text-gray-500" />
                       <button
                         className="flex-1 text-sm text-left text-blue-600 hover:text-blue-800 hover:underline"
-                        onClick={() => {
-                          // Create a download link for the PDF
-                          const link = document.createElement("a")
-                          link.href = `/api/cost-estimates/${costEstimate?.id}/pdf?page=${index + 1}`
-                          link.download = attachment
-                          link.click()
-                        }}
+                        onClick={() => handleDownloadAttachment(attachment, index)}
+                        disabled={downloadingPDF === index}
                       >
-                        {attachment}
+                        {downloadingPDF === index ? "Downloading..." : attachment}
                       </button>
                       <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)} className="h-6 w-6 p-0">
                         <Trash2 className="h-3 w-3" />
