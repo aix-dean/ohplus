@@ -36,6 +36,8 @@ export default function ComposeEmailPage() {
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
+  const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
   const [newTemplateName, setNewTemplateName] = useState("")
   const [newTemplateSubject, setNewTemplateSubject] = useState("")
   const [newTemplateBody, setNewTemplateBody] = useState("")
@@ -214,7 +216,7 @@ ${user?.email || ""}`)
 
   const handleDeleteTemplate = async (templateId: string) => {
     try {
-      await emailService.deleteEmailTemplate(templateId)
+      await emailService.softDeleteEmailTemplate(templateId)
       setTemplates((prev) => prev.filter((template) => template.id !== templateId))
       toast({
         title: "Template Deleted",
@@ -227,6 +229,56 @@ ${user?.email || ""}`)
         description: "Failed to delete template. Please try again.",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleEditTemplate = (template: EmailTemplate) => {
+    setEditingTemplate(template)
+    setNewTemplateName(template.name)
+    setNewTemplateSubject(template.subject)
+    setNewTemplateBody(template.body)
+    setShowEditTemplateDialog(true)
+  }
+
+  const handleSaveEditedTemplate = async () => {
+    if (!editingTemplate || !newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all template fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSavingTemplate(true)
+    try {
+      const updatedTemplate = await emailService.updateEmailTemplate(editingTemplate.id, {
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+      })
+
+      setTemplates((prev) => prev.map((template) => (template.id === editingTemplate.id ? updatedTemplate : template)))
+
+      setShowEditTemplateDialog(false)
+      setEditingTemplate(null)
+      setNewTemplateName("")
+      setNewTemplateSubject("")
+      setNewTemplateBody("")
+
+      toast({
+        title: "Template Updated",
+        description: "Email template has been updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update template. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
@@ -416,9 +468,19 @@ ${user?.email || ""}`)
                   key={template.id}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
                 >
-                  <span className="text-sm">{template.name}</span>
+                  <button
+                    className="text-sm text-left flex-1 hover:text-blue-600"
+                    onClick={() => applyTemplate(template)}
+                  >
+                    {template.name}
+                  </button>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => applyTemplate(template)} className="h-6 w-6 p-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditTemplate(template)}
+                      className="h-6 w-6 p-0"
+                    >
                       <Edit className="h-3 w-3" />
                     </Button>
                     <Button
@@ -503,6 +565,58 @@ ${user?.email || ""}`)
             </Button>
             <Button onClick={handleAddTemplate} disabled={savingTemplate}>
               {savingTemplate ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Email Template</DialogTitle>
+            <DialogDescription>Update the email template details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-name">Template Name</Label>
+              <Input
+                id="edit-template-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="e.g., Standard Quotation"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-subject">Subject</Label>
+              <Input
+                id="edit-template-subject"
+                value={newTemplateSubject}
+                onChange={(e) => setNewTemplateSubject(e.target.value)}
+                placeholder="e.g., Cost Estimate: {title} - {companyName}"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-body">Body</Label>
+              <Textarea
+                id="edit-template-body"
+                value={newTemplateBody}
+                onChange={(e) => setNewTemplateBody(e.target.value)}
+                placeholder="Hi {clientName},&#10;&#10;Please find attached..."
+                className="min-h-[200px]"
+              />
+            </div>
+            <div className="text-sm text-gray-500">
+              <p className="font-medium mb-1">Available placeholders:</p>
+              <p>{"{clientName}, {title}, {userName}, {companyName}, {userContact}, {userEmail}"}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditedTemplate} disabled={savingTemplate}>
+              {savingTemplate ? "Updating..." : "Update Template"}
             </Button>
           </DialogFooter>
         </DialogContent>

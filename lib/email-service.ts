@@ -149,9 +149,16 @@ class EmailService {
     }
   }
 
-  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
+  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate> {
     try {
       await updateDoc(doc(db, this.templatesCollection, templateId), updates)
+
+      // Return the updated template
+      const updatedDoc = await getDoc(doc(db, this.templatesCollection, templateId))
+      if (updatedDoc.exists()) {
+        return { id: updatedDoc.id, ...updatedDoc.data() } as EmailTemplate
+      }
+      throw new Error("Template not found after update")
     } catch (error) {
       console.error("Error updating email template:", error)
       throw new Error("Failed to update email template")
@@ -164,6 +171,15 @@ class EmailService {
     } catch (error) {
       console.error("Error deleting email template:", error)
       throw new Error("Failed to delete email template")
+    }
+  }
+
+  async softDeleteEmailTemplate(templateId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, this.templatesCollection, templateId), { deleted: true })
+    } catch (error) {
+      console.error("Error soft deleting email template:", error)
+      throw new Error("Failed to soft delete email template")
     }
   }
 
