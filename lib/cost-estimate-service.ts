@@ -26,6 +26,8 @@ interface CreateCostEstimateOptions {
   startDate?: Date | undefined // Made startDate and endDate optional and allow undefined
   endDate?: Date | undefined
   customLineItems?: CostEstimateLineItem[] // Allow passing custom line items
+  company_id?: string
+  page_id?: string
 }
 
 interface CostEstimateClientData {
@@ -141,6 +143,8 @@ export async function createCostEstimateFromProposal(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
+      company_id: options?.company_id || "",
+      page_id: options?.page_id || "",
       startDate: options?.startDate || null, // Store new dates
       endDate: options?.endDate || null, // Store new dates
       durationDays: durationDays, // Store duration in days
@@ -181,35 +185,6 @@ export async function createDirectCostEstimate(
           notes: `Location: ${site.location}`,
         })
       })
-
-      // Add default cost categories if not using custom line items
-      lineItems.push({
-        id: "production-cost",
-        description: "Production Cost (Tarpaulin/LED Content)",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Production",
-        notes: "Estimated cost for content production.",
-      })
-      lineItems.push({
-        id: "installation-cost",
-        description: "Installation/Dismantling Fees",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Installation",
-        notes: "Estimated cost for installation and dismantling.",
-      })
-      lineItems.push({
-        id: "maintenance-cost",
-        description: "Maintenance & Monitoring",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Maintenance",
-        notes: "Estimated cost for ongoing maintenance and monitoring.",
-      })
     }
 
     // Recalculate total amount based on final line items
@@ -239,6 +214,8 @@ export async function createDirectCostEstimate(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
+      company_id: options?.company_id || "",
+      page_id: options?.page_id || "",
       startDate: options?.startDate || null,
       endDate: options?.endDate || null,
       durationDays: durationDays, // Store duration in days
@@ -325,6 +302,8 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -362,6 +341,8 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       createdAt: data.createdAt?.toDate(),
       updatedAt: data.updatedAt?.toDate(),
       createdBy: data.createdBy,
+      company_id: data.company_id || "",
+      page_id: data.page_id || "",
       startDate: data.startDate?.toDate() || null, // Retrieve new dates
       endDate: data.endDate?.toDate() || null, // Retrieve new dates
       durationDays: data.durationDays || null, // Retrieve duration in days
@@ -422,6 +403,8 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -481,6 +464,8 @@ export async function getPaginatedCostEstimates(
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -533,6 +518,8 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -574,35 +561,6 @@ export async function createMultipleCostEstimates(
         notes: `Location: ${site.location}`,
       })
 
-      // Add default cost categories for each site
-      lineItems.push({
-        id: `production-cost-${site.id}`,
-        description: "Production Cost (Tarpaulin/LED Content)",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Production",
-        notes: "Estimated cost for content production.",
-      })
-      lineItems.push({
-        id: `installation-cost-${site.id}`,
-        description: "Installation/Dismantling Fees",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Installation",
-        notes: "Estimated cost for installation and dismantling.",
-      })
-      lineItems.push({
-        id: `maintenance-cost-${site.id}`,
-        description: "Maintenance & Monitoring",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Maintenance",
-        notes: "Estimated cost for ongoing maintenance and monitoring.",
-      })
-
       // Calculate total amount for this site
       totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
 
@@ -630,6 +588,8 @@ export async function createMultipleCostEstimates(
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
+        company_id: options?.company_id || "",
+        page_id: options?.page_id || "",
         startDate: options?.startDate || null,
         endDate: options?.endDate || null,
         durationDays: durationDays,
