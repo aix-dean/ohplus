@@ -21,12 +21,13 @@ import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, userData, refreshUserData } = useAuth()
 
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
@@ -41,11 +42,43 @@ export default function ComposeEmailPage() {
   const [newTemplateBody, setNewTemplateBody] = useState("")
   const [savingTemplate, setSavingTemplate] = useState(false)
 
+  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [pendingTemplateAction, setPendingTemplateAction] = useState<"add" | "delete" | null>(null)
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null)
+
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
+
+  const handleActionWithCompanyCheck = (
+    actionCallback: () => void,
+    actionType?: "add" | "delete",
+    templateId?: string,
+  ) => {
+    if (!userData?.company_id) {
+      setPendingTemplateAction(actionType || null)
+      setPendingTemplateId(templateId || null)
+      setIsCompanyRegistrationDialogOpen(true)
+    } else {
+      actionCallback()
+    }
+  }
+
+  const handleCompanyRegistrationSuccess = async () => {
+    setIsCompanyRegistrationDialogOpen(false)
+    await refreshUserData()
+
+    if (pendingTemplateAction === "add") {
+      setShowAddTemplateDialog(true)
+    } else if (pendingTemplateAction === "delete" && pendingTemplateId) {
+      handleDeleteTemplate(pendingTemplateId)
+    }
+
+    setPendingTemplateAction(null)
+    setPendingTemplateId(null)
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,12 +121,12 @@ OH Plus
 ${user?.phoneNumber || ""}
 ${user?.email || ""}`)
 
-        if (user?.company_id) {
+        if (userData?.company_id) {
           try {
-            const userTemplates = await emailService.getEmailTemplates(user.company_id)
+            const userTemplates = await emailService.getEmailTemplates(userData.company_id)
             if (userTemplates.length === 0) {
-              await emailService.createDefaultTemplates(user.company_id)
-              const newTemplates = await emailService.getEmailTemplates(user.company_id)
+              await emailService.createDefaultTemplates(userData.company_id)
+              const newTemplates = await emailService.getEmailTemplates(userData.company_id)
               setTemplates(newTemplates)
             } else {
               setTemplates(userTemplates)
@@ -103,12 +136,8 @@ ${user?.email || ""}`)
             setTemplates([])
           }
         } else {
-          console.error("User company_id not found")
-          toast({
-            title: "Error",
-            description: "Company ID not found in user data",
-            variant: "destructive",
-          })
+          console.log("User company_id not found - user needs to register company")
+          setTemplates([])
         }
       } catch (error) {
         console.error("Error fetching cost estimate:", error)
@@ -123,7 +152,7 @@ ${user?.email || ""}`)
     }
 
     fetchData()
-  }, [params.id, user, toast])
+  }, [params.id, user, userData, toast])
 
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
@@ -157,10 +186,10 @@ ${user?.email || ""}`)
       return
     }
 
-    if (!user?.company_id) {
+    if (!userData?.company_id) {
       toast({
         title: "Error",
-        description: "Company ID not found in user data",
+        description: "Company registration required to create templates",
         variant: "destructive",
       })
       return
@@ -172,7 +201,7 @@ ${user?.email || ""}`)
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
-        company_id: user.company_id,
+        company_id: userData.company_id,
         deleted: false,
       })
 
@@ -410,7 +439,9 @@ ${user?.email || ""}`)
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteTemplate(template.id)}
+                      onClick={() =>
+                        handleActionWithCompanyCheck(() => handleDeleteTemplate(template.id), "delete", template.id)
+                      }
                       className="h-6 w-6 p-0"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -420,7 +451,7 @@ ${user?.email || ""}`)
               ))}
               <Button
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => setShowAddTemplateDialog(true)}
+                onClick={() => handleActionWithCompanyCheck(() => setShowAddTemplateDialog(true), "add")}
               >
                 +Add Template
               </Button>
@@ -493,6 +524,13 @@ ${user?.email || ""}`)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company Registration Dialog */}
+      <CompanyRegistrationDialog
+        isOpen={isCompanyRegistrationDialogOpen}
+        onClose={() => setIsCompanyRegistrationDialogOpen(false)}
+        onSuccess={handleCompanyRegistrationSuccess}
+      />
     </div>
   )
 }
