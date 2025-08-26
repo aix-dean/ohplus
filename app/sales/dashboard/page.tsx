@@ -978,7 +978,7 @@ function SalesDashboardContent() {
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-4">
                   {/* Proposal Creation Mode Controls (on dashboard) */}
                   {proposalCreationMode && (
                     <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
@@ -1072,7 +1072,7 @@ function SalesDashboardContent() {
 
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs" ref={clientSearchRef}>
+                <div className="relative w-full max-w-xs mt-4" ref={clientSearchRef}>
                   <div className="relative">
                     <Input
                       placeholder="Search or select client..."
@@ -1538,7 +1538,7 @@ function SalesDashboardContent() {
 
             {/* Right Column: Proposal History - Conditionally rendered */}
             {proposalCreationMode && (
-              <div className="flex flex-col gap-4 pt-16 md:pt-20">
+              <div className="flex flex-col gap-4 pt-4 md:pt-6">
                 <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
               </div>
             )}
