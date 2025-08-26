@@ -662,6 +662,44 @@ export default function ProposalDetailsPage() {
     return `${baseStyles} ${sizeStyles} ${orientationStyles}`
   }
 
+  const getMainContainerDimensions = () => {
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        sizeStyles = "max-w-[210mm]" // A4 width constraint
+        break
+      case "Letter size":
+        sizeStyles = "max-w-[8.5in]" // US Letter width constraint
+        break
+      case "Legal size":
+        sizeStyles = "max-w-[8.5in]" // US Legal width constraint
+        break
+      default:
+        sizeStyles = "max-w-4xl"
+    }
+
+    let orientationStyles = ""
+    switch (selectedOrientation) {
+      case "Square":
+        orientationStyles = "max-w-[600px]"
+        break
+      case "Landscape":
+        orientationStyles = "max-w-[900px]"
+        break
+      case "Portrait":
+        orientationStyles = "max-w-[600px]"
+        break
+      default:
+        orientationStyles = ""
+    }
+
+    return `${sizeStyles} ${orientationStyles} mx-auto`
+  }
+
+  const getPageContainerDimensions = () => {
+    return "bg-white shadow-lg border-transparent relative w-full"
+  }
+
   const getSitesPerPage = () => Number.parseInt(selectedLayout)
 
   const getTotalPages = () => {
@@ -790,7 +828,7 @@ export default function ProposalDetailsPage() {
         <span className="text-black italic ml-2">{proposal?.proposalNumber || params.id}</span>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className={`flex-1 flex items-center justify-center p-4 ${getMainContainerDimensions()}`}>
         {showTemplatesPanel && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -1121,7 +1159,7 @@ export default function ProposalDetailsPage() {
             const pageContent = getPageContent(pageNumber)
 
             return (
-              <div key={pageNumber} className={getContainerDimensions()}>
+              <div key={pageNumber} className={getPageContainerDimensions()}>
                 {/* Background template */}
                 {selectedTemplateBackground && (
                   <div
