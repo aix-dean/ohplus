@@ -844,7 +844,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     setCurrentPageIndex(pageIndex)
   }
 
-  const statusConfig = getStatusConfig(costEstimate.status)
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
     return lineItems.reduce((acc: { [key: string]: CostEstimateLineItem[] }, item) => {
       const siteName = item.site || "Unknown Site"
@@ -860,24 +859,15 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const siteGroups = groupLineItemsBySite(costEstimate?.lineItems || [])
   const siteNames = Object.keys(siteGroups)
   const totalPages = siteNames.length
-  \
-            <Badge className=
-  {
-    ;`${statusConfig.color} border font-medium px-3 py-1\`}>
-              {statusConfig.icon}
-              <span className="ml-1.5">{statusConfig.label}</span>
-            </Badge>
-          </div>
-
 
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites ? \`${siteName}\` : costEstimate?.title
+    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
-      ? \`${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.\
-    : baseCENumber
+      ? `${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.
+      : baseCENumber
 
     const rentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
     const monthlyRate = rentalItem
@@ -1235,280 +1225,369 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const statusConfig = getStatusConfig(costEstimate.status)
 
   return (
-    
-      
-        @media print
-  .page-
-  break
-    ;
-  ;-before
-  \
-            page-
-  break
-      ;
-  ;-before
-  : always
-  \
-  \
-  @page
-  margin:
-  0.5in
-  \
+    <>
+      <style jsx global>{`
+        @media print {
+          .page-break {
+            page-break-before: always;
+          }
+        }
+        @page {
+          margin: 0.5in;
+        }
+      `}</style>
+      <div className="container max-w-5xl mx-auto py-12">
+        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          ← Back
+        </Button>
+        <div className="grid grid-cols-1 gap-6">
+          {/* Main content area */}
+          <div className="col-span-1">
+            {/* Cost Estimate Details */}
+            {loading ? (
+              <div>Loading cost estimate...</div>
+            ) : costEstimate ? (
+              <>
+                {/* Header Section */}
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">{costEstimate.title}</h1>
+                    <p className="text-sm text-gray-600">
+                      Created on {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
+                    </p>
+                  </div>
+                  {companyData?.photo_url ? (
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={companyData.photo_url || "/placeholder.svg"}
+                        alt="Company Logo"
+                        className="w-20 h-auto rounded-md shadow-md"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-4">
+                      <div className="w-20 h-20 bg-gray-200 rounded-md flex items-center justify-center">
+                        <span className="text-gray-500">No Logo</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-  Back
-  costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""
-  companyData?.photo_url ? (
-                  
+                {/* Render Cost Estimation Block */}
+                {hasMultipleSites ? (
+                  <>
+                    {renderCostEstimationBlock(
+                      siteNames[currentProductIndex],
+                      siteGroups[siteNames[currentProductIndex]],
+                      currentProductIndex + 1,
+                    )}
+                  </>
                 ) : (
-                  
-                    
-                  
-                )
-  companyData?.name
-  hasMultipleSites ? (
-            
-              {renderCostEstimationBlock(
-                siteNames[currentProductIndex],\
-                siteGroups[siteNames[currentProductIndex]],\
-                currentProductIndex + 1,\
-              )}
-            \
-  ) : (\
-            // Render single page for single site (original behavior)
-            renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-          )
-  proposal && (
-            
-              
-                Linked
-  Proposal
-  \
-  proposal.title
-  Created
-  on
-  format(proposal.createdAt, "PPP\")} by {proposal.createdBy}\
-                    
-                      View Proposal
-                    \
-                  
-                
-              
-            
-          )
-  isEditing && (
-        
-          
-            
-              Edit
-  Mode
-  Active
-  \
-              Click on highlighted fields to edit them
-            
-          
-        
-      )
-  isEditing ? (
-        
-          
-            
-              
-              Cancel
-            
-            {isSaving ? (
-  \
-                \
-                 Saving...
-                
-              
+                  // Render single page for single site (original behavior)
+                  renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+                )}
+
+                {/* Linked Proposal Section */}
+                {proposal && (
+                  <div className="mt-8 p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Linked Proposal</h3>
+                        <p className="text-sm text-gray-600">
+                          {proposal.title} - Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                        </p>
+                      </div>
+                      <div>
+                        <Button asChild>
+                          <a href={`/sales/proposals/${proposal.id}`} target="_blank" rel="noopener noreferrer">
+                            View Proposal
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Edit Mode Indicator */}
+                {isEditing && (
+                  <div className="fixed top-6 right-6 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-md shadow-md z-50">
+                    <div className="flex items-center gap-2">
+                      <Pencil className="h-4 w-4" />
+                      <span>Edit Mode Active</span>
+                    </div>
+                    <p className="text-sm mt-1">Click on highlighted fields to edit them</p>
+                  </div>
+                )}
+
+                {/* Edit and Save Buttons */}
+                {isEditing ? (
+                  <div className="fixed bottom-6 left-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
+                    <Button variant="outline" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                    {isSaving ? (
+                      <Button disabled>
+                        <div className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                            <path
+                              fill="currentColor"
+                              d="M12 4V2a1 1 0 0 1 1-1h0a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1zm5.37 2.59a1 1 0 0 1 1.44 1.22l-1.4 2.43a10 10 0 1 1-8.34-8.34l2.43-1.4a1 1 0 0 1 1.22 1.44l-2.43 1.4a10 10 0 0 0 8.34 8.34l1.4-2.43z"
+                            />
+                          </svg>
+                          Saving...
+                        </div>
+                      </Button>
+                    ) : (
+                      <Button onClick={handleSaveEdit}>
+                        <div className="flex items-center gap-2">
+                          <Save className="h-4 w-4" />
+                          Save Changes
+                        </div>
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* Page Navigation */}
+                {relatedCostEstimates.length > 1 && (
+                  <div className="flex justify-between items-center mt-8">
+                    <Button
+                      variant="outline"
+                      onClick={handlePreviousPage}
+                      disabled={currentPageIndex === 0}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
+                      <Send className="w-4 h-4 rotate-180" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {currentPageIndex + 1} of {relatedCostEstimates.length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={handleNextPage}
+                      disabled={currentPageIndex === relatedCostEstimates.length - 1}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
+                      {currentPageIndex === relatedCostEstimates.length - 1 ? Send : "Next"}
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Product Navigation */}
+                {hasMultipleSites && relatedCostEstimates.length <= 1 && (
+                  <div className="flex justify-between items-center mt-8">
+                    <Button
+                      variant="outline"
+                      onClick={handlePreviousProduct}
+                      disabled={currentProductIndex === 0}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
+                      <Send className="w-4 h-4 rotate-180" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {currentProductIndex + 1} of {Object.keys(siteGroups).length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={handleNextProduct}
+                      disabled={currentProductIndex === Object.keys(siteGroups).length - 1}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
+                      Next
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                {costEstimate && (
+                  <div className="mt-8 flex justify-end gap-4">
+                    <Button onClick={() => setIsSendEmailDialogOpen(true)} className="flex items-center gap-2">
+                      <Send className="w-4 h-4" />
+                      Send Cost Estimate
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
-              
-                
-                 Save Changes
-                
-              
-            )
+              <div>Cost estimate not found.</div>
+            )}
+          </div>
+        </div>
+      </div>
 
-  ) : null
-  \
-  relatedCostEstimates.length > 1 && (
-        
-          
-            
-              Previous
+      {/* Send Email Dialog */}
+      {isSendEmailDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Send Cost Estimate</h3>
 
-  \
-  currentPageIndex + 1
-  ;/.CEaadeeeeghillmnorsssttttt{}
-  currentPageIndex === relatedCostEstimates.length - 1 ? Send : Next
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                <div className="text-sm text-gray-600">{costEstimate?.client?.email}</div>
+              </div>
 
-  )
-  \
-  hasMultipleSites && relatedCostEstimates.length <= 1 && (
-        
-          
-            
-              Previous
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CC</label>
+                <Input
+                  type="email"
+                  value={ccEmail}
+                  onChange={(e) => setCcEmail(e.target.value)}
+                  placeholder="Enter CC email addresses (comma separated)"
+                />
+              </div>
 
-  \
-  currentProductIndex + 1
-  of
-  Object.keys(siteGroups).length
-  \
-              
-            
-            
-              Next
-            
-          
-        
-      )
-  costEstimate && (
-        
-      )
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                <div className="text-sm text-gray-600">{user?.email}</div>
+              </div>
 
-  Send
-  Cost
-  Estimate
-  \
-                Review the email details before sending the cost estimate to
-  costEstimate?.client?.email
-  .
-              
-            \
-            
-              
-                To
-              
-              
-            
-            
-              
-                CC
-              
-              
-            
-            
-              
-                From
-              
-              
-            
-            
-              
-                Reply-To
-              
-              
-            
-            
-              
-                Subject
-              
-              
-            
-            
-              
-                Body
-              
-              
-            
-          
-          
-            
-              Cancel
-  sendingEmail ? (
-                
-                  
-                   Sending
-  ...
-    \
-                
-              ) : (
-                "Send Email"
-              )
-  timelineOpen && (
-        
-          {/* Backdrop */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To</label>
+                <div className="text-sm text-gray-600">{user?.email}</div>
+              </div>
 
-  Activity
-  Timeline
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <Input type="text" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+              </div>
 
-  )
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                <textarea
+                  className="w-full p-2 border border-gray-300 rounded-md resize-none"
+                  rows={6}
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                />
+              </div>
+            </div>
 
-  Select
-  Pages
-  for PDF Download
-                Choose which
-  site
-  pages
-  to
-  include in your
-  PDF
-  selectedPages.length === Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
-    ? "Deselect All"
-    : "Select All"
-  costEstimate &&
-    // Updated page selection logic to use site names
-    Object.keys(siteGroups).map((siteName, index) => {
-      const siteItems = siteGroups[siteName]
-      const isSelected = selectedPages.includes(siteName)
-      const totalCost = siteItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-      const items = siteGroups[siteName]
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
+                {sendingEmail ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Sending...
+                  </div>
+                ) : (
+                  "Send Email"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      return (
-                    
-                      
-                        
-                          
-                        
-                      
+      {/* Success Dialog */}
+      {showSuccessDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 text-center">
+            <div className="mb-4">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+              <h3 className="text-lg font-semibold">Email Sent Successfully!</h3>
+            </div>
+            <p className="text-gray-600 mb-6">The cost estimate has been successfully sent to the client.</p>
+            <Button onClick={handleSuccessDialogDismissAndNavigate} className="w-full">
+              Dismiss and Go to Dashboard
+            </Button>
+          </div>
+        </div>
+      )}
 
-                      {/* Page Preview */}
+      {/* Timeline Dialog */}
+      {timelineOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+            <h3 className="text-lg font-semibold mb-4">Activity Timeline</h3>
+            <Button variant="outline" onClick={() => setTimelineOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
 
-      Page
-      index + 1
-      costEstimate.costEstimateNumber || costEstimate.id
-      Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
-        ? `-${String.fromCharCode(65 + index)}`
-        : ""
+      {/* Page Selection Dialog */}
+      {showPageSelection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+            <h3 className="text-lg font-semibold mb-2">Select Pages for PDF Download</h3>
+            <p className="text-gray-600 mb-4">Choose which site pages to include in your PDF</p>
 
-      Cost
-      Estimate
-      for {siteName}
-                        
-                        
-                          {items.length} line
-      item
-      items.length !== 1 ? "s" : ""
+            <Button variant="outline" onClick={handleSelectAllPages} className="mb-4 bg-transparent">
+              {selectedPages.length === Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
+                ? "Deselect All"
+                : "Select All"}
+            </Button>
 
-      Total:
-      ₱
-      items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {costEstimate &&
+                Object.keys(siteGroups).map((siteName, index) => {
+                  const siteItems = siteGroups[siteName]
+                  const isSelected = selectedPages.includes(siteName)
+                  const items = siteGroups[siteName]
 
-      )
-    })
-  selectedPages.length
-  of
-  Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
-  pages
-  selected
+                  return (
+                    <div
+                      key={siteName}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                      }`}
+                      onClick={() => handlePageToggle(index)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handlePageToggle(index)}
+                            className="rounded"
+                          />
+                          <div>
+                            <div className="font-medium">
+                              Page {index + 1} - {costEstimate.costEstimateNumber || costEstimate.id}
+                              {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
+                                ? `-${String.fromCharCode(65 + index)}`
+                                : ""}
+                            </div>
+                            <div className="text-sm text-gray-600">Cost Estimate for {siteName}</div>
+                            <div className="text-sm text-gray-500">
+                              {items.length} line item{items.length !== 1 ? "s" : ""} • Total: ₱
+                              {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
 
-  Cancel
-  downloadingPDF ? (
-                  
-                    
-                     Generating
-  ...
-
-    ) : (
-                  
-                    
-                     Download PDF (
-  selectedPages.length
-  )
-                    
-                  
-                )
-
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setShowPageSelection(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleDownloadSelectedPages} disabled={downloadingPDF || selectedPages.length === 0}>
+                {downloadingPDF ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Generating PDF...
+                  </div>
+                ) : (
+                  "Download Selected Pages"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
