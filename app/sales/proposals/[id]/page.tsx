@@ -690,12 +690,7 @@ export default function ProposalDetailsPage() {
     const startIndex = (pageNumber - 1) * sitesPerPage
     const endIndex = startIndex + sitesPerPage
 
-    const pageProducts = proposal.products.slice(startIndex, endIndex)
-
-    // Debug logging to verify pagination
-    console.log(`[v0] Page ${pageNumber}: Sites per page = ${sitesPerPage}, Products = ${pageProducts.length}`)
-
-    return pageProducts
+    return proposal.products.slice(startIndex, endIndex)
   }
 
   const getLayoutGridClass = () => {
@@ -753,12 +748,6 @@ export default function ProposalDetailsPage() {
       return "Company Name"
     }
 
-    // For single site per page, show just the site code
-    if (getSitesPerPage() === 1 && siteCodes.length === 1) {
-      return siteCodes[0]
-    }
-
-    // For multiple sites per page layouts, combine appropriately
     if (siteCodes.length === 1) {
       return siteCodes[0]
     }
@@ -797,6 +786,55 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
     )
+  }
+
+  const getPageContainerClass = () => {
+    const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
+
+    // Size-based dimensions with orientation support
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
+        } else {
+          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
+        }
+        break
+      case "Letter size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
+        }
+        break
+      case "Legal size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
+        }
+        break
+      default:
+        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+    }
+
+    // Square orientation for any paper size
+    if (selectedOrientation === "Square") {
+      switch (selectedSize) {
+        case "A4":
+          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
+          break
+        case "Letter size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
+          break
+        case "Legal size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
+          break
+      }
+    }
+
+    return `${baseStyles} ${sizeStyles}`
   }
 
   return (
@@ -1174,7 +1212,7 @@ export default function ProposalDetailsPage() {
             const pageContent = getPageContent(pageNumber)
 
             return (
-              <div key={pageNumber} className={getContainerDimensions()}>
+              <div key={pageNumber} className={getPageContainerClass()}>
                 {/* Background template */}
                 {selectedTemplateBackground && (
                   <div
@@ -1188,11 +1226,7 @@ export default function ProposalDetailsPage() {
                   <div className="flex justify-between items-start mb-4 md:mb-6">
                     <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
                     <div className="text-right">
-                      <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                        {getSitesPerPage() === 1 && pageContent.length === 1
-                          ? pageContent[0].site_code || "Site"
-                          : getPageTitle(pageContent)}
-                      </h1>
+                      <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">{getPageTitle(pageContent)}</h1>
 
                       {isEditingPrice ? (
                         <div className="flex items-center gap-2 justify-end">
@@ -1241,10 +1275,7 @@ export default function ProposalDetailsPage() {
                         </div>
                       ) : (
                         <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                          ₱
-                          {getSitesPerPage() === 1 && pageContent.length === 1
-                            ? (pageContent[0].price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })
-                            : getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                         </div>
                       )}
                     </div>
