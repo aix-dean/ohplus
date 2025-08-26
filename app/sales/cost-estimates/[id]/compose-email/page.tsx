@@ -88,12 +88,12 @@ OH Plus
 ${user?.phoneNumber || ""}
 ${user?.email || ""}`)
 
-        if (estimate?.company_id) {
+        if (user?.company_id) {
           try {
-            const userTemplates = await emailService.getEmailTemplates(estimate.company_id)
+            const userTemplates = await emailService.getEmailTemplates(user.company_id)
             if (userTemplates.length === 0) {
-              await emailService.createDefaultTemplates(estimate.company_id)
-              const newTemplates = await emailService.getEmailTemplates(estimate.company_id)
+              await emailService.createDefaultTemplates(user.company_id)
+              const newTemplates = await emailService.getEmailTemplates(user.company_id)
               setTemplates(newTemplates)
             } else {
               setTemplates(userTemplates)
@@ -102,6 +102,13 @@ ${user?.email || ""}`)
             console.error("Error fetching templates:", error)
             setTemplates([])
           }
+        } else {
+          console.error("User company_id not found")
+          toast({
+            title: "Error",
+            description: "Company ID not found in user data",
+            variant: "destructive",
+          })
         }
       } catch (error) {
         console.error("Error fetching cost estimate:", error)
@@ -150,10 +157,10 @@ ${user?.email || ""}`)
       return
     }
 
-    if (!costEstimate?.company_id) {
+    if (!user?.company_id) {
       toast({
         title: "Error",
-        description: "Company ID not found",
+        description: "Company ID not found in user data",
         variant: "destructive",
       })
       return
@@ -165,7 +172,7 @@ ${user?.email || ""}`)
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
-        company_id: costEstimate.company_id,
+        company_id: user.company_id,
         deleted: false,
       })
 
