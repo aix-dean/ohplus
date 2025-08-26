@@ -192,6 +192,9 @@ export async function createDirectCostEstimate(
 
     const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
 
+    const pageId = options?.page_id || `PAGE-${Date.now()}`
+    const companyId = options?.company_id || ""
+
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: null, // No associated proposal
       costEstimateNumber: costEstimateNumber, // Store the new number
@@ -214,8 +217,9 @@ export async function createDirectCostEstimate(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
-      company_id: options?.company_id || "",
-      page_id: options?.page_id || "",
+      company_id: companyId,
+      page_id: pageId,
+      page_number: 1, // Added page_number field for single documents
       startDate: options?.startDate || null,
       endDate: options?.endDate || null,
       durationDays: durationDays, // Store duration in days
@@ -304,6 +308,7 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
+        page_number: data.page_number || 1, // Include page_number field
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -343,6 +348,7 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       createdBy: data.createdBy,
       company_id: data.company_id || "",
       page_id: data.page_id || "",
+      page_number: data.page_number || 1, // Include page_number field
       startDate: data.startDate?.toDate() || null, // Retrieve new dates
       endDate: data.endDate?.toDate() || null, // Retrieve new dates
       durationDays: data.durationDays || null, // Retrieve duration in days
@@ -405,6 +411,7 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
+        page_number: data.page_number || 1, // Include page_number field
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -466,8 +473,9 @@ export async function getPaginatedCostEstimates(
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        page_number: data.page_number || 1, // Include page_number field
+        startDate: data.startDate?.toDate() || null, // Retrieve new dates
+        endDate: data.endDate?.toDate() || null, // Retrieve new dates
         durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
@@ -520,6 +528,7 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
+        page_number: data.page_number || 1, // Include page_number field
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
@@ -542,8 +551,12 @@ export async function createMultipleCostEstimates(
   try {
     const costEstimateIds: string[] = []
 
+    const pageId = options?.page_id || `PAGE-${Date.now()}`
+    const companyId = options?.company_id || ""
+
     // Create a separate cost estimate for each site
-    for (const site of sitesData) {
+    for (let i = 0; i < sitesData.length; i++) {
+      const site = sitesData[i]
       const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
       let totalAmount = 0
       const lineItems: CostEstimateLineItem[] = []
@@ -588,8 +601,9 @@ export async function createMultipleCostEstimates(
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
-        company_id: options?.company_id || "",
-        page_id: options?.page_id || "",
+        company_id: companyId, // Use the provided company_id
+        page_id: pageId, // Use the same page_id for all documents
+        page_number: i + 1, // Add sequential page numbers (1, 2, 3, etc.)
         startDate: options?.startDate || null,
         endDate: options?.endDate || null,
         durationDays: durationDays,
