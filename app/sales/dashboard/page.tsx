@@ -1604,7 +1604,7 @@ export default function SalesDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="sales">
-      <div>
+      <div className="h-screen overflow-hidden">
         <SalesDashboardContent />
 
         {/* Render SalesChatWidget without the floating button */}
