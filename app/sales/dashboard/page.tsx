@@ -1538,7 +1538,7 @@ function SalesDashboardContent() {
 
             {/* Right Column: Proposal History - Conditionally rendered */}
             {proposalCreationMode && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 pt-4 md:pt-6">
                 <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
               </div>
             )}
