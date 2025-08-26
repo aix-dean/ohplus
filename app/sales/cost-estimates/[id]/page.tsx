@@ -419,12 +419,18 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           setCostEstimate(ce)
           setEditableCostEstimate(ce)
 
+          console.log("[v0] Current cost estimate page_id:", ce.page_id)
+
           if (ce.page_id) {
             const relatedCEs = await getCostEstimatesByPageId(ce.page_id)
+            console.log("[v0] Related cost estimates found:", relatedCEs.length, relatedCEs)
             setRelatedCostEstimates(relatedCEs)
             // Find current page index
             const currentIndex = relatedCEs.findIndex((rce) => rce.id === ce.id)
+            console.log("[v0] Current page index:", currentIndex)
             setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+          } else {
+            console.log("[v0] No page_id found for this cost estimate")
           }
 
           if (ce.proposalId) {
