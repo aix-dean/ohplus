@@ -211,8 +211,8 @@ export function SideNavigation() {
   const SectionIcon = currentNavItem?.icon
 
   return (
-    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 shadow-sm">
-      <nav className="p-3 space-y-4">
+    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 shadow-sm flex flex-col">
+      <nav className="p-3 space-y-4 flex-1 overflow-y-auto">
         {currentSection === "cms" ? (
           <>
             {/* Notification Section */}
@@ -309,8 +309,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white mt-auto">
               <div className="flex items-center space-x-2 mb-3">
                 <h3 className="text-sm font-medium">Intelligence</h3>
                 <Sparkles className="h-4 w-4" />
@@ -685,6 +684,22 @@ export function SideNavigation() {
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
