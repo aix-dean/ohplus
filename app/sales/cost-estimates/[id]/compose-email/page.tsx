@@ -12,76 +12,7 @@ import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-s
 import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
-
-const emailTemplates = [
-  {
-    id: 1,
-    name: "Template 1",
-    subject: "Cost Estimate: {title} - OH Plus",
-    body: `Hi {clientName},
-
-I hope you're doing well!
-
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
-
-If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
-
-Best regards,
-{userName}
-Sales Executive
-{companyName}
-{userContact}
-{userEmail}`,
-  },
-  {
-    id: 2,
-    name: "Template 2",
-    subject: "Your Advertising Campaign Quote - {title}",
-    body: `Dear {clientName},
-
-Thank you for your interest in our advertising services. We are pleased to provide you with a detailed cost estimate for your campaign.
-
-Please review the attached quotation and let us know if you have any questions or require any modifications.
-
-We look forward to working with you!
-
-Best regards,
-{userName}
-{companyName}`,
-  },
-  {
-    id: 3,
-    name: "Template 3",
-    subject: "Billboard Campaign Proposal - {title}",
-    body: `Hello {clientName},
-
-We've prepared a comprehensive cost estimate for your billboard advertising campaign. The attached document includes all the details we discussed.
-
-Please take your time to review it and don't hesitate to contact us with any questions.
-
-Thank you for considering OH Plus for your advertising needs.
-
-Best regards,
-{userName}`,
-  },
-  {
-    id: 4,
-    name: "Template 4",
-    subject: "Cost Estimate Ready for Review - {title}",
-    body: `Dear {clientName},
-
-Your cost estimate is ready! We've carefully prepared a detailed proposal that aligns with your requirements and budget considerations.
-
-The attached document contains all the information you need to make an informed decision about your advertising campaign.
-
-We're excited about the possibility of working together!
-
-Best regards,
-{userName}
-Sales Executive
-{companyName}`,
-  },
-]
+import { emailService, type EmailTemplate } from "@/lib/email-service"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
@@ -91,6 +22,7 @@ export default function ComposeEmailPage() {
 
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
@@ -141,6 +73,22 @@ Sales Executive
 OH Plus
 ${user?.phoneNumber || ""}
 ${user?.email || ""}`)
+
+        if (estimate?.company_id) {
+          try {
+            const userTemplates = await emailService.getEmailTemplates(estimate.company_id)
+            if (userTemplates.length === 0) {
+              await emailService.createDefaultTemplates(estimate.company_id)
+              const newTemplates = await emailService.getEmailTemplates(estimate.company_id)
+              setTemplates(newTemplates)
+            } else {
+              setTemplates(userTemplates)
+            }
+          } catch (error) {
+            console.error("Error fetching templates:", error)
+            setTemplates([])
+          }
+        }
       } catch (error) {
         console.error("Error fetching cost estimate:", error)
         toast({
@@ -156,7 +104,7 @@ ${user?.email || ""}`)
     fetchData()
   }, [params.id, user, toast])
 
-  const applyTemplate = (template: (typeof emailTemplates)[0]) => {
+  const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
       "{title}": costEstimate?.title || "Custom Cost Estimate",
       "{clientName}": costEstimate?.client?.contactPerson || costEstimate?.client?.company || "Valued Client",
@@ -359,7 +307,7 @@ ${user?.email || ""}`)
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="font-medium mb-4">Templates:</h3>
             <div className="space-y-3">
-              {emailTemplates.map((template) => (
+              {templates.map((template) => (
                 <div
                   key={template.id}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
