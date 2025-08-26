@@ -777,9 +777,12 @@ function SalesDashboardContent() {
           created_by: user.uid,
           created_by_first_name: userData?.first_name || "",
           created_by_last_name: userData?.last_name || "",
+          seller_id: user.uid, // Current user as seller
+          company_id: userData?.company_id || "", // Company ID from user data
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
           client_id: selectedClientForProposal.id,
+          client_company_name: selectedClientForProposal.company || "",
           client_designation: selectedClientForProposal.designation || "", // Add client designation
           client_address: selectedClientForProposal.address || "", // Add client address
           client_phone: selectedClientForProposal.phone || "", // Add client phone

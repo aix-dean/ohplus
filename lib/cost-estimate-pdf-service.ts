@@ -452,7 +452,7 @@ export async function generateCostEstimatePDF(
 
       // Titles/Companies
       pdf.setFont("helvetica", "normal")
-      pdf.text("Account Management", margin, yPosition)
+      pdf.text(costEstimate.position || "Position", margin, yPosition)
       pdf.text(costEstimate.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
       yPosition += 10
 
