@@ -20,6 +20,7 @@ import {
   Upload,
   Check,
   XIcon,
+  Minus,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -228,6 +229,7 @@ export default function ProposalDetailsPage() {
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState<number>(1)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -759,6 +761,18 @@ export default function ProposalDetailsPage() {
     return `${siteCodes[0]} & ${siteCodes.length - 1} more sites`
   }
 
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(prev + 0.1, 2)) // Max zoom 200%
+  }
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3)) // Min zoom 30%
+  }
+
+  const handleResetZoom = () => {
+    setZoomLevel(1)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
@@ -850,9 +864,40 @@ export default function ProposalDetailsPage() {
         </Button>
         <span className="text-black font-medium">Finalize Proposal</span>
         <span className="text-black italic ml-2">{proposal?.proposalNumber || params.id}</span>
+
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomOut}
+              className="h-7 w-7 p-0 hover:bg-gray-200"
+              disabled={zoomLevel <= 0.3}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetZoom}
+              className="h-7 px-2 text-xs font-medium hover:bg-gray-200 min-w-[50px]"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomIn}
+              className="h-7 w-7 p-0 hover:bg-gray-200"
+              disabled={zoomLevel >= 2}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
         {showTemplatesPanel && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -1206,14 +1251,16 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-8">
+        <div
+          className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
+          style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
+        >
           {Array.from({ length: getTotalPages() }, (_, index) => {
             const pageNumber = index + 1
             const pageContent = getPageContent(pageNumber)
 
             return (
               <div key={pageNumber} className={getPageContainerClass()}>
-                {/* Background template */}
                 {selectedTemplateBackground && (
                   <div
                     className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
