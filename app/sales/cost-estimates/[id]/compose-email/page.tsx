@@ -262,48 +262,28 @@ ${user?.email || ""}`)
               {/* To Field */}
               <div className="flex items-center gap-4">
                 <Label className="w-12 text-sm font-medium">To:</Label>
-                <div className="flex-1 relative">
+                <div className="flex-1">
                   <Input
                     value={toEmail}
                     onChange={(e) => setToEmail(e.target.value)}
                     placeholder="recipient@example.com"
-                    className="pr-12"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                    80
-                  </div>
                 </div>
               </div>
 
               {/* CC Field */}
               <div className="flex items-center gap-4">
                 <Label className="w-12 text-sm font-medium">Cc:</Label>
-                <div className="flex-1 relative">
-                  <Input
-                    value={ccEmail}
-                    onChange={(e) => setCcEmail(e.target.value)}
-                    placeholder="cc@example.com"
-                    className="pr-12"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                    81
-                  </div>
+                <div className="flex-1">
+                  <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
                 </div>
               </div>
 
               {/* Subject Field */}
               <div className="flex items-center gap-4">
                 <Label className="w-12 text-sm font-medium">Subject:</Label>
-                <div className="flex-1 relative">
-                  <Input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Email subject"
-                    className="pr-12"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                    82
-                  </div>
+                <div className="flex-1">
+                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" />
                 </div>
               </div>
 
@@ -314,9 +294,8 @@ ${user?.email || ""}`)
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder="Email body..."
-                    className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500 pr-12"
+                    className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500"
                   />
-                  <div className="absolute top-3 right-3 bg-green-500 text-white text-xs px-2 py-1 rounded">83</div>
                 </div>
               </div>
 
@@ -327,15 +306,24 @@ ${user?.email || ""}`)
                   {attachments.map((attachment, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
                       <Paperclip className="h-4 w-4 text-gray-500" />
-                      <span className="flex-1 text-sm">{attachment}</span>
-                      <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded">180</div>
+                      <button
+                        className="flex-1 text-sm text-left text-blue-600 hover:text-blue-800 hover:underline"
+                        onClick={() => {
+                          // Create a download link for the PDF
+                          const link = document.createElement("a")
+                          link.href = `/api/cost-estimates/${costEstimate?.id}/pdf?page=${index + 1}`
+                          link.download = attachment
+                          link.click()
+                        }}
+                      >
+                        {attachment}
+                      </button>
                       <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)} className="h-6 w-6 p-0">
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
                   <Button variant="link" className="text-blue-500 text-sm p-0 h-auto">
-                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded mr-2">86</span>
                     +Add Attachment
                   </Button>
                 </div>
@@ -354,7 +342,6 @@ ${user?.email || ""}`)
                 >
                   <span className="text-sm">{template.name}</span>
                   <div className="flex items-center gap-2">
-                    <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded">8{template.id + 3}</div>
                     <Button variant="ghost" size="sm" onClick={() => applyTemplate(template)} className="h-6 w-6 p-0">
                       <Edit className="h-3 w-3" />
                     </Button>
@@ -364,11 +351,7 @@ ${user?.email || ""}`)
                   </div>
                 </div>
               ))}
-
-              <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-                <span className="bg-green-500 text-white text-xs px-2 py-1 rounded mr-2">87</span>
-                +Add Template
-              </Button>
+              <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">+Add Template</Button>
             </div>
           </div>
         </div>
@@ -380,7 +363,6 @@ ${user?.email || ""}`)
             disabled={sending || !toEmail || !subject}
             className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
           >
-            <span className="bg-green-500 text-white text-xs px-2 py-1 rounded mr-2">89</span>
             {sending ? "Sending..." : "Send Email"}
           </Button>
         </div>
