@@ -21,13 +21,12 @@ import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
-  const { user, userData, refreshUserData } = useAuth()
+  const { user, userData } = useAuth()
 
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
@@ -42,43 +41,11 @@ export default function ComposeEmailPage() {
   const [newTemplateBody, setNewTemplateBody] = useState("")
   const [savingTemplate, setSavingTemplate] = useState(false)
 
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
-  const [pendingTemplateAction, setPendingTemplateAction] = useState<"add" | "delete" | null>(null)
-  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null)
-
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
-
-  const handleActionWithCompanyCheck = (
-    actionCallback: () => void,
-    actionType?: "add" | "delete",
-    templateId?: string,
-  ) => {
-    if (!userData?.company_id) {
-      setPendingTemplateAction(actionType || null)
-      setPendingTemplateId(templateId || null)
-      setIsCompanyRegistrationDialogOpen(true)
-    } else {
-      actionCallback()
-    }
-  }
-
-  const handleCompanyRegistrationSuccess = async () => {
-    setIsCompanyRegistrationDialogOpen(false)
-    await refreshUserData()
-
-    if (pendingTemplateAction === "add") {
-      setShowAddTemplateDialog(true)
-    } else if (pendingTemplateAction === "delete" && pendingTemplateId) {
-      handleDeleteTemplate(pendingTemplateId)
-    }
-
-    setPendingTemplateAction(null)
-    setPendingTemplateId(null)
-  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -118,15 +85,18 @@ Best regards,
 ${user?.displayName || "Sales Executive"}
 Sales Executive
 OH Plus
-${user?.phoneNumber || ""}
+${userData?.phone_number || ""}
 ${user?.email || ""}`)
 
-        if (userData?.company_id) {
+        const companyId = userData?.company_id || estimate?.company_id
+
+        if (companyId) {
           try {
-            const userTemplates = await emailService.getEmailTemplates(userData.company_id)
+            console.log("[v0] Using company_id:", companyId)
+            const userTemplates = await emailService.getEmailTemplates(companyId)
             if (userTemplates.length === 0) {
-              await emailService.createDefaultTemplates(userData.company_id)
-              const newTemplates = await emailService.getEmailTemplates(userData.company_id)
+              await emailService.createDefaultTemplates(companyId)
+              const newTemplates = await emailService.getEmailTemplates(companyId)
               setTemplates(newTemplates)
             } else {
               setTemplates(userTemplates)
@@ -136,7 +106,11 @@ ${user?.email || ""}`)
             setTemplates([])
           }
         } else {
-          console.log("User company_id not found - user needs to register company")
+          console.error("Company ID not found in user data or cost estimate")
+          console.log("[v0] userData:", userData)
+          console.log("[v0] estimate company_id:", estimate?.company_id)
+
+          console.warn("No company_id available, continuing without templates")
           setTemplates([])
         }
       } catch (error) {
@@ -151,7 +125,9 @@ ${user?.email || ""}`)
       }
     }
 
-    fetchData()
+    if (userData !== null) {
+      fetchData()
+    }
   }, [params.id, user, userData, toast])
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -186,10 +162,12 @@ ${user?.email || ""}`)
       return
     }
 
-    if (!userData?.company_id) {
+    const companyId = userData?.company_id || costEstimate?.company_id
+
+    if (!companyId) {
       toast({
         title: "Error",
-        description: "Company registration required to create templates",
+        description: "Company ID not found. Cannot create template.",
         variant: "destructive",
       })
       return
@@ -201,7 +179,7 @@ ${user?.email || ""}`)
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
-        company_id: userData.company_id,
+        company_id: companyId,
         deleted: false,
       })
 
@@ -333,7 +311,7 @@ ${user?.email || ""}`)
     }
   }
 
-  if (loading) {
+  if (loading || userData === null) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
@@ -439,9 +417,7 @@ ${user?.email || ""}`)
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
-                        handleActionWithCompanyCheck(() => handleDeleteTemplate(template.id), "delete", template.id)
-                      }
+                      onClick={() => handleDeleteTemplate(template.id)}
                       className="h-6 w-6 p-0"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -451,7 +427,7 @@ ${user?.email || ""}`)
               ))}
               <Button
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => handleActionWithCompanyCheck(() => setShowAddTemplateDialog(true), "add")}
+                onClick={() => setShowAddTemplateDialog(true)}
               >
                 +Add Template
               </Button>
@@ -524,13 +500,6 @@ ${user?.email || ""}`)
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Company Registration Dialog */}
-      <CompanyRegistrationDialog
-        isOpen={isCompanyRegistrationDialogOpen}
-        onClose={() => setIsCompanyRegistrationDialogOpen(false)}
-        onSuccess={handleCompanyRegistrationSuccess}
-      />
     </div>
   )
 }
