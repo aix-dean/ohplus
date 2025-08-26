@@ -326,6 +326,19 @@ export default function ProposalDetailsPage() {
 
       await updateProposal(proposal.id, updateData, userData.uid, userData.displayName || "User")
 
+      setProposal((prev) =>
+        prev
+          ? {
+              ...prev,
+              templateSize: selectedSize,
+              templateOrientation: selectedOrientation,
+              templateLayout: selectedLayout,
+              templateBackground:
+                selectedTemplateBackground !== "" ? selectedTemplateBackground : prev.templateBackground,
+            }
+          : null,
+      )
+
       toast({
         title: "Template Applied",
         description: "Template settings have been applied and saved",
@@ -666,18 +679,32 @@ export default function ProposalDetailsPage() {
 
   const getTotalPages = () => {
     const numberOfSites = proposal?.products?.length || 1
-    return numberOfSites
+    const sitesPerPage = getSitesPerPage()
+    return Math.ceil(numberOfSites / sitesPerPage)
   }
 
   const getPageContent = (pageNumber: number) => {
     if (!proposal?.products) return []
 
-    const siteIndex = pageNumber - 1
-    return proposal.products[siteIndex] ? [proposal.products[siteIndex]] : []
+    const sitesPerPage = getSitesPerPage()
+    const startIndex = (pageNumber - 1) * sitesPerPage
+    const endIndex = startIndex + sitesPerPage
+
+    return proposal.products.slice(startIndex, endIndex)
   }
 
   const getLayoutGridClass = () => {
-    return "grid-cols-1"
+    const sitesPerPage = getSitesPerPage()
+    switch (sitesPerPage) {
+      case 1:
+        return "grid-cols-1"
+      case 2:
+        return "grid-cols-1 lg:grid-cols-2"
+      case 4:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
+      default:
+        return "grid-cols-1"
+    }
   }
 
   const saveTemplateSettings = async () => {
@@ -1005,7 +1032,7 @@ export default function ProposalDetailsPage() {
 
                     <div>
                       <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-3">
                         {[
                           {
                             name: "1 per page",
@@ -1028,27 +1055,33 @@ export default function ProposalDetailsPage() {
                         ].map((layout) => (
                           <div
                             key={layout.value}
-                            className={`cursor-pointer border-2 rounded-lg p-4 transition-colors flex items-center space-x-4 ${
+                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
                               selectedLayout === layout.value
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-gray-300"
+                                ? "border-blue-500 bg-blue-50 shadow-md scale-105"
+                                : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                             }`}
-                            onClick={() => setSelectedLayout(layout.value)}
+                            onClick={() => {
+                              setSelectedLayout(layout.value)
+                              toast({
+                                title: "Layout Updated",
+                                description: `Switched to ${layout.name} layout`,
+                              })
+                            }}
                           >
-                            <div className="aspect-[4/3] bg-gray-50 rounded w-16 p-1 flex-shrink-0">
+                            <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
                               <div className={`grid ${layout.layout} gap-0.5 h-full`}>
                                 {Array.from({ length: Number.parseInt(layout.value) }).map((_, i) => (
                                   <div key={i} className="bg-gray-200 rounded-sm"></div>
                                 ))}
                               </div>
                             </div>
-                            <div className="flex-1 text-left">
-                              <div className="text-sm font-medium text-gray-900">{layout.name}</div>
-                              <div className="text-xs text-gray-500 mt-1">{layout.description}</div>
+                            <div className="space-y-1">
+                              <span className="text-xs font-medium text-gray-700 block">{layout.name}</span>
+                              <span className="text-xs text-gray-500 block">{layout.description}</span>
                             </div>
                             {selectedLayout === layout.value && (
-                              <div className="flex-shrink-0">
-                                <Check className="h-5 w-5 text-blue-500" />
+                              <div className="absolute top-2 right-2">
+                                <Check className="h-4 w-4 text-blue-500" />
                               </div>
                             )}
                           </div>
@@ -1200,15 +1233,19 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   {/* Product content grid */}
-                  <div className={`grid gap-4 ${getLayoutGridClass()}`}>
+                  <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
                     {pageContent.map((product, productIndex) => (
-                      <div key={product.id} className="space-y-4">
+                      <div key={product.id} className="space-y-4 transition-all duration-300">
                         {/* Rest of product content */}
                         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                           <div className="flex-shrink-0">
                             <div
-                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
-                                getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
+                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
+                                getSitesPerPage() === 1
+                                  ? "w-48 h-60 md:w-64 md:h-80"
+                                  : getSitesPerPage() === 2
+                                    ? "w-40 h-48 md:w-48 md:h-60"
+                                    : "w-32 h-40 md:w-36 md:h-44"
                               }`}
                             >
                               {product.media && product.media.length > 0 ? (
