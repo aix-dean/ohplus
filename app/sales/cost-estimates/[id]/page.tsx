@@ -492,6 +492,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     }
   }, [isSendEmailDialogOpen, costEstimate, user])
 
+  const handleSendEmail = () => {
+    router.push(`/sales/cost-estimates/${params.id}/compose-email`)
+  }
+
   const handleSendEmailConfirm = async () => {
     if (!costEstimate || !user?.uid) return
 
@@ -1576,8 +1580,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           onOpenChange={setIsSendOptionsDialogOpen}
           costEstimate={costEstimate}
           onEmailClick={() => {
-            setIsSendOptionsDialogOpen(false) // Close options dialog
-            setIsSendEmailDialogOpen(true) // Open email dialog
+            setIsSendOptionsDialogOpen(false)
+            handleSendEmail()
           }}
         />
       )}
