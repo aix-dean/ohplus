@@ -412,6 +412,16 @@ export async function updateProposal(
     if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
     if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
 
+    if (data.products !== undefined) {
+      updateData.products = data.products
+      // Recalculate total amount when products are updated
+      const totalAmount = data.products.reduce((sum, product) => {
+        const price = typeof product.price === "string" ? Number.parseFloat(product.price) : product.price
+        return sum + (isNaN(price) ? 0 : price)
+      }, 0)
+      updateData.totalAmount = totalAmount
+    }
+
     // Handle client object updates
     if (data.client) {
       if (data.client.company !== undefined) updateData["client.company"] = data.client.company
