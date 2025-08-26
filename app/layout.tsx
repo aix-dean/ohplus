@@ -32,7 +32,7 @@ export default function RootLayout({
           <AuthProvider>
             <FleetProvider>
               <AuthLayout>
-                <div className="flex flex-col h-screen">{children}</div>
+                <div className="flex flex-col min-h-screen">{children}</div>
                 <AssistantProvider />
                 <Toaster />
               </AuthLayout>
