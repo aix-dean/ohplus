@@ -5,7 +5,12 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getCostEstimate, updateCostEstimateStatus, updateCostEstimate } from "@/lib/cost-estimate-service"
+import {
+  getCostEstimate,
+  updateCostEstimateStatus,
+  updateCostEstimate,
+  getCostEstimatesByPageId, // Import new function
+} from "@/lib/cost-estimate-service"
 import type {
   CostEstimate,
   CostEstimateClient,
@@ -96,15 +101,17 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
-export default function CostEstimateDetailsPage({ params }: { params: { id: string } }) {
+export default function CostEstimatePage({ params }: { params: { id: string } }) {
+  const { id: costEstimateId } = params
   const router = useRouter()
   const { user, userData } = useAuth()
 
   const { toast } = useToast()
 
-  const costEstimateId = params.id
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
+  const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
+  const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
@@ -408,7 +415,16 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         const ce = await getCostEstimate(costEstimateId)
         if (ce) {
           setCostEstimate(ce)
-          setEditableCostEstimate(ce) // Initialize editable state
+          setEditableCostEstimate(ce)
+
+          if (ce.page_id) {
+            const relatedCEs = await getCostEstimatesByPageId(ce.page_id)
+            setRelatedCostEstimates(relatedCEs)
+            // Find current page index
+            const currentIndex = relatedCEs.findIndex((rce) => rce.id === ce.id)
+            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+          }
+
           if (ce.proposalId) {
             const linkedProposal = await getProposal(ce.proposalId)
             setProposal(linkedProposal)
@@ -825,6 +841,25 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
     const totalProducts = Object.keys(siteGroups).length
     setCurrentProductIndex((prev) => (prev - 1 + totalProducts) % totalProducts)
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPageIndex > 0) {
+      const prevCostEstimate = relatedCostEstimates[currentPageIndex - 1]
+      router.push(`/sales/cost-estimates/${prevCostEstimate.id}`)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPageIndex < relatedCostEstimates.length - 1) {
+      const nextCostEstimate = relatedCostEstimates[currentPageIndex + 1]
+      router.push(`/sales/cost-estimates/${nextCostEstimate.id}`)
+    }
+  }
+
+  const handlePageSelect = (pageIndex: number) => {
+    const selectedCostEstimate = relatedCostEstimates[pageIndex]
+    router.push(`/sales/cost-estimates/${selectedCostEstimate.id}`)
   }
 
   if (loading) {

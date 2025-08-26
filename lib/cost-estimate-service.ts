@@ -222,7 +222,7 @@ export async function createDirectCostEstimate(
       page_number: 1, // Added page_number field for single documents
       startDate: options?.startDate || null,
       endDate: options?.endDate || null,
-      durationDays: durationDays, // Store duration in days
+      durationDays: durationDays,
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
 
@@ -295,7 +295,7 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
+        costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -308,11 +308,11 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
-        page_number: data.page_number || 1, // Include page_number field
-        startDate: data.startDate?.toDate() || null, // Retrieve new dates
-        endDate: data.endDate?.toDate() || null, // Retrieve new dates
-        durationDays: data.durationDays || null, // Retrieve duration in days
-        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
     })
   } catch (error) {
@@ -335,7 +335,7 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
     return {
       id: docSnap.id,
       proposalId: data.proposalId || null,
-      costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
+      costEstimateNumber: data.costEstimateNumber || null,
       title: data.title,
       client: data.client,
       lineItems: data.lineItems,
@@ -348,11 +348,11 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       createdBy: data.createdBy,
       company_id: data.company_id || "",
       page_id: data.page_id || "",
-      page_number: data.page_number || 1, // Include page_number field
-      startDate: data.startDate?.toDate() || null, // Retrieve new dates
-      endDate: data.endDate?.toDate() || null, // Retrieve new dates
-      durationDays: data.durationDays || null, // Retrieve duration in days
-      validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+      page_number: data.page_number || 1,
+      startDate: data.startDate?.toDate() || null,
+      endDate: data.endDate?.toDate() || null,
+      durationDays: data.durationDays || null,
+      validUntil: data.validUntil?.toDate() || null,
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -398,7 +398,7 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
+        costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -411,11 +411,11 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
-        page_number: data.page_number || 1, // Include page_number field
-        startDate: data.startDate?.toDate() || null, // Retrieve new dates
-        endDate: data.endDate?.toDate() || null, // Retrieve new dates
-        durationDays: data.durationDays || null, // Retrieve duration in days
-        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
     })
   } catch (error) {
@@ -460,7 +460,7 @@ export async function getPaginatedCostEstimates(
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
+        costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -473,10 +473,10 @@ export async function getPaginatedCostEstimates(
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
-        page_number: data.page_number || 1, // Include page_number field
-        startDate: data.startDate?.toDate() || null, // Retrieve new dates
-        endDate: data.endDate?.toDate() || null, // Retrieve new dates
-        durationDays: data.durationDays || null, // Retrieve duration in days
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
         validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
     })
@@ -515,7 +515,7 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
+        costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -528,11 +528,11 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
-        page_number: data.page_number || 1, // Include page_number field
+        page_number: data.page_number || 1,
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
-        durationDays: data.durationDays || null, // Retrieve duration in days
-        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
     })
   } catch (error) {
@@ -617,5 +617,45 @@ export async function createMultipleCostEstimates(
   } catch (error) {
     console.error("Error creating multiple cost estimates:", error)
     throw new Error("Failed to create multiple cost estimates.")
+  }
+}
+
+// Get cost estimates by page_id for pagination
+export async function getCostEstimatesByPageId(pageId: string): Promise<CostEstimate[]> {
+  try {
+    const q = query(
+      collection(db, COST_ESTIMATES_COLLECTION),
+      where("page_id", "==", pageId),
+      orderBy("page_number", "asc"),
+    )
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+    })
+  } catch (error) {
+    console.error("Error fetching cost estimates by page_id:", error)
+    return []
   }
 }
