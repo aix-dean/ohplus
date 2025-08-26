@@ -1658,41 +1658,37 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
       {relatedCostEstimates.length > 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
+              size="lg"
               onClick={handlePreviousPage}
               disabled={currentPageIndex === 0}
-              className="h-8 px-3 text-gray-600 hover:text-gray-900"
+              className="h-12 px-6 bg-white border-2 border-gray-300 rounded-full text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               Previous
             </Button>
             
-            <div className="flex items-center gap-1 px-2">
-              <span className="text-sm font-medium text-gray-900">
-                {currentPageIndex + 1}
-              </span>
-              <span className="text-sm text-gray-500">of</span>
-              <span className="text-sm font-medium text-gray-900">
-                {relatedCostEstimates.length}
+            <div className="h-12 px-4 bg-gray-200 rounded-full flex items-center justify-center shadow-lg">
+              <span className="text-lg font-bold text-gray-900">
+                {currentPageIndex + 1}/{relatedCostEstimates.length}
               </span>
             </div>
 
             {currentPageIndex === relatedCostEstimates.length - 1 ? (
               <Button
-                size="sm"
+                size="lg"
                 onClick={() => setIsSendEmailDialogOpen(true)}
-                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                className="h-12 px-8 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full shadow-lg"
               >
                 Send
               </Button>
             ) : (
               <Button
-                variant="ghost"
-                size="sm"
+                variant="outline"
+                size="lg"
                 onClick={handleNextPage}
-                className="h-8 px-3 text-gray-600 hover:text-gray-900"
+                className="h-12 px-6 bg-white border-2 border-gray-300 rounded-full text-gray-700 font-medium hover:bg-gray-50 shadow-lg"
               >
                 Next
               </Button>
