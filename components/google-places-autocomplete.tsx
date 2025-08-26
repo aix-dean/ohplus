@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { MapPin, Loader2 } from "lucide-react"
-import { getGoogleMapsScriptUrl } from "@/lib/actions/google-maps"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
 
 interface GooglePlacesAutocompleteProps {
   value: string
@@ -41,45 +41,19 @@ export function GooglePlacesAutocomplete({
   const [geocoder, setGeocoder] = useState<any>(null)
 
   useEffect(() => {
-    const loadGoogleMaps = async () => {
-      if (window.google && window.google.maps) {
+    const initializeMaps = async () => {
+      try {
+        setIsLoading(true)
+        await loadGoogleMaps()
         setIsLoaded(true)
         setIsLoading(false)
-        return
-      }
-
-      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-        const checkGoogle = setInterval(() => {
-          if (window.google && window.google.maps) {
-            setIsLoaded(true)
-            setIsLoading(false)
-            clearInterval(checkGoogle)
-          }
-        }, 100)
-        return
-      }
-
-      try {
-        const scriptUrl = await getGoogleMapsScriptUrl()
-
-        const script = document.createElement("script")
-        script.src = scriptUrl
-        script.async = true
-        script.defer = true
-
-        window.initMap = () => {
-          setIsLoaded(true)
-          setIsLoading(false)
-        }
-
-        document.head.appendChild(script)
       } catch (error) {
         console.error("Failed to load Google Maps:", error)
         setIsLoading(false)
       }
     }
 
-    loadGoogleMaps()
+    initializeMaps()
   }, [])
 
   // Function to geocode an address and update the map

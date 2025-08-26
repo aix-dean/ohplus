@@ -18,6 +18,9 @@ import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationById } from "@/lib/quotation-service"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -39,6 +42,7 @@ interface CollectibleFormData {
   booking_no?: string
   site?: string
   covered_period?: string
+  covered_period_range?: DateRange
   bir_2307?: File | null
   collection_date?: string
   // Supplies specific fields
@@ -145,6 +149,11 @@ export default function CreateTreasuryCollectiblePage() {
               const endDate = formatDateOnly(quotationData.end_date)
               const coveredPeriod = `${startDate} - ${endDate}`
 
+              const coveredPeriodRange: DateRange = {
+                from: new Date(quotationData.start_date),
+                to: new Date(quotationData.end_date),
+              }
+
               let siteCode = ""
               if (quotationData.site_code) {
                 siteCode = quotationData.site_code
@@ -165,6 +174,7 @@ export default function CreateTreasuryCollectiblePage() {
                 status: "pending",
                 quotation_id: quotationId,
                 covered_period: coveredPeriod,
+                covered_period_range: coveredPeriodRange,
                 site: siteCode, // Auto-fill site field with quotation site code
               }))
             } else {
@@ -368,6 +378,15 @@ export default function CreateTreasuryCollectiblePage() {
     }
   }
 
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      covered_period_range: range,
+      covered_period:
+        range?.from && range?.to ? `${format(range.from, "yyyy-MM-dd")} - ${format(range.to, "yyyy-MM-dd")}` : "",
+    }))
+  }
+
   const renderFormFields = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="space-y-2">
@@ -559,13 +578,11 @@ export default function CreateTreasuryCollectiblePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
-            <Input
-              id="covered_period"
-              type="text"
-              placeholder="YYYY-MM-DD - YYYY-MM-DD"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
-              className="font-mono text-sm"
+            <DateRangePicker
+              value={formData.covered_period_range}
+              onChange={handleDateRangeChange}
+              placeholder="Select date range"
+              className="w-full"
             />
           </div>
           <div className="space-y-2">
