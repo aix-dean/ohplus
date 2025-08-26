@@ -50,6 +50,9 @@ export default function ComposeEmailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log("[v0] fetchData called with userData:", userData)
+        console.log("[v0] userData.company_id:", userData?.company_id)
+
         const id = params.id as string
         const estimate = await getCostEstimate(id)
         setCostEstimate(estimate)
@@ -89,6 +92,7 @@ ${userData?.phone_number || ""}
 ${user?.email || ""}`)
 
         const companyId = userData?.company_id || estimate?.company_id
+        console.log("[v0] Final companyId being used:", companyId)
 
         if (companyId) {
           try {
@@ -125,8 +129,11 @@ ${user?.email || ""}`)
       }
     }
 
-    if (userData !== null) {
+    if (userData !== null && userData !== undefined) {
+      console.log("[v0] userData is available, calling fetchData")
       fetchData()
+    } else {
+      console.log("[v0] userData not yet available:", userData)
     }
   }, [params.id, user, userData, toast])
 
