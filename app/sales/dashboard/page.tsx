@@ -1513,6 +1513,74 @@ function SalesDashboardContent() {
         </div>
       )}
 
+      {/* Create Proposal Button - Fixed position when in proposal mode */}
+      {proposalCreationMode && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <Button
+            onClick={handleConfirmProposalCreation}
+            disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+            className={`px-8 py-3 text-lg font-semibold transition-all duration-200 ${
+              selectedClientForProposal && selectedProducts.length > 0
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-400 text-gray-600 cursor-not-allowed"
+            }`}
+          >
+            {isCreatingProposal ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Proposal"
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* CE/Quote Button - Fixed position when in CE mode */}
+      {ceQuoteMode && selectedSites.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          {ceMode && (
+            <Button
+              onClick={openCreateCostEstimateDateDialog}
+              className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Calculator className="h-4 w-4" />
+                  Create Cost Estimate
+                </>
+              )}
+            </Button>
+          )}
+          {quoteMode && (
+            <Button
+              onClick={openCreateQuotationDateDialog}
+              className="gap-2 bg-green-600 text-white hover:bg-green-700"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Create Quotation
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      )}
+
       {ceMode && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
           <Button
