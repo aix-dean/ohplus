@@ -933,14 +933,35 @@ function SalesDashboardContent() {
         >
           {/* Left Column: Main Dashboard Content */}
           <div className="flex flex-col gap-4 md:gap-6 h-full overflow-hidden">
+            {proposalCreationMode && (
+              <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelProposalCreationMode}
+                    className="p-1 hover:bg-gray-100"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <h2 className="text-lg font-semibold text-gray-900">Select Sites</h2>
+                </div>
+                <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md">
+                  + Collab
+                </Button>
+              </div>
+            )}
+
             {/* Header with title, actions, and search box */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
-                <h1 className="text-xl md:text-2xl font-bold">
-                  {userData?.first_name
-                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                    : "Dashboard"}
-                </h1>
+                {!proposalCreationMode && (
+                  <h1 className="text-xl md:text-2xl font-bold">
+                    {userData?.first_name
+                      ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                      : "Dashboard"}
+                  </h1>
+                )}
                 {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
                 {!(proposalCreationMode || ceQuoteMode) && (
                   <div className="w-full sm:w-64 md:w-80">
