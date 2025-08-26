@@ -558,7 +558,8 @@ export default function ProposalDetailsPage() {
   }
 
   const handleEdit = () => {
-    handleEditPrice(1) // Default to first page, but this will be updated per page
+    setIsEditingPrice(true)
+    // Don't set currentEditingPage here - let individual pages handle their own editing
   }
 
   const handleDownload = () => {
@@ -593,7 +594,6 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save background template",
-        variant: "destructive",
       })
     }
   }
@@ -617,7 +617,6 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to remove background template",
-        variant: "destructive",
       })
     }
   }
@@ -1138,14 +1137,27 @@ export default function ProposalDetailsPage() {
                     <div className="text-right">
                       <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">{getPageTitle(pageContent)}</h1>
 
-                      {isEditingPrice && currentEditingPage === pageNumber ? (
+                      {isEditingPrice ? (
                         <div className="flex items-center gap-2 justify-end">
                           <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
                             <span className="text-gray-600 mr-1">₱</span>
                             <Input
                               type="number"
-                              value={editablePrice}
-                              onChange={(e) => setEditablePrice(e.target.value)}
+                              value={
+                                currentEditingPage === pageNumber ? editablePrice : getPagePrice(pageContent).toString()
+                              }
+                              onChange={(e) => {
+                                if (currentEditingPage !== pageNumber) {
+                                  setCurrentEditingPage(pageNumber)
+                                  setEditablePrice(e.target.value)
+                                } else {
+                                  setEditablePrice(e.target.value)
+                                }
+                              }}
+                              onFocus={() => {
+                                setCurrentEditingPage(pageNumber)
+                                setEditablePrice(getPagePrice(pageContent).toString())
+                              }}
                               className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
                               min="0"
                               step="0.01"
