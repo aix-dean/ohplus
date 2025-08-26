@@ -690,7 +690,12 @@ export default function ProposalDetailsPage() {
     const startIndex = (pageNumber - 1) * sitesPerPage
     const endIndex = startIndex + sitesPerPage
 
-    return proposal.products.slice(startIndex, endIndex)
+    const pageProducts = proposal.products.slice(startIndex, endIndex)
+
+    // Debug logging to verify pagination
+    console.log(`[v0] Page ${pageNumber}: Sites per page = ${sitesPerPage}, Products = ${pageProducts.length}`)
+
+    return pageProducts
   }
 
   const getLayoutGridClass = () => {
@@ -748,6 +753,12 @@ export default function ProposalDetailsPage() {
       return "Company Name"
     }
 
+    // For single site per page, show just the site code
+    if (getSitesPerPage() === 1 && siteCodes.length === 1) {
+      return siteCodes[0]
+    }
+
+    // For multiple sites per page layouts, combine appropriately
     if (siteCodes.length === 1) {
       return siteCodes[0]
     }
@@ -1177,7 +1188,11 @@ export default function ProposalDetailsPage() {
                   <div className="flex justify-between items-start mb-4 md:mb-6">
                     <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
                     <div className="text-right">
-                      <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">{getPageTitle(pageContent)}</h1>
+                      <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
+                        {getSitesPerPage() === 1 && pageContent.length === 1
+                          ? pageContent[0].site_code || "Site"
+                          : getPageTitle(pageContent)}
+                      </h1>
 
                       {isEditingPrice ? (
                         <div className="flex items-center gap-2 justify-end">
@@ -1226,7 +1241,10 @@ export default function ProposalDetailsPage() {
                         </div>
                       ) : (
                         <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                          ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          ₱
+                          {getSitesPerPage() === 1 && pageContent.length === 1
+                            ? (pageContent[0].price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })
+                            : getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                         </div>
                       )}
                     </div>
