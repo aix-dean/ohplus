@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
@@ -26,6 +34,12 @@ export default function ComposeEmailPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
+
+  const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
+  const [newTemplateName, setNewTemplateName] = useState("")
+  const [newTemplateSubject, setNewTemplateSubject] = useState("")
+  const [newTemplateBody, setNewTemplateBody] = useState("")
+  const [savingTemplate, setSavingTemplate] = useState(false)
 
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
@@ -124,6 +138,75 @@ ${user?.email || ""}`)
 
     setSubject(newSubject)
     setBody(newBody)
+  }
+
+  const handleAddTemplate = async () => {
+    if (!newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all template fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!costEstimate?.company_id) {
+      toast({
+        title: "Error",
+        description: "Company ID not found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSavingTemplate(true)
+    try {
+      const newTemplate = await emailService.createEmailTemplate({
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        company_id: costEstimate.company_id,
+        deleted: false,
+      })
+
+      setTemplates((prev) => [...prev, newTemplate])
+      setShowAddTemplateDialog(false)
+      setNewTemplateName("")
+      setNewTemplateSubject("")
+      setNewTemplateBody("")
+
+      toast({
+        title: "Template Added",
+        description: "Email template has been created successfully",
+      })
+    } catch (error) {
+      console.error("Error creating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create template. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await emailService.deleteEmailTemplate(templateId)
+      setTemplates((prev) => prev.filter((template) => template.id !== templateId))
+      toast({
+        title: "Template Deleted",
+        description: "Email template has been deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete template. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const removeAttachment = (index: number) => {
@@ -317,13 +400,23 @@ ${user?.email || ""}`)
                     <Button variant="ghost" size="sm" onClick={() => applyTemplate(template)} className="h-6 w-6 p-0">
                       <Edit className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      className="h-6 w-6 p-0"
+                    >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               ))}
-              <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">+Add Template</Button>
+              <Button
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                onClick={() => setShowAddTemplateDialog(true)}
+              >
+                +Add Template
+              </Button>
             </div>
           </div>
         </div>
@@ -339,6 +432,60 @@ ${user?.email || ""}`)
           </Button>
         </div>
       </div>
+
+      {/* Add Template Dialog */}
+      <Dialog open={showAddTemplateDialog} onOpenChange={setShowAddTemplateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Email Template</DialogTitle>
+            <DialogDescription>
+              Create a new email template that can be reused for future cost estimates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">Template Name</Label>
+              <Input
+                id="template-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="e.g., Standard Quotation"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-subject">Subject</Label>
+              <Input
+                id="template-subject"
+                value={newTemplateSubject}
+                onChange={(e) => setNewTemplateSubject(e.target.value)}
+                placeholder="e.g., Cost Estimate: {title} - {companyName}"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-body">Body</Label>
+              <Textarea
+                id="template-body"
+                value={newTemplateBody}
+                onChange={(e) => setNewTemplateBody(e.target.value)}
+                placeholder="Hi {clientName},&#10;&#10;Please find attached..."
+                className="min-h-[200px]"
+              />
+            </div>
+            <div className="text-sm text-gray-500">
+              <p className="font-medium mb-1">Available placeholders:</p>
+              <p>{"{clientName}, {title}, {userName}, {companyName}, {userContact}, {userEmail}"}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddTemplate} disabled={savingTemplate}>
+              {savingTemplate ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
