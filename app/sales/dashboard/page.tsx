@@ -1304,7 +1304,7 @@ function SalesDashboardContent() {
 
                 {/* Grid View */}
                 {!loading && products.length > 0 && viewMode === "grid" && (
-                  <div className="flex-1 overflow-y-auto relative">
+                  <div className="flex-1 overflow-y-auto">
                     <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
                       {products.map((product) => (
                         <ProductCard
@@ -1326,27 +1326,6 @@ function SalesDashboardContent() {
                         />
                       ))}
                     </ResponsiveCardGrid>
-
-                    {proposalCreationMode && selectedProducts.length > 0 && selectedClientForProposal && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="pointer-events-auto">
-                          <Button
-                            onClick={handleConfirmProposalCreation}
-                            className="bg-green-600 text-white hover:bg-green-700 px-8 py-3 text-lg font-semibold shadow-lg"
-                            disabled={isCreatingProposal}
-                          >
-                            {isCreatingProposal ? (
-                              <>
-                                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                Creating...
-                              </>
-                            ) : (
-                              "Create Proposal"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
