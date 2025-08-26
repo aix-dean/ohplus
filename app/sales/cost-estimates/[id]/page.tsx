@@ -37,9 +37,12 @@ import {
   Save,
   X,
   Building,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
+import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { getProposalActivities } from "@/lib/proposal-activity-service"
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
 import {
@@ -53,6 +56,8 @@ import {
 import { generateCostEstimatePDF, generateSeparateCostEstimatePDFs } from "@/lib/cost-estimate-pdf-service"
 import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 
@@ -1033,7 +1038,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Duration</span>
-              <span className="text-gray-700">: </span> 
+              <span className="text-gray-700">: </span>
               {isEditing && editingField === "durationDays" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
@@ -1063,7 +1068,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Period</span>
-              <span className="text-gray-700">: </span> 
+              <span className="text-gray-700">: </span>
               {isEditing && editingField === "contractPeriod" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
@@ -1111,7 +1116,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex items-center">
                 <span className="w-4 text-center">•</span>
                 <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">: </span> 
+                <span className="text-gray-700">: </span>
                 {isEditing && editingField === "illumination" ? (
                   <div className="flex items-center gap-2 ml-1">
                     <Input
@@ -1142,7 +1147,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
-              <span className="text-gray-700">: PHP </span> 
+              <span className="text-gray-700">: PHP </span>
               {isEditing && editingField === "unitPrice" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
@@ -1352,11 +1357,51 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Back</span>
             </Button>
-            <div className="flex items-center justify-between">
             <Badge className={`${statusConfig.color} border font-medium px-3 py-1`}>
               {statusConfig.icon}
               <span className="ml-1.5">{statusConfig.label}</span>
             </Badge>
+            {relatedCostEstimates.length > 1 && (
+              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPageIndex === 0}
+                  className="h-8 px-2 bg-transparent"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {relatedCostEstimates.map((_, index) => (
+                    <Button
+                      key={index}
+                      variant={index === currentPageIndex ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageSelect(index)}
+                      className="h-8 w-8 p-0 text-xs"
+                    >
+                      {index + 1}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPageIndex === relatedCostEstimates.length - 1}
+                  className="h-8 px-2 bg-transparent"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                <div className="text-sm text-gray-600 ml-2">
+                  Page {currentPageIndex + 1} of {relatedCostEstimates.length}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2"></div>
@@ -1494,30 +1539,49 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </Button>
         </div>
-      ) : (
-        costEstimate.status === "draft" && (
-          <div className="fixed bottom-6 right-6 flex space-x-4">
+      ) : null}
+
+      {relatedCostEstimates.length > 1 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
-              onClick={() => handleUpdatePublicStatus("draft")} // Explicitly save as draft
               variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              size="sm"
+              onClick={handlePreviousPage}
+              disabled={currentPageIndex === 0}
+              className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
             >
-              <FileText className="h-5 w-5 mr-2" />
-              Save as Draft
+              Previous
             </Button>
-            <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the new options dialog
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-            >
-              <Send className="h-5 w-5 mr-2" />
-              Send
-            </Button>
+
+            <div className="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
+              {currentPageIndex + 1}/{relatedCostEstimates.length}
+            </div>
+
+            {currentPageIndex === relatedCostEstimates.length - 1 ? (
+              <Button
+                onClick={() => setIsSendOptionsDialogOpen(true)}
+                disabled={costEstimate?.status !== "draft"}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+              >
+                Send
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPageIndex === relatedCostEstimates.length - 1}
+                className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
+              >
+                Next
+              </Button>
+            )}
           </div>
-        )
+        </div>
       )}
 
-      {/* Floating Navigation for Multiple Sites */}
-      {hasMultipleSites && (
+      {hasMultipleSites && relatedCostEstimates.length <= 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
             <Button
@@ -1653,49 +1717,145 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       <CostEstimateSentSuccessDialog
         isOpen={showSuccessDialog}
         onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
-        costEstimate={costEstimate}
       />
+      {/* Timeline Sidebar */}
+      {timelineOpen && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setTimelineOpen(false)} />
 
-      {relatedCostEstimates.length > 1 && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={handlePreviousPage}
-              disabled={currentPageIndex === 0}
-              className="h-12 px-6 bg-white border-2 border-gray-300 rounded-full text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              Previous
-            </Button>
-            
-            <div className="h-12 px-4 bg-gray-200 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-lg font-bold text-gray-900">
-                {currentPageIndex + 1}/{relatedCostEstimates.length}
-              </span>
+          {/* Sidebar */}
+          <div className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTimelineOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XCircle className="h-5 w-5" />
+              </Button>
             </div>
 
-            {currentPageIndex === relatedCostEstimates.length - 1 ? (
-              <Button
-                size="lg"
-                onClick={() => setIsSendEmailDialogOpen(true)}
-                className="h-12 px-8 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full shadow-lg"
-              >
-                Send
-              </Button>
-            ) : (
+            <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+              <ProposalActivityTimeline
+                proposalId={costEstimate.id}
+                currentUserId={user?.uid || "unknown_user"}
+                currentUserName={user?.displayName || "Unknown User"}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      <Dialog open={showPageSelection} onOpenChange={setShowPageSelection}>
+        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <DialogTitle className="text-xl font-semibold">Select Pages for PDF Download</DialogTitle>
+              <p className="text-sm text-gray-500 mt-1">Choose which site pages to include in your PDF</p>
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                size="lg"
-                onClick={handleNextPage}
-                className="h-12 px-6 bg-white border-2 border-gray-300 rounded-full text-gray-700 font-medium hover:bg-gray-50 shadow-lg"
+                size="sm"
+                onClick={handleSelectAllPages}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
               >
-                Next
+                {selectedPages.length === Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length
+                  ? "Deselect All"
+                  : "Select All"}
               </Button>
-            )}
+              <Button variant="ghost" size="sm" onClick={() => setShowPageSelection(false)} className="h-8 w-8 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {costEstimate &&
+                // Updated page selection logic to use site names
+                Object.keys(siteGroups).map((siteName, index) => {
+                  const siteItems = siteGroups[siteName]
+                  const isSelected = selectedPages.includes(siteName)
+                  const totalCost = siteItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+                  const items = siteGroups[siteName]
+
+                  return (
+                    <div
+                      key={siteName}
+                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
+                        isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+                      }`}
+                      onClick={() => handlePageToggle(index)}
+                    >
+                      {/* Checkbox */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => handlePageToggle(index)}
+                          className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                        />
+                      </div>
+
+                      {/* Page Preview */}
+                      <div className="mt-6 space-y-3">
+                        <div className="text-sm font-semibold text-gray-900">Page {index + 1}</div>
+                        <div className="text-xs text-gray-600 font-medium">
+                          {costEstimate.costEstimateNumber || costEstimate.id}
+                          {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length > 1
+                            ? `-${String.fromCharCode(65 + index)}`
+                            : ""}
+                        </div>
+                        <div className="text-sm font-medium text-gray-800 line-clamp-2">
+                          Cost Estimate for {siteName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {items.length} line item{items.length !== 1 ? "s" : ""}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Total: ₱
+                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </ScrollArea>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-gray-500">
+              {selectedPages.length} of {Object.keys(groupLineItemsBySite(costEstimate?.lineItems || [])).length} pages
+              selected
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowPageSelection(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDownloadSelectedPages}
+                disabled={selectedPages.length === 0 || downloadingPDF}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {downloadingPDF ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="h-4 w-4 mr-2" />
+                    Download PDF ({selectedPages.length})
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
-  )\
+  )
 }
