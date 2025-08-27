@@ -1,15 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
   getCostEstimate,
-  updateCostEstimateStatus,
   updateCostEstimate,
-  getCostEstimatesByPageId, // Import new function
+  getCostEstimatesByPageId,
+  getCostEstimatesByClientId, // Import new function
+  updateCostEstimateStatus, // Import updateCostEstimateStatus
 } from "@/lib/cost-estimate-service"
 import type {
   CostEstimate,
@@ -153,6 +154,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
+  const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
@@ -440,6 +443,22 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     }
   }
 
+  const fetchClientHistory = useCallback(async () => {
+    if (!costEstimate?.client?.id) return
+
+    setLoadingHistory(true)
+    try {
+      const history = await getCostEstimatesByClientId(costEstimate.client.id)
+      // Filter out current cost estimate from history
+      const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
+      setClientHistory(filteredHistory)
+    } catch (error) {
+      console.error("Error fetching client history:", error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [costEstimate?.client?.id, costEstimate?.id])
+
   useEffect(() => {
     const fetchCostEstimateData = async () => {
       if (!costEstimateId) return
@@ -499,6 +518,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       fetchCompanyData()
     }
   }, [user, userData])
+
+  useEffect(() => {
+    if (costEstimate?.client?.id) {
+      fetchClientHistory()
+    }
+  }, [fetchClientHistory])
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -896,6 +921,21 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           icon: <FileText className="h-3.5 w-3.5" />,
           label: "Unknown",
         }
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "sent":
+        return "bg-blue-100 text-blue-800"
+      case "accepted":
+        return "bg-green-100 text-green-800"
+      case "declined":
+        return "bg-red-100 text-red-800"
+      case "revised":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
@@ -1511,59 +1551,104 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           </Button>
         </div>
 
-        <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              {companyData?.photo_url ? (
-                <img
-                  src={companyData.photo_url || "/placeholder.svg"}
-                  alt="Company Logo"
-                  className="h-16 w-auto object-contain"
-                />
-              ) : (
-                <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Building className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
+        <div className="flex gap-6 items-start">
+          <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center mb-4">
+                {companyData?.photo_url ? (
+                  <img
+                    src={companyData.photo_url || "/placeholder.svg"}
+                    alt="Company Logo"
+                    className="h-16 w-auto object-contain"
+                  />
+                ) : (
+                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Building className="h-8 w-8 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+
+            {hasMultipleSites ? (
+              <>
+                {renderCostEstimationBlock(
+                  siteNames[currentProductIndex],
+                  siteGroups[siteNames[currentProductIndex]],
+                  currentProductIndex + 1,
+                )}
+              </>
+            ) : (
+              // Render single page for single site (original behavior)
+              renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+            )}
+
+            {proposal && (
+              <div className="p-6 sm:p-8 border-t border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Linked Proposal
+                </h2>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-lg font-semibold">{proposal.title}</p>
+                    <p className="text-gray-600">
+                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                    </p>
+                    <Button
+                      variant="link"
+                      className="p-0 mt-2"
+                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
+                    >
+                      View Proposal
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
 
-          {hasMultipleSites ? (
-            <>
-              {renderCostEstimationBlock(
-                siteNames[currentProductIndex],
-                siteGroups[siteNames[currentProductIndex]],
-                currentProductIndex + 1,
-              )}
-            </>
-          ) : (
-            // Render single page for single site (original behavior)
-            renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-          )}
-
-          {proposal && (
-            <div className="p-6 sm:p-8 border-t border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Linked Proposal
-              </h2>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-lg font-semibold">{proposal.title}</p>
-                  <p className="text-gray-600">
-                    Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                  </p>
-                  <Button
-                    variant="link"
-                    className="p-0 mt-2"
-                    onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                  >
-                    View Proposal
-                  </Button>
-                </CardContent>
-              </Card>
+          <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
+              <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
+                {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
+              </div>
             </div>
-          )}
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : clientHistory.length > 0 ? (
+              <div className="space-y-3">
+                {clientHistory.map((historyItem) => (
+                  <div
+                    key={historyItem.id}
+                    onClick={() => router.push(`/sales/cost-estimates/${historyItem.id}`)}
+                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="text-sm font-medium text-gray-900 mb-1">
+                      {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
+                    </div>
+                    <div className="text-sm text-red-600 font-medium mb-2">
+                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                    </div>
+                    <div className="flex justify-end">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(historyItem.status)}`}
+                      >
+                        {historyItem.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-sm">No other quotations found for this client</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

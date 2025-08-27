@@ -662,3 +662,43 @@ export async function getCostEstimatesByPageId(pageId: string): Promise<CostEsti
     return []
   }
 }
+
+// Get cost estimates by client ID for history sidebar
+export async function getCostEstimatesByClientId(clientId: string): Promise<CostEstimate[]> {
+  try {
+    const q = query(
+      collection(db, COST_ESTIMATES_COLLECTION),
+      where("client.id", "==", clientId),
+      orderBy("createdAt", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+    })
+  } catch (error) {
+    console.error("Error fetching cost estimates by client ID:", error)
+    return []
+  }
+}
