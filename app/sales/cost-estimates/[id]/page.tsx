@@ -1609,7 +1609,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
           <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Cost Estimate History</h3>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
                 {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
               </div>
@@ -1645,7 +1645,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <div className="text-sm">No other quotations found for this client</div>
+                <div className="text-sm">No other cost estimates found for this client</div>
               </div>
             )}
           </div>
