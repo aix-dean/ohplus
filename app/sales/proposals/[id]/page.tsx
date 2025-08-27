@@ -734,7 +734,6 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save template settings",
-        variant: "destructive",
       })
     }
   }
@@ -771,6 +770,46 @@ export default function ProposalDetailsPage() {
 
   const handleResetZoom = () => {
     setZoomLevel(1)
+  }
+
+  const handleSaveAsDraft = async () => {
+    if (!proposal || !userData) return
+
+    try {
+      await updateProposal(proposal.id, { status: "draft" }, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Success",
+        description: "Proposal saved as draft",
+      })
+    } catch (error) {
+      console.error("Error saving as draft:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save as draft",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSend = async () => {
+    if (!proposal || !userData) return
+
+    try {
+      await updateProposal(proposal.id, { status: "sent" }, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Success",
+        description: "Proposal sent successfully",
+      })
+    } catch (error) {
+      console.error("Error sending proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to send proposal",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -1415,35 +1454,24 @@ export default function ProposalDetailsPage() {
                       </div>
                     ))}
                   </div>
-
-                  {pageNumber === getTotalPages() && (
-                    <div className="flex justify-end gap-3 mt-8 pt-4">
-                      <Button
-                        variant="outline"
-                        className="px-6 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
-                        onClick={() => {
-                          // Handle save as draft
-                          console.log("[v0] Save as Draft clicked")
-                        }}
-                      >
-                        Save as Draft
-                      </Button>
-                      <Button
-                        className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white"
-                        onClick={() => {
-                          // Handle send proposal
-                          console.log("[v0] Send clicked")
-                        }}
-                      >
-                        Send
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
             )
           })}
         </div>
+      </div>
+
+      <div className="fixed bottom-6 right-6 flex gap-3 z-40">
+        <Button
+          onClick={handleSaveAsDraft}
+          variant="outline"
+          className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-lg"
+        >
+          Save as Draft
+        </Button>
+        <Button onClick={handleSend} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+          Send
+        </Button>
       </div>
     </div>
   )
