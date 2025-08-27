@@ -1026,17 +1026,15 @@ export default function ProductDetailPage() {
                     </div>
                   ) : (
                     <>
-                      {/* Table Header */}
                       <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        <div>Quote Number</div>
-                        <div>Client</div>
                         <div>Date</div>
-                        <div>Amount</div>
+                        <div>Project ID</div>
+                        <div>Type</div>
+                        <div>Client</div>
                         <div>Status</div>
-                        <div>Items</div>
+                        <div>Price</div>
                       </div>
 
-                      {/* Quotations Rows */}
                       <div className="divide-y divide-gray-100">
                         {quotations.map((quotation) => {
                           const statusConfig = getQuotationStatusConfig(quotation.status)
@@ -1046,15 +1044,13 @@ export default function ProductDetailPage() {
                               className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                               onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                             >
+                              <div className="text-gray-600">{formatDate(quotation.created)}</div>
                               <div className="text-gray-900 font-medium">
                                 {quotation.quotationNumber || quotation.id.slice(-8)}
                               </div>
+                              <div className="text-gray-600">Quotation</div>
                               <div className="text-gray-900">
                                 {quotation.client?.company || quotation.client?.name || "Unknown Client"}
-                              </div>
-                              <div className="text-gray-600">{formatDate(quotation.created)}</div>
-                              <div className="text-red-600 font-medium">
-                                ₱{quotation.totalAmount?.toLocaleString() || "0"}
                               </div>
                               <div>
                                 <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
@@ -1062,7 +1058,9 @@ export default function ProductDetailPage() {
                                   <span className="ml-1">{statusConfig.label}</span>
                                 </Badge>
                               </div>
-                              <div className="text-gray-600">{quotation.products?.length || 0} items</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{quotation.totalAmount?.toLocaleString() || "0"}/month
+                              </div>
                             </div>
                           )
                         })}
