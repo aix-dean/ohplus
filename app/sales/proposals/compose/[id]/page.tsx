@@ -23,7 +23,6 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
 
-  // Email form state
   const [emailData, setEmailData] = useState({
     to: "",
     cc: "",
@@ -57,10 +56,8 @@ OH PLUS
   ])
 
   useEffect(() => {
-    // Simulate fetching proposal data
     const fetchProposal = async () => {
       try {
-        // This would be replaced with actual API call
         const mockProposal: Proposal = {
           id: params.id,
           code: "AIX",
@@ -101,8 +98,6 @@ OH PLUS
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
-      // This would integrate with a PDF generation service
-      // For now, we'll simulate the PDF generation
       const proposalPDFs = [
         {
           name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Main.pdf`,
@@ -134,58 +129,62 @@ OH PLUS
   }
 
   const handleSendEmail = async () => {
-    if (sending) return
+    if (!emailData.to.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a recipient email address.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!emailData.subject.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter an email subject.",
+        variant: "destructive",
+      })
+      return
+    }
 
     setSending(true)
 
     try {
-      // Validate email fields
-      if (!emailData.to.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please enter a recipient email address.",
-          variant: "destructive",
-        })
-        return
+      const formData = new FormData()
+
+      const toEmails = emailData.to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email)
+      const ccEmails = emailData.cc
+        ? emailData.cc
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email)
+        : []
+
+      formData.append("to", JSON.stringify(toEmails))
+      if (ccEmails.length > 0) {
+        formData.append("cc", JSON.stringify(ccEmails))
+      }
+      formData.append("subject", emailData.subject)
+      formData.append("body", emailData.message)
+
+      for (let i = 0; i < attachments.length; i++) {
+        const attachment = attachments[i]
+        try {
+          const pdfContent = `Proposal PDF: ${attachment.name}`
+          const blob = new Blob([pdfContent], { type: "application/pdf" })
+          const file = new File([blob], attachment.name, { type: "application/pdf" })
+          formData.append(`attachment_${i}`, file)
+        } catch (error) {
+          console.error(`Error processing attachment ${attachment.name}:`, error)
+        }
       }
 
-      if (!emailData.subject.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please enter an email subject.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (!emailData.message.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please enter an email message.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const emailPayload = {
-        to: emailData.to.trim(),
-        cc: emailData.cc.trim() || undefined,
-        subject: emailData.subject.trim(),
-        message: emailData.message.trim(),
-        attachments: attachments.map((att) => ({
-          name: att.name,
-          url: att.url || `https://ohplus.ph/api/proposals/${params.id}/pdf`,
-          type: att.type,
-        })),
-        proposalId: params.id,
-      }
-
-      const response = await fetch("/api/proposals/send-email", {
+      const response = await fetch("/api/send-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
+        body: formData,
       })
 
       const result = await response.json()
@@ -195,19 +194,16 @@ OH PLUS
       }
 
       toast({
-        title: "Email sent successfully!",
-        description: `Your proposal has been sent to ${emailData.to}`,
+        title: "Email sent!",
+        description: "Your proposal has been sent successfully.",
       })
 
-      // Navigate back after successful send
-      setTimeout(() => {
-        router.back()
-      }, 1500)
+      router.back()
     } catch (error) {
-      console.error("Error sending email:", error)
+      console.error("Email sending error:", error)
       toast({
-        title: "Failed to send email",
-        description: error instanceof Error ? error.message : "Please check your connection and try again.",
+        title: "Failed to send",
+        description: error instanceof Error ? error.message : "Could not send the email. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -257,7 +253,6 @@ OH PLUS
   }
 
   const handleAddAttachment = () => {
-    // This would open a file picker or generate additional proposal documents
     toast({
       title: "Add attachment",
       description: "Opening file picker to add additional attachments.",
@@ -278,7 +273,6 @@ OH PLUS
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
         <div className="flex items-center space-x-4 mb-6">
           <Button
             variant="ghost"
@@ -293,13 +287,10 @@ OH PLUS
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Email Compose Area */}
           <div className="lg:col-span-3">
             <Card>
               <CardContent className="p-6">
-                {/* Email Form */}
                 <div className="space-y-4">
-                  {/* To Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
                     <Input
@@ -310,7 +301,6 @@ OH PLUS
                     />
                   </div>
 
-                  {/* CC Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
                     <Input
@@ -321,7 +311,6 @@ OH PLUS
                     />
                   </div>
 
-                  {/* Subject Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
                     <Input
@@ -332,7 +321,6 @@ OH PLUS
                     />
                   </div>
 
-                  {/* Message Body */}
                   <div>
                     <Textarea
                       value={emailData.message}
@@ -342,7 +330,6 @@ OH PLUS
                     />
                   </div>
 
-                  {/* Attachments */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
                     <div className="space-y-2">
@@ -373,7 +360,6 @@ OH PLUS
             </Card>
           </div>
 
-          {/* Templates Sidebar */}
           <div className="lg:col-span-1">
             <Card>
               <CardContent className="p-4">
@@ -419,21 +405,13 @@ OH PLUS
           </div>
         </div>
 
-        {/* Send Button */}
         <div className="flex justify-end mt-6">
           <Button
             onClick={handleSendEmail}
             disabled={sending}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 disabled:opacity-50"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
           >
-            {sending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Sending...
-              </>
-            ) : (
-              "Send Email"
-            )}
+            {sending ? "Sending..." : "Send Email"}
           </Button>
         </div>
       </div>
