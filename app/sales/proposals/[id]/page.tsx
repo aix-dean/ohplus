@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   ArrowLeft,
   Loader2,
@@ -22,6 +23,9 @@ import {
   XIcon,
   Minus,
   Send,
+  Mail,
+  MessageCircle,
+  Phone,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -36,7 +40,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -1467,12 +1470,141 @@ export default function ProposalDetailsPage() {
         </div>
       )}
 
-      {/* Send Options Dialog */}
-      <SendProposalShareDialog
-        isOpen={isSendOptionsDialogOpen}
-        onClose={() => setIsSendOptionsDialogOpen(false)}
-        proposal={proposal}
-      />
+      <Dialog open={isSendOptionsDialogOpen} onOpenChange={setIsSendOptionsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Send Proposal To</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Proposal Preview */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                {proposal?.products &&
+                proposal.products.length > 0 &&
+                proposal.products[0].media &&
+                proposal.products[0].media.length > 0 ? (
+                  <img
+                    src={proposal.products[0].media[0].url || "/placeholder.svg"}
+                    alt="Proposal preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="h-6 w-6 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900">{proposal?.proposalNumber || params.id}</div>
+                <div className="text-sm text-gray-600 truncate">
+                  {proposal?.title || "Golden Touch Site Proposals (3 Sites)"}
+                </div>
+              </div>
+            </div>
+
+            {/* URL Sharing */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={`${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`}
+                  readOnly
+                  className="flex-1 text-sm"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`,
+                    )
+                    toast({ title: "Link copied to clipboard" })
+                  }}
+                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                >
+                  COPY LINK
+                </Button>
+              </div>
+            </div>
+
+            {/* Sharing Options */}
+            <div className="grid grid-cols-4 gap-4 pt-2">
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent(`Proposal: ${proposal?.title || proposal?.proposalNumber}`)
+                  const body = encodeURIComponent(
+                    `Please review this proposal: ${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`,
+                  )
+                  window.open(`mailto:?subject=${subject}&body=${body}`)
+                }}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xs font-medium text-gray-700">Email</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const text = encodeURIComponent(
+                    `Check out this proposal: ${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`,
+                  )
+                  window.open(`https://wa.me/?text=${text}`)
+                }}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xs font-medium text-gray-700">WhatsApp</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const text = encodeURIComponent(
+                    `Check out this proposal: ${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`,
+                  )
+                  window.open(`viber://forward?text=${text}`)
+                }}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+                  <Phone className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xs font-medium text-gray-700">Viber</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const url = encodeURIComponent(
+                    `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/proposals/view/${params.id}`,
+                  )
+                  window.open(`https://www.messenger.com/t/?link=${url}`)
+                }}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-12 h-12 bg-pink-500 rounded-full flex items-center justify-center">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xs font-medium text-gray-700">Messenger</span>
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fixed bottom buttons */}
+      {!loading && proposal && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-4 z-50">
+          <Button
+            onClick={() => handleUpdatePublicStatus("public")}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+          >
+            Publish Proposal
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
