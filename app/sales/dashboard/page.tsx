@@ -1072,7 +1072,7 @@ function SalesDashboardContent() {
 
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs mt-4" ref={clientSearchRef}>
+                <div className="relative w-full max-w-xs mt-1" ref={clientSearchRef}>
                   <div className="relative">
                     <Input
                       placeholder="Search or select client..."
