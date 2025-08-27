@@ -107,13 +107,13 @@ OH PLUS
           name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Main.pdf`,
           size: "2.3 MB",
           type: "proposal",
-          url: `/api/proposals/${proposalData.id}/pdf?type=main`,
+          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf?type=main`,
         },
         {
           name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Details.pdf`,
           size: "1.9 MB",
           type: "proposal",
-          url: `/api/proposals/${proposalData.id}/pdf?type=details`,
+          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf?type=details`,
         },
       ]
 
@@ -138,7 +138,7 @@ OH PLUS
         ...emailData,
         attachments: attachments.map((att) => ({
           name: att.name,
-          url: att.url || `/api/proposals/${params.id}/pdf`,
+          url: att.url || `https://ohplus.ph/api/proposals/${params.id}/pdf`,
           type: att.type,
         })),
         proposalId: params.id,
