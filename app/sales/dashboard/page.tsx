@@ -58,6 +58,7 @@ import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
+import { createQuotation, createMultipleQuotations, generateQuotationNumber } from "@/lib/quotation-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -713,7 +714,7 @@ function SalesDashboardContent() {
       })
       toast({
         title: "Authentication Required",
-        description: "Please log in to create a cost estimate.",
+        description: "Please log in to create a document.",
         variant: "destructive",
       })
       return
@@ -722,7 +723,7 @@ function SalesDashboardContent() {
     if (selectedProducts.length === 0) {
       toast({
         title: "No Products Selected",
-        description: "Please select at least one product to create a cost estimate.",
+        description: "Please select at least one product to create a document.",
         variant: "destructive",
       })
       return
@@ -731,7 +732,7 @@ function SalesDashboardContent() {
     if (!selectedClientForProposal) {
       toast({
         title: "No Client Selected",
-        description: "Please select a client to create a cost estimate.",
+        description: "Please select a client to create a document.",
         variant: "destructive",
       })
       return
@@ -768,34 +769,102 @@ function SalesDashboardContent() {
 
       console.log("[v0] handleDatesSelected - options being passed:", options)
 
-      let costEstimateIds: string[]
+      if (actionAfterDateSelection === "quotation") {
+        let quotationIds: string[]
 
-      if (selectedProducts.length > 1) {
-        // Create multiple cost estimates for multiple products
-        costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+        if (selectedProducts.length > 1) {
+          // Create multiple quotations for multiple products
+          quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
 
-        toast({
-          title: "Cost Estimates Created",
-          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
-        })
+          toast({
+            title: "Quotations Created",
+            description: `Successfully created ${quotationIds.length} quotations for the selected products.`,
+          })
+        } else {
+          // Create single quotation for one product
+          const quotationData = {
+            quotation_number: generateQuotationNumber(),
+            client_name: clientData.name,
+            client_company_name: clientData.company,
+            client_email: clientData.email,
+            client_phone: clientData.phone,
+            client_address: clientData.address,
+            client_designation: clientData.designation,
+            client_industry: clientData.industry,
+            start_date: startDate,
+            end_date: endDate,
+            valid_until: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+            status: "draft",
+            created_by: user.uid,
+            seller_id: user.uid,
+            company_id: userData.company_id,
+            items: [
+              {
+                id: sitesData[0].id,
+                name: sitesData[0].name,
+                location: sitesData[0].location,
+                price: sitesData[0].price,
+                type: sitesData[0].type,
+                media_url: sitesData[0].image,
+                quantity: 1,
+                duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
+                item_total_amount: sitesData[0].price,
+                illumination: "10 units of 1000 watts metal Halide",
+                dimensions: "100ft (H) x 60ft (W)",
+              },
+            ],
+            total_amount: sitesData[0].price,
+            projectCompliance: {
+              signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+              signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+              poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+              finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+              paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+            },
+          }
+
+          const quotationId = await createQuotation(quotationData)
+          quotationIds = [quotationId]
+
+          toast({
+            title: "Quotation Created",
+            description: "Quotation has been created successfully.",
+          })
+        }
+
+        // Navigate to the first quotation
+        router.push(`/sales/quotations/${quotationIds[0]}`)
       } else {
-        // Create single cost estimate for one product
-        const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
-        costEstimateIds = [costEstimateId]
+        // Existing cost estimate creation logic
+        let costEstimateIds: string[]
 
-        toast({
-          title: "Cost Estimate Created",
-          description: "Cost estimate has been created successfully.",
-        })
+        if (selectedProducts.length > 1) {
+          // Create multiple cost estimates for multiple products
+          costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Cost Estimates Created",
+            description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
+          })
+        } else {
+          // Create single cost estimate for one product
+          const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
+          costEstimateIds = [costEstimateId]
+
+          toast({
+            title: "Cost Estimate Created",
+            description: "Cost estimate has been created successfully.",
+          })
+        }
+
+        // Navigate to the first cost estimate
+        router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
       }
-
-      // Navigate to the first cost estimate
-      router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
     } catch (error) {
-      console.error("Error creating cost estimate:", error)
+      console.error("Error creating document:", error)
       toast({
         title: "Error",
-        description: "Failed to create cost estimate. Please try again.",
+        description: `Failed to create ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}. Please try again.`,
         variant: "destructive",
       })
     } finally {

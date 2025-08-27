@@ -773,3 +773,75 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
     throw new Error("Failed to copy quotation: " + error.message)
   }
 }
+
+export async function createMultipleQuotations(
+  clientData: any,
+  sitesData: any[],
+  userId: string,
+  options: {
+    startDate: Date
+    endDate: Date
+    company_id: string
+    page_id?: string
+  },
+): Promise<string[]> {
+  try {
+    const quotationIds: string[] = []
+    const pageId = options.page_id || `PAGE-${Date.now()}`
+
+    for (let i = 0; i < sitesData.length; i++) {
+      const site = sitesData[i]
+
+      const quotationData: Omit<Quotation, "id"> = {
+        quotation_number: generateQuotationNumber(),
+        client_name: clientData.name,
+        client_company_name: clientData.company,
+        client_email: clientData.email,
+        client_phone: clientData.phone,
+        client_address: clientData.address,
+        client_designation: clientData.designation,
+        client_industry: clientData.industry,
+        start_date: options.startDate,
+        end_date: options.endDate,
+        valid_until: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+        status: "draft",
+        created_by: userId,
+        seller_id: userId,
+        company_id: options.company_id,
+        page_id: pageId,
+        page_number: i + 1,
+        items: [
+          {
+            id: site.id,
+            name: site.name,
+            location: site.location,
+            price: site.price,
+            type: site.type,
+            media_url: site.image,
+            quantity: 1,
+            duration_days: Math.ceil((options.endDate.getTime() - options.startDate.getTime()) / (1000 * 60 * 60 * 24)),
+            item_total_amount: site.price,
+            illumination: "10 units of 1000 watts metal Halide",
+            dimensions: "100ft (H) x 60ft (W)",
+          },
+        ],
+        total_amount: site.price,
+        projectCompliance: {
+          signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        },
+      }
+
+      const quotationId = await createQuotation(quotationData)
+      quotationIds.push(quotationId)
+    }
+
+    return quotationIds
+  } catch (error) {
+    console.error("Error creating multiple quotations:", error)
+    throw error
+  }
+}
