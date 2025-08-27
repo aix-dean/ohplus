@@ -953,7 +953,7 @@ function SalesDashboardContent() {
             )}
           >
             {/* Left Column: Main Dashboard Content */}
-            <div className="flex flex-col gap-2 md:gap-4 h-full overflow-hidden">
+            <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
               {/* Header with title, actions, and search box */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div className="flex flex-col gap-2">
