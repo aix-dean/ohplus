@@ -16,7 +16,7 @@ interface SendProposalShareDialogProps {
 
 export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendProposalShareDialogProps) {
   const { toast } = useToast()
-  const [proposalUrl] = useState(`https://ohplus.ph/sales/proposals/${proposal.id}`)
+  const [proposalUrl] = useState(`https://ohplus.ph/proposals/view/${proposal.id}`)
 
   const handleCopyLink = async () => {
     try {
