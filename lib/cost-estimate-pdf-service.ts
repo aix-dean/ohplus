@@ -343,15 +343,17 @@ export async function generateCostEstimatePDF(
       // RFQ Number (top right)
       pdf.setFontSize(10)
       pdf.setFont("helvetica", "normal")
-      pdf.text(`RFQ. No. ${ceNumber}`, pageWidth - margin - 40, yPosition - 15)
+      const rfqText = `RFQ. No. ${ceNumber}`
+      const rfqTextWidth = pdf.getTextWidth(rfqText)
+      const rfqX = pageWidth - margin - rfqTextWidth
+      pdf.text(rfqText, rfqX, yPosition - 15)
 
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "normal")
-      pdf.text(
-        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-        pageWidth - margin - 40,
-        yPosition - 10,
-      )
+      const dateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      const dateTextWidth = pdf.getTextWidth(dateText)
+      const dateX = pageWidth - margin - dateTextWidth
+      pdf.text(dateText, dateX, yPosition - 10)
 
       // Greeting message - positioned prominently at top
       pdf.setFontSize(11)
@@ -618,15 +620,17 @@ export async function generateDetailedCostEstimatePDF(
     // RFQ Number (top right)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`, pageWidth - margin - 40, yPosition - 15)
+    const detailedRfqText = `RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`
+    const detailedRfqTextWidth = pdf.getTextWidth(detailedRfqText)
+    const detailedRfqX = pageWidth - margin - detailedRfqTextWidth
+    pdf.text(detailedRfqText, detailedRfqX, yPosition - 15)
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.text(
-      createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-      pageWidth - margin - 40,
-      yPosition - 10,
-    )
+    const detailedDateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    const detailedDateTextWidth = pdf.getTextWidth(detailedDateText)
+    const detailedDateX = pageWidth - margin - detailedDateTextWidth
+    pdf.text(detailedDateText, detailedDateX, yPosition - 10)
 
     // Greeting message - positioned prominently at top
     pdf.setFontSize(11)
