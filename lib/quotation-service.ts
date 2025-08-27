@@ -773,3 +773,28 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
     throw new Error("Failed to copy quotation: " + error.message)
   }
 }
+
+// Get all quotations
+export async function getAllQuotations(): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching all quotations:", error)
+    return []
+  }
+}

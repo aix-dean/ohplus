@@ -1,5 +1,13 @@
 "use client"
 
+import { TabsContent } from "@/components/ui/tabs"
+
+import { TabsTrigger } from "@/components/ui/tabs"
+
+import { TabsList } from "@/components/ui/tabs"
+
+import { Tabs } from "@/components/ui/tabs"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -15,6 +23,9 @@ import {
   FileText,
   Mail,
   Eye,
+  DollarSign,
+  Wrench,
+  AlertCircle,
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -26,8 +37,9 @@ import { db } from "@/lib/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/firebase-service"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
+import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
+import { getAllJobOrders, type JobOrder } from "@/lib/job-order-service"
 
 // Helper function to format dates
 function formatDate(dateString) {
@@ -105,6 +117,10 @@ export default function ProductDetailPage() {
   const [quotationRequestsLoading, setQuotationRequestsLoading] = useState(true)
   const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
   const [costEstimatesLoading, setCostEstimatesLoading] = useState(true)
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [quotationsLoading, setQuotationsLoading] = useState(true)
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+  const [jobOrdersLoading, setJobOrdersLoading] = useState(true)
 
   // Notification state
   const [notification, setNotification] = useState({
@@ -217,6 +233,82 @@ export default function ProductDetailPage() {
     }
 
     fetchCostEstimates()
+  }, [params.id, product])
+
+  useEffect(() => {
+    const fetchQuotations = async () => {
+      if (!params.id || params.id === "new" || !product) {
+        setQuotationsLoading(false)
+        return
+      }
+
+      setQuotationsLoading(true)
+      try {
+        const allQuotations = await getAllQuotations()
+
+        // Filter quotations that have products referencing this product
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedQuotations = allQuotations.filter((quotation) =>
+          quotation.products?.some(
+            (item) =>
+              item.id === productId ||
+              item.name?.toLowerCase().includes(productName.toLowerCase()) ||
+              (productLocation && item.location?.toLowerCase().includes(productLocation.toLowerCase())),
+          ),
+        )
+
+        setQuotations(relatedQuotations)
+      } catch (error) {
+        console.error("Error fetching quotations:", error)
+      } finally {
+        setQuotationsLoading(false)
+      }
+    }
+
+    fetchQuotations()
+  }, [params.id, product])
+
+  useEffect(() => {
+    const fetchJobOrders = async () => {
+      if (!params.id || params.id === "new" || !product) {
+        setJobOrdersLoading(false)
+        return
+      }
+
+      setJobOrdersLoading(true)
+      try {
+        const allJobOrders = await getAllJobOrders()
+
+        // Filter job orders that reference this product by site info
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedJobOrders = allJobOrders.filter(
+          (jobOrder) =>
+            jobOrder.siteId === productId ||
+            jobOrder.siteName?.toLowerCase().includes(productName.toLowerCase()) ||
+            (productLocation && jobOrder.siteLocation?.toLowerCase().includes(productLocation.toLowerCase())),
+        )
+
+        setJobOrders(relatedJobOrders)
+      } catch (error) {
+        console.error("Error fetching job orders:", error)
+      } finally {
+        setJobOrdersLoading(false)
+      }
+    }
+
+    fetchJobOrders()
   }, [params.id, product])
 
   const handleBack = () => {
@@ -417,6 +509,119 @@ export default function ProductDetailPage() {
           color: "bg-gray-100 text-gray-800 border-gray-200",
           icon: <Clock3 className="h-3.5 w-3.5" />,
           label: "Unknown",
+        }
+    }
+  }
+
+  const getQuotationStatusConfig = (status: Quotation["status"]) => {
+    switch (status?.toLowerCase()) {
+      case "draft":
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <FileText className="h-3.5 w-3.5" />,
+          label: "Draft",
+        }
+      case "sent":
+        return {
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+          icon: <Mail className="h-3.5 w-3.5" />,
+          label: "Sent",
+        }
+      case "viewed":
+        return {
+          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          label: "Viewed",
+        }
+      case "accepted":
+        return {
+          color: "bg-green-100 text-green-800 border-green-200",
+          icon: <CheckCircle className="h-3.5 w-3.5" />,
+          label: "Accepted",
+        }
+      case "rejected":
+        return {
+          color: "bg-red-100 text-red-800 border-red-200",
+          icon: <XCircle className="h-3.5 w-3.5" />,
+          label: "Rejected",
+        }
+      case "expired":
+        return {
+          color: "bg-orange-100 text-orange-800 border-orange-200",
+          icon: <AlertCircle className="h-3.5 w-3.5" />,
+          label: "Expired",
+        }
+      default:
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <Clock3 className="h-3.5 w-3.5" />,
+          label: "Unknown",
+        }
+    }
+  }
+
+  const getJobOrderStatusConfig = (status: JobOrder["status"]) => {
+    switch (status?.toLowerCase()) {
+      case "draft":
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <FileText className="h-3.5 w-3.5" />,
+          label: "Draft",
+        }
+      case "pending":
+        return {
+          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          icon: <Clock3 className="h-3.5 w-3.5" />,
+          label: "Pending",
+        }
+      case "approved":
+        return {
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+          icon: <CheckCircle className="h-3.5 w-3.5" />,
+          label: "Approved",
+        }
+      case "completed":
+        return {
+          color: "bg-green-100 text-green-800 border-green-200",
+          icon: <CheckCircle className="h-3.5 w-3.5" />,
+          label: "Completed",
+        }
+      case "cancelled":
+        return {
+          color: "bg-red-100 text-red-800 border-red-200",
+          icon: <XCircle className="h-3.5 w-3.5" />,
+          label: "Cancelled",
+        }
+      default:
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <Clock3 className="h-3.5 w-3.5" />,
+          label: "Unknown",
+        }
+    }
+  }
+
+  const getJobOrderPriorityConfig = (priority: JobOrder["priority"]) => {
+    switch (priority?.toLowerCase()) {
+      case "high":
+        return {
+          color: "bg-red-100 text-red-800 border-red-200",
+          label: "High",
+        }
+      case "medium":
+        return {
+          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          label: "Medium",
+        }
+      case "low":
+        return {
+          color: "bg-green-100 text-green-800 border-green-200",
+          label: "Low",
+        }
+      default:
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          label: "Normal",
         }
     }
   }
@@ -804,20 +1009,153 @@ export default function ProductDetailPage() {
 
             <TabsContent value="quote" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
-                <CardContent className="p-8 text-center">
-                  <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <h3 className="text-sm font-medium text-gray-900 mb-1">No Quote records</h3>
-                  <p className="text-sm text-gray-500">No quotes have been created for this site yet.</p>
+                <CardContent className="p-0">
+                  {quotationsLoading ? (
+                    <div className="p-8">
+                      <div className="space-y-4">
+                        {Array(3)
+                          .fill(0)
+                          .map((_, i) => (
+                            <div key={i} className="grid grid-cols-6 gap-4">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-4 w-28" />
+                              <Skeleton className="h-4 w-20" />
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-16" />
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : quotations.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <DollarSign className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">No Quote records</h3>
+                      <p className="text-sm text-gray-500">No quotes have been created for this site yet.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Table Header */}
+                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Quote Number</div>
+                        <div>Client</div>
+                        <div>Date</div>
+                        <div>Amount</div>
+                        <div>Status</div>
+                        <div>Items</div>
+                      </div>
+
+                      {/* Quotations Rows */}
+                      <div className="divide-y divide-gray-100">
+                        {quotations.map((quotation) => {
+                          const statusConfig = getQuotationStatusConfig(quotation.status)
+                          return (
+                            <div
+                              key={quotation.id}
+                              className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => router.push(`/quotations/${quotation.id}`)}
+                            >
+                              <div className="text-gray-900 font-medium">
+                                {quotation.quotationNumber || quotation.id.slice(-8)}
+                              </div>
+                              <div className="text-gray-900">
+                                {quotation.client?.company || quotation.client?.name || "Unknown Client"}
+                              </div>
+                              <div className="text-gray-600">{formatDate(quotation.created)}</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{quotation.totalAmount?.toLocaleString() || "0"}
+                              </div>
+                              <div>
+                                <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                                  {statusConfig.icon}
+                                  <span className="ml-1">{statusConfig.label}</span>
+                                </Badge>
+                              </div>
+                              <div className="text-gray-600">{quotation.products?.length || 0} items</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="job-order" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
-                <CardContent className="p-8 text-center">
-                  <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <h3 className="text-sm font-medium text-gray-900 mb-1">No job orders</h3>
-                  <p className="text-sm text-gray-500">No job orders have been created for this site yet.</p>
+                <CardContent className="p-0">
+                  {jobOrdersLoading ? (
+                    <div className="p-8">
+                      <div className="space-y-4">
+                        {Array(3)
+                          .fill(0)
+                          .map((_, i) => (
+                            <div key={i} className="grid grid-cols-6 gap-4">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-4 w-28" />
+                              <Skeleton className="h-4 w-20" />
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-16" />
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : jobOrders.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Wrench className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">No job orders</h3>
+                      <p className="text-sm text-gray-500">No job orders have been created for this site yet.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Table Header */}
+                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>JO Number</div>
+                        <div>Type</div>
+                        <div>Assigned To</div>
+                        <div>Date</div>
+                        <div>Priority</div>
+                        <div>Status</div>
+                      </div>
+
+                      {/* Job Orders Rows */}
+                      <div className="divide-y divide-gray-100">
+                        {jobOrders.map((jobOrder) => {
+                          const statusConfig = getJobOrderStatusConfig(jobOrder.status)
+                          const priorityConfig = getJobOrderPriorityConfig(jobOrder.priority)
+                          return (
+                            <div
+                              key={jobOrder.id}
+                              className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => router.push(`/logistics/job-orders/${jobOrder.id}`)}
+                            >
+                              <div className="text-gray-900 font-medium">
+                                {jobOrder.jobOrderNumber || jobOrder.id.slice(-8)}
+                              </div>
+                              <div className="text-gray-900">{jobOrder.type || "Unknown"}</div>
+                              <div className="text-gray-900">
+                                {jobOrder.assignedTo?.name || jobOrder.assignedTo || "Unassigned"}
+                              </div>
+                              <div className="text-gray-600">{formatDate(jobOrder.createdAt)}</div>
+                              <div>
+                                <Badge variant="outline" className={`${priorityConfig.color} border font-medium`}>
+                                  {priorityConfig.label}
+                                </Badge>
+                              </div>
+                              <div>
+                                <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                                  {statusConfig.icon}
+                                  <span className="ml-1">{statusConfig.label}</span>
+                                </Badge>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
