@@ -1071,20 +1071,18 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Site Location</span>
-              <span className="text-gray-700">: {siteName}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.notes || siteName}</span>
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Type</span>
               <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
             </div>
-            {siteLineItems[0] && (
-              <div className="flex">
-                <span className="w-4 text-center">•</span>
-                <span className="font-medium text-gray-700 w-32">Size</span>
-                <span className="text-gray-700">: {siteLineItems[0].notes || "Standard Size"}</span>
-              </div>
-            )}
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-32">Size</span>
+              <span className="text-gray-700">: {costEstimate?.size || ""}</span>
+            </div>
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Contract Duration</span>
@@ -1151,8 +1149,9 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   }
                   title={isEditing ? "Click to edit contract period" : ""}
                 >
-                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
-                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
+                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : ""}
+                  {costEstimate?.startDate && costEstimate?.endDate ? " - " : ""}
+                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
