@@ -338,13 +338,13 @@ export async function generateCostEstimatePDF(
         // Special handling for lease rate values
         if (point.label === "Lease Rate/Month") {
           pdf.text(
-            `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+            `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
             margin + 65,
             yPosition,
           )
         } else if (point.label === "Total Lease") {
           pdf.text(
-            `${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
+            `PHP ${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
             margin + 65,
             yPosition,
           )
@@ -370,7 +370,7 @@ export async function generateCostEstimatePDF(
       // Lease rate calculation - using actual monthly rate
       pdf.text("Lease rate per month", margin + 5, yPosition)
       pdf.text(
-        `${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        `PHP ${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -378,7 +378,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
       pdf.text(
-        `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        `PHP ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -386,7 +386,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text("12 % VAT", margin + 5, yPosition)
       pdf.text(
-        `${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        `PHP ${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -396,7 +396,7 @@ export async function generateCostEstimatePDF(
       pdf.setFont("helvetica", "bold")
       pdf.text("TOTAL", margin + 5, yPosition)
       pdf.text(
-        `${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
+        `PHP ${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 40,
         yPosition,
       )
