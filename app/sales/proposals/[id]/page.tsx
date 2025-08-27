@@ -792,7 +792,6 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save proposal as draft",
-        variant: "destructive",
       })
     } finally {
       setIsSaving(false)
@@ -1475,12 +1474,12 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   {isLastPage && (
-                    <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
+                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
                       <Button
                         variant="outline"
                         onClick={handleSaveAsDraft}
                         disabled={isSaving}
-                        className="px-8 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 font-medium bg-transparent"
+                        className="px-6 py-3 text-gray-700 border-gray-300 hover:bg-gray-50 font-medium bg-white shadow-lg hover:shadow-xl transition-shadow duration-200"
                       >
                         {isSaving ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1492,7 +1491,7 @@ export default function ProposalDetailsPage() {
                       <Button
                         onClick={handleSendProposal}
                         disabled={isSaving}
-                        className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-medium"
+                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-lg hover:shadow-xl transition-shadow duration-200"
                       >
                         {isSaving ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
