@@ -21,6 +21,8 @@ import {
   Check,
   XIcon,
   Minus,
+  Save,
+  Send,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -230,6 +232,7 @@ export default function ProposalDetailsPage() {
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [zoomLevel, setZoomLevel] = useState<number>(1)
+  const [isSaving, setIsSaving] = useState(false) // Added state for save/send actions
 
   useEffect(() => {
     async function fetchProposal() {
@@ -734,6 +737,7 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save template settings",
+        variant: "destructive",
       })
     }
   }
@@ -770,6 +774,60 @@ export default function ProposalDetailsPage() {
 
   const handleResetZoom = () => {
     setZoomLevel(1)
+  }
+
+  const handleSaveAsDraft = async () => {
+    if (!proposal || !userData) return
+
+    setIsSaving(true)
+    try {
+      await updateProposal(proposal.id, { status: "draft" }, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Success",
+        description: "Proposal saved as draft",
+      })
+    } catch (error) {
+      console.error("Error saving proposal as draft:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save proposal as draft",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSendProposal = async () => {
+    if (!proposal || !userData) return
+
+    setIsSaving(true)
+    try {
+      await updateProposal(
+        proposal.id,
+        { status: "sent", sent_at: new Date() },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      toast({
+        title: "Success",
+        description: "Proposal sent successfully",
+      })
+
+      // Optionally redirect to proposals list
+      router.push("/sales/proposals")
+    } catch (error) {
+      console.error("Error sending proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to send proposal",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (loading) {
@@ -893,34 +951,6 @@ export default function ProposalDetailsPage() {
               <Plus className="h-3 w-3" />
             </Button>
           </div>
-        </div>
-      </div>
-
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 translate-x-8 z-40">
-        <div className="flex items-center bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden">
-          <Button
-            variant="outline"
-            className="rounded-l-full rounded-r-none px-6 py-3 text-gray-700 border-0 hover:bg-gray-50 bg-white border-r border-gray-200"
-            onClick={() => {
-              toast({
-                title: "Draft Saved",
-                description: "Proposal has been saved as draft",
-              })
-            }}
-          >
-            Save as Draft
-          </Button>
-          <Button
-            className="rounded-r-full rounded-l-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white border-0"
-            onClick={() => {
-              toast({
-                title: "Proposal Sent",
-                description: "Proposal has been sent successfully",
-              })
-            }}
-          >
-            Send
-          </Button>
         </div>
       </div>
 
@@ -1285,6 +1315,7 @@ export default function ProposalDetailsPage() {
           {Array.from({ length: getTotalPages() }, (_, index) => {
             const pageNumber = index + 1
             const pageContent = getPageContent(pageNumber)
+            const isLastPage = pageNumber === getTotalPages() // Check if this is the last page
 
             return (
               <div key={pageNumber} className={getPageContainerClass()}>
@@ -1442,6 +1473,36 @@ export default function ProposalDetailsPage() {
                       </div>
                     ))}
                   </div>
+
+                  {isLastPage && (
+                    <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveAsDraft}
+                        disabled={isSaving}
+                        className="px-8 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 font-medium bg-transparent"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Save as Draft
+                      </Button>
+                      <Button
+                        onClick={handleSendProposal}
+                        disabled={isSaving}
+                        className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-medium"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        Send
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
