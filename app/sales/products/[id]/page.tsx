@@ -953,17 +953,15 @@ export default function ProductDetailPage() {
                     </div>
                   ) : (
                     <>
-                      {/* Table Header */}
                       <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        <div>CE Number</div>
-                        <div>Client</div>
                         <div>Date</div>
-                        <div>Amount</div>
+                        <div>Project ID</div>
+                        <div>Type</div>
+                        <div>Client</div>
                         <div>Status</div>
-                        <div>Items</div>
+                        <div>Price</div>
                       </div>
 
-                      {/* Cost Estimates Rows */}
                       <div className="divide-y divide-gray-100">
                         {costEstimates.map((estimate) => {
                           const statusConfig = getCostEstimateStatusConfig(estimate.status)
@@ -973,15 +971,13 @@ export default function ProductDetailPage() {
                               className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                               onClick={() => router.push(`/sales/cost-estimates/${estimate.id}`)}
                             >
+                              <div className="text-gray-600">{formatDate(estimate.createdAt)}</div>
                               <div className="text-gray-900 font-medium">
                                 {estimate.costEstimateNumber || estimate.id.slice(-8)}
                               </div>
+                              <div className="text-gray-600">Cost Estimate</div>
                               <div className="text-gray-900">
                                 {estimate.client?.company || estimate.client?.name || "Unknown Client"}
-                              </div>
-                              <div className="text-gray-600">{formatDate(estimate.createdAt)}</div>
-                              <div className="text-red-600 font-medium">
-                                ₱{estimate.totalAmount?.toLocaleString() || "0"}
                               </div>
                               <div>
                                 <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
@@ -989,7 +985,9 @@ export default function ProductDetailPage() {
                                   <span className="ml-1">{statusConfig.label}</span>
                                 </Badge>
                               </div>
-                              <div className="text-gray-600">{estimate.lineItems.length} items</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{estimate.totalAmount?.toLocaleString() || "0"}/month
+                              </div>
                             </div>
                           )
                         })}
