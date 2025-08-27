@@ -1447,24 +1447,22 @@ export default function ProposalDetailsPage() {
       </div>
 
       {proposal?.status === "draft" && (
-        <div className="flex justify-center mt-8 mb-6">
-          <div className="flex space-x-4">
-            <Button
-              onClick={() => handleUpdatePublicStatus("draft")}
-              variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-            >
-              <FileText className="h-5 w-5 mr-2" />
-              Save as Draft
-            </Button>
-            <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)}
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-            >
-              <Send className="h-5 w-5 mr-2" />
-              Send
-            </Button>
-          </div>
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-4 z-50">
+          <Button
+            onClick={() => handleUpdatePublicStatus("draft")}
+            variant="outline"
+            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+          >
+            <FileText className="h-5 w-5 mr-2" />
+            Save as Draft
+          </Button>
+          <Button
+            onClick={() => setIsSendOptionsDialogOpen(true)}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+          >
+            <Send className="h-5 w-5 mr-2" />
+            Send
+          </Button>
         </div>
       )}
     </div>
