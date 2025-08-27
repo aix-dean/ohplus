@@ -1447,8 +1447,8 @@ export default function ProposalDetailsPage() {
       </div>
 
       {proposal?.status === "draft" && (
-        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
-          <div className="flex space-x-4 pointer-events-auto">
+        <div className="flex justify-center mt-8 mb-6">
+          <div className="flex space-x-4">
             <Button
               onClick={() => handleUpdatePublicStatus("draft")}
               variant="outline"
