@@ -1206,32 +1206,50 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           <div className="grid grid-cols-2 gap-4 py-4">
             {/* OOH!Shop */}
             <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center mb-2">
-                <span className="text-orange-600 font-bold text-sm">OOH!</span>
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+                <Image src="/ooh-shop-logo.png" alt="OOH!Shop logo" width={48} height={48} className="object-contain" />
               </div>
               <span className="text-sm font-medium">OOH!Shop</span>
             </button>
 
             {/* Vistar Media */}
             <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 bg-orange-500 rounded-lg flex items-center justify-center mb-2">
-                <span className="text-white font-bold text-xs">vistar media</span>
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+                <Image
+                  src="/vistar-media-logo.png"
+                  alt="Vistar Media logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
               <span className="text-sm font-medium">Vistar Media</span>
             </button>
 
             {/* Broadsign */}
             <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 bg-blue-900 rounded-lg flex items-center justify-center mb-2">
-                <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-sm"></div>
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+                <Image
+                  src="/broadsign-logo.png"
+                  alt="Broadsign logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
               <span className="text-sm font-medium">Broadsign</span>
             </button>
 
             {/* Moving Walls */}
             <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mb-2">
-                <span className="text-white font-bold text-lg">MW</span>
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+                <Image
+                  src="/moving-walls-logo.png"
+                  alt="Moving Walls logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
               <span className="text-sm font-medium">Moving Walls</span>
             </button>
