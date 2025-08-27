@@ -955,115 +955,119 @@ function SalesDashboardContent() {
             {/* Left Column: Main Dashboard Content */}
             <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
               {/* Header with title, actions, and search box */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex flex-col gap-2">
+                  {!proposalCreationMode && (
+                    <h1 className="text-xl md:text-2xl font-bold">
+                      {userData?.first_name
+                        ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                        : "Dashboard"}
+                    </h1>
+                  )}
+                  {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
+                  {!(proposalCreationMode || ceQuoteMode) && (
+                    <div className="w-full sm:w-64 md:w-80">
+                      <SearchBox
+                        onSearchResults={handleSearchResults}
+                        onSearchError={handleSearchError}
+                        onSearchLoading={handleSearchLoading}
+                        onSearchClear={handleSearchClear}
+                        userId={user?.uid}
+                      />
+                    </div>
+                  )}
+                </div>
 
-              <div className="flex flex-col gap-2">
-                {!proposalCreationMode && (
-                  <h1 className="text-xl md:text-2xl font-bold">
-                    {userData?.first_name
-                      ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                      : "Dashboard"}
-                  </h1>
-                )}
-                {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
-                {!(proposalCreationMode || ceQuoteMode) && (
-                  <div className="w-full sm:w-64 md:w-80">
-                    <SearchBox
-                      onSearchResults={handleSearchResults}
-                      onSearchError={handleSearchError}
-                      onSearchLoading={handleSearchLoading}
-                      onSearchClear={handleSearchClear}
-                      userId={user?.uid}
-                    />
-                  </div>
-                )}
-              </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-2">
+                  {/* Proposal Creation Mode Controls (on dashboard) */}
+                  {proposalCreationMode && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-sm text-blue-700">
+                        {selectedClientForProposal ? (
+                          <>
+                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                          </>
+                        ) : (
+                          "Select a client"
+                        )}
+                        {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-2">
-                {/* Proposal Creation Mode Controls (on dashboard) */}
-                {proposalCreationMode && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-sm text-blue-700">
-                      {selectedClientForProposal ? (
-                        <>
-                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                        </>
-                      ) : (
-                        "Select a client"
-                      )}
-                      {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
-                    </span>
-                    <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                  {/* CE/Quote Mode Controls (on dashboard) */}
+                  {ceQuoteMode && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-sm text-blue-700">
+                        {selectedClientForProposal ? (
+                          <>
+                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                          </>
+                        ) : (
+                          "Select a client"
+                        )}
+                        {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
 
-                {/* CE/Quote Mode Controls (on dashboard) */}
-                {ceQuoteMode && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-sm text-blue-700">
-                      {selectedClientForProposal ? (
-                        <>
-                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                        </>
-                      ) : (
-                        "Select a client"
-                      )}
-                      {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
-                    </span>
-                    <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                  {/* Action Buttons (only visible when not in any selection mode) */}
+                  {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleInitiateProposalFlow}
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      >
+                        Planning & Proposals
+                      </Button>
+                      <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                        CE
+                      </Button>
+                      <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                        Quote
+                      </Button>
+                      <Button
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                        onClick={() => setIsCollabPartnerDialogOpen(true)}
+                      >
+                        Collab
+                      </Button>
+                      <Button
+                        onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      >
+                        Job Order
+                      </Button>
+                    </div>
+                  )}
 
-                {/* Action Buttons (only visible when not in any selection mode) */}
-                {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
-                  <div className="flex gap-2">
-                    <Button onClick={handleInitiateProposalFlow} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      Planning & Proposals
-                    </Button>
-                    <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      CE
-                    </Button>
-                    <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      Quote
-                    </Button>
-                    <Button
-                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      onClick={() => setIsCollabPartnerDialogOpen(true)}
-                    >
-                      Collab
-                    </Button>
-                    <Button
-                      onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
-                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                    >
-                      Job Order
-                    </Button>
-                  </div>
-                )}
-
-                {!isMobile && (
-                  <div className="border rounded-md p-1 flex">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="icon"
-                      className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      <LayoutGrid size={18} />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="icon"
-                      className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                      onClick={() => setViewMode("list")}
-                    >
-                      <List size={18} />
-                    </Button>
-                  </div>
-                )}
+                  {!isMobile && (
+                    <div className="border rounded-md p-1 flex">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="icon"
+                        className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                        onClick={() => setViewMode("grid")}
+                      >
+                        <LayoutGrid size={18} />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="icon"
+                        className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                        onClick={() => setViewMode("list")}
+                      >
+                        <List size={18} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}

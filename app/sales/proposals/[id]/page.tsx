@@ -1415,6 +1415,30 @@ export default function ProposalDetailsPage() {
                       </div>
                     ))}
                   </div>
+
+                  {pageNumber === getTotalPages() && (
+                    <div className="flex justify-end gap-3 mt-8 pt-4">
+                      <Button
+                        variant="outline"
+                        className="px-6 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+                        onClick={() => {
+                          // Handle save as draft
+                          console.log("[v0] Save as Draft clicked")
+                        }}
+                      >
+                        Save as Draft
+                      </Button>
+                      <Button
+                        className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white"
+                        onClick={() => {
+                          // Handle send proposal
+                          console.log("[v0] Send clicked")
+                        }}
+                      >
+                        Send
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
