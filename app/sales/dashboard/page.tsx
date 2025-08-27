@@ -19,9 +19,10 @@ import {
   Filter,
   AlertCircle,
   Search,
-  PlusCircle,
   Calculator,
   FileText,
+  Users,
+  Grid3X3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -59,7 +60,6 @@ import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import type { QuotationProduct } from "@/lib/types/quotation"
-import { CheckCircle } from "lucide-react"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -875,6 +875,9 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
   }
 
+  const [showClientSelector, setShowClientSelector] = useState(false)
+  const [clientSearchQuery, setClientSearchQuery] = useState("")
+
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {proposalCreationMode && (
@@ -953,9 +956,9 @@ function SalesDashboardContent() {
             )}
           >
             {/* Left Column: Main Dashboard Content */}
-            <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
+            <div className="flex flex-col gap-0 h-full overflow-hidden">
               {/* Header with title, actions, and search box */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                 <div className="flex flex-col gap-2">
                   {!proposalCreationMode && (
                     <h1 className="text-xl md:text-2xl font-bold">
@@ -978,7 +981,7 @@ function SalesDashboardContent() {
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                   {/* Proposal Creation Mode Controls (on dashboard) */}
                   {proposalCreationMode && (
                     <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
@@ -1070,77 +1073,53 @@ function SalesDashboardContent() {
                 </div>
               </div>
 
-              {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
-              {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs mt-1" ref={clientSearchRef}>
-                  <div className="relative">
-                    <Input
-                      placeholder="Search or select client..."
-                      value={
-                        selectedClientForProposal
-                          ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
-                          : dashboardClientSearchTerm
-                      }
-                      onChange={(e) => {
-                        setDashboardClientSearchTerm(e.target.value)
-                        setSelectedClientForProposal(null)
-                      }}
-                      onFocus={() => {
-                        setIsClientDropdownOpen(true)
-                        if (selectedClientForProposal) {
-                          setDashboardClientSearchTerm("")
-                        }
-                      }}
-                      className={cn(
-                        "pr-10 h-9 text-sm",
-                        (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
-                      )}
-                    />
-                    {isSearchingDashboardClients && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
-                    )}
+              {/* Client Selection UI for Proposal Creation */}
+              {proposalCreationMode && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowClientSelector(!showClientSelector)}
+                        className="gap-2"
+                      >
+                        <Users size={16} />
+                        Select a client
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleCancelProposalCreationMode}>
+                        Cancel
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className={cn("h-8 w-8 p-0", viewMode === "grid" && "bg-gray-100")}
+                      >
+                        <Grid3X3 size={16} />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className={cn("h-8 w-8 p-0", viewMode === "list" && "bg-gray-100")}
+                      >
+                        <List size={16} />
+                      </Button>
+                    </div>
                   </div>
-                  {/* Results dropdown */}
-                  {isClientDropdownOpen && (
-                    <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
-                      <div className="p-2">
-                        {/* Always show "Add New Client" option at the top */}
-                        <div
-                          className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                          onClick={() => setIsNewClientDialogOpen(true)}
-                        >
-                          <PlusCircle className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium text-blue-700">Add New Client</span>
-                        </div>
 
-                        {dashboardClientSearchResults.length > 0 ? (
-                          dashboardClientSearchResults.map((result) => (
-                            <div
-                              key={result.id}
-                              className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                              onClick={() => handleClientSelectOnDashboard(result)}
-                            >
-                              <div>
-                                <p className="font-medium">
-                                  {result.name} ({result.company})
-                                </p>
-                                <p className="text-xs text-gray-500">{result.email}</p>
-                              </div>
-                              {selectedClientForProposal?.id === result.id && (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500 text-center py-2">
-                            {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                              ? `No clients found for "${dashboardClientSearchTerm}".`
-                              : "Start typing to search for clients."}
-                          </p>
-                        )}
-                      </div>
-                    </Card>
-                  )}
+                  <div className="w-full sm:w-64 md:w-80">
+                    <Input
+                      type="text"
+                      placeholder="Search or select client..."
+                      value={clientSearchQuery}
+                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
               )}
 
