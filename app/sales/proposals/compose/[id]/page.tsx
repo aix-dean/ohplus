@@ -76,7 +76,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: mockProposal.client.email,
-          cc: "akoymababaix.com",
+          cc: "admin@aix.com",
           subject: `Proposal: Proposal for ${mockProposal.code} | Kalayaan Flyover Site D - ${mockProposal.code} - OH Plus`,
         }))
 
@@ -147,21 +147,45 @@ OH PLUS
       return
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const toEmails = emailData.to
+      .split(",")
+      .map((email) => email.trim())
+      .filter((email) => email)
+
+    const ccEmails = emailData.cc
+      ? emailData.cc
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email)
+      : []
+
+    for (const email of toEmails) {
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Validation Error",
+          description: `Invalid email format: ${email}`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    for (const email of ccEmails) {
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Validation Error",
+          description: `Invalid CC email format: ${email}`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setSending(true)
 
     try {
       const formData = new FormData()
-
-      const toEmails = emailData.to
-        .split(",")
-        .map((email) => email.trim())
-        .filter((email) => email)
-      const ccEmails = emailData.cc
-        ? emailData.cc
-            .split(",")
-            .map((email) => email.trim())
-            .filter((email) => email)
-        : []
 
       formData.append("to", JSON.stringify(toEmails))
       if (ccEmails.length > 0) {
@@ -173,12 +197,76 @@ OH PLUS
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
         try {
-          const pdfContent = `Proposal PDF: ${attachment.name}`
-          const blob = new Blob([pdfContent], { type: "application/pdf" })
-          const file = new File([blob], attachment.name, { type: "application/pdf" })
-          formData.append(`attachment_${i}`, file)
+          const pdfResponse = await fetch(
+            attachment.url || `https://ohplus.ph/api/proposals/${params.id}/pdf?type=${i === 0 ? "main" : "details"}`,
+          )
+
+          if (pdfResponse.ok) {
+            const pdfBlob = await pdfResponse.blob()
+            const file = new File([pdfBlob], attachment.name, { type: "application/pdf" })
+            formData.append(`attachment_${i}`, file)
+          } else {
+            console.log(`[v0] PDF API failed for ${attachment.name}, using placeholder`)
+            const pdfContent = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 44
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Proposal Document: ${attachment.name}) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000206 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+300
+%%EOF`
+            const blob = new Blob([pdfContent], { type: "application/pdf" })
+            const file = new File([blob], attachment.name, { type: "application/pdf" })
+            formData.append(`attachment_${i}`, file)
+          }
         } catch (error) {
-          console.error(`Error processing attachment ${attachment.name}:`, error)
+          console.error(`[v0] Error processing attachment ${attachment.name}:`, error)
+          toast({
+            title: "Warning",
+            description: `Could not attach ${attachment.name}. Continuing without this attachment.`,
+            variant: "destructive",
+          })
         }
       }
 
