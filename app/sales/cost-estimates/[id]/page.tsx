@@ -1269,7 +1269,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   {companyData?.company_location ||
                     (typeof companyData?.address === "string"
                       ? companyData.address
-                      : companyData?.address
+                      : companyData?.address && typeof companyData.address === "object"
                         ? `${companyData.address.street || ""}, ${companyData.address.city || ""}, ${companyData.address.province || ""}`
                             .replace(/^,\s*|,\s*$/g, "")
                             .replace(/,\s*,/g, ",")
