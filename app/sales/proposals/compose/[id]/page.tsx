@@ -53,10 +53,7 @@ OH PLUS
 +639XXXXXXXXX`,
   })
 
-  const [attachments, setAttachments] = useState<Attachment[]>([
-    { name: `OH_OH_PROP${params.id}_Proposal_Page_1.pdf`, size: "2.1 MB", type: "proposal" },
-    { name: `OH_OH_PROP${params.id}_VIEW_Proposal_Page_2.pdf`, size: "1.8 MB", type: "proposal" },
-  ])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
 
   const [templates] = useState([
     { id: 1, name: "Standard", type: "standard" },
@@ -109,27 +106,48 @@ OH PLUS
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
-      const proposalPDFs: Attachment[] = [
-        {
-          name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Main.pdf`,
-          size: "2.3 MB",
-          type: "proposal",
-          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf?type=main`,
+      const response = await fetch(`/api/proposals/generate-pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        {
-          name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Details.pdf`,
-          size: "1.9 MB",
-          type: "proposal",
-          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf?type=details`,
-        },
-      ]
+        body: JSON.stringify({ proposal: proposalData }),
+      })
 
-      setAttachments(proposalPDFs)
+      if (response.ok) {
+        const pdfBlob = await response.blob()
+        const pdfFile = new File([pdfBlob], `OH_PROP_${proposalData.id}_${proposalData.code}_Complete.pdf`, {
+          type: "application/pdf",
+        })
+
+        const proposalPDFs: Attachment[] = [
+          {
+            name: `OH_PROP_${proposalData.id}_${proposalData.code}_Complete.pdf`,
+            size: formatFileSize(pdfBlob.size),
+            type: "proposal",
+            file: pdfFile,
+          },
+        ]
+
+        setAttachments(proposalPDFs)
+      } else {
+        throw new Error("Failed to generate PDF")
+      }
     } catch (error) {
       console.error("Error generating proposal PDFs:", error)
+      const fallbackPDFs: Attachment[] = [
+        {
+          name: `OH_PROP_${proposalData.id}_${proposalData.code}_Proposal.pdf`,
+          size: "2.3 MB",
+          type: "proposal",
+          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf`,
+        },
+      ]
+      setAttachments(fallbackPDFs)
+
       toast({
         title: "Warning",
-        description: "Could not generate proposal PDFs. Using default attachments.",
+        description: "Could not generate proposal PDF. Using fallback attachment.",
         variant: "destructive",
       })
     }
@@ -185,14 +203,16 @@ OH PLUS
         const attachment = attachments[i]
         try {
           if (attachment.file) {
-            // Real file upload
+            // Real file upload (including generated PDFs)
             formData.append(`attachment_${i}`, attachment.file)
-          } else {
-            // Generate PDF content for proposal attachments
-            const pdfContent = `Proposal PDF: ${attachment.name}`
-            const blob = new Blob([pdfContent], { type: "application/pdf" })
-            const file = new File([blob], attachment.name, { type: "application/pdf" })
-            formData.append(`attachment_${i}`, file)
+          } else if (attachment.url && attachment.type === "proposal") {
+            // Generate PDF from URL for proposal attachments
+            const pdfResponse = await fetch(attachment.url)
+            if (pdfResponse.ok) {
+              const pdfBlob = await pdfResponse.blob()
+              const pdfFile = new File([pdfBlob], attachment.name, { type: "application/pdf" })
+              formData.append(`attachment_${i}`, pdfFile)
+            }
           }
         } catch (error) {
           console.error(`Error processing attachment ${attachment.name}:`, error)
