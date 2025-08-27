@@ -21,6 +21,7 @@ import {
   Check,
   XIcon,
   Minus,
+  Send,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -230,8 +231,8 @@ export default function ProposalDetailsPage() {
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [zoomLevel, setZoomLevel] = useState<number>(1)
-  const [savingDraft, setSavingDraft] = useState(false)
-  const [sending, setSending] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -776,76 +777,52 @@ export default function ProposalDetailsPage() {
   }
 
   const handleSaveAsDraft = async () => {
-    if (!proposal || !userData) {
-      toast({
-        title: "Error",
-        description: "Unable to save draft",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!proposal || !userData?.uid) return
 
-    setSavingDraft(true)
+    setUpdatingStatus(true)
     try {
-      await updateProposal(
-        proposal.id,
-        { status: "draft", lastModified: new Date().toISOString() },
-        userData.uid,
-        userData.displayName || "User",
-      )
-
+      // Update proposal status to draft
+      await updateProposal(proposal.id, { status: "draft" })
       setProposal((prev) => (prev ? { ...prev, status: "draft" } : null))
 
       toast({
-        title: "Success",
-        description: "Proposal saved as draft",
+        title: "Saved as Draft",
+        description: "Proposal has been saved as draft successfully.",
       })
     } catch (error) {
-      console.error("Error saving draft:", error)
+      console.error("Error saving as draft:", error)
       toast({
         title: "Error",
-        description: "Failed to save draft",
+        description: "Failed to save proposal as draft. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setSavingDraft(false)
+      setUpdatingStatus(false)
     }
   }
 
   const handleSend = async () => {
-    if (!proposal || !userData) {
-      toast({
-        title: "Error",
-        description: "Unable to send proposal",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!proposal || !userData?.uid) return
 
-    setSending(true)
+    setSendingEmail(true)
     try {
-      await updateProposal(
-        proposal.id,
-        { status: "sent", sentDate: new Date().toISOString() },
-        userData.uid,
-        userData.displayName || "User",
-      )
-
+      // Update proposal status to sent
+      await updateProposal(proposal.id, { status: "sent" })
       setProposal((prev) => (prev ? { ...prev, status: "sent" } : null))
 
       toast({
-        title: "Success",
-        description: "Proposal sent successfully",
+        title: "Proposal Sent",
+        description: "Proposal has been sent successfully.",
       })
     } catch (error) {
       console.error("Error sending proposal:", error)
       toast({
         title: "Error",
-        description: "Failed to send proposal",
+        description: "Failed to send proposal. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setSending(false)
+      setSendingEmail(false)
     }
   }
 
@@ -970,42 +947,6 @@ export default function ProposalDetailsPage() {
               <Plus className="h-3 w-3" />
             </Button>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-center gap-3">
-          <Button
-            onClick={handleSaveAsDraft}
-            variant="outline"
-            size="lg"
-            disabled={savingDraft || sending}
-            className="px-8 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 font-medium bg-transparent"
-          >
-            {savingDraft ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save as Draft"
-            )}
-          </Button>
-          <Button
-            onClick={handleSend}
-            size="lg"
-            disabled={savingDraft || sending}
-            className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-medium"
-          >
-            {sending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              "Send"
-            )}
-          </Button>
         </div>
       </div>
 
@@ -1533,6 +1474,46 @@ export default function ProposalDetailsPage() {
           })}
         </div>
       </div>
+
+      {proposal?.status === "draft" && (
+        <div className="fixed bottom-6 right-6 flex space-x-4">
+          <Button
+            onClick={handleSaveAsDraft}
+            variant="outline"
+            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+            disabled={updatingStatus}
+          >
+            {updatingStatus ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <FileText className="h-5 w-5 mr-2" />
+                Save as Draft
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleSend}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+            disabled={sendingEmail}
+          >
+            {sendingEmail ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="h-5 w-5 mr-2" />
+                Send
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
