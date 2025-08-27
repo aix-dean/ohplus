@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
+import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -1465,6 +1466,13 @@ export default function ProposalDetailsPage() {
           </Button>
         </div>
       )}
+
+      {/* Send Options Dialog */}
+      <SendProposalShareDialog
+        isOpen={isSendOptionsDialogOpen}
+        onClose={() => setIsSendOptionsDialogOpen(false)}
+        proposal={proposal}
+      />
     </div>
   )
 }
