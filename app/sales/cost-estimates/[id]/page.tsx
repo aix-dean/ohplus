@@ -1265,7 +1265,16 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="text-center text-xs text-gray-500">
               <p className="flex items-center justify-center gap-2 mb-2">
-                <span>{companyData?.company_location || companyData?.address || ""}</span>
+                <span>
+                  {companyData?.company_location ||
+                    (typeof companyData?.address === "string"
+                      ? companyData.address
+                      : companyData?.address
+                        ? `${companyData.address.street || ""}, ${companyData.address.city || ""}, ${companyData.address.province || ""}`
+                            .replace(/^,\s*|,\s*$/g, "")
+                            .replace(/,\s*,/g, ",")
+                        : "")}
+                </span>
                 {companyData?.phone && (
                   <>
                     <span>•</span>
