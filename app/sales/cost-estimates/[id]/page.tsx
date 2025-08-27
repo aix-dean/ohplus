@@ -309,6 +309,18 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
           }
           break
+
+        case "size":
+          updatedCostEstimate.size = newValue
+          break
+
+        case "signatureName":
+          updatedCostEstimate.signatureName = newValue
+          break
+
+        case "signaturePosition":
+          updatedCostEstimate.signaturePosition = newValue
+          break
       }
     })
 
@@ -1034,7 +1046,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
         <div className="p-6 sm:p-8 border-b">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex justify-between items-start mb-6 mx-4">
             <div>
               <p className="text-sm text-gray-600 mb-2">
                 {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
@@ -1078,25 +1090,19 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <span className="font-medium text-gray-700 w-32">Type</span>
               <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
             </div>
-            <div className="flex">
-              <span className="w-4 text-center">•</span>
-              <span className="font-medium text-gray-700 w-32">Size</span>
-              <span className="text-gray-700">: {costEstimate?.size || ""}</span>
-            </div>
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
-              <span className="font-medium text-gray-700 w-32">Contract Duration</span>
+              <span className="font-medium text-gray-700 w-32">Size</span>
               <span className="text-gray-700">: </span>
-              {isEditing && editingField === "durationDays" ? (
+              {isEditing && editingField === "size" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
-                    type="number"
-                    value={tempValues.durationDays || ""}
-                    onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
-                    className="w-20 h-6 text-sm"
-                    placeholder="Days"
+                    type="text"
+                    value={tempValues.size || ""}
+                    onChange={(e) => updateTempValues("size", e.target.value)}
+                    className="w-48 h-6 text-sm"
+                    placeholder="Enter size"
                   />
-                  <span className="text-sm text-gray-600">days</span>
                 </div>
               ) : (
                 <span
@@ -1105,10 +1111,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                       ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
-                  onClick={() => isEditing && handleFieldEdit("durationDays", costEstimate?.durationDays)}
-                  title={isEditing ? "Click to edit duration" : ""}
+                  onClick={() => isEditing && handleFieldEdit("size", costEstimate?.size || "")}
+                  title={isEditing ? "Click to edit size" : ""}
                 >
-                  {formatDurationDisplay(costEstimate?.durationDays)}
+                  {costEstimate?.size || ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1123,14 +1129,14 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                     type="date"
                     value={tempValues.startDate ? format(tempValues.startDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
-                    className="w-32 h-6 text-sm"
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
-                  <span>-</span>
+                  <span className="text-gray-500">-</span>
                   <Input
                     type="date"
                     value={tempValues.endDate ? format(tempValues.endDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
-                    className="w-32 h-6 text-sm"
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
                 </div>
               ) : (
@@ -1263,21 +1269,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             </div>
           </div>
 
-          <div className="mb-8">
-            <h3 className="font-semibold text-gray-900 mb-3">Terms and Conditions:</h3>
-            <div className="space-y-2 text-sm text-gray-700">
-              <p>1. Quotation validity: 5 working days.</p>
-              <p>
-                2. Availability of the site is on first-come-first-served basis only. Only official documents such as
-                P.O.'s, Media Orders, signed quotation, & contracts are accepted in order to be booked the site.
-              </p>
-              <p>3. To book the site, one (1) month advance and one (2) months security deposit.</p>
-              <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
-              <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-              <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
-            </div>
-          </div>
-
           <div className="mt-12 mb-8">
             <div className="flex justify-between items-start">
               {/* Left side - Company signature */}
@@ -1286,11 +1277,59 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 <div className="mb-2">
                   <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
                 </div>
-                <p className="text-sm font-medium text-gray-900">
-                  {userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1)}{" "}
-                  {userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1)}
-                </p>
-                <p className="text-sm text-gray-600">Account Manager</p>
+                {/* Editable name */}
+                {isEditing && editingField === "signatureName" ? (
+                  <Input
+                    type="text"
+                    value={tempValues.signatureName || ""}
+                    onChange={(e) => updateTempValues("signatureName", e.target.value)}
+                    className="w-48 h-8 text-sm font-medium mb-1"
+                    placeholder="Enter name"
+                  />
+                ) : (
+                  <p
+                    className={`text-sm font-medium text-gray-900 ${
+                      isEditing
+                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      isEditing &&
+                      handleFieldEdit(
+                        "signatureName",
+                        `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim(),
+                      )
+                    }
+                  >
+                    {tempValues.signatureName ||
+                      `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim()}
+                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                  </p>
+                )}
+                {/* Editable position */}
+                {isEditing && editingField === "signaturePosition" ? (
+                  <Input
+                    type="text"
+                    value={tempValues.signaturePosition || ""}
+                    onChange={(e) => updateTempValues("signaturePosition", e.target.value)}
+                    className="w-48 h-8 text-sm"
+                    placeholder="Enter position"
+                  />
+                ) : (
+                  <p
+                    className={`text-sm text-gray-600 ${
+                      isEditing
+                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      isEditing && handleFieldEdit("signaturePosition", userData?.position || "Account Manager")
+                    }
+                  >
+                    {tempValues.signaturePosition || userData?.position || "Account Manager"}
+                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                  </p>
+                )}
               </div>
 
               {/* Right side - Client conforme */}
@@ -1307,6 +1346,21 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   official document for billing purposes
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="font-semibold text-gray-900 mb-3">Terms and Conditions:</h3>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p>1. Quotation validity: 5 working days.</p>
+              <p>
+                2. Availability of the site is on first-come-first-served basis only. Only official documents such as
+                P.O.'s, Media Orders, signed quotation, & contracts are accepted in order to be booked the site.
+              </p>
+              <p>3. To book the site, one (1) month advance and one (2) months security deposit.</p>
+              <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
+              <p>4. Final artwork should be approved ten (10) days before the contract period</p>
+              <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
             </div>
           </div>
 
