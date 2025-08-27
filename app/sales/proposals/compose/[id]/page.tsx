@@ -42,9 +42,9 @@ OH PLUS
 +639XXXXXXXXX`,
   })
 
-  const [attachments] = useState([
-    { name: "OH_OH_CETP5027B21H37_P54_AIX_Cost_Estimate_Page_1.pdf", size: "2.1 MB" },
-    { name: "OH_OH_CETP5027B21H36_VIEW_AIX_Cost_Estimate_Page_2.pdf", size: "1.8 MB" },
+  const [attachments, setAttachments] = useState([
+    { name: `OH_OH_PROP${params.id}_Proposal_Page_1.pdf`, size: "2.1 MB", type: "proposal" },
+    { name: `OH_OH_PROP${params.id}_VIEW_Proposal_Page_2.pdf`, size: "1.8 MB", type: "proposal" },
   ])
 
   const [templates] = useState([
@@ -81,6 +81,8 @@ OH PLUS
           cc: "akoymababaix.com",
           subject: `Proposal: Proposal for ${mockProposal.code} | Kalayaan Flyover Site D - ${mockProposal.code} - OH Plus`,
         }))
+
+        await generateProposalPDFs(mockProposal)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
@@ -96,14 +98,53 @@ OH PLUS
     fetchProposal()
   }, [params.id, toast])
 
+  const generateProposalPDFs = async (proposalData: Proposal) => {
+    try {
+      // This would integrate with a PDF generation service
+      // For now, we'll simulate the PDF generation
+      const proposalPDFs = [
+        {
+          name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Main.pdf`,
+          size: "2.3 MB",
+          type: "proposal",
+          url: `/api/proposals/${proposalData.id}/pdf?type=main`,
+        },
+        {
+          name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Details.pdf`,
+          size: "1.9 MB",
+          type: "proposal",
+          url: `/api/proposals/${proposalData.id}/pdf?type=details`,
+        },
+      ]
+
+      setAttachments(proposalPDFs)
+    } catch (error) {
+      console.error("Error generating proposal PDFs:", error)
+      toast({
+        title: "Warning",
+        description: "Could not generate proposal PDFs. Using default attachments.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleBack = () => {
     router.back()
   }
 
   const handleSendEmail = async () => {
     try {
-      // This would be replaced with actual email sending API
-      console.log("Sending email:", emailData)
+      const emailPayload = {
+        ...emailData,
+        attachments: attachments.map((att) => ({
+          name: att.name,
+          url: att.url || `/api/proposals/${params.id}/pdf`,
+          type: att.type,
+        })),
+        proposalId: params.id,
+      }
+
+      console.log("Sending proposal email:", emailPayload)
       toast({
         title: "Email sent!",
         description: "Your proposal has been sent successfully.",
@@ -148,6 +189,22 @@ OH PLUS
     toast({
       title: "Add template",
       description: "Opening template creation dialog.",
+    })
+  }
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+    toast({
+      title: "Attachment removed",
+      description: "The attachment has been removed from the email.",
+    })
+  }
+
+  const handleAddAttachment = () => {
+    // This would open a file picker or generate additional proposal documents
+    toast({
+      title: "Add attachment",
+      description: "Opening file picker to add additional attachments.",
     })
   }
 
@@ -240,12 +297,17 @@ OH PLUS
                             <span className="text-sm text-gray-700">{attachment.name}</span>
                             <span className="text-xs text-gray-500">({attachment.size})</span>
                           </div>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
-                      <Button variant="outline" size="sm" className="text-blue-600 bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 bg-transparent"
+                        onClick={handleAddAttachment}
+                      >
                         + Add Attachment
                       </Button>
                     </div>
