@@ -573,9 +573,10 @@ export default function ProductDetailPage() {
         <div className="lg:col-span-2">
           <Tabs defaultValue="booking-summary" className="w-full">
             <div className="flex items-center justify-between mb-4">
-              <TabsList className="grid w-fit grid-cols-3">
+              <TabsList className="grid w-fit grid-cols-4">
                 <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
-                <TabsTrigger value="ce-quote">CE/Quote</TabsTrigger>
+                <TabsTrigger value="ce">CE</TabsTrigger>
+                <TabsTrigger value="quote">Quote</TabsTrigger>
                 <TabsTrigger value="job-order">Job Order</TabsTrigger>
               </TabsList>
               <div className="text-sm text-gray-600">Total: 2025</div>
@@ -641,14 +642,22 @@ export default function ProductDetailPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="ce-quote" className="mt-0">
+            <TabsContent value="ce" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
                 <CardContent className="p-8 text-center">
                   <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <h3 className="text-sm font-medium text-gray-900 mb-1">No CE/Quote records</h3>
-                  <p className="text-sm text-gray-500">
-                    No cost estimates or quotes have been created for this site yet.
-                  </p>
+                  <h3 className="text-sm font-medium text-gray-900 mb-1">No CE records</h3>
+                  <p className="text-sm text-gray-500">No cost estimates have been created for this site yet.</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="quote" className="mt-0">
+              <Card className="rounded-xl shadow-sm border border-gray-200">
+                <CardContent className="p-8 text-center">
+                  <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                  <h3 className="text-sm font-medium text-gray-900 mb-1">No Quote records</h3>
+                  <p className="text-sm text-gray-500">No quotes have been created for this site yet.</p>
                 </CardContent>
               </Card>
             </TabsContent>
