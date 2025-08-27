@@ -13,6 +13,8 @@ import {
   X,
   Calendar,
   FileText,
+  Mail,
+  Eye,
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -25,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/firebase-service"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 
 // Helper function to format dates
 function formatDate(dateString) {
@@ -100,6 +103,8 @@ export default function ProductDetailPage() {
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [quotationRequests, setQuotationRequests] = useState<QuotationRequest[]>([])
   const [quotationRequestsLoading, setQuotationRequestsLoading] = useState(true)
+  const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
+  const [costEstimatesLoading, setCostEstimatesLoading] = useState(true)
 
   // Notification state
   const [notification, setNotification] = useState({
@@ -174,6 +179,45 @@ export default function ProductDetailPage() {
 
     fetchQuotationRequests()
   }, [params.id])
+
+  useEffect(() => {
+    const fetchCostEstimates = async () => {
+      if (!params.id || params.id === "new" || !product) {
+        setCostEstimatesLoading(false)
+        return
+      }
+
+      setCostEstimatesLoading(true)
+      try {
+        const allCostEstimates = await getAllCostEstimates()
+
+        // Filter cost estimates that have line items referencing this product
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedEstimates = allCostEstimates.filter((estimate) =>
+          estimate.lineItems.some(
+            (item) =>
+              item.id === productId ||
+              item.description.toLowerCase().includes(productName.toLowerCase()) ||
+              (productLocation && item.notes?.toLowerCase().includes(productLocation.toLowerCase())),
+          ),
+        )
+
+        setCostEstimates(relatedEstimates)
+      } catch (error) {
+        console.error("Error fetching cost estimates:", error)
+      } finally {
+        setCostEstimatesLoading(false)
+      }
+    }
+
+    fetchCostEstimates()
+  }, [params.id, product])
 
   const handleBack = () => {
     router.back()
@@ -334,6 +378,47 @@ export default function ProductDetailPage() {
     if (product.current_campaign) return product.current_campaign
 
     return null
+  }
+
+  const getCostEstimateStatusConfig = (status: CostEstimate["status"]) => {
+    switch (status?.toLowerCase()) {
+      case "draft":
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <FileText className="h-3.5 w-3.5" />,
+          label: "Draft",
+        }
+      case "sent":
+        return {
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+          icon: <Mail className="h-3.5 w-3.5" />,
+          label: "Sent",
+        }
+      case "viewed":
+        return {
+          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          label: "Viewed",
+        }
+      case "approved":
+        return {
+          color: "bg-green-100 text-green-800 border-green-200",
+          icon: <CheckCircle className="h-3.5 w-3.5" />,
+          label: "Approved",
+        }
+      case "rejected":
+        return {
+          color: "bg-red-100 text-red-800 border-red-200",
+          icon: <XCircle className="h-3.5 w-3.5" />,
+          label: "Rejected",
+        }
+      default:
+        return {
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+          icon: <Clock3 className="h-3.5 w-3.5" />,
+          label: "Unknown",
+        }
+    }
   }
 
   if (loading) {
@@ -644,10 +729,75 @@ export default function ProductDetailPage() {
 
             <TabsContent value="ce" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
-                <CardContent className="p-8 text-center">
-                  <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <h3 className="text-sm font-medium text-gray-900 mb-1">No CE records</h3>
-                  <p className="text-sm text-gray-500">No cost estimates have been created for this site yet.</p>
+                <CardContent className="p-0">
+                  {costEstimatesLoading ? (
+                    <div className="p-8">
+                      <div className="space-y-4">
+                        {Array(3)
+                          .fill(0)
+                          .map((_, i) => (
+                            <div key={i} className="grid grid-cols-6 gap-4">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-4 w-28" />
+                              <Skeleton className="h-4 w-20" />
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-16" />
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : costEstimates.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">No CE records</h3>
+                      <p className="text-sm text-gray-500">No cost estimates have been created for this site yet.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Table Header */}
+                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>CE Number</div>
+                        <div>Client</div>
+                        <div>Date</div>
+                        <div>Amount</div>
+                        <div>Status</div>
+                        <div>Items</div>
+                      </div>
+
+                      {/* Cost Estimates Rows */}
+                      <div className="divide-y divide-gray-100">
+                        {costEstimates.map((estimate) => {
+                          const statusConfig = getCostEstimateStatusConfig(estimate.status)
+                          return (
+                            <div
+                              key={estimate.id}
+                              className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => router.push(`/sales/cost-estimates/${estimate.id}`)}
+                            >
+                              <div className="text-gray-900 font-medium">
+                                {estimate.costEstimateNumber || estimate.id.slice(-8)}
+                              </div>
+                              <div className="text-gray-900">
+                                {estimate.client?.company || estimate.client?.name || "Unknown Client"}
+                              </div>
+                              <div className="text-gray-600">{formatDate(estimate.createdAt)}</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{estimate.totalAmount?.toLocaleString() || "0"}
+                              </div>
+                              <div>
+                                <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                                  {statusConfig.icon}
+                                  <span className="ml-1">{statusConfig.label}</span>
+                                </Badge>
+                              </div>
+                              <div className="text-gray-600">{estimate.lineItems.length} items</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
