@@ -1408,10 +1408,12 @@ function SalesDashboardContent() {
                         isSelected={
                           proposalCreationMode
                             ? selectedProducts.some((p) => p.id === product.id)
-                            : selectedSites.some((p) => p.id === product.id)
+                            : ceQuoteMode
+                              ? selectedProducts.some((p) => p.id === product.id)
+                              : selectedSites.some((p) => p.id === product.id)
                         }
                         onSelect={() =>
-                          proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                          proposalCreationMode || ceQuoteMode ? handleProductSelect(product) : handleSiteSelect(product)
                         }
                         selectionMode={proposalCreationMode || ceQuoteMode}
                       />
