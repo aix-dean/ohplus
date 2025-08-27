@@ -896,11 +896,11 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40">
-        <div className="flex items-center gap-3 bg-white rounded-full shadow-lg border border-gray-200 px-2 py-2">
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 translate-x-8 z-40">
+        <div className="flex items-center bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden">
           <Button
             variant="outline"
-            className="rounded-full px-6 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+            className="rounded-l-full rounded-r-none px-6 py-3 text-gray-700 border-0 hover:bg-gray-50 bg-white border-r border-gray-200"
             onClick={() => {
               toast({
                 title: "Draft Saved",
@@ -911,7 +911,7 @@ export default function ProposalDetailsPage() {
             Save as Draft
           </Button>
           <Button
-            className="rounded-full px-6 py-2 bg-green-600 hover:bg-green-700 text-white"
+            className="rounded-r-full rounded-l-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white border-0"
             onClick={() => {
               toast({
                 title: "Proposal Sent",
