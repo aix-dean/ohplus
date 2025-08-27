@@ -736,7 +736,6 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save template settings",
-        variant: "destructive",
       })
     }
   }
@@ -1448,7 +1447,7 @@ export default function ProposalDetailsPage() {
       </div>
 
       {proposal?.status === "draft" && (
-        <div className="fixed bottom-6 right-6 flex space-x-4">
+        <div className="flex justify-center space-x-4 mt-8 mb-6">
           <Button
             onClick={() => handleUpdatePublicStatus("draft")}
             variant="outline"
