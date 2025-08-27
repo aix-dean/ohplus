@@ -1,5 +1,7 @@
 import jsPDF from "jspdf"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Helper function to safely convert dates
 function safeToDate(dateValue: any): Date {
@@ -29,13 +31,75 @@ const categoryLabels = {
   Maintenance: "Maintenance",
 }
 
+async function fetchCompanyData(companyId: string) {
+  try {
+    const companyDoc = await getDoc(doc(db, "companies", companyId))
+    if (companyDoc.exists()) {
+      return companyDoc.data()
+    }
+    return null
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    return null
+  }
+}
+
+function formatCompanyAddress(companyData: any): string {
+  if (!companyData) return ""
+
+  // Handle company_location field (string format)
+  if (companyData.company_location && typeof companyData.company_location === "string") {
+    return companyData.company_location
+  }
+
+  // Handle address object format
+  if (companyData.address && typeof companyData.address === "object") {
+    const { street, city, province } = companyData.address
+    const addressParts = []
+
+    // Filter out default placeholder values
+    if (street && street !== "Default Street" && street.trim()) {
+      addressParts.push(street)
+    }
+    if (city && city !== "Default City" && city.trim()) {
+      addressParts.push(city)
+    }
+    if (province && province !== "Default Province" && province.trim()) {
+      addressParts.push(province)
+    }
+
+    return addressParts.join(", ")
+  }
+
+  // Handle address as string
+  if (companyData.address && typeof companyData.address === "string") {
+    return companyData.address
+  }
+
+  return ""
+}
+
+function formatCompanyPhone(companyData: any): string {
+  if (!companyData) return ""
+
+  // Try different phone field names
+  const phoneFields = ["phone", "telephone", "contact_number"]
+  for (const field of phoneFields) {
+    if (companyData[field] && companyData[field].trim()) {
+      return companyData[field]
+    }
+  }
+
+  return ""
+}
+
 /**
  * Generate separate PDF files for each site in a cost estimate
  */
 export async function generateSeparateCostEstimatePDFs(
   costEstimate: CostEstimate,
   selectedPages?: string[],
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<void> {
   try {
     // Group line items by site based on the site rental items
@@ -139,7 +203,7 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -245,6 +309,12 @@ export async function generateCostEstimatePDF(
       throw new Error("No sites selected for PDF generation")
     }
 
+    let companyData = null
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      companyData = await fetchCompanyData(companyId)
+    }
+
     // Process each site
     sitesToProcess.forEach(async (siteName, siteIndex) => {
       if (siteIndex > 0) {
@@ -290,9 +360,9 @@ export async function generateCostEstimatePDF(
       const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
 
       // Calculate center position for each line
+      const centerX = pageWidth / 2
       const line1Width = pdf.getTextWidth(greetingLine1)
       const line2Width = pdf.getTextWidth(greetingLine2)
-      const centerX = pageWidth / 2
 
       pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
       yPosition += 5
@@ -464,15 +534,23 @@ export async function generateCostEstimatePDF(
       pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
       yPosition += 15
 
-      // Footer with company details only - no description text
       pdf.setFontSize(8)
       pdf.setTextColor(100, 100, 100)
-      pdf.text(
-        "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
-        margin,
-        pageHeight - 20,
-      )
-      pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
+
+      // Format company address and phone
+      const companyAddress = formatCompanyAddress(companyData)
+      const companyPhone = formatCompanyPhone(companyData)
+
+      // Create footer text with fallback to default values
+      const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
+      const phoneText = companyPhone ? `Telephone: ${companyPhone}` : "Telephone: (02) 5310 1750 to 53"
+      const footerText = `${addressText}. ${phoneText}`
+
+      // Calculate text width and center the footer
+      const footerTextWidth = pdf.getTextWidth(footerText)
+      const footerX = pageWidth / 2 - footerTextWidth / 2
+
+      pdf.text(footerText, footerX, pageHeight - 15)
     })
 
     // Return base64 or download PDF
@@ -506,7 +584,7 @@ export async function generateCostEstimatePDF(
 export async function generateDetailedCostEstimatePDF(
   costEstimate: CostEstimate,
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name for consistency
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -521,6 +599,12 @@ export async function generateDetailedCostEstimatePDF(
     const validUntil = safeToDate(costEstimate.validUntil)
     const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
     const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
+
+    let companyData = null
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      companyData = await fetchCompanyData(companyId)
+    }
 
     // Client name and company (top left)
     pdf.setFontSize(11)
@@ -552,9 +636,9 @@ export async function generateDetailedCostEstimatePDF(
     const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
 
     // Calculate center position for each line
+    const centerX = pageWidth / 2
     const line1Width = pdf.getTextWidth(greetingLine1)
     const line2Width = pdf.getTextWidth(greetingLine2)
-    const centerX = pageWidth / 2
 
     pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
     yPosition += 5
@@ -716,12 +800,23 @@ export async function generateDetailedCostEstimatePDF(
       yPosition += noteLines.length * 5 + 10
     }
 
-    // Footer
     yPosition = pageHeight - 30
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
-    pdf.text(`© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`, margin, yPosition)
+
+    // Format company address and phone
+    const companyAddress = formatCompanyAddress(companyData)
+    const companyPhone = formatCompanyPhone(companyData)
+    const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
+    const phoneText = companyPhone ? `Telephone: ${companyPhone}` : "Telephone: (02) 5310 1750 to 53"
+    const footerText = `${addressText}. ${phoneText}`
+
+    // Center the footer text
+    const footerTextWidth = pdf.getTextWidth(footerText)
+    const footerX = pageWidth / 2 - footerTextWidth / 2
+
+    pdf.text(footerText, footerX, yPosition)
 
     // Return base64 or download PDF
     if (returnBase64) {
