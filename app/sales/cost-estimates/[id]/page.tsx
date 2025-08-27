@@ -621,10 +621,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
-    // Check if there are multiple sites
-    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-    const sites = Object.keys(siteGroups)
-
     const userDataForPDF = userData
       ? {
           first_name: userData.first_name || "",
@@ -632,6 +628,36 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           email: userData.email || "",
         }
       : undefined
+
+    // Check if there are multiple related cost estimates (same page_id)
+    if (relatedCostEstimates.length > 1) {
+      setDownloadingPDF(true)
+      try {
+        // Download all related cost estimates as separate PDFs
+        for (let i = 0; i < relatedCostEstimates.length; i++) {
+          const estimate = relatedCostEstimates[i]
+          await generateCostEstimatePDF(estimate, undefined, false, userDataForPDF)
+        }
+        toast({
+          title: "PDFs Generated",
+          description: `${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
+        })
+      } catch (error) {
+        console.error("Error downloading multiple PDFs:", error)
+        toast({
+          title: "Error",
+          description: "Failed to generate PDFs. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setDownloadingPDF(false)
+      }
+      return
+    }
+
+    // Check if current cost estimate has multiple sites
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
 
     if (sites.length > 1) {
       setDownloadingPDF(true)
