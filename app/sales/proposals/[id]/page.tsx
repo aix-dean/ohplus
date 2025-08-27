@@ -1305,6 +1305,40 @@ export default function ProposalDetailsPage() {
             </Button>
             <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Download</span>
           </div>
+
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleSaveAsDraft}
+              variant="outline"
+              size="lg"
+              disabled={isSaving}
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+            >
+              {isSaving ? (
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
+              )}
+            </Button>
+            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Save Draft</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleSendProposal}
+              variant="outline"
+              size="lg"
+              disabled={isSaving}
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-green-600 shadow-lg hover:shadow-xl border-green-600 hover:border-green-700 hover:bg-green-700 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+            >
+              {isSaving ? (
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-white animate-spin" />
+              ) : (
+                <Send className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-white" />
+              )}
+            </Button>
+            <span className="text-xs text-white mt-1 sm:mt-2 font-medium hidden md:block">Send</span>
+          </div>
         </div>
 
         <div
@@ -1474,32 +1508,8 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   {isLastPage && (
-                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
-                      <Button
-                        variant="outline"
-                        onClick={handleSaveAsDraft}
-                        disabled={isSaving}
-                        className="px-6 py-3 text-gray-700 border-gray-300 hover:bg-gray-50 font-medium bg-white shadow-lg hover:shadow-xl transition-shadow duration-200"
-                      >
-                        {isSaving ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Save as Draft
-                      </Button>
-                      <Button
-                        onClick={handleSendProposal}
-                        disabled={isSaving}
-                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-lg hover:shadow-xl transition-shadow duration-200"
-                      >
-                        {isSaving ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-2" />
-                        )}
-                        Send
-                      </Button>
+                    <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
+                      {/* Buttons moved to floating container */}
                     </div>
                   )}
                 </div>
