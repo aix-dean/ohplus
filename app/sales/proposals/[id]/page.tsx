@@ -21,8 +21,6 @@ import {
   Check,
   XIcon,
   Minus,
-  Save,
-  Send,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -232,7 +230,8 @@ export default function ProposalDetailsPage() {
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [zoomLevel, setZoomLevel] = useState<number>(1)
-  const [isSaving, setIsSaving] = useState(false) // Added state for save/send actions
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -777,46 +776,67 @@ export default function ProposalDetailsPage() {
   }
 
   const handleSaveAsDraft = async () => {
-    if (!proposal || !userData) return
+    if (!proposal || !userData) {
+      toast({
+        title: "Error",
+        description: "Unable to save draft",
+        variant: "destructive",
+      })
+      return
+    }
 
-    setIsSaving(true)
+    setSavingDraft(true)
     try {
-      await updateProposal(proposal.id, { status: "draft" }, userData.uid, userData.displayName || "User")
+      await updateProposal(
+        proposal.id,
+        { status: "draft", lastModified: new Date().toISOString() },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      setProposal((prev) => (prev ? { ...prev, status: "draft" } : null))
 
       toast({
         title: "Success",
         description: "Proposal saved as draft",
       })
     } catch (error) {
-      console.error("Error saving proposal as draft:", error)
+      console.error("Error saving draft:", error)
       toast({
         title: "Error",
-        description: "Failed to save proposal as draft",
+        description: "Failed to save draft",
+        variant: "destructive",
       })
     } finally {
-      setIsSaving(false)
+      setSavingDraft(false)
     }
   }
 
-  const handleSendProposal = async () => {
-    if (!proposal || !userData) return
+  const handleSend = async () => {
+    if (!proposal || !userData) {
+      toast({
+        title: "Error",
+        description: "Unable to send proposal",
+        variant: "destructive",
+      })
+      return
+    }
 
-    setIsSaving(true)
+    setSending(true)
     try {
       await updateProposal(
         proposal.id,
-        { status: "sent", sent_at: new Date() },
+        { status: "sent", sentDate: new Date().toISOString() },
         userData.uid,
         userData.displayName || "User",
       )
+
+      setProposal((prev) => (prev ? { ...prev, status: "sent" } : null))
 
       toast({
         title: "Success",
         description: "Proposal sent successfully",
       })
-
-      // Optionally redirect to proposals list
-      router.push("/sales/proposals")
     } catch (error) {
       console.error("Error sending proposal:", error)
       toast({
@@ -825,7 +845,7 @@ export default function ProposalDetailsPage() {
         variant: "destructive",
       })
     } finally {
-      setIsSaving(false)
+      setSending(false)
     }
   }
 
@@ -950,6 +970,42 @@ export default function ProposalDetailsPage() {
               <Plus className="h-3 w-3" />
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-center gap-3">
+          <Button
+            onClick={handleSaveAsDraft}
+            variant="outline"
+            size="lg"
+            disabled={savingDraft || sending}
+            className="px-8 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 font-medium bg-transparent"
+          >
+            {savingDraft ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save as Draft"
+            )}
+          </Button>
+          <Button
+            onClick={handleSend}
+            size="lg"
+            disabled={savingDraft || sending}
+            className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-medium"
+          >
+            {sending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              "Send"
+            )}
+          </Button>
         </div>
       </div>
 
@@ -1305,40 +1361,6 @@ export default function ProposalDetailsPage() {
             </Button>
             <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Download</span>
           </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleSaveAsDraft}
-              variant="outline"
-              size="lg"
-              disabled={isSaving}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              {isSaving ? (
-                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600 animate-spin" />
-              ) : (
-                <Save className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-              )}
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Save Draft</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleSendProposal}
-              variant="outline"
-              size="lg"
-              disabled={isSaving}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-green-600 shadow-lg hover:shadow-xl border-green-600 hover:border-green-700 hover:bg-green-700 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              {isSaving ? (
-                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-white animate-spin" />
-              ) : (
-                <Send className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-white" />
-              )}
-            </Button>
-            <span className="text-xs text-white mt-1 sm:mt-2 font-medium hidden md:block">Send</span>
-          </div>
         </div>
 
         <div
@@ -1348,7 +1370,6 @@ export default function ProposalDetailsPage() {
           {Array.from({ length: getTotalPages() }, (_, index) => {
             const pageNumber = index + 1
             const pageContent = getPageContent(pageNumber)
-            const isLastPage = pageNumber === getTotalPages() // Check if this is the last page
 
             return (
               <div key={pageNumber} className={getPageContainerClass()}>
@@ -1506,12 +1527,6 @@ export default function ProposalDetailsPage() {
                       </div>
                     ))}
                   </div>
-
-                  {isLastPage && (
-                    <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
-                      {/* Buttons moved to floating container */}
-                    </div>
-                  )}
                 </div>
               </div>
             )
