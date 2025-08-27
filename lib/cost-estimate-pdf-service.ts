@@ -1,7 +1,5 @@
 import jsPDF from "jspdf"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
-import { db } from "@/lib/firebase"
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 
 // Helper function to safely convert dates
 function safeToDate(dateValue: any): Date {
@@ -37,7 +35,7 @@ const categoryLabels = {
 export async function generateSeparateCostEstimatePDFs(
   costEstimate: CostEstimate,
   selectedPages?: string[],
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string; uid?: string },
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
 ): Promise<void> {
   try {
     // Group line items by site based on the site rental items
@@ -141,7 +139,7 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string; uid?: string },
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -150,77 +148,6 @@ export async function generateCostEstimatePDF(
     const margin = 15
     const contentWidth = pageWidth - margin * 2
     let yPosition = margin
-
-    let companyData: any = null
-    let companyAddress = "No. 727 General Solano St., San Miguel, Manila 1005"
-    let companyPhone = "Telephone: (02) 5310 1750 to 53"
-
-    if (userData?.company_id || userData?.uid) {
-      try {
-        // First try to get company using company_id
-        if (userData.company_id) {
-          const companyDocRef = doc(db, "companies", userData.company_id)
-          const companyDoc = await getDoc(companyDocRef)
-
-          if (companyDoc.exists()) {
-            companyData = companyDoc.data()
-          }
-        }
-
-        // If no company found by company_id, try other methods
-        if (!companyData && userData.uid) {
-          const companiesQuery = query(collection(db, "companies"), where("created_by", "==", userData.uid))
-          const companiesSnapshot = await getDocs(companiesQuery)
-
-          if (!companiesSnapshot.empty) {
-            companyData = companiesSnapshot.docs[0].data()
-          }
-        }
-
-        // Build company address and phone from fetched data with fallback support
-        if (companyData) {
-          // Handle address - support both object and string formats
-          if (companyData.address) {
-            if (typeof companyData.address === "string") {
-              // Address is already a string
-              companyAddress = companyData.address
-            } else if (typeof companyData.address === "object") {
-              // Address is an object with street, city, province structure
-              const addressParts = []
-              if (companyData.address.street && companyData.address.street !== "Default Street") {
-                addressParts.push(companyData.address.street)
-              }
-              if (companyData.address.city && companyData.address.city !== "Default City") {
-                addressParts.push(companyData.address.city)
-              }
-              if (companyData.address.province && companyData.address.province !== "Default Province") {
-                addressParts.push(companyData.address.province)
-              }
-              if (addressParts.length > 0) {
-                companyAddress = addressParts.join(", ")
-              }
-            }
-          } else if (companyData.company_location) {
-            // Fallback to company_location field
-            companyAddress = companyData.company_location
-          } else if (companyData.location) {
-            // Another fallback to location field
-            companyAddress = companyData.location
-          }
-
-          // Handle phone - support multiple field names and formats
-          if (companyData.phone && companyData.phone !== "+639000000000") {
-            companyPhone = `Telephone: ${companyData.phone}`
-          } else if (companyData.contact_phone) {
-            companyPhone = `Telephone: ${companyData.contact_phone}`
-          } else if (companyData.telephone) {
-            companyPhone = `Telephone: ${companyData.telephone}`
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching company data:", error)
-      }
-    }
 
     // Convert dates safely
     const createdAt = safeToDate(costEstimate.createdAt)
@@ -346,16 +273,15 @@ export async function generateCostEstimatePDF(
       // RFQ Number (top right)
       pdf.setFontSize(10)
       pdf.setFont("helvetica", "normal")
-      const rfqText = `RFQ. No. ${ceNumber}`
-      const rfqWidth = pdf.getTextWidth(rfqText)
-      // Position from right edge with proper margin to prevent overflow
-      pdf.text(rfqText, pageWidth - margin - rfqWidth, yPosition - 15)
+      pdf.text(`RFQ. No. ${ceNumber}`, pageWidth - margin - 40, yPosition - 15)
 
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "normal")
-      const dateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      const dateWidth = pdf.getTextWidth(dateText)
-      pdf.text(dateText, pageWidth - margin - dateWidth, yPosition - 10)
+      pdf.text(
+        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+        pageWidth - margin - 40,
+        yPosition - 10,
+      )
 
       // Greeting message - positioned prominently at top
       pdf.setFontSize(11)
@@ -412,13 +338,13 @@ export async function generateCostEstimatePDF(
         // Special handling for lease rate values
         if (point.label === "Lease Rate/Month") {
           pdf.text(
-            `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
+            `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
             margin + 65,
             yPosition,
           )
         } else if (point.label === "Total Lease") {
           pdf.text(
-            `PHP ${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
+            `${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
             margin + 65,
             yPosition,
           )
@@ -444,7 +370,7 @@ export async function generateCostEstimatePDF(
       // Lease rate calculation - using actual monthly rate
       pdf.text("Lease rate per month", margin + 5, yPosition)
       pdf.text(
-        `PHP ${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -452,7 +378,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
       pdf.text(
-        `PHP ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -460,7 +386,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text("12 % VAT", margin + 5, yPosition)
       pdf.text(
-        `PHP ${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -470,7 +396,7 @@ export async function generateCostEstimatePDF(
       pdf.setFont("helvetica", "bold")
       pdf.text("TOTAL", margin + 5, yPosition)
       pdf.text(
-        `PHP ${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
         pageWidth - margin - 40,
         yPosition,
       )
@@ -541,16 +467,12 @@ export async function generateCostEstimatePDF(
       // Footer with company details only - no description text
       pdf.setFontSize(8)
       pdf.setTextColor(100, 100, 100)
-
-      // Calculate center position for address
-      const addressWidth = pdf.getTextWidth(companyAddress)
-      const addressX = (pageWidth - addressWidth) / 2
-      pdf.text(companyAddress, addressX, pageHeight - 20)
-
-      // Calculate center position for phone
-      const phoneWidth = pdf.getTextWidth(companyPhone)
-      const phoneX = (pageWidth - phoneWidth) / 2
-      pdf.text(companyPhone, phoneX, pageHeight - 15)
+      pdf.text(
+        "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
+        margin,
+        pageHeight - 20,
+      )
+      pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
     })
 
     // Return base64 or download PDF
@@ -584,7 +506,7 @@ export async function generateCostEstimatePDF(
 export async function generateDetailedCostEstimatePDF(
   costEstimate: CostEstimate,
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string; uid?: string },
+  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name for consistency
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -593,77 +515,6 @@ export async function generateDetailedCostEstimatePDF(
     const margin = 15
     const contentWidth = pageWidth - margin * 2
     let yPosition = margin
-
-    let companyData: any = null
-    let companyAddress = "No. 727 General Solano St., San Miguel, Manila 1005"
-    let companyPhone = "Telephone: (02) 5310 1750 to 53"
-
-    if (userData?.company_id || userData?.uid) {
-      try {
-        // First try to get company using company_id
-        if (userData.company_id) {
-          const companyDocRef = doc(db, "companies", userData.company_id)
-          const companyDoc = await getDoc(companyDocRef)
-
-          if (companyDoc.exists()) {
-            companyData = companyDoc.data()
-          }
-        }
-
-        // If no company found by company_id, try other methods
-        if (!companyData && userData.uid) {
-          const companiesQuery = query(collection(db, "companies"), where("created_by", "==", userData.uid))
-          const companiesSnapshot = await getDocs(companiesQuery)
-
-          if (!companiesSnapshot.empty) {
-            companyData = companiesSnapshot.docs[0].data()
-          }
-        }
-
-        // Build company address and phone from fetched data with fallback support
-        if (companyData) {
-          // Handle address - support both object and string formats
-          if (companyData.address) {
-            if (typeof companyData.address === "string") {
-              // Address is already a string
-              companyAddress = companyData.address
-            } else if (typeof companyData.address === "object") {
-              // Address is an object with street, city, province structure
-              const addressParts = []
-              if (companyData.address.street && companyData.address.street !== "Default Street") {
-                addressParts.push(companyData.address.street)
-              }
-              if (companyData.address.city && companyData.address.city !== "Default City") {
-                addressParts.push(companyData.address.city)
-              }
-              if (companyData.address.province && companyData.address.province !== "Default Province") {
-                addressParts.push(companyData.address.province)
-              }
-              if (addressParts.length > 0) {
-                companyAddress = addressParts.join(", ")
-              }
-            }
-          } else if (companyData.company_location) {
-            // Fallback to company_location field
-            companyAddress = companyData.company_location
-          } else if (companyData.location) {
-            // Another fallback to location field
-            companyAddress = companyData.location
-          }
-
-          // Handle phone - support multiple field names and formats
-          if (companyData.phone && companyData.phone !== "+639000000000") {
-            companyPhone = `Telephone: ${companyData.phone}`
-          } else if (companyData.contact_phone) {
-            companyPhone = `Telephone: ${companyData.contact_phone}`
-          } else if (companyData.telephone) {
-            companyPhone = `Telephone: ${companyData.telephone}`
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching company data:", error)
-      }
-    }
 
     // Convert dates safely
     const createdAt = safeToDate(costEstimate.createdAt)
@@ -684,15 +535,15 @@ export async function generateDetailedCostEstimatePDF(
     // RFQ Number (top right)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    const rfqText = `RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`
-    const rfqWidth = pdf.getTextWidth(rfqText)
-    pdf.text(rfqText, pageWidth - margin - rfqWidth, yPosition - 15)
+    pdf.text(`RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`, pageWidth - margin - 40, yPosition - 15)
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    const dateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-    const dateWidth = pdf.getTextWidth(dateText)
-    pdf.text(dateText, pageWidth - margin - dateWidth, yPosition - 10)
+    pdf.text(
+      createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+      pageWidth - margin - 40,
+      yPosition - 10,
+    )
 
     // Greeting message - positioned prominently at top
     pdf.setFontSize(11)
@@ -818,8 +669,8 @@ export async function generateDetailedCostEstimatePDF(
       pdf.text(description, margin + 2, yPosition)
       pdf.text(categoryLabels[item.category] || item.category, margin + 80, yPosition)
       pdf.text(item.quantity.toString(), margin + 120, yPosition)
-      pdf.text(`PHP ${item.unitPrice.toLocaleString()}`, margin + 135, yPosition)
-      pdf.text(`PHP ${item.total.toLocaleString()}`, margin + 165, yPosition)
+      pdf.text(`₱${item.unitPrice.toLocaleString()}`, margin + 135, yPosition)
+      pdf.text(`₱${item.total.toLocaleString()}`, margin + 165, yPosition)
 
       subtotal += item.total
       yPosition += 8
@@ -834,11 +685,11 @@ export async function generateDetailedCostEstimatePDF(
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Subtotal:", margin + 135, yPosition)
-    pdf.text(`PHP ${subtotal.toLocaleString()}`, margin + 165, yPosition)
+    pdf.text(`₱${subtotal.toLocaleString()}`, margin + 165, yPosition)
     yPosition += 6
 
     pdf.text(`VAT (${(taxRate * 100).toFixed(0)}%):`, margin + 135, yPosition)
-    pdf.text(`PHP ${taxAmount.toLocaleString()}`, margin + 165, yPosition)
+    pdf.text(`₱${taxAmount.toLocaleString()}`, margin + 165, yPosition)
     yPosition += 6
 
     // Total line
@@ -848,7 +699,7 @@ export async function generateDetailedCostEstimatePDF(
 
     pdf.setFontSize(12)
     pdf.text("TOTAL AMOUNT:", margin + 135, yPosition)
-    pdf.text(`PHP ${totalAmount.toLocaleString()}`, margin + 165, yPosition)
+    pdf.text(`₱${totalAmount.toLocaleString()}`, margin + 165, yPosition)
     yPosition += 15
 
     // Notes section
