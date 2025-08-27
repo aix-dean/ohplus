@@ -2,7 +2,7 @@
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   AlertTriangle,
@@ -28,7 +28,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/firebase-service"
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
@@ -98,8 +105,7 @@ function Notification({ show, type, message, onClose }) {
   )
 }
 
-export default function ProductDetailPage() {
-  const params = useParams()
+export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -114,6 +120,7 @@ export default function ProductDetailPage() {
   const [quotationsLoading, setQuotationsLoading] = useState(true)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [jobOrdersLoading, setJobOrdersLoading] = useState(true)
+  const [marketplaceDialogOpen, setMarketplaceDialogOpen] = useState(false)
 
   // Notification state
   const [notification, setNotification] = useState({
@@ -721,7 +728,13 @@ export default function ProductDetailPage() {
           <h1 className="text-xl font-semibold">Site Information</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-red-500 text-white px-3 py-1 rounded-full">Marketplace</Badge>
+          <Button
+            variant="outline"
+            className="bg-red-500 text-white px-3 py-1 rounded-full hover:bg-red-600 border-red-500"
+            onClick={() => setMarketplaceDialogOpen(true)}
+          >
+            Marketplace
+          </Button>
         </div>
       </div>
 
@@ -1179,6 +1192,56 @@ export default function ProductDetailPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Marketplace dialog */}
+      <Dialog open={marketplaceDialogOpen} onOpenChange={setMarketplaceDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Connect to a marketplace</DialogTitle>
+            <DialogDescription className="text-gray-600">Select a DSP:</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-4 py-4">
+            {/* OOH!Shop */}
+            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+              <div className="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center mb-2">
+                <span className="text-orange-600 font-bold text-sm">OOH!</span>
+              </div>
+              <span className="text-sm font-medium">OOH!Shop</span>
+            </button>
+
+            {/* Vistar Media */}
+            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+              <div className="w-16 h-16 bg-orange-500 rounded-lg flex items-center justify-center mb-2">
+                <span className="text-white font-bold text-xs">vistar media</span>
+              </div>
+              <span className="text-sm font-medium">Vistar Media</span>
+            </button>
+
+            {/* Broadsign */}
+            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+              <div className="w-16 h-16 bg-blue-900 rounded-lg flex items-center justify-center mb-2">
+                <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-sm"></div>
+              </div>
+              <span className="text-sm font-medium">Broadsign</span>
+            </button>
+
+            {/* Moving Walls */}
+            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+              <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mb-2">
+                <span className="text-white font-bold text-lg">MW</span>
+              </div>
+              <span className="text-sm font-medium">Moving Walls</span>
+            </button>
+          </div>
+
+          <DialogClose asChild>
+            <Button variant="outline" className="w-full mt-2 bg-transparent">
+              Cancel
+            </Button>
+          </DialogClose>
         </DialogContent>
       </Dialog>
     </div>
