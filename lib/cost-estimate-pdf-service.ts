@@ -543,8 +543,7 @@ export async function generateCostEstimatePDF(
 
       // Create footer text with fallback to default values
       const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
-      const phoneText = companyPhone ? `Telephone: ${companyPhone}` : "Telephone: (02) 5310 1750 to 53"
-      const footerText = `${addressText}. ${phoneText}`
+      const footerText = addressText
 
       // Calculate text width and center the footer
       const footerTextWidth = pdf.getTextWidth(footerText)
@@ -809,8 +808,7 @@ export async function generateDetailedCostEstimatePDF(
     const companyAddress = formatCompanyAddress(companyData)
     const companyPhone = formatCompanyPhone(companyData)
     const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
-    const phoneText = companyPhone ? `Telephone: ${companyPhone}` : "Telephone: (02) 5310 1750 to 53"
-    const footerText = `${addressText}. ${phoneText}`
+    const footerText = addressText
 
     // Center the footer text
     const footerTextWidth = pdf.getTextWidth(footerText)
