@@ -177,20 +177,44 @@ export async function generateCostEstimatePDF(
           }
         }
 
-        // Build company address and phone from fetched data
+        // Build company address and phone from fetched data with fallback support
         if (companyData) {
+          // Handle address - support both object and string formats
           if (companyData.address) {
-            const addressParts = []
-            if (companyData.address.street) addressParts.push(companyData.address.street)
-            if (companyData.address.city) addressParts.push(companyData.address.city)
-            if (companyData.address.province) addressParts.push(companyData.address.province)
-            companyAddress = addressParts.join(", ") || companyAddress
+            if (typeof companyData.address === "string") {
+              // Address is already a string
+              companyAddress = companyData.address
+            } else if (typeof companyData.address === "object") {
+              // Address is an object with street, city, province structure
+              const addressParts = []
+              if (companyData.address.street && companyData.address.street !== "Default Street") {
+                addressParts.push(companyData.address.street)
+              }
+              if (companyData.address.city && companyData.address.city !== "Default City") {
+                addressParts.push(companyData.address.city)
+              }
+              if (companyData.address.province && companyData.address.province !== "Default Province") {
+                addressParts.push(companyData.address.province)
+              }
+              if (addressParts.length > 0) {
+                companyAddress = addressParts.join(", ")
+              }
+            }
           } else if (companyData.company_location) {
+            // Fallback to company_location field
             companyAddress = companyData.company_location
+          } else if (companyData.location) {
+            // Another fallback to location field
+            companyAddress = companyData.location
           }
 
-          if (companyData.phone || companyData.contact_phone) {
-            companyPhone = `Telephone: ${companyData.phone || companyData.contact_phone}`
+          // Handle phone - support multiple field names and formats
+          if (companyData.phone && companyData.phone !== "+639000000000") {
+            companyPhone = `Telephone: ${companyData.phone}`
+          } else if (companyData.contact_phone) {
+            companyPhone = `Telephone: ${companyData.contact_phone}`
+          } else if (companyData.telephone) {
+            companyPhone = `Telephone: ${companyData.telephone}`
           }
         }
       } catch (error) {
@@ -596,20 +620,44 @@ export async function generateDetailedCostEstimatePDF(
           }
         }
 
-        // Build company address and phone from fetched data
+        // Build company address and phone from fetched data with fallback support
         if (companyData) {
+          // Handle address - support both object and string formats
           if (companyData.address) {
-            const addressParts = []
-            if (companyData.address.street) addressParts.push(companyData.address.street)
-            if (companyData.address.city) addressParts.push(companyData.address.city)
-            if (companyData.address.province) addressParts.push(companyData.address.province)
-            companyAddress = addressParts.join(", ") || companyAddress
+            if (typeof companyData.address === "string") {
+              // Address is already a string
+              companyAddress = companyData.address
+            } else if (typeof companyData.address === "object") {
+              // Address is an object with street, city, province structure
+              const addressParts = []
+              if (companyData.address.street && companyData.address.street !== "Default Street") {
+                addressParts.push(companyData.address.street)
+              }
+              if (companyData.address.city && companyData.address.city !== "Default City") {
+                addressParts.push(companyData.address.city)
+              }
+              if (companyData.address.province && companyData.address.province !== "Default Province") {
+                addressParts.push(companyData.address.province)
+              }
+              if (addressParts.length > 0) {
+                companyAddress = addressParts.join(", ")
+              }
+            }
           } else if (companyData.company_location) {
+            // Fallback to company_location field
             companyAddress = companyData.company_location
+          } else if (companyData.location) {
+            // Another fallback to location field
+            companyAddress = companyData.location
           }
 
-          if (companyData.phone || companyData.contact_phone) {
-            companyPhone = `Telephone: ${companyData.phone || companyData.contact_phone}`
+          // Handle phone - support multiple field names and formats
+          if (companyData.phone && companyData.phone !== "+639000000000") {
+            companyPhone = `Telephone: ${companyData.phone}`
+          } else if (companyData.contact_phone) {
+            companyPhone = `Telephone: ${companyData.contact_phone}`
+          } else if (companyData.telephone) {
+            companyPhone = `Telephone: ${companyData.telephone}`
           }
         }
       } catch (error) {
