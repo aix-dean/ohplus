@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Mail, MessageCircle, Phone, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 import type { Proposal } from "@/lib/types/proposal"
 
 interface SendProposalShareDialogProps {
@@ -16,6 +17,7 @@ interface SendProposalShareDialogProps {
 
 export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendProposalShareDialogProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const [proposalUrl] = useState(`https://ohplus.ph/proposals/view/${proposal.id}`)
 
   const handleCopyLink = async () => {
@@ -35,9 +37,8 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
   }
 
   const handleEmailShare = () => {
-    const subject = encodeURIComponent(`Proposal: ${proposal.title}`)
-    const body = encodeURIComponent(`Please review our proposal: ${proposalUrl}`)
-    window.open(`mailto:${proposal.client.email}?subject=${subject}&body=${body}`)
+    onClose()
+    router.push(`/sales/proposals/compose/${proposal.id}`)
   }
 
   const handleWhatsAppShare = () => {
