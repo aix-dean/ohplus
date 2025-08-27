@@ -1461,15 +1461,18 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 right-6 flex gap-3 z-40">
+      <div className="fixed bottom-6 right-6 flex z-40">
         <Button
           onClick={handleSaveAsDraft}
           variant="outline"
-          className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-lg"
+          className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-lg rounded-r-none border-r-0 px-6 py-2"
         >
           Save as Draft
         </Button>
-        <Button onClick={handleSend} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+        <Button
+          onClick={handleSend}
+          className="bg-green-600 hover:bg-green-700 text-white shadow-lg rounded-l-none px-6 py-2"
+        >
           Send
         </Button>
       </div>
