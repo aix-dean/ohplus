@@ -1288,7 +1288,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
                 </div>
                 <p className="text-sm font-medium text-gray-900">
-                  {userData?.first_name} {userData?.last_name}
+                  {userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1)}{" "}
+                  {userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1)}
                 </p>
                 <p className="text-sm text-gray-600">Account Manager</p>
               </div>
