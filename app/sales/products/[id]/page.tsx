@@ -1,13 +1,6 @@
 "use client"
 
-import { TabsContent } from "@/components/ui/tabs"
-
-import { TabsTrigger } from "@/components/ui/tabs"
-
-import { TabsList } from "@/components/ui/tabs"
-
-import { Tabs } from "@/components/ui/tabs"
-
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -1053,7 +1046,7 @@ export default function ProductDetailPage() {
                             <div
                               key={quotation.id}
                               className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => router.push(`/quotations/${quotation.id}`)}
+                              onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                             >
                               <div className="text-gray-900 font-medium">
                                 {quotation.quotationNumber || quotation.id.slice(-8)}
