@@ -59,6 +59,7 @@ import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createQuotation, createMultipleQuotations, generateQuotationNumber } from "@/lib/quotation-service"
+import { Check } from "lucide-react"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -1022,6 +1023,12 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
   }
 
+  // Filter products based on whether they have a site code
+  const filteredProducts = products.filter((product) => {
+    const siteCode = getSiteCode(product)
+    return siteCode !== null && siteCode !== undefined && siteCode !== ""
+  })
+
   return (
     <div className="flex-1 p-4 md:p-6">
       {loading ? (
@@ -1452,26 +1459,112 @@ function SalesDashboardContent() {
                 {/* Grid View */}
                 {!loading && products.length > 0 && viewMode === "grid" && (
                   <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                    {products.map((product) => (
-                      <ProductCard
+                    {filteredProducts.map((product) => (
+                      <div
                         key={product.id}
-                        product={product}
-                        hasOngoingBooking={productsWithBookings[product.id] || false}
-                        onView={() => handleViewDetails(product.id)}
-                        onEdit={(e) => handleEditClick(product, e)}
-                        onDelete={(e) => handleDeleteClick(product, e)}
-                        isSelected={
-                          proposalCreationMode
-                            ? selectedProducts.some((p) => p.id === product.id)
-                            : ceQuoteMode
-                              ? selectedProducts.some((p) => p.id === product.id)
-                              : selectedSites.some((p) => p.id === product.id)
-                        }
-                        onSelect={() =>
-                          proposalCreationMode || ceQuoteMode ? handleProductSelect(product) : handleSiteSelect(product)
-                        }
-                        selectionMode={proposalCreationMode || ceQuoteMode}
-                      />
+                        className={`relative border rounded-lg overflow-hidden transition-all duration-200 ${
+                          (proposalCreationMode && selectedProducts.some((p) => p.id === product.id)) ||
+                          (ceQuoteMode && selectedSites.some((p) => p.id === product.id))
+                            ? "ring-2 ring-blue-500 bg-blue-50"
+                            : "hover:shadow-md"
+                        }`}
+                        onClick={() => {
+                          if (proposalCreationMode) {
+                            handleProductSelect(product)
+                          } else if (ceQuoteMode) {
+                            handleSiteSelect(product)
+                          }
+                        }}
+                      >
+                        {/* Selection indicator */}
+                        {((proposalCreationMode && selectedProducts.some((p) => p.id === product.id)) ||
+                          (ceQuoteMode && selectedSites.some((p) => p.id === product.id))) && (
+                          <div className="absolute top-2 left-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center z-10">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-500">Site Code: {product.siteCode || "N/A"}</span>
+                          </div>
+                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
+                          <p className="text-sm text-gray-600 mb-3">
+                            {product.unitPrice ? `₱${product.unitPrice.toLocaleString()}/month` : "Price not set"}
+                          </p>
+
+                          {!proposalCreationMode && !ceQuoteMode ? (
+                            <div className="space-y-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full bg-transparent"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Handle create proposal for individual product
+                                  setSelectedProducts([product])
+                                  setProposalCreationMode(true)
+                                }}
+                              >
+                                Create Proposal
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full bg-transparent"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Handle create cost estimate for individual product
+                                  setSelectedSites([product])
+                                  setCeMode(true)
+                                  setCeQuoteMode(true)
+                                  openCreateCostEstimateDateDialog()
+                                }}
+                              >
+                                Create Cost Estimate
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full bg-green-600 text-white hover:bg-green-700"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Handle create quotation for individual product
+                                  setSelectedSites([product])
+                                  setQuoteMode(true)
+                                  setCeQuoteMode(true)
+                                  openCreateQuotationDateDialog()
+                                }}
+                              >
+                                Create Quotation
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full bg-transparent"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Handle create report
+                                }}
+                              >
+                                Create Report
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full bg-transparent"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // Handle create report when in selection mode
+                              }}
+                            >
+                              Create Report
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </ResponsiveCardGrid>
                 )}
