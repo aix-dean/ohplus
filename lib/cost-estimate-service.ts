@@ -47,6 +47,7 @@ interface CostEstimateSiteData {
   location: string
   price: number
   type: string
+  image?: string // Added image field for product images
 }
 
 // Generate a secure password for cost estimate access
@@ -183,6 +184,7 @@ export async function createDirectCostEstimate(
           total: calculatedTotalPrice,
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
+          image: site.image || undefined, // Added image field to line items
         })
       })
     }
@@ -572,6 +574,7 @@ export async function createMultipleCostEstimates(
         total: calculatedTotalPrice,
         category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
         notes: `Location: ${site.location}`,
+        image: site.image || undefined, // Added image field to line items for multiple cost estimates
       })
 
       // Calculate total amount for this site

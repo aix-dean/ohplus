@@ -736,6 +736,7 @@ function SalesDashboardContent() {
         location: product.location,
         price: product.price,
         type: product.type,
+        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
       }))
 
       const clientData = {
@@ -793,28 +794,27 @@ function SalesDashboardContent() {
   }
 
   const handleSkipDates = async () => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    if (!user?.uid || !userData?.company_id) {
       toast({
-        title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        title: "Authentication Required",
+        description: "Please log in to create a cost estimate.",
         variant: "destructive",
       })
       return
     }
 
     setIsCreatingDocument(true)
-    setIsDateRangeDialogOpen(false) // Close dialog immediately
-
     try {
       if (actionAfterDateSelection === "cost_estimate") {
         const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          address: selectedClientForProposal.address,
-          industry: selectedClientForProposal.industry,
+          id: selectedClientForProposal!.id,
+          name: selectedClientForProposal!.contactPerson,
+          email: selectedClientForProposal!.email,
+          company: selectedClientForProposal!.company,
+          phone: selectedClientForProposal!.phone,
+          address: selectedClientForProposal!.address,
+          designation: selectedClientForProposal!.designation,
+          industry: selectedClientForProposal!.industry,
         }
 
         const sitesData = selectedSites.map((site) => ({
@@ -823,14 +823,19 @@ function SalesDashboardContent() {
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
+
+        const options = {
+          startDate: undefined,
+          endDate: undefined,
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        }
 
         if (selectedSites.length === 1) {
           // Single site - create one document
-          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
-            startDate: undefined,
-            endDate: undefined,
-          })
+          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
 
           toast({
             title: "Cost Estimate Created",
@@ -839,10 +844,7 @@ function SalesDashboardContent() {
           router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
         } else {
           // Multiple sites - create separate documents for each site
-          const newCostEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
-            startDate: undefined,
-            endDate: undefined,
-          })
+          const newCostEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
 
           toast({
             title: "Cost Estimates Created",

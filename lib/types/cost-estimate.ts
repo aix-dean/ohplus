@@ -12,6 +12,7 @@ export interface CostEstimateLineItem {
   total: number
   category: string // e.g., "Billboard Rental", "Production", "Installation", "Maintenance"
   notes?: string
+  image?: string // Added optional image field for product images
 }
 
 export interface CostEstimate {
