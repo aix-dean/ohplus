@@ -21,6 +21,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const { toast } = useToast()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
 
   // Email form state
   const [emailData, setEmailData] = useState({
@@ -133,9 +134,44 @@ OH PLUS
   }
 
   const handleSendEmail = async () => {
+    if (sending) return
+
+    setSending(true)
+
     try {
+      // Validate email fields
+      if (!emailData.to.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a recipient email address.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!emailData.subject.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter an email subject.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!emailData.message.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter an email message.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const emailPayload = {
-        ...emailData,
+        to: emailData.to.trim(),
+        cc: emailData.cc.trim() || undefined,
+        subject: emailData.subject.trim(),
+        message: emailData.message.trim(),
         attachments: attachments.map((att) => ({
           name: att.name,
           url: att.url || `https://ohplus.ph/api/proposals/${params.id}/pdf`,
@@ -144,18 +180,38 @@ OH PLUS
         proposalId: params.id,
       }
 
-      console.log("Sending proposal email:", emailPayload)
-      toast({
-        title: "Email sent!",
-        description: "Your proposal has been sent successfully.",
+      const response = await fetch("/api/proposals/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
       })
-      router.back()
-    } catch (error) {
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send email")
+      }
+
       toast({
-        title: "Failed to send",
-        description: "Could not send the email. Please try again.",
+        title: "Email sent successfully!",
+        description: `Your proposal has been sent to ${emailData.to}`,
+      })
+
+      // Navigate back after successful send
+      setTimeout(() => {
+        router.back()
+      }, 1500)
+    } catch (error) {
+      console.error("Error sending email:", error)
+      toast({
+        title: "Failed to send email",
+        description: error instanceof Error ? error.message : "Please check your connection and try again.",
         variant: "destructive",
       })
+    } finally {
+      setSending(false)
     }
   }
 
@@ -365,8 +421,19 @@ OH PLUS
 
         {/* Send Button */}
         <div className="flex justify-end mt-6">
-          <Button onClick={handleSendEmail} className="bg-blue-600 hover:bg-blue-700 text-white px-8">
-            Send Email
+          <Button
+            onClick={handleSendEmail}
+            disabled={sending}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 disabled:opacity-50"
+          >
+            {sending ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Sending...
+              </>
+            ) : (
+              "Send Email"
+            )}
           </Button>
         </div>
       </div>
