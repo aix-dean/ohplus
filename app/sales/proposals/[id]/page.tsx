@@ -897,7 +897,7 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 translate-x-16 z-40">
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 -translate-x-32 z-40">
         <div className="flex items-center gap-3 bg-white rounded-full shadow-lg border border-gray-200 px-2 py-2">
           <Button
             variant="outline"
