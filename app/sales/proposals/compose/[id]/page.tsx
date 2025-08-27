@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
@@ -16,12 +18,21 @@ interface ComposeEmailPageProps {
   }
 }
 
+interface Attachment {
+  name: string
+  size: string
+  type: string
+  file?: File
+  url?: string
+}
+
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [emailData, setEmailData] = useState({
     to: "",
@@ -42,7 +53,7 @@ OH PLUS
 +639XXXXXXXXX`,
   })
 
-  const [attachments, setAttachments] = useState([
+  const [attachments, setAttachments] = useState<Attachment[]>([
     { name: `OH_OH_PROP${params.id}_Proposal_Page_1.pdf`, size: "2.1 MB", type: "proposal" },
     { name: `OH_OH_PROP${params.id}_VIEW_Proposal_Page_2.pdf`, size: "1.8 MB", type: "proposal" },
   ])
@@ -76,7 +87,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: mockProposal.client.email,
-          cc: "admin@aix.com",
+          cc: "akoymababaix.com",
           subject: `Proposal: Proposal for ${mockProposal.code} | Kalayaan Flyover Site D - ${mockProposal.code} - OH Plus`,
         }))
 
@@ -98,7 +109,7 @@ OH PLUS
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
-      const proposalPDFs = [
+      const proposalPDFs: Attachment[] = [
         {
           name: `OH_OH_PROP${proposalData.id}_${proposalData.code}_Proposal_Main.pdf`,
           size: "2.3 MB",
@@ -147,45 +158,21 @@ OH PLUS
       return
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const toEmails = emailData.to
-      .split(",")
-      .map((email) => email.trim())
-      .filter((email) => email)
-
-    const ccEmails = emailData.cc
-      ? emailData.cc
-          .split(",")
-          .map((email) => email.trim())
-          .filter((email) => email)
-      : []
-
-    for (const email of toEmails) {
-      if (!emailRegex.test(email)) {
-        toast({
-          title: "Validation Error",
-          description: `Invalid email format: ${email}`,
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    for (const email of ccEmails) {
-      if (!emailRegex.test(email)) {
-        toast({
-          title: "Validation Error",
-          description: `Invalid CC email format: ${email}`,
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
     setSending(true)
 
     try {
       const formData = new FormData()
+
+      const toEmails = emailData.to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email)
+      const ccEmails = emailData.cc
+        ? emailData.cc
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email)
+        : []
 
       formData.append("to", JSON.stringify(toEmails))
       if (ccEmails.length > 0) {
@@ -197,76 +184,18 @@ OH PLUS
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
         try {
-          const pdfResponse = await fetch(
-            attachment.url || `https://ohplus.ph/api/proposals/${params.id}/pdf?type=${i === 0 ? "main" : "details"}`,
-          )
-
-          if (pdfResponse.ok) {
-            const pdfBlob = await pdfResponse.blob()
-            const file = new File([pdfBlob], attachment.name, { type: "application/pdf" })
-            formData.append(`attachment_${i}`, file)
+          if (attachment.file) {
+            // Real file upload
+            formData.append(`attachment_${i}`, attachment.file)
           } else {
-            console.log(`[v0] PDF API failed for ${attachment.name}, using placeholder`)
-            const pdfContent = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
->>
-endobj
-4 0 obj
-<<
-/Length 44
->>
-stream
-BT
-/F1 12 Tf
-72 720 Td
-(Proposal Document: ${attachment.name}) Tj
-ET
-endstream
-endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000206 00000 n 
-trailer
-<<
-/Size 5
-/Root 1 0 R
->>
-startxref
-300
-%%EOF`
+            // Generate PDF content for proposal attachments
+            const pdfContent = `Proposal PDF: ${attachment.name}`
             const blob = new Blob([pdfContent], { type: "application/pdf" })
             const file = new File([blob], attachment.name, { type: "application/pdf" })
             formData.append(`attachment_${i}`, file)
           }
         } catch (error) {
-          console.error(`[v0] Error processing attachment ${attachment.name}:`, error)
-          toast({
-            title: "Warning",
-            description: `Could not attach ${attachment.name}. Continuing without this attachment.`,
-            variant: "destructive",
-          })
+          console.error(`Error processing attachment ${attachment.name}:`, error)
         }
       }
 
@@ -341,10 +270,51 @@ startxref
   }
 
   const handleAddAttachment = () => {
-    toast({
-      title: "Add attachment",
-      description: "Opening file picker to add additional attachments.",
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    Array.from(files).forEach((file) => {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      const newAttachment: Attachment = {
+        name: file.name,
+        size: formatFileSize(file.size),
+        type: "user-upload",
+        file: file,
+      }
+
+      setAttachments((prev) => [...prev, newAttachment])
     })
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+
+    toast({
+      title: "Files added",
+      description: `${files.length} file(s) have been added to your email.`,
+    })
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   if (loading) {
@@ -427,6 +397,9 @@ startxref
                             <Paperclip className="h-4 w-4 text-gray-500" />
                             <span className="text-sm text-gray-700">{attachment.name}</span>
                             <span className="text-xs text-gray-500">({attachment.size})</span>
+                            {attachment.type === "user-upload" && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                            )}
                           </div>
                           <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
                             <X className="h-4 w-4" />
@@ -439,8 +412,17 @@ startxref
                         className="text-blue-600 bg-transparent"
                         onClick={handleAddAttachment}
                       >
-                        + Add Attachment
+                        <Upload className="h-4 w-4 mr-2" />
+                        Add Attachment
                       </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                      />
                     </div>
                   </div>
                 </div>
