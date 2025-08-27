@@ -28,14 +28,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/firebase-service"
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
@@ -1197,13 +1190,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
       {/* Marketplace dialog */}
       <Dialog open={marketplaceDialogOpen} onOpenChange={setMarketplaceDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">Connect to a marketplace</DialogTitle>
             <DialogDescription className="text-gray-600">Select a DSP:</DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="flex gap-4 py-4 justify-center">
             {/* OOH!Shop */}
             <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
               <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
@@ -1254,12 +1247,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <span className="text-sm font-medium">Moving Walls</span>
             </button>
           </div>
-
-          <DialogClose asChild>
-            <Button variant="outline" className="w-full mt-2 bg-transparent">
-              Cancel
-            </Button>
-          </DialogClose>
         </DialogContent>
       </Dialog>
     </div>
