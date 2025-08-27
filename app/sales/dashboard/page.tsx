@@ -701,7 +701,16 @@ function SalesDashboardContent() {
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const handleDatesSelected = async (startDate: Date, endDate: Date) => {
+    console.log("[v0] handleDatesSelected - userData:", userData)
+    console.log("[v0] handleDatesSelected - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleDatesSelected - user:", user)
+
     if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleDatesSelected - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
         title: "Authentication Required",
         description: "Please log in to create a cost estimate.",
@@ -757,6 +766,8 @@ function SalesDashboardContent() {
         page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
+      console.log("[v0] handleDatesSelected - options being passed:", options)
+
       let costEstimateIds: string[]
 
       if (selectedProducts.length > 1) {
@@ -794,7 +805,16 @@ function SalesDashboardContent() {
   }
 
   const handleSkipDates = async () => {
+    console.log("[v0] handleSkipDates - userData:", userData)
+    console.log("[v0] handleSkipDates - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleSkipDates - user:", user)
+
     if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleSkipDates - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
         title: "Authentication Required",
         description: "Please log in to create a cost estimate.",
@@ -832,6 +852,8 @@ function SalesDashboardContent() {
           company_id: userData.company_id,
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
+
+        console.log("[v0] handleSkipDates - options being passed:", options)
 
         if (selectedSites.length === 1) {
           // Single site - create one document
