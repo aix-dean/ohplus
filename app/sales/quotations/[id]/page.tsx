@@ -645,7 +645,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <p>3. To book the site, one (1) month advance and one (2) months security deposit</p>
             <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
             <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-            <p>5. Print is exclusively for {companyData?.name || "Golden Touch Imaging Specialist"} Only.</p>
+            <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
           </div>
         </div>
 
@@ -741,7 +741,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <p className="mt-2">This quotation is valid until {format(currentQuotation.validUntil, "PPP")}</p>
           )}
           <p className="mt-1">
-            © {new Date().getFullYear()} {companyData?.name || "Golden Touch Imaging Specialist"}. All rights reserved.
+            © {new Date().getFullYear()} {companyData?.name || "Company Name"}. All rights reserved.
           </p>
           {relatedQuotations.length > 1 && (
             <p className="mt-2 font-medium">
