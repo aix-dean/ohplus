@@ -1366,34 +1366,36 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             {Object.keys(tempValues).length}
           </div>
         )}
-        <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
-          <Button
-            onClick={handleSaveAsDraft}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white"
-          >
-            <FileText className="h-4 w-4" />
-            Save as Draft
-          </Button>
-          {hasUnsavedChanges && (
+        {!isEditing && (
+          <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
             <Button
-              onClick={(e) => {
-                console.log("[v0] Save button clicked - event:", e)
-                console.log("[v0] Save button state check:", {
-                  hasUnsavedChanges,
-                  tempValuesCount: Object.keys(tempValues).length,
-                  tempValues,
-                })
-                e.preventDefault()
-                e.stopPropagation()
-                handleSaveAllChanges()
-              }}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleSaveAsDraft}
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white"
             >
-              <Save className="h-4 w-4" />
-              Save Changes
+              <FileText className="h-4 w-4" />
+              Save as Draft
             </Button>
-          )}
-        </div>
+            {hasUnsavedChanges && (
+              <Button
+                onClick={(e) => {
+                  console.log("[v0] Save button clicked - event:", e)
+                  console.log("[v0] Save button state check:", {
+                    hasUnsavedChanges,
+                    tempValuesCount: Object.keys(tempValues).length,
+                    tempValues,
+                  })
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleSaveAllChanges()
+                }}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Save className="h-4 w-4" />
+                Save Changes
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -1642,7 +1644,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         </div>
       ) : null}
 
-      {relatedCostEstimates.length > 1 ? (
+      {!isEditing && relatedCostEstimates.length > 1 ? (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
@@ -1680,7 +1682,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </div>
         </div>
-      ) : (
+      ) : !isEditing ? (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
@@ -1692,9 +1694,9 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             </Button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {hasMultipleSites && relatedCostEstimates.length <= 1 && (
+      {!isEditing && hasMultipleSites && relatedCostEstimates.length <= 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
             <Button
