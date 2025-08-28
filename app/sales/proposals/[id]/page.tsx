@@ -685,7 +685,55 @@ export default function ProposalDetailsPage() {
     }
   }
 
-  // Helper functions to calculate container styles based on template settings
+  const getPageContainerClass = () => {
+    const baseStyles = "mx-auto print:mx-0 print:my-0 relative overflow-hidden"
+
+    // Size-based dimensions with orientation support
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
+        } else {
+          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
+        }
+        break
+      case "Letter size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
+        }
+        break
+      case "Legal size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
+        }
+        break
+      default:
+        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+    }
+
+    // Square orientation for any paper size
+    if (selectedOrientation === "Square") {
+      switch (selectedSize) {
+        case "A4":
+          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
+          break
+        case "Letter size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
+          break
+        case "Legal size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
+          break
+      }
+    }
+
+    return `${baseStyles} ${sizeStyles}`
+  }
+
   const getContainerDimensions = () => {
     const baseStyles = "bg-white shadow-lg border-transparent relative"
 
@@ -871,55 +919,6 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
     )
-  }
-
-  const getPageContainerClass = () => {
-    const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
-
-    // Size-based dimensions with orientation support
-    let sizeStyles = ""
-    switch (selectedSize) {
-      case "A4":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
-        } else {
-          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
-        }
-        break
-      case "Letter size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
-        }
-        break
-      case "Legal size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
-        }
-        break
-      default:
-        sizeStyles = "w-full max-w-4xl min-h-[600px]"
-    }
-
-    // Square orientation for any paper size
-    if (selectedOrientation === "Square") {
-      switch (selectedSize) {
-        case "A4":
-          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
-          break
-        case "Letter size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
-          break
-        case "Legal size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
-          break
-      }
-    }
-
-    return `${baseStyles} ${sizeStyles}`
   }
 
   return (
