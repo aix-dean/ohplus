@@ -608,21 +608,54 @@ export default function ProposalDetailsPage() {
       }
 
       const blob = await response.blob()
+      const suggestedName = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
 
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.style.display = "none"
-      a.href = url
-      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      if ("showSaveFilePicker" in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName,
+            types: [
+              {
+                description: "PDF files",
+                accept: { "application/pdf": [".pdf"] },
+              },
+            ],
+          })
 
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully! Check your downloads folder.",
-      })
+          const writable = await fileHandle.createWritable()
+          await writable.write(blob)
+          await writable.close()
+
+          toast({
+            title: "Success",
+            description: "PDF saved successfully to your chosen location!",
+          })
+        } catch (error: any) {
+          if (error.name === "AbortError") {
+            toast({
+              title: "Cancelled",
+              description: "File save was cancelled.",
+            })
+          } else {
+            throw error
+          }
+        }
+      } else {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.style.display = "none"
+        a.href = url
+        a.download = suggestedName
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+
+        toast({
+          title: "Success",
+          description: "PDF download started! Your browser will prompt you to choose a save location.",
+        })
+      }
     } catch (error) {
       console.error("Error downloading PDF:", error)
       toast({
