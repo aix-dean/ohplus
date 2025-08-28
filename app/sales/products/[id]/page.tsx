@@ -849,7 +849,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create CE/ Quote</Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
+                    onClick={() => {
+                      console.log("[v0] Create Job Order button clicked, product ID:", params.id)
+                      console.log("[v0] Navigating to:", `/sales/job-orders/select-quotation?productId=${params.id}`)
+                      router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)
+                    }}
                   >
                     Create Job Order
                   </Button>
