@@ -112,13 +112,14 @@ OH PLUS
 
       if (response.ok) {
         const pdfBlob = await response.blob()
-        const pdfFile = new File([pdfBlob], `OH_PROP_${proposalData.id}_${proposalData.code}_Complete.pdf`, {
+        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
+        const pdfFile = new File([pdfBlob], fileName, {
           type: "application/pdf",
         })
 
         const proposalPDFs: Attachment[] = [
           {
-            name: `OH_PROP_${proposalData.id}_${proposalData.code}_Complete.pdf`,
+            name: fileName,
             size: formatFileSize(pdfBlob.size),
             type: "proposal",
             file: pdfFile,
@@ -131,9 +132,10 @@ OH PLUS
       }
     } catch (error) {
       console.error("Error generating proposal PDFs:", error)
+      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
       const fallbackPDFs: Attachment[] = [
         {
-          name: `OH_PROP_${proposalData.id}_${proposalData.code}_Proposal.pdf`,
+          name: fallbackFileName,
           size: "2.3 MB",
           type: "proposal",
           url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf`,
