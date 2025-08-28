@@ -1,7 +1,9 @@
 "use client"
 
 import type React from "react"
-
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useAuth } from "@/contexts/auth-context"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +32,7 @@ interface Attachment {
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth() // Added auth context to get current user
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -77,7 +80,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
-          cc: "akoymababaix@aix.com",
+          cc: "akoymababaix.com",
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
@@ -151,8 +154,6 @@ OH PLUS
   }
 
   const handleSendEmail = async () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
     if (!emailData.to.trim()) {
       toast({
         title: "Validation Error",
@@ -160,42 +161,6 @@ OH PLUS
         variant: "destructive",
       })
       return
-    }
-
-    // Validate To emails
-    const toEmails = emailData.to
-      .split(",")
-      .map((email) => email.trim())
-      .filter((email) => email)
-
-    for (const email of toEmails) {
-      if (!emailRegex.test(email)) {
-        toast({
-          title: "Validation Error",
-          description: `Invalid email format in To field: ${email}`,
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    // Validate CC emails if provided
-    if (emailData.cc.trim()) {
-      const ccEmails = emailData.cc
-        .split(",")
-        .map((email) => email.trim())
-        .filter((email) => email)
-
-      for (const email of ccEmails) {
-        if (!emailRegex.test(email)) {
-          toast({
-            title: "Validation Error",
-            description: `Invalid email format in CC field: ${email}`,
-            variant: "destructive",
-          })
-          return
-        }
-      }
     }
 
     if (!emailData.subject.trim()) {
@@ -208,29 +173,28 @@ OH PLUS
     }
 
     setSending(true)
-    console.log("[v0] Starting email send process...")
 
     try {
       const formData = new FormData()
 
+      const toEmails = emailData.to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email)
+      const ccEmails = emailData.cc
+        ? emailData.cc
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email)
+        : []
+
       formData.append("to", JSON.stringify(toEmails))
-
-      if (emailData.cc.trim()) {
-        const ccEmails = emailData.cc
-          .split(",")
-          .map((email) => email.trim())
-          .filter((email) => email && emailRegex.test(email))
-
-        if (ccEmails.length > 0) {
-          formData.append("cc", JSON.stringify(ccEmails))
-        }
+      if (ccEmails.length > 0) {
+        formData.append("cc", JSON.stringify(ccEmails))
       }
-
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
-      formData.append("proposalId", params.id)
 
-      console.log("[v0] Processing attachments...")
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
         try {
@@ -247,48 +211,58 @@ OH PLUS
             }
           }
         } catch (error) {
-          console.error(`[v0] Error processing attachment ${attachment.name}:`, error)
+          console.error(`Error processing attachment ${attachment.name}:`, error)
         }
       }
 
-      console.log("[v0] Calling proposal email API...")
-      const response = await fetch("/api/proposals/send-email", {
+      const response = await fetch("/api/send-email", {
         method: "POST",
         body: formData,
       })
 
-      let result
-      try {
-        const responseText = await response.text()
-        console.log("[v0] Raw response:", responseText)
-
-        // Try to parse as JSON
-        result = JSON.parse(responseText)
-      } catch (parseError) {
-        console.error("[v0] Failed to parse response as JSON:", parseError)
-
-        // If response is not JSON, it's likely an HTML error page
-        if (!response.ok) {
-          throw new Error(`Server error (${response.status}): Unable to send email. Please try again.`)
-        }
-
-        // If response is OK but not JSON, treat as success
-        result = { success: true }
-      }
+      const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || `Server error (${response.status}): Failed to send email`)
+        throw new Error(result.error || "Failed to send email")
       }
 
-      console.log("[v0] Email sent successfully!")
+      try {
+        const emailRecord = {
+          body: emailData.message,
+          created: serverTimestamp(),
+          from: user?.email || "noreply@ohplus.ph",
+          proposalId: params.id,
+          sentAt: serverTimestamp(),
+          status: "sent",
+          subject: emailData.subject,
+          to: toEmails,
+          cc: ccEmails.length > 0 ? ccEmails : null,
+          updated: serverTimestamp(),
+          userId: user?.uid || null,
+          email_type: "proposal", // Added email_type field for proposal emails
+          attachments: attachments.map((att) => ({
+            fileName: att.name,
+            fileSize: att.file?.size || 0,
+            fileType: att.file?.type || "application/pdf",
+            fileUrl: att.url || null,
+          })),
+        }
+
+        await addDoc(collection(db, "emails"), emailRecord)
+        console.log("Email record saved successfully")
+      } catch (emailRecordError) {
+        console.error("Error saving email record:", emailRecordError)
+        // Don't fail the entire operation if email record saving fails
+      }
+
       toast({
         title: "Email sent!",
-        description: result.warning || "Your proposal has been sent successfully.",
+        description: "Your proposal has been sent successfully.",
       })
 
       router.back()
     } catch (error) {
-      console.error("[v0] Email sending error:", error)
+      console.error("Email sending error:", error)
       toast({
         title: "Failed to send",
         description: error instanceof Error ? error.message : "Could not send the email. Please try again.",

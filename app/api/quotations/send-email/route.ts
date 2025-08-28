@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { getQuotationById } from "@/lib/quotation-service" // Import to fetch quotation details
-import { createEmailRecord } from "@/lib/email-record-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -180,23 +179,6 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 },
       )
-    }
-
-    try {
-      await createEmailRecord({
-        from: "noreply@resend.dev",
-        to: [toEmail],
-        cc: ccEmail ? ccEmail.split(",").map((email: string) => email.trim()) : undefined,
-        subject: subject,
-        body: emailHtml,
-        email_type: "quotation",
-        status: "sent",
-        userId: replyToEmail || "system",
-        quotationId: quotationId,
-      })
-    } catch (recordError) {
-      console.error("Failed to create email record:", recordError)
-      // Don't fail the API call if record creation fails
     }
 
     console.log("Email sent successfully:", data)

@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { createEmailRecord } from "@/lib/email-record-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -233,23 +232,6 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Resend error:", error)
       return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
-    }
-
-    try {
-      await createEmailRecord({
-        from: "noreply@resend.dev",
-        to: [clientEmail],
-        cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
-        subject: subject,
-        body: emailHtml,
-        email_type: "CE",
-        status: "sent",
-        userId: currentUserEmail || "system",
-        costEstimateId: costEstimate.id,
-      })
-    } catch (recordError) {
-      console.error("Failed to create email record:", recordError)
-      // Don't fail the API call if record creation fails
     }
 
     return NextResponse.json({ success: true, data })
