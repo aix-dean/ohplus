@@ -1847,78 +1847,83 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl =
-    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
-
-  // Determine location based on product type
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
-
-  // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
-
-  // Get site code
   const siteCode = getSiteCode(product)
-
-  const handleClick = () => {
-    if (selectionMode && onSelect) {
-      onSelect()
-    } else {
-      onView()
-    }
-  }
 
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
-        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
-        selectionMode ? "hover:border-green-300" : "",
+        "group cursor-pointer transition-all duration-200 hover:shadow-lg border-2",
+        isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300",
+        selectionMode && "hover:border-blue-400",
       )}
-      onClick={handleClick}
+      onClick={selectionMode ? onSelect : onView}
     >
-      <div className="h-48 bg-gray-200 relative">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-          }}
-        />
-
-        {/* Selection indicator */}
-        {selectionMode && (
-          <div className="absolute top-2 left-2 z-10">
-            <div
-              className={cn(
-                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 truncate text-sm">{product.name}</h3>
+            {siteCode && <p className="text-xs text-gray-500 mt-1">Site: {siteCode}</p>}
+          </div>
+          {selectionMode && (
+            <div className="ml-2 flex-shrink-0">
+              {isSelected ? (
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+              ) : (
+                <div className="h-5 w-5 border-2 border-gray-300 rounded-full" />
               )}
-            >
-              {isSelected && <CheckCircle2 size={16} className="text-white" />}
             </div>
+          )}
+        </div>
+
+        {product.media && product.media.length > 0 && (
+          <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden bg-gray-100">
+            <Image
+              src={product.media[0].url || "/placeholder.svg"}
+              alt={product.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
           </div>
         )}
-      </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Badge variant="secondary" className="text-xs">
+              {product.type}
+            </Badge>
+            {hasOngoingBooking && (
+              <Badge variant="destructive" className="text-xs">
+                Booked
+              </Badge>
+            )}
+          </div>
 
-          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+          {product.location && (
+            <div className="flex items-center text-xs text-gray-600">
+              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span className="truncate">{product.location}</span>
+            </div>
+          )}
 
-          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-          >
-            Create Report
-          </Button>
+          {product.price && <p className="text-sm font-medium text-gray-900">₱{product.price.toLocaleString()}</p>}
         </div>
+
+        {!selectionMode && (
+          <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 text-xs bg-transparent">
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDelete}
+              className="flex-1 text-xs text-red-600 hover:text-red-700 bg-transparent"
+            >
+              Delete
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
