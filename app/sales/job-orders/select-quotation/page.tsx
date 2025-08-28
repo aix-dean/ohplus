@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,9 +18,6 @@ export default function SelectQuotationPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  const searchParams = useSearchParams()
-
-  const productId = searchParams.get("productId")
 
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,20 +38,7 @@ export default function SelectQuotationPage() {
       setLoading(true)
       try {
         const fetchedQuotations = await getQuotationsForSelection(user.uid)
-
-        let filteredByProduct = fetchedQuotations
-        if (productId) {
-          filteredByProduct = fetchedQuotations.filter((quotation) => {
-            // Check if quotation has items array (modern format)
-            if (quotation.items && Array.isArray(quotation.items)) {
-              return quotation.items.some((item: any) => item.product_id === productId)
-            }
-            // Check legacy format with single product_id
-            return quotation.product_id === productId
-          })
-        }
-
-        setQuotations(filteredByProduct)
+        setQuotations(fetchedQuotations)
       } catch (error) {
         console.error("Error fetching quotations:", error)
         toast({
@@ -68,7 +52,7 @@ export default function SelectQuotationPage() {
     }
 
     fetchQuotations()
-  }, [user?.uid, toast, productId])
+  }, [user?.uid, toast])
 
   const filteredQuotations = quotations.filter(
     (q) =>
@@ -113,9 +97,7 @@ export default function SelectQuotationPage() {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">
-          {productId ? "Select Quotation for This Product" : "Select Quotation for Job Order"}
-        </h1>
+        <h1 className="text-2xl font-bold">Select Quotation for Job Order</h1>
       </div>
 
       <Card className="flex-1 flex flex-col p-6">

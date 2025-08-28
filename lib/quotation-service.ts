@@ -905,9 +905,6 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
   }
 }
 
-// Get all quotations
-export async function getAllQuotations(): Promise<Quotation[]> {
-
 export async function createDirectQuotation(
   clientData: any,
   sitesData: any[],
@@ -1095,7 +1092,6 @@ export async function getQuotationsByProductId(productId: string): Promise<Quota
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       // Check if any item in this quotation matches the product ID
@@ -1133,7 +1129,6 @@ export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]
 
     return quotations
   } catch (error) {
-
     console.error("Error fetching quotations by page ID:", error)
     return []
   }
