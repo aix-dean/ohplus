@@ -1,12 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail, subject, body } = await request.json() // Destructure new fields
+    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail, subject, body } = await request.json()
 
     if (!costEstimate || !clientEmail || !client || !subject || !body) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
@@ -38,23 +40,24 @@ export async function POST(request: NextRequest) {
     const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
 
     let pdfBase64 = null
+    let pdfFileName = ""
     try {
       console.log("Generating PDF for email attachment...")
 
       const pdfTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("PDF generation timeout")), 30000) // 30 second timeout
+        setTimeout(() => reject(new Error("PDF generation timeout")), 30000)
       })
 
       const pdfGenerationPromise = generateCostEstimatePDF(costEstimate, undefined, true)
 
       pdfBase64 = await Promise.race([pdfGenerationPromise, pdfTimeoutPromise])
+      pdfFileName = `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`
       console.log("PDF generated successfully for email attachment")
     } catch (pdfError) {
       console.error("Error generating PDF:", pdfError)
       if (pdfError.message.includes("timeout")) {
         console.error("PDF generation timed out - continuing without attachment")
       }
-      // Continue without PDF attachment if generation fails
     }
 
     const emailHtml = `
@@ -63,7 +66,7 @@ export async function POST(request: NextRequest) {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${subject}</title> {/* Use dynamic subject */}
+          <title>${subject}</title>
           <style>
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -199,7 +202,7 @@ export async function POST(request: NextRequest) {
                 Dear ${client.contactPerson || client.company || "Valued Client"},
               </div>
 
-              <p>${body.replace(/\n/g, "<br>")}</p> {/* Use dynamic body and replace newlines with <br> */}
+              <p>${body.replace(/\n/g, "<br>")}</p>
 
               <div class="cost-estimate-summary">
                 <h3 style="margin-top: 0; color: #1f2937;">Cost Estimate Summary</h3>
@@ -261,18 +264,18 @@ export async function POST(request: NextRequest) {
     `
 
     const emailData: any = {
-      from: "OH Plus <noreply@resend.dev>",
+      from: "OH Plus <noreply@ohplus.com>",
       to: [clientEmail],
-      subject: subject, // Use dynamic subject
+      subject: subject,
       html: emailHtml,
-      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
-      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
+      reply_to: currentUserEmail ? [currentUserEmail] : undefined,
+      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
     }
 
     if (pdfBase64) {
       emailData.attachments = [
         {
-          filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
+          filename: pdfFileName,
           content: pdfBase64,
           type: "application/pdf",
         },
@@ -285,6 +288,39 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Resend error:", error)
       return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
+    }
+
+    try {
+      const emailDoc = {
+        to: clientEmail,
+        from: currentUserEmail || "noreply@ohplus.com",
+        cc: ccEmailsArray,
+        subject: subject,
+        body: body,
+        status: "sent",
+        created: serverTimestamp(),
+        sentAt: serverTimestamp(),
+        updated: serverTimestamp(),
+        userId: costEstimate.created_by || "",
+        reportId: costEstimate.id,
+        templateId: "",
+        attachments: pdfBase64
+          ? [
+              {
+                fileName: pdfFileName,
+                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate size from base64
+                fileType: "application/pdf",
+                fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${pdfFileName}`,
+              },
+            ]
+          : [],
+      }
+
+      await addDoc(collection(db, "emails"), emailDoc)
+      console.log("Email document created in emails collection")
+    } catch (emailDocError) {
+      console.error("Error creating email document:", emailDocError)
+      // Don't fail the request if email doc creation fails
     }
 
     return NextResponse.json({

@@ -326,12 +326,13 @@ ${user?.email || ""}`)
         description: "Cost estimate has been sent successfully",
       })
 
-      router.back()
+      // Use router.push instead of router.back() for better navigation
+      router.push(`/sales/cost-estimates/${params.id}`)
     } catch (error) {
       console.error("Error sending email:", error)
       toast({
         title: "Error",
-        description: "Failed to send email. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to send email. Please try again.",
         variant: "destructive",
       })
     } finally {
