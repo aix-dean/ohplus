@@ -610,54 +610,20 @@ export default function ProposalDetailsPage() {
       const blob = await response.blob()
       const fileName = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
 
-      if ("showSaveFilePicker" in window) {
-        try {
-          const fileHandle = await window.showSaveFilePicker({
-            suggestedName: fileName,
-            types: [
-              {
-                description: "PDF files",
-                accept: {
-                  "application/pdf": [".pdf"],
-                },
-              },
-            ],
-          })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
 
-          const writable = await fileHandle.createWritable()
-          await writable.write(blob)
-          await writable.close()
-
-          toast({
-            title: "Success",
-            description: "PDF saved successfully to your chosen location",
-          })
-        } catch (error) {
-          if (error.name === "AbortError") {
-            toast({
-              title: "Cancelled",
-              description: "File save was cancelled",
-            })
-          } else {
-            throw error
-          }
-        }
-      } else {
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.style.display = "none"
-        a.href = url
-        a.download = fileName
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-
-        toast({
-          title: "Success",
-          description: "PDF downloaded to your default downloads folder",
-        })
-      }
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully to your downloads folder",
+      })
     } catch (error) {
       console.error("Error downloading PDF:", error)
       toast({
@@ -1553,6 +1519,7 @@ export default function ProposalDetailsPage() {
               <Button
                 variant="outline"
                 className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+                onClick={() => handleUpdatePublicStatus("draft")}
               >
                 <FileText className="h-5 w-5 mr-2" />
                 Save as Draft
