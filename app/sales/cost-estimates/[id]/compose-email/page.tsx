@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,7 @@ import {
 import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
-import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
@@ -30,12 +30,19 @@ export default function ComposeEmailPage() {
   const { toast } = useToast()
   const { user, userData } = useAuth()
 
+  const dataFetched = useRef(false)
+  const userDataRef = useRef(userData)
+  const [isInitialized, setIsInitialized] = useState(false)
+
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
+  const [preGeneratedPDF, setPreGeneratedPDF] = useState<string | null>(null)
+  const [preGeneratedPDFs, setPreGeneratedPDFs] = useState<Array<{ filename: string; content: string }>>([]) // Add state for storing all pre-generated PDFs
+  const [pdfGenerating, setPdfGenerating] = useState(false)
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
   const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false)
@@ -49,39 +56,137 @@ export default function ComposeEmailPage() {
   const [ccEmail, setCcEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   useEffect(() => {
-    const fetchData = async () => {
+    userDataRef.current = userData
+  }, [userData])
+
+  const preGenerateAllPDFs = useCallback(
+    async (mainEstimate: CostEstimate, relatedEstimates: CostEstimate[]) => {
+      if (!mainEstimate) return
+
+      setPdfGenerating(true)
       try {
-        console.log("[v0] fetchData called with userData:", userData)
-        console.log("[v0] userData.company_id:", userData?.company_id)
+        console.log("[v0] Pre-generating all PDFs for email attachments...")
+        const currentUserData = userDataRef.current
+        const userDataForPDF = currentUserData
+          ? {
+              first_name: currentUserData.first_name || user?.displayName?.split(" ")[0] || "",
+              last_name: currentUserData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
+              email: currentUserData.email || user?.email || "",
+              company_id: currentUserData.company_id,
+            }
+          : undefined
 
-        const id = params.id as string
-        const estimate = await getCostEstimate(id)
-        setCostEstimate(estimate)
+        const allPDFs: Array<{ filename: string; content: string }> = []
 
-        if (estimate?.page_id) {
-          const related = await getCostEstimatesByPageId(estimate.page_id)
-          setRelatedCostEstimates(related)
-
-          const attachmentNames = related.map(
-            (est, index) =>
-              `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
-          )
-          setAttachments(attachmentNames)
-        } else {
-          setRelatedCostEstimates([estimate])
-          setAttachments([
-            `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
-          ])
+        // Generate PDF for main estimate
+        try {
+          const mainPdfBase64 = await generateCostEstimateEmailPDF(mainEstimate, true, userDataForPDF)
+          if (typeof mainPdfBase64 === "string") {
+            const mainFilename = `QU-SU-${mainEstimate.costEstimateNumber}_${mainEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
+            allPDFs.push({
+              filename: mainFilename,
+              content: mainPdfBase64,
+            })
+            setPreGeneratedPDF(mainPdfBase64) // Keep for backward compatibility
+            console.log("[v0] Main PDF pre-generated successfully")
+          }
+        } catch (error) {
+          console.error("[v0] Error generating main PDF:", error)
         }
 
-        setToEmail(estimate.client?.email || "")
-        setCcEmail(user?.email || "")
-        setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
-        setBody(`Hi ${estimate.client?.contactPerson || estimate.client?.company || "Valued Client"},
+        const uniqueRelatedEstimates = relatedEstimates.filter((estimate) => estimate.id !== mainEstimate.id)
+
+        // Generate PDFs for unique related estimates only
+        for (let i = 0; i < uniqueRelatedEstimates.length; i++) {
+          const estimate = uniqueRelatedEstimates[i]
+          try {
+            console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedEstimates.length} for estimate:`, estimate.id)
+            const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
+            if (typeof pdfBase64 === "string") {
+              const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 2}.pdf`
+              allPDFs.push({
+                filename,
+                content: pdfBase64,
+              })
+              console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
+            }
+          } catch (error) {
+            console.error(`[v0] Error generating PDF for estimate ${estimate.id}:`, error)
+            // Continue with other PDFs even if one fails
+          }
+        }
+
+        setPreGeneratedPDFs(allPDFs)
+        console.log(`[v0] All PDFs pre-generated successfully. Total: ${allPDFs.length}`)
+
+        if (allPDFs.length === 0) {
+          toast({
+            title: "PDF Generation Warning",
+            description: "No PDFs could be generated. Email will be sent without PDF attachments.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("[v0] Error pre-generating PDFs:", error)
+        toast({
+          title: "PDF Generation Warning",
+          description: "Some PDFs could not be generated. Email may be sent with fewer attachments.",
+          variant: "destructive",
+        })
+      } finally {
+        setPdfGenerating(false)
+      }
+    },
+    [user, toast],
+  )
+
+  const fetchData = useCallback(async () => {
+    if (dataFetched.current) return
+
+    const currentUserData = userDataRef.current
+    if (!currentUserData) return
+
+    try {
+      console.log("[v0] fetchData called with userData:", currentUserData)
+      console.log("[v0] userData.company_id:", currentUserData?.company_id)
+
+      const id = params.id as string
+      const estimate = await getCostEstimate(id)
+      setCostEstimate(estimate)
+
+      let related: CostEstimate[] = []
+      if (estimate?.page_id) {
+        related = await getCostEstimatesByPageId(estimate.page_id)
+        setRelatedCostEstimates(related)
+
+        const uniqueRelated = related.filter((est) => est.id !== estimate.id)
+        const attachmentNames = [
+          `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
+          ...uniqueRelated.map(
+            (est, index) =>
+              `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 2}.pdf`,
+          ),
+        ]
+        setPdfAttachments(attachmentNames)
+      } else {
+        related = []
+        setRelatedCostEstimates([estimate])
+        setPdfAttachments([
+          `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
+        ])
+      }
+
+      await preGenerateAllPDFs(estimate, related)
+
+      setToEmail(estimate.client?.email || "")
+      setCcEmail(user?.email || "")
+      setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
+      setBody(`Hi ${estimate.client?.contactPerson || estimate.client?.company || "Valued Client"},
 
 I hope you're doing well!
 
@@ -93,54 +198,58 @@ Best regards,
 ${user?.displayName || "Sales Executive"}
 Sales Executive
 OH Plus
-${userData?.phone_number || ""}
+${currentUserData?.phone_number || ""}
 ${user?.email || ""}`)
 
-        const companyId = userData?.company_id || estimate?.company_id
-        console.log("[v0] Final companyId being used:", companyId)
+      const companyId = currentUserData?.company_id || estimate?.company_id
+      console.log("[v0] Final companyId being used:", companyId)
 
-        if (companyId) {
-          try {
-            console.log("[v0] Using company_id:", companyId)
-            const userTemplates = await emailService.getEmailTemplates(companyId)
-            if (userTemplates.length === 0) {
-              await emailService.createDefaultTemplates(companyId)
-              const newTemplates = await emailService.getEmailTemplates(companyId)
-              setTemplates(newTemplates)
-            } else {
-              setTemplates(userTemplates)
-            }
-          } catch (error) {
-            console.error("Error fetching templates:", error)
-            setTemplates([])
+      if (companyId) {
+        try {
+          console.log("[v0] Using company_id:", companyId)
+          const userTemplates = await emailService.getEmailTemplates(companyId)
+          if (userTemplates.length === 0) {
+            await emailService.createDefaultTemplates(companyId)
+            const newTemplates = await emailService.getEmailTemplates(companyId)
+            setTemplates(newTemplates)
+          } else {
+            setTemplates(userTemplates)
           }
-        } else {
-          console.error("Company ID not found in user data or cost estimate")
-          console.log("[v0] userData:", userData)
-          console.log("[v0] estimate company_id:", estimate?.company_id)
-
-          console.warn("No company_id available, continuing without templates")
+        } catch (error) {
+          console.error("Error fetching templates:", error)
           setTemplates([])
         }
-      } catch (error) {
-        console.error("Error fetching cost estimate:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load cost estimate data",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
+      } else {
+        console.error("Company ID not found in user data or cost estimate")
+        console.log("[v0] userData:", currentUserData)
+        console.log("[v0] estimate company_id:", estimate?.company_id)
 
-    if (userData !== null && userData !== undefined) {
+        console.warn("No company_id available, continuing without templates")
+        setTemplates([])
+      }
+
+      dataFetched.current = true
+      setIsInitialized(true)
+    } catch (error) {
+      console.error("Error fetching cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load cost estimate data",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [params.id, user, toast, preGenerateAllPDFs])
+
+  useEffect(() => {
+    if (userData && !isInitialized && !dataFetched.current) {
       console.log("[v0] userData is available, calling fetchData")
       fetchData()
-    } else {
-      console.log("[v0] userData not yet available:", userData)
+    } else if (userData === null) {
+      setLoading(false)
     }
-  }, [params.id, user, userData, toast])
+  }, [userData, isInitialized, fetchData])
 
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
@@ -291,27 +400,21 @@ ${user?.email || ""}`)
       const newFiles = Array.from(files)
       setUploadedFiles((prev) => [...prev, ...newFiles])
 
-      // Add file names to attachments list for display
-      const newAttachmentNames = newFiles.map((file) => file.name)
-      setAttachments((prev) => [...prev, ...newAttachmentNames])
-
       toast({
         title: "Files Added",
         description: `${newFiles.length} file(s) added to attachments`,
       })
     }
 
-    // Reset the input
     event.target.value = ""
   }
 
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-    const pdfAttachmentCount = relatedCostEstimates.length
-    if (index >= pdfAttachmentCount) {
-      const uploadedFileIndex = index - pdfAttachmentCount
-      setUploadedFiles((prev) => prev.filter((_, i) => i !== uploadedFileIndex))
-    }
+  const removePdfAttachment = (index: number) => {
+    setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeUploadedFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSendEmail = async () => {
@@ -326,39 +429,78 @@ ${user?.email || ""}`)
 
     setSending(true)
     try {
+      console.log("[v0] Starting email send process...")
+      console.log("[v0] Uploaded files count:", uploadedFiles.length)
+      console.log("[v0] Pre-generated PDFs available:", preGeneratedPDFs.length)
+
+      const uploadedFilesData =
+        uploadedFiles.length > 0
+          ? await Promise.all(
+              uploadedFiles.map(async (file) => {
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    const result = reader.result as string
+                    resolve(result.split(",")[1])
+                  }
+                  reader.readAsDataURL(file)
+                })
+
+                return {
+                  filename: file.name,
+                  content: base64,
+                  type: file.type,
+                }
+              }),
+            )
+          : []
+
+      console.log("[v0] Processed uploaded files:", uploadedFilesData.length)
+
+      const allAttachments = [...preGeneratedPDFs.map((pdf) => pdf.filename), ...uploadedFiles.map((f) => f.name)]
+
+      const requestBody = {
+        costEstimate: costEstimate,
+        clientEmail: toEmail,
+        client: costEstimate.client,
+        currentUserEmail: user?.email,
+        ccEmail: ccEmail,
+        subject: subject,
+        body: body,
+        attachments: allAttachments,
+        preGeneratedPDFs: preGeneratedPDFs, // Send all pre-generated PDFs
+        uploadedFiles: uploadedFilesData,
+      }
+
+      console.log("[v0] Sending request with body:", {
+        hasCostEstimate: !!requestBody.costEstimate,
+        clientEmail: requestBody.clientEmail,
+        uploadedFilesCount: uploadedFilesData.length,
+        preGeneratedPDFsCount: preGeneratedPDFs.length,
+        totalAttachments: allAttachments.length,
+      })
+
       const response = await fetch("/api/cost-estimates/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          costEstimate: costEstimate,
-          relatedCostEstimates: relatedCostEstimates,
-          clientEmail: toEmail,
-          client: costEstimate.client,
-          currentUserEmail: user?.email,
-          ccEmail: ccEmail,
-          subject: subject,
-          body: body,
-          attachments: attachments,
-          uploadedFiles: uploadedFiles,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
+      console.log("[v0] Response status:", response.status)
+
       const result = await response.json()
+      console.log("[v0] Response result:", result)
+
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to send email")
       }
 
-      toast({
-        title: "Email Sent",
-        description: "Cost estimate has been sent successfully",
-      })
-
-      // Use router.push instead of router.back() for better navigation
-      router.push(`/sales/cost-estimates/${params.id}`)
+      console.log("[v0] Email sent successfully!")
+      setShowSuccessDialog(true)
     } catch (error) {
-      console.error("Error sending email:", error)
+      console.error("[v0] Error sending email:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to send email. Please try again.",
@@ -370,38 +512,69 @@ ${user?.email || ""}`)
   }
 
   const handleDownloadAttachment = async (attachment: string, index: number) => {
-    if (!costEstimate || !relatedCostEstimates[index]) return
+    if (preGeneratedPDFs[index]) {
+      // Update attachment viewing to use pre-generated PDFs
+      try {
+        const pdfData = preGeneratedPDFs[index]
 
-    const targetEstimate = relatedCostEstimates[index]
-    const userDataForPDF = user
-      ? {
-          first_name: user.displayName?.split(" ")[0] || "",
-          last_name: user.displayName?.split(" ").slice(1).join(" ") || "",
-          email: user.email || "",
+        // Create blob URL and open in new tab
+        const byteCharacters = atob(pdfData.content)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
         }
-      : undefined
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: "application/pdf" })
+        const url = URL.createObjectURL(blob)
 
-    setDownloadingPDF(index)
-    try {
-      await generateCostEstimatePDF(targetEstimate, undefined, false, userDataForPDF)
-      toast({
-        title: "PDF Downloaded",
-        description: `${attachment} has been downloaded successfully.`,
-      })
-    } catch (error) {
-      console.error("Error downloading PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to download PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setDownloadingPDF(null)
+        // Open PDF in new tab
+        window.open(url, "_blank")
+
+        // Clean up the URL after a short delay
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+        toast({
+          title: "PDF Opened",
+          description: `${attachment} has been opened in a new tab.`,
+        })
+      } catch (error) {
+        console.error("Error opening PDF:", error)
+        toast({
+          title: "Error",
+          description: "Failed to open PDF. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
-  if (loading || userData === null) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  const handleViewUploadedFile = (file: File) => {
+    const url = URL.createObjectURL(file)
+    window.open(url, "_blank")
+
+    // Clean up the URL after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    toast({
+      title: "File Opened",
+      description: `${file.name} has been opened in a new tab.`,
+    })
+  }
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.push(`/sales/cost-estimates/${params.id}`)
+  }
+
+  if (loading || userData === undefined) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="text-lg">Loading...</div>
+          {pdfGenerating && <div className="text-sm text-gray-600">Preparing PDF for email attachment...</div>}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -414,6 +587,16 @@ ${user?.email || ""}`)
             Back
           </Button>
           <h1 className="text-xl font-semibold">Compose Email</h1>
+          {pdfGenerating && (
+            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+              Preparing {relatedCostEstimates.length} PDF(s)...
+            </div>
+          )}
+          {preGeneratedPDFs.length > 0 && !pdfGenerating && (
+            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+              {preGeneratedPDFs.length} PDF(s) Ready
+            </div>
+          )}
         </div>
       </div>
 
@@ -466,21 +649,53 @@ ${user?.email || ""}`)
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Attachments:</Label>
                 <div className="space-y-2">
-                  {attachments.map((attachment, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                      <Paperclip className="h-4 w-4 text-gray-500" />
+                  {preGeneratedPDFs.map((pdf, index) => (
+                    <div
+                      key={`pdf-${index}`}
+                      className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200"
+                    >
+                      <Paperclip className="h-4 w-4 text-green-600" />
                       <button
-                        className="flex-1 text-sm text-left text-blue-600 hover:text-blue-800 hover:underline"
-                        onClick={() => handleDownloadAttachment(attachment, index)}
+                        className="flex-1 text-sm text-left text-green-800 hover:text-green-900 hover:underline"
+                        onClick={() => handleDownloadAttachment(pdf.filename, index)}
                         disabled={downloadingPDF === index}
                       >
-                        {downloadingPDF === index ? "Downloading..." : attachment}
+                        {downloadingPDF === index ? "Opening..." : pdf.filename}
                       </button>
-                      <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)} className="h-6 w-6 p-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
+                          setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+                        }}
+                        className="h-6 w-6 p-0"
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
+
+                  {uploadedFiles.map((file, index) => (
+                    <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                      <Paperclip className="h-4 w-4 text-gray-500" />
+                      <button
+                        className="flex-1 text-sm text-left text-gray-700 hover:text-blue-600 hover:underline"
+                        onClick={() => handleViewUploadedFile(file)}
+                      >
+                        {file.name}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeUploadedFile(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -554,10 +769,14 @@ ${user?.email || ""}`)
         <div className="flex justify-end mt-6">
           <Button
             onClick={handleSendEmail}
-            disabled={sending || !toEmail || !subject}
+            disabled={sending || !toEmail || !subject || pdfGenerating}
             className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
           >
-            {sending ? "Sending..." : "Send Email"}
+            {sending
+              ? "Sending..."
+              : pdfGenerating
+                ? `Preparing ${relatedCostEstimates.length} PDF(s)...`
+                : "Send Email"}
           </Button>
         </div>
       </div>
@@ -663,6 +882,34 @@ ${user?.email || ""}`)
             </Button>
             <Button onClick={handleSaveEditedTemplate} disabled={savingTemplate}>
               {savingTemplate ? "Updating..." : "Update Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-[400px] text-center">
+          <div className="space-y-4 pb-4">
+            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2L3 7v11a2 2 0 002 2h10a2 2 0 002-2V7l-7-5z" />
+                    <path d="M9 9h2v6H9V9z" />
+                    <path d="M9 6h2v2H9V6z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
+              <p className="text-gray-600">You have successfully sent a cost estimate!</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSuccessDialogClose} className="w-full">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
