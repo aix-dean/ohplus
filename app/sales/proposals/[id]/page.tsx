@@ -608,12 +608,11 @@ export default function ProposalDetailsPage() {
       }
 
       const blob = await response.blob()
-      const suggestedName = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
 
       if ("showSaveFilePicker" in window) {
         try {
-          const fileHandle = await (window as any).showSaveFilePicker({
-            suggestedName,
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`,
             types: [
               {
                 description: "PDF files",
@@ -628,16 +627,12 @@ export default function ProposalDetailsPage() {
 
           toast({
             title: "Success",
-            description: "PDF saved successfully to your chosen location!",
+            description: "PDF saved successfully",
           })
-        } catch (error: any) {
-          if (error.name === "AbortError") {
-            toast({
-              title: "Cancelled",
-              description: "File save was cancelled.",
-            })
-          } else {
-            throw error
+        } catch (saveError) {
+          // User cancelled the save dialog
+          if (saveError.name !== "AbortError") {
+            throw saveError
           }
         }
       } else {
@@ -645,7 +640,7 @@ export default function ProposalDetailsPage() {
         const a = document.createElement("a")
         a.style.display = "none"
         a.href = url
-        a.download = suggestedName
+        a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -653,7 +648,7 @@ export default function ProposalDetailsPage() {
 
         toast({
           title: "Success",
-          description: "PDF download started! Your browser will prompt you to choose a save location.",
+          description: "PDF download initiated",
         })
       }
     } catch (error) {
