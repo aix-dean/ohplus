@@ -1372,22 +1372,22 @@ export default function ProposalDetailsPage() {
                               disabled={savingPrice}
                             />
                           </div>
-                          <Button
-                            onClick={handleSavePrice}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 h-8"
-                            disabled={savingPrice}
-                          >
-                            {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save All Updated Prices"}
-                          </Button>
-                          <Button
-                            onClick={() => setIsEditingPrice(false)}
-                            variant="outline"
-                            size="sm"
-                            className="px-3 py-1 h-8"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                          {isEditingPrice && currentEditingPage && (
+                            <div className="flex items-center gap-2 ml-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setIsEditingPrice(false)
+                                  setCurrentEditingPage(null)
+                                  setEditablePrice("")
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
