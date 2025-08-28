@@ -67,7 +67,7 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
         {/* Proposal Preview */}
         <div className="px-6 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
               {proposal.products &&
               proposal.products.length > 0 &&
               proposal.products[0].media &&
