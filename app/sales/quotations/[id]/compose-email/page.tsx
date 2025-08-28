@@ -183,7 +183,7 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(quotation, related)
 
       setToEmail(quotation.client_email || "")
-      setCcEmail(user?.email || "")
+      setCcEmail("aixymbiosis@ohplus.ph")
       setSubject(`Quotation: ${quotation.items?.[0]?.name || "Custom Quotation"} - OH Plus`)
       setBody(`Hi ${quotation.client_name || "Valued Client"},
 
