@@ -9,7 +9,6 @@ import type { Proposal } from "@/lib/types/proposal"
 import Image from "next/image"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
-import { generateProposalPDF } from "@/lib/pdf-service"
 import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
 import { useToast } from "@/hooks/use-toast"
 
@@ -48,16 +47,6 @@ function initializeFirebaseIfNeeded() {
   } catch (error) {
     console.error("Firebase initialization error:", error)
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
-  }
-}
-
-// Public PDF generation function using existing service
-async function generatePublicProposalPDF(proposal: Proposal) {
-  try {
-    await generateProposalPDF(proposal, false)
-  } catch (error) {
-    console.error("Error generating PDF:", error)
-    throw error
   }
 }
 
@@ -118,7 +107,34 @@ export default function PublicProposalViewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      await generatePublicProposalPDF(proposal)
+      const response = await fetch("/api/proposals/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ proposal }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF")
+      }
+
+      // Get the PDF as a blob
+      const pdfBlob = await response.blob()
+
+      // Create a temporary download link
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "proposal.pdf"
+
+      // Trigger the download
+      document.body.appendChild(link)
+      link.click()
+
+      // Clean up
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
 
       // Log PDF generation activity (only for client-side downloads)
       try {

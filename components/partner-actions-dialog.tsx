@@ -15,27 +15,34 @@ interface PartnerActionsDialogProps {
   isOpen: boolean
   onClose: () => void
   partner: Partner | null
+  onActionClick: () => void // Added callback to trigger under construction dialog
 }
 
-export function PartnerActionsDialog({ isOpen, onClose, partner }: PartnerActionsDialogProps) {
+export function PartnerActionsDialog({ isOpen, onClose, partner, onActionClick }: PartnerActionsDialogProps) {
   if (!partner) return null
 
   const handleCall = () => {
-    // Add call functionality here
     console.log(`Calling ${partner.name}`)
     onClose()
+    setTimeout(() => {
+      onActionClick()
+    }, 100)
   }
 
   const handleEmail = () => {
-    // Add email functionality here
     console.log(`Emailing ${partner.name}`)
     onClose()
+    setTimeout(() => {
+      onActionClick()
+    }, 100)
   }
 
   const handleVisitWebsite = () => {
-    // Add visit website functionality here
     console.log(`Visiting ${partner.name} website`)
     onClose()
+    setTimeout(() => {
+      onActionClick()
+    }, 100)
   }
 
   return (

@@ -19,7 +19,6 @@ import {
   ImageIcon,
   Upload,
   Check,
-  XIcon,
   Minus,
   Send,
 } from "lucide-react"
@@ -1373,23 +1372,22 @@ export default function ProposalDetailsPage() {
                               disabled={savingPrice}
                             />
                           </div>
-                          <Button
-                            onClick={handleSavePrice}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white p-1 h-8 w-8"
-                            disabled={savingPrice}
-                          >
-                            {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                          </Button>
-                          <Button
-                            onClick={handleCancelPriceEdit}
-                            size="sm"
-                            variant="outline"
-                            className="p-1 h-8 w-8 bg-transparent"
-                            disabled={savingPrice}
-                          >
-                            <XIcon className="h-3 w-3" />
-                          </Button>
+                          {isEditingPrice && currentEditingPage && (
+                            <div className="flex items-center gap-2 ml-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setIsEditingPrice(false)
+                                  setCurrentEditingPage(null)
+                                  setEditablePrice("")
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
@@ -1493,23 +1491,45 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      {proposal?.status === "draft" && (
-        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 flex space-x-4 z-50">
-          <Button
-            onClick={() => handleUpdatePublicStatus("draft")}
-            variant="outline"
-            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-          >
-            <FileText className="h-5 w-5 mr-2" />
-            Save as Draft
-          </Button>
-          <Button
-            onClick={() => setIsSendOptionsDialogOpen(true)}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-          >
-            <Send className="h-5 w-5 mr-2" />
-            Send
-          </Button>
+      {/* Bottom Action Buttons */}
+      {!loading && proposal && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
+          {isEditingPrice ? (
+            <>
+              <Button
+                onClick={() => setIsEditingPrice(false)}
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePrice}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+                disabled={savingPrice}
+              >
+                {savingPrice ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              >
+                <FileText className="h-5 w-5 mr-2" />
+                Save as Draft
+              </Button>
+              <Button
+                onClick={() => setIsSendOptionsDialogOpen(true)}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+              >
+                <Send className="h-5 w-5 mr-2" />
+                Send
+              </Button>
+            </>
+          )}
         </div>
       )}
 
