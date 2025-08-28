@@ -51,6 +51,7 @@ export default function ComposeEmailPage() {
   const [body, setBody] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -326,6 +327,25 @@ ${user?.email || ""}`)
 
     setSending(true)
     try {
+      const uploadedFilesData = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const result = reader.result as string
+              resolve(result.split(",")[1]) // Remove data:type;base64, prefix
+            }
+            reader.readAsDataURL(file)
+          })
+
+          return {
+            filename: file.name,
+            content: base64,
+            type: file.type,
+          }
+        }),
+      )
+
       const response = await fetch("/api/cost-estimates/send-email", {
         method: "POST",
         headers: {
@@ -341,7 +361,7 @@ ${user?.email || ""}`)
           subject: subject,
           body: body,
           attachments: attachments,
-          uploadedFiles: uploadedFiles,
+          uploadedFiles: uploadedFilesData, // Send processed file data instead of File objects
         }),
       })
 
@@ -350,13 +370,7 @@ ${user?.email || ""}`)
         throw new Error(result.error || "Failed to send email")
       }
 
-      toast({
-        title: "Email Sent",
-        description: "Cost estimate has been sent successfully",
-      })
-
-      // Use router.push instead of router.back() for better navigation
-      router.push(`/sales/cost-estimates/${params.id}`)
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error("Error sending email:", error)
       toast({
@@ -398,6 +412,11 @@ ${user?.email || ""}`)
     } finally {
       setDownloadingPDF(null)
     }
+  }
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.push(`/sales/cost-estimates/${params.id}`)
   }
 
   if (loading || userData === null) {
@@ -665,6 +684,34 @@ ${user?.email || ""}`)
               {savingTemplate ? "Updating..." : "Update Template"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-[400px] text-center">
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={handleSuccessDialogClose} className="h-6 w-6 p-0 rounded-full">
+              ×
+            </Button>
+          </div>
+          <div className="space-y-4 pb-4">
+            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2L3 7v11a2 2 0 002 2h10a2 2 0 002-2V7l-7-5z" />
+                    <path d="M9 9h2v6H9V9z" />
+                    <path d="M9 6h2v2H9V6z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
+              <p className="text-gray-600">You have successfully sent a proposal!</p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
       ccEmail: body.ccEmail,
+      hasUploadedFiles: !!body.uploadedFiles,
+      uploadedFilesCount: body.uploadedFiles?.length || 0,
     })
 
     const {
@@ -45,6 +47,7 @@ export async function POST(request: NextRequest) {
       subject,
       body: customBody,
       attachments,
+      uploadedFiles,
     } = body
 
     if ((!singleCostEstimate && !costEstimateIds) || !clientEmail || !client || !subject || !customBody) {
@@ -146,6 +149,34 @@ export async function POST(request: NextRequest) {
       } catch (pdfError) {
         console.error(`Error generating PDF ${i + 1}:`, pdfError)
         // Continue with other PDFs if one fails
+      }
+    }
+
+    if (uploadedFiles && Array.isArray(uploadedFiles)) {
+      console.log(`Processing ${uploadedFiles.length} uploaded files`)
+
+      for (const uploadedFile of uploadedFiles) {
+        try {
+          if (uploadedFile.filename && uploadedFile.content && uploadedFile.type) {
+            pdfAttachments.push({
+              filename: uploadedFile.filename,
+              content: uploadedFile.content,
+              type: uploadedFile.type,
+            })
+
+            attachmentInfo.push({
+              fileName: uploadedFile.filename,
+              fileSize: Math.round(uploadedFile.content.length * 0.75),
+              fileType: uploadedFile.type,
+              fileUrl: `blob:uploaded-file/${uploadedFile.filename}`,
+            })
+
+            console.log(`Uploaded file processed: ${uploadedFile.filename}`)
+          }
+        } catch (fileError) {
+          console.error(`Error processing uploaded file:`, fileError)
+          // Continue with other files if one fails
+        }
       }
     }
 
@@ -320,7 +351,7 @@ export async function POST(request: NextRequest) {
                 pdfAttachments.length > 0
                   ? `
               <div class="attachment-note">
-                📎 <strong>PDF${pdfAttachments.length > 1 ? "s" : ""} Attached:</strong> You'll find ${pdfAttachments.length > 1 ? "the complete cost estimate documents" : "the complete cost estimate document"} attached to this email for your convenience.
+                📎 <strong>Attachment${pdfAttachments.length > 1 ? "s" : ""}:</strong> You'll find ${pdfAttachments.length > 1 ? "the complete documents" : "the complete document"} attached to this email for your convenience.
               </div>
               `
                   : ""
@@ -368,7 +399,7 @@ export async function POST(request: NextRequest) {
 
     if (pdfAttachments.length > 0) {
       emailData.attachments = pdfAttachments
-      console.log(`${pdfAttachments.length} PDF attachment(s) added to email`)
+      console.log(`${pdfAttachments.length} attachment(s) added to email (PDFs + uploaded files)`)
     }
 
     const { data, error } = await resend.emails.send(emailData)
@@ -417,8 +448,8 @@ export async function POST(request: NextRequest) {
       data,
       message:
         pdfAttachments.length > 0
-          ? `Email sent successfully with ${pdfAttachments.length} PDF attachment(s)`
-          : "Email sent successfully without PDF attachments",
+          ? `Email sent successfully with ${pdfAttachments.length} attachment(s)`
+          : "Email sent successfully without attachments",
     })
   } catch (error) {
     console.error("Email sending error:", error)
