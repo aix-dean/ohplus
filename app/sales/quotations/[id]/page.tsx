@@ -550,6 +550,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Company Header */}
         <div className="text-center mb-8">
+          <h2 className="text-xl font-bold mb-4">{items[0]?.name || "SITE NAME"}</h2>
           <p className="text-base mb-2">
             Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
           </p>
@@ -587,30 +588,28 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Lease Rate/Month:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
+            <span className="font-bold">PHP {(items[0]?.price || 0).toLocaleString()} (Exclusive of VAT)</span>
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Total Lease:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
+            <span className="font-bold">
+              PHP {(items[0]?.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)
+            </span>
           </div>
         </div>
 
         {/* Pricing Table - Updated for quotation pricing */}
         <div className="mb-8">
-          <div className="border border-gray-300">
-            <div className="grid grid-cols-3 bg-gray-100 border-b border-gray-300">
+          <div className="">
+            <div className="grid grid-cols-3 bg-gray-100">
               <div className="p-3 font-bold text-center">Lease rate per month</div>
-              <div className="p-3 font-bold text-center border-l border-gray-300">12% VAT</div>
-              <div className="p-3 font-bold text-center border-l border-gray-300">TOTAL</div>
+              <div className="p-3 font-bold text-center">12% VAT</div>
+              <div className="p-3 font-bold text-center">TOTAL</div>
             </div>
             <div className="grid grid-cols-3">
               <div className="p-3 text-center font-bold">PHP {(items[0]?.price || 0).toLocaleString()}</div>
-              <div className="p-3 text-center font-bold border-l border-gray-300">
-                PHP {((items[0]?.price || 0) * 0.12).toLocaleString()}
-              </div>
-              <div className="p-3 text-center font-bold border-l border-gray-300">
-                PHP {((items[0]?.price || 0) * 1.12).toLocaleString()}
-              </div>
+              <div className="p-3 text-center font-bold">PHP {((items[0]?.price || 0) * 0.12).toLocaleString()}</div>
+              <div className="p-3 text-center font-bold">PHP {((items[0]?.price || 0) * 1.12).toLocaleString()}</div>
             </div>
           </div>
           <div className="flex justify-between items-center mt-4">
