@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { emailService } from "@/lib/email-service"
+import { emailLoggingService } from "@/lib/email-logging-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -232,24 +232,40 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend error:", error)
+
+      try {
+        await emailLoggingService.logEmail({
+          from: "noreply@resend.dev",
+          to: [clientEmail],
+          cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
+          subject: subject,
+          body: body,
+          userId: "system", // You may want to pass actual user ID
+          email_type: "CE",
+          costEstimateId: costEstimate.id,
+          status: "failed",
+        })
+      } catch (logError) {
+        console.error("Failed to log failed email:", logError)
+      }
+
       return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
     }
 
     try {
-      await emailService.createEmailRecord({
-        from: "OH Plus <noreply@resend.dev>",
+      await emailLoggingService.logEmail({
+        from: "noreply@resend.dev",
         to: [clientEmail],
         cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
         subject: subject,
-        body: emailHtml,
+        body: body,
+        userId: "system", // You may want to pass actual user ID
         email_type: "CE",
-        userId: currentUserEmail || "system",
-        reportId: costEstimate.id,
+        costEstimateId: costEstimate.id,
+        status: "sent",
       })
-      console.log("Email record created successfully")
-    } catch (recordError) {
-      console.error("Failed to create email record:", recordError)
-      // Don't fail the API call if record creation fails
+    } catch (logError) {
+      console.error("Failed to log successful email:", logError)
     }
 
     return NextResponse.json({ success: true, data })

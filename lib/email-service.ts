@@ -24,12 +24,10 @@ export interface Email {
   body: string
   templateId?: string
   reportId?: string
-  email_type?: "CE" | "quotation" | "report" | "proposals" | "invitation" | "general"
   status: "draft" | "sending" | "sent" | "failed"
   userId: string
   created?: Timestamp
   sent?: Timestamp
-  updated?: Timestamp
   error?: string
 }
 
@@ -43,7 +41,7 @@ export interface EmailTemplate {
 }
 
 class EmailService {
-  private emailsCollection = "emails"
+  private emailsCollection = "compose_emails"
   private templatesCollection = "email_templates"
 
   // Email CRUD operations
@@ -113,34 +111,6 @@ class EmailService {
     } catch (error) {
       console.error("Error deleting email:", error)
       throw new Error("Failed to delete email")
-    }
-  }
-
-  async createEmailRecord(emailData: {
-    from: string
-    to: string[]
-    cc?: string[]
-    subject: string
-    body: string
-    email_type: "CE" | "quotation" | "report" | "proposals" | "invitation" | "general"
-    userId: string
-    templateId?: string
-    reportId?: string
-  }): Promise<string> {
-    try {
-      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
-
-      const docRef = await addDoc(collection(db, this.emailsCollection), {
-        ...cleanEmailData,
-        status: "sent",
-        created: Timestamp.now(),
-        sentAt: Timestamp.now(),
-        updated: Timestamp.now(),
-      })
-      return docRef.id
-    } catch (error) {
-      console.error("Error creating email record:", error)
-      throw new Error("Failed to create email record")
     }
   }
 

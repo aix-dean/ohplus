@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { emailService } from "@/lib/email-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -229,21 +228,6 @@ If you didn't expect this invitation, you can safely ignore this email.
     if (error) {
       console.error("Resend error:", error)
       return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
-    }
-
-    try {
-      await emailService.createEmailRecord({
-        from: `${senderName} <noreply@ohplus.ph>`,
-        to: [recipientEmail],
-        subject: subject,
-        body: htmlContent,
-        email_type: "invitation",
-        userId: senderName || "system",
-      })
-      console.log("Email record created successfully")
-    } catch (recordError) {
-      console.error("Failed to create email record:", recordError)
-      // Don't fail the API call if record creation fails
     }
 
     return NextResponse.json({
