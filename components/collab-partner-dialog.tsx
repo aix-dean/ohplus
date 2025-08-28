@@ -42,9 +42,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
 
   useEffect(() => {
     const handleReopenDialog = () => {
-      if (selectedPartner) {
-        setIsPartnerActionsDialogOpen(true)
-      }
+      setIsPartnerActionsDialogOpen(true)
     }
 
     window.addEventListener("reopenDialog", handleReopenDialog)
@@ -52,7 +50,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
     return () => {
       window.removeEventListener("reopenDialog", handleReopenDialog)
     }
-  }, [selectedPartner])
+  }, [])
 
   const filteredOperators = operators.filter((partner) =>
     partner.name.toLowerCase().includes(operatorSearch.toLowerCase()),
