@@ -77,7 +77,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
-          cc: "akoymababaix.com",
+          cc: "akoymababaix@aix.com",
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
@@ -151,6 +151,8 @@ OH PLUS
   }
 
   const handleSendEmail = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
     if (!emailData.to.trim()) {
       toast({
         title: "Validation Error",
@@ -158,6 +160,42 @@ OH PLUS
         variant: "destructive",
       })
       return
+    }
+
+    // Validate To emails
+    const toEmails = emailData.to
+      .split(",")
+      .map((email) => email.trim())
+      .filter((email) => email)
+
+    for (const email of toEmails) {
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Validation Error",
+          description: `Invalid email format in To field: ${email}`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    // Validate CC emails if provided
+    if (emailData.cc.trim()) {
+      const ccEmails = emailData.cc
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email)
+
+      for (const email of ccEmails) {
+        if (!emailRegex.test(email)) {
+          toast({
+            title: "Validation Error",
+            description: `Invalid email format in CC field: ${email}`,
+            variant: "destructive",
+          })
+          return
+        }
+      }
     }
 
     if (!emailData.subject.trim()) {
@@ -174,21 +212,19 @@ OH PLUS
     try {
       const formData = new FormData()
 
-      const toEmails = emailData.to
-        .split(",")
-        .map((email) => email.trim())
-        .filter((email) => email)
-      const ccEmails = emailData.cc
-        ? emailData.cc
-            .split(",")
-            .map((email) => email.trim())
-            .filter((email) => email)
-        : []
-
       formData.append("to", JSON.stringify(toEmails))
-      if (ccEmails.length > 0) {
-        formData.append("cc", JSON.stringify(ccEmails))
+
+      if (emailData.cc.trim()) {
+        const ccEmails = emailData.cc
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email && emailRegex.test(email))
+
+        if (ccEmails.length > 0) {
+          formData.append("cc", JSON.stringify(ccEmails))
+        }
       }
+
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
 
