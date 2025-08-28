@@ -36,7 +36,6 @@ export interface EmailTemplate {
   name: string
   subject: string
   body: string
-  type: string // Added type field for categorizing templates
   userId: string
   created?: Timestamp
 }
@@ -147,25 +146,6 @@ class EmailService {
     }
   }
 
-  async getEmailTemplatesByType(userId: string, type: string): Promise<EmailTemplate[]> {
-    try {
-      const q = query(
-        collection(db, this.templatesCollection),
-        where("userId", "==", userId),
-        where("type", "==", type),
-        orderBy("created", "desc"),
-      )
-      const querySnapshot = await getDocs(q)
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as EmailTemplate[]
-    } catch (error) {
-      console.error("Error getting email templates by type:", error)
-      throw new Error("Failed to get email templates by type")
-    }
-  }
-
   async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
     try {
       await updateDoc(doc(db, this.templatesCollection, templateId), updates)
@@ -187,62 +167,66 @@ class EmailService {
   async createDefaultTemplates(userId: string): Promise<void> {
     const defaultTemplates = [
       {
-        name: "Standard Proposal",
-        subject: "Proposal: [Proposal Title] - [Client Company] - OH Plus",
-        body: `Hi [Client Name],
+        name: "Report Delivery",
+        subject: "Report Ready for Review",
+        body: `Hi [Customer's Name],
 
-I hope you're doing well!
+I hope you're doing well.
 
-Please find attached the proposal for your upcoming advertising campaign. The proposal includes the site details and pricing details based on our recent discussion.
+Attached is the report you requested. We've prepared a comprehensive analysis based on your requirements and current project status.
 
-If you have any questions or would like to explore other options, feel free to reach out to us. I'll be happy to assist you further. Looking forward to your feedback!
+Please feel free to review and let me know if you have any questions or would like to explore additional options. I'm happy to assist.
+
+Looking forward to your feedback!
 
 Best regards,
-Sales Executive
-OH PLUS
-+639XXXXXXXXX`,
-        type: "PROPOSALS", // Set type to PROPOSALS for proposal templates
+[Your Full Name]
+[Your Position]
+[Company Name]
+[Contact Info]`,
         userId,
       },
       {
-        name: "Follow-up Proposal",
-        subject: "Follow-up: [Proposal Title] - [Client Company]",
-        body: `Dear [Client Name],
+        name: "Project Update",
+        subject: "Project Status Update",
+        body: `Dear [Customer's Name],
 
-I wanted to follow up on the proposal we sent regarding your advertising campaign.
+I wanted to provide you with an update on your project progress.
 
-Have you had a chance to review the attached proposal? We're excited about the opportunity to work with [Client Company] and would be happy to discuss any questions or modifications you might have.
+Current Status: [Project Status]
+Completion: [Percentage]%
+Next Steps: [Next Steps]
 
-Please let me know if you'd like to schedule a call to go over the details or if you need any additional information.
+Attached you'll find the detailed progress report with all relevant information and documentation.
 
-Looking forward to hearing from you!
+If you have any questions or concerns, please don't hesitate to reach out.
 
 Best regards,
-Sales Executive
-OH PLUS`,
-        type: "PROPOSALS", // Set type to PROPOSALS for proposal templates
+[Your Full Name]
+[Your Position]
+[Company Name]`,
         userId,
       },
       {
-        name: "Proposal Revision",
-        subject: "Revised Proposal: [Proposal Title] - [Client Company]",
-        body: `Hi [Client Name],
+        name: "Completion Report",
+        subject: "Project Completion Report",
+        body: `Dear [Customer's Name],
 
-Thank you for your feedback on our initial proposal.
+I'm pleased to inform you that your project has been completed successfully!
 
-Based on our discussion, I've prepared a revised proposal that addresses your requirements and budget considerations. Please find the updated proposal attached.
+Project Details:
+- Start Date: [Start Date]
+- Completion Date: [Completion Date]
+- Final Status: Completed
 
-The key changes include:
-- [Change 1]
-- [Change 2]
-- [Change 3]
+Please find the final completion report attached for your records. This document contains all the details about the work performed and final deliverables.
 
-I believe this revised proposal better aligns with your needs. Please review and let me know your thoughts.
+Thank you for choosing our services. We look forward to working with you again in the future.
 
 Best regards,
-Sales Executive
-OH PLUS`,
-        type: "PROPOSALS", // Set type to PROPOSALS for proposal templates
+[Your Full Name]
+[Your Position]
+[Company Name]`,
         userId,
       },
     ]

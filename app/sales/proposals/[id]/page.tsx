@@ -590,12 +590,6 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    console.log("[v0] Frontend - Proposal ID:", proposal.id)
-    console.log("[v0] Frontend - Proposal Title:", proposal.title)
-    console.log("[v0] Frontend - Products Count:", proposal.products?.length || 0)
-    console.log("[v0] Frontend - Products Data:", JSON.stringify(proposal.products, null, 2))
-    console.log("[v0] Frontend - Total Amount:", proposal.totalAmount)
-
     toast({
       title: "Download",
       description: "Generating PDF...",
@@ -619,7 +613,7 @@ export default function ProposalDetailsPage() {
       const a = document.createElement("a")
       a.style.display = "none"
       a.href = url
-      a.download = `proposal-${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -633,7 +627,7 @@ export default function ProposalDetailsPage() {
       console.error("Error downloading PDF:", error)
       toast({
         title: "Error",
-        description: "Failed to download PDF",
+        description: "Failed to download PDF. Please try again.",
         variant: "destructive",
       })
     }
