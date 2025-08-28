@@ -378,7 +378,10 @@ export async function generateCostEstimatePDF(
       pdf.setFontSize(14)
       pdf.setFont("helvetica", "bold")
       pdf.setTextColor(0, 0, 0)
-      const titleText = `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+      const titleText = isMultipleSites
+        ? `Cost Estimate for ${siteName}`
+        : costEstimate.title ||
+          `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
       const titleWidth = pdf.getTextWidth(titleText)
       const titleX = pageWidth / 2 - titleWidth / 2
       pdf.text(titleText, titleX, yPosition)
@@ -615,7 +618,8 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    const detailedTitleText = `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+    const detailedTitleText =
+      costEstimate.title || `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
     const detailedTitleWidth = pdf.getTextWidth(detailedTitleText)
     const detailedTitleX = pageWidth / 2 - detailedTitleWidth / 2
     pdf.text(detailedTitleText, detailedTitleX, yPosition)
