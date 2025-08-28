@@ -25,8 +25,10 @@ import {
   Loader2,
   LayoutGrid,
   Pencil,
+  CalendarIcon,
   Save,
   X,
+
   Building,
   History,
 } from "lucide-react"
@@ -138,9 +140,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const { id: quotationId } = params // Use quotationId instead of costEstimateId
   const router = useRouter()
   const { user, userData } = useAuth()
-
   const { toast } = useToast()
-
   const [quotation, setQuotation] = useState<Quotation | null>(null) // Use quotation state
   const [editableQuotation, setEditableQuotation] = useState<Quotation | null>(null) // Use quotation state
   const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([]) // Use quotations array
@@ -225,7 +225,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     setTempValues({ ...tempValues, [fieldName]: currentValue })
     setHasUnsavedChanges(true)
   }
-
   const updateTempValues = (fieldName: string, newValue: any) => {
     const updatedTempValues = { ...tempValues, [fieldName]: newValue }
 
@@ -247,7 +246,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     setTempValues(updatedTempValues)
     setHasUnsavedChanges(true)
   }
-
   useEffect(() => {
     const fetchQuotationData = async () => {
       if (!quotationId) return
@@ -389,19 +387,11 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     setDownloadingPDF(true)
     try {
-      if (quotation.items && quotation.items.length > 1) {
-        await generateSeparateQuotationPDFs(quotation)
-        toast({
-          title: "Success",
-          description: `${quotation.items.length} separate PDFs downloaded successfully`,
-        })
-      } else {
-        await generateQuotationPDF(quotation)
-        toast({
-          title: "Success",
-          description: "PDF downloaded successfully",
-        })
-      }
+      await generateQuotationPDF(quotation)
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully",
+      })
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -550,7 +540,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
         </div>
-
         {/* Site Details - Updated for quotation data structure */}
         <div className="mb-8 space-y-3">
           <div className="flex items-start">
@@ -914,7 +903,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
             </div>
-
             {hasMultipleSites ? (
               <>
                 {renderQuotationBlock(
@@ -986,7 +974,39 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                       </span>
                     </div>
                   </div>
-                ))}
+                )}
+                {currentQuotation.client_phone && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
+                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_phone)}</p>
+                  </div>
+                )}
+                {currentQuotation.client_address && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Address</Label>
+                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_address)}</p>
+                  </div>
+                )}
+                {currentQuotation.quotation_request_id && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
+                    <p className="text-base text-gray-900 font-mono">
+                      {safeString(currentQuotation.quotation_request_id)}
+                    </p>
+                  </div>
+                )}
+                {currentQuotation.proposalId && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Proposal ID</Label>
+                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.proposalId)}</p>
+                  </div>
+                )}
+                {currentQuotation.campaignId && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Campaign ID</Label>
+                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.campaignId)}</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">

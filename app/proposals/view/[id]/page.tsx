@@ -4,14 +4,13 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Eye, CheckCircle, XCircle, Mail, Phone, AlertCircle, ArrowLeft, Grid3X3, Edit, FileDown } from "lucide-react"
+import { Eye, CheckCircle, XCircle, Mail, Phone, AlertCircle, ArrowLeft, FileDown } from "lucide-react"
 import type { Proposal } from "@/lib/types/proposal"
 import Image from "next/image"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
 import { generateProposalPDF } from "@/lib/pdf-service"
 import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
-import { updateProposalStatus } from "@/lib/proposal-service"
 import { useToast } from "@/hooks/use-toast"
 
 // Helper function to generate QR code URL
@@ -69,7 +68,6 @@ export default function PublicProposalViewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
-  const [isAccepting, setIsAccepting] = useState(false)
   const { toast } = useToast()
   const [lightboxImage, setLightboxImage] = useState<{ url: string; isVideo: boolean } | null>(null)
 
@@ -147,38 +145,6 @@ export default function PublicProposalViewPage() {
       })
     } finally {
       setIsGeneratingPDF(false)
-    }
-  }
-
-  const handleAcceptProposal = async () => {
-    if (!proposal) return
-
-    setIsAccepting(true)
-    try {
-      // Update proposal status to accepted with custom user info for public viewer
-      await updateProposalStatus(
-        proposal.id,
-        "accepted",
-        "public_viewer",
-        `${proposal.client.contactPerson} (${proposal.client.company})`,
-      )
-
-      // Update local state
-      setProposal((prev) => (prev ? { ...prev, status: "accepted" } : null))
-
-      toast({
-        title: "Proposal Accepted",
-        description: "Thank you! Your proposal has been accepted. Our team will contact you shortly.",
-      })
-    } catch (error) {
-      console.error("Error accepting proposal:", error)
-      toast({
-        title: "Error",
-        description: "Failed to accept proposal. Please try again or contact our sales team.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsAccepting(false)
     }
   }
 
@@ -295,32 +261,15 @@ ${proposal?.client.contactPerson || "Client"}`)
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-1 hover:bg-gray-100">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold text-gray-900">
-            Finalize Proposal {proposal.id.slice(0, 8).toUpperCase()}
-          </h1>
+          <h1 className="text-lg font-semibold text-gray-900">View Proposal {proposal.id.slice(0, 8).toUpperCase()}</h1>
         </div>
       </div>
 
       <div className="flex h-[calc(100vh-60px)]">
-        {/* Main Content Area with Action Buttons */}
+        {/* Main Content Area with Limited Action Buttons */}
         <div className="flex-1 overflow-auto p-6">
           <div className="flex gap-6">
-            {/* Action Buttons positioned where red squares were shown */}
             <div className="flex flex-col space-y-4 pt-8">
-              <div className="flex flex-col items-center space-y-2 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors w-16">
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Grid3X3 className="h-6 w-6 text-gray-600" />
-                </div>
-                <span className="text-xs text-gray-600 font-medium text-center">Templates</span>
-              </div>
-
-              <div className="flex flex-col items-center space-y-2 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors w-16">
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Edit className="h-6 w-6 text-gray-600" />
-                </div>
-                <span className="text-xs text-gray-600 font-medium text-center">Edit</span>
-              </div>
-
               <div
                 className="flex flex-col items-center space-y-2 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors w-16"
                 onClick={handleDownloadPDF}
@@ -613,53 +562,6 @@ ${proposal?.client.contactPerson || "Client"}`)
                     </div>
                   )}
 
-                  {/* Client Actions */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Next Steps
-                    </h2>
-
-                    {proposal.status === "accepted" ? (
-                      <div className="bg-green-50 border border-green-200 rounded-sm p-6">
-                        <div className="flex items-center text-green-700 mb-3">
-                          <CheckCircle className="h-5 w-5 mr-2" />
-                          <span className="font-semibold text-lg">Proposal Accepted!</span>
-                        </div>
-                        <p className="text-green-600 mb-4">
-                          Thank you for accepting our proposal. Our team is now preparing your quotation and will
-                          contact you shortly with the next steps.
-                        </p>
-                        <div className="space-y-3">
-                          <Button variant="outline" className="w-full bg-transparent" onClick={handleContactSales}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Contact Sales Team
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <p className="text-gray-600 mb-4">
-                          We're excited about the opportunity to work with you. Please review our proposal and let us
-                          know your decision.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <Button
-                            onClick={handleAcceptProposal}
-                            disabled={isAccepting}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {isAccepting ? "Accepting..." : "Accept Proposal"}
-                          </Button>
-                          <Button variant="outline" onClick={handleContactSales}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Contact Sales Team
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Contact Information */}
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
@@ -685,6 +587,16 @@ ${proposal?.client.contactPerson || "Client"}`)
                             <p className="text-sm text-blue-600">+63 123 456 7890</p>
                           </div>
                         </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 mb-3">
+                          This is a read-only view of the proposal. For any changes or to accept this proposal, please
+                          contact our sales team.
+                        </p>
+                        <Button variant="outline" className="w-full bg-transparent" onClick={handleContactSales}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contact Sales Team
+                        </Button>
                       </div>
                     </div>
                   </div>
