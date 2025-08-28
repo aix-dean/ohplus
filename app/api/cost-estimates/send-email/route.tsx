@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -35,6 +36,16 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
+
+    let pdfBase64 = null
+    try {
+      console.log("Generating PDF for email attachment...")
+      pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true) // true for base64 return
+      console.log("PDF generated successfully for email attachment")
+    } catch (pdfError) {
+      console.error("Error generating PDF:", pdfError)
+      // Continue without PDF attachment if generation fails
+    }
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -155,6 +166,15 @@ export async function POST(request: NextRequest) {
               margin: 20px 0;
               text-align: center;
             }
+            .attachment-note {
+              background: #fef3c7;
+              border: 1px solid #f59e0b;
+              border-radius: 8px;
+              padding: 15px;
+              margin: 20px 0;
+              color: #92400e;
+              text-align: center;
+            }
           </style>
         </head>
         <body>
@@ -191,6 +211,16 @@ export async function POST(request: NextRequest) {
                 Total Estimated Cost: ₱${(costEstimate.totalAmount || 0).toLocaleString()}
               </div>
 
+              ${
+                pdfBase64
+                  ? `
+              <div class="attachment-note">
+                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document attached to this email for your convenience.
+              </div>
+              `
+                  : ""
+              }
+
               <div class="action-button">
                 <a href="${costEstimateUrl}" class="btn">View Full Cost Estimate Online</a>
               </div>
@@ -220,21 +250,40 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    const { data, error } = await resend.emails.send({
+    const emailData: any = {
       from: "OH Plus <noreply@resend.dev>",
       to: [clientEmail],
       subject: subject, // Use dynamic subject
       html: emailHtml,
       reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
-    })
+    }
+
+    if (pdfBase64) {
+      emailData.attachments = [
+        {
+          filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
+          content: pdfBase64,
+          type: "application/pdf",
+        },
+      ]
+      console.log("PDF attachment added to email")
+    }
+
+    const { data, error } = await resend.emails.send(emailData)
 
     if (error) {
       console.error("Resend error:", error)
       return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({
+      success: true,
+      data,
+      message: pdfBase64
+        ? "Email sent successfully with PDF attachment"
+        : "Email sent successfully without PDF attachment",
+    })
   } catch (error) {
     console.error("Error sending cost estimate email:", error)
     return NextResponse.json(

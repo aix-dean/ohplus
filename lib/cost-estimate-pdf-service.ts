@@ -330,6 +330,15 @@ export async function generateCostEstimatePDF(
         ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
         : costEstimate.costEstimateNumber || costEstimate.id
 
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.setTextColor(0, 0, 0)
+      const companyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
+      const companyNameWidth = pdf.getTextWidth(companyName)
+      const companyNameX = pageWidth / 2 - companyNameWidth / 2
+      pdf.text(companyName, companyNameX, yPosition)
+      yPosition += 15
+
       // Client name and company (top left)
       pdf.setFontSize(11)
       pdf.setFont("helvetica", "bold")
@@ -355,11 +364,24 @@ export async function generateCostEstimatePDF(
       const dateX = pageWidth - margin - dateTextWidth
       pdf.text(dateText, dateX, yPosition - 10)
 
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.setTextColor(0, 0, 0)
+      const titleText = `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+      const titleWidth = pdf.getTextWidth(titleText)
+      const titleX = pageWidth / 2 - titleWidth / 2
+      pdf.text(titleText, titleX, yPosition)
+
+      // Add underline to title
+      pdf.setLineWidth(0.5)
+      pdf.line(titleX, yPosition + 2, titleX + titleWidth, yPosition + 2)
+      yPosition += 15
+
       // Greeting message - positioned prominently at top
       pdf.setFontSize(11)
       pdf.setFont("helvetica", "normal")
-      const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
-      const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
+      const greetingLine1 = `Good Day! Thank you for considering ${companyName} for your business needs.`
+      const greetingLine2 = "We are pleased to submit our cost estimate for your requirements:"
 
       // Calculate center position for each line
       const centerX = pageWidth / 2
@@ -474,68 +496,6 @@ export async function generateCostEstimatePDF(
       )
       yPosition += 10
 
-      // Note about free material changes
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(9)
-      pdf.text(`Note: free two (2) change material for ${formattedDuration} rental`, margin, yPosition)
-      yPosition += 10
-
-      // Terms and Conditions section with exact formatting
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(11)
-      pdf.text("Terms and Conditions:", margin, yPosition)
-      yPosition += 8
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(10)
-      const terms = [
-        "1. Quotation validity:  5 working days.",
-        "2. Availability of the site is on first-come-first-served-basis only. Only offical documents such as P.O's,",
-        "    Media Orders, signed quotation, & contracts are accepted in order to booked the site.",
-        "3. To book the site, one (1) month advance and one (2) months security deposit",
-        "    payment dated 7 days before the start of rental is required.",
-        "4. Final artwork should be approved ten (10) days before the contract period",
-        "5. Print is exclusively for Golden Touch Imaging Specialist Only.",
-      ]
-
-      terms.forEach((term) => {
-        pdf.text(term, margin, yPosition)
-        yPosition += 6
-      })
-
-      yPosition += 15
-
-      // Signature section with exact formatting
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-
-      // "Very truly yours," and "Conforme:" on same line
-      pdf.text("Very truly yours,", margin, yPosition)
-      pdf.text("C o n f o r m e:", margin + contentWidth / 2, yPosition)
-      yPosition += 20
-
-      // Names
-      pdf.setFont("helvetica", "normal")
-      const userFullName =
-        userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
-      pdf.text(userFullName, margin, yPosition)
-      pdf.text(costEstimate.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
-      yPosition += 6
-
-      // Titles/Companies
-      pdf.setFont("helvetica", "normal")
-      pdf.text(costEstimate.position || "Position", margin, yPosition)
-      pdf.text(costEstimate.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
-      yPosition += 10
-
-      // Billing purpose note
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "normal")
-      pdf.text("This signed Quotation serves as an", margin + contentWidth / 2, yPosition)
-      yPosition += 4
-      pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
-      yPosition += 15
-
       pdf.setFontSize(8)
       pdf.setTextColor(100, 100, 100)
 
@@ -574,8 +534,8 @@ export async function generateCostEstimatePDF(
       console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
-    console.error("Error generating Cost Estimate PDF:", error)
-    throw new Error("Failed to generate Cost Estimate PDF")
+    console.error("Error generating separate PDFs:", error)
+    throw error
   }
 }
 
@@ -607,6 +567,15 @@ export async function generateDetailedCostEstimatePDF(
       companyData = await fetchCompanyData(companyId)
     }
 
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const detailedCompanyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
+    const detailedCompanyNameWidth = pdf.getTextWidth(detailedCompanyName)
+    const detailedCompanyNameX = pageWidth / 2 - detailedCompanyNameWidth / 2
+    pdf.text(detailedCompanyName, detailedCompanyNameX, yPosition)
+    yPosition += 15
+
     // Client name and company (top left)
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
@@ -632,11 +601,24 @@ export async function generateDetailedCostEstimatePDF(
     const detailedDateX = pageWidth - margin - detailedDateTextWidth
     pdf.text(detailedDateText, detailedDateX, yPosition - 10)
 
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const detailedTitleText = `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+    const detailedTitleWidth = pdf.getTextWidth(detailedTitleText)
+    const detailedTitleX = pageWidth / 2 - detailedTitleWidth / 2
+    pdf.text(detailedTitleText, detailedTitleX, yPosition)
+
+    // Add underline to title
+    pdf.setLineWidth(0.5)
+    pdf.line(detailedTitleX, yPosition + 2, detailedTitleX + detailedTitleWidth, yPosition + 2)
+    yPosition += 15
+
     // Greeting message - positioned prominently at top
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
-    const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
+    const greetingLine1 = `Good Day! Thank you for considering ${detailedCompanyName} for your business needs.`
+    const greetingLine2 = "We are pleased to submit our cost estimate for your requirements:"
 
     // Calculate center position for each line
     const centerX = pageWidth / 2

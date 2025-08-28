@@ -38,6 +38,7 @@ import {
   Save,
   X,
   Building,
+  History,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -156,10 +157,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
   const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     console.log("[v0] Save button visibility check:", {
@@ -1083,6 +1084,31 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       ? rentalItem.unitPrice
       : siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)
 
+    const handleSaveAsDraft = async () => {
+      if (!costEstimate) return
+
+      try {
+        // Update the cost estimate status to "draft"
+        await updateCostEstimateStatus(costEstimate.id, "draft")
+
+        // Update the local state to reflect the change
+        setCostEstimate((prev) => (prev ? { ...prev, status: "draft" } : null))
+        setEditableCostEstimate((prev) => (prev ? { ...prev, status: "draft" } : null))
+
+        toast({
+          title: "Saved as Draft",
+          description: "Cost estimate saved as draft successfully.",
+        })
+      } catch (error) {
+        console.error("Error saving as draft:", error)
+        toast({
+          title: "Error",
+          description: "Failed to save as draft. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }
+
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
         <div className="p-6 sm:p-8 border-b">
@@ -1103,13 +1129,14 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           </div>
 
           <div className="text-center mb-8">
-            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
+            {/* Updated title to remove uppercase COST ESTIMATE */}
+            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle}</h2>
           </div>
 
           <div className="mb-6 p-4 text-center">
             <p className="text-gray-800 font-medium">
-              Good Day! Thank you for considering Golden Touch for your business needs. We are pleased to submit our
-              quotation for your requirements:
+              Good Day! Thank you for considering {companyData?.name || "Golden Touch"} for your business needs. We are
+              pleased to submit our cost estimate for your requirements:
             </p>
           </div>
 
@@ -1309,124 +1336,28 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             </div>
           </div>
 
-          <div className="mt-12 mb-8">
-            <div className="flex justify-between items-start">
-              {/* Left side - Company signature */}
-              <div className="w-1/2">
-                <p className="text-sm text-gray-700 mb-8">Very truly yours,</p>
-                <div className="mb-2">
-                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-                </div>
-                {/* Editable name */}
-                {isEditing && editingField === "signatureName" ? (
-                  <Input
-                    type="text"
-                    value={tempValues.signatureName || ""}
-                    onChange={(e) => updateTempValues("signatureName", e.target.value)}
-                    className="w-48 h-8 text-sm font-medium mb-1"
-                    placeholder="Enter name"
-                  />
-                ) : (
-                  <p
-                    className={`text-sm font-medium text-gray-900 ${
-                      isEditing
-                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      isEditing &&
-                      handleFieldEdit(
-                        "signatureName",
-                        `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim(),
-                      )
-                    }
-                  >
-                    {tempValues.signatureName ||
-                      `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim()}
-                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                  </p>
-                )}
-                {/* Editable position */}
-                {isEditing && editingField === "signaturePosition" ? (
-                  <Input
-                    type="text"
-                    value={tempValues.signaturePosition || ""}
-                    onChange={(e) => updateTempValues("signaturePosition", e.target.value)}
-                    className="w-48 h-8 text-sm"
-                    placeholder="Enter position"
-                  />
-                ) : (
-                  <p
-                    className={`text-sm text-gray-600 ${
-                      isEditing
-                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      isEditing && handleFieldEdit("signaturePosition", userData?.position || "Account Manager")
-                    }
-                  >
-                    {tempValues.signaturePosition || userData?.position || "Account Manager"}
-                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                  </p>
-                )}
-              </div>
-
-              {/* Right side - Client conforme */}
-              <div className="w-1/2 pl-8">
-                <p className="text-sm text-gray-700 mb-8">Conforme:</p>
-                <div className="mb-2">
-                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-                </div>
-                <p className="text-sm font-medium text-gray-900">{costEstimate?.client.name || "Client Name"}</p>
-                <p className="text-sm text-gray-600">{costEstimate?.client.company || "Client Company"}</p>
-                <p className="text-sm text-gray-500 italic mt-2">
-                  This signed quotation serves as an
-                  <br />
-                  official document for billing purposes
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-8">
-            <h3 className="font-semibold text-gray-900 mb-3">Terms and Conditions:</h3>
-            <div className="space-y-2 text-sm text-gray-700">
-              <p>1. Quotation validity: 5 working days.</p>
-              <p>
-                2. Availability of the site is on first-come-first-served basis only. Only official documents such as
-                P.O.'s, Media Orders, signed quotation, & contracts are accepted in order to be booked the site.
-              </p>
-              <p>3. To book the site, one (1) month advance and one (2) months security deposit.</p>
-              <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
-              <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-              <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="text-center text-xs text-gray-500">
-              <p className="flex items-center justify-center gap-2 mb-2">
-                <span>{formatCompanyAddress(companyData)}</span>
-                {companyData?.phone && (
-                  <>
-                    <span>•</span>
-                    <span>phone: {companyData.phone}</span>
-                  </>
-                )}
-              </p>
-              {costEstimate?.validUntil && (
-                <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+          {/* Footer */}
+          <div className="text-center text-xs text-gray-500 border-t pt-4">
+            <p className="flex items-center justify-center gap-2 mb-2">
+              <span>{formatCompanyAddress(companyData)}</span>
+              {companyData?.phone && (
+                <>
+                  <span>•</span>
+                  <span>phone: {companyData.phone}</span>
+                </>
               )}
-              <p className="mt-1">
-                © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
+            </p>
+            {costEstimate?.validUntil && (
+              <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+            )}
+            <p className="mt-1">
+              © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
+            </p>
+            {hasMultipleSites && (
+              <p className="mt-2 font-medium">
+                Page {pageNumber} of {totalPages}
               </p>
-              {hasMultipleSites && (
-                <p className="mt-2 font-medium">
-                  Page {pageNumber} of {totalPages}
-                </p>
-              )}
-            </div>
+            )}
           </div>
         </div>
         {process.env.NODE_ENV === "development" && (
@@ -1435,20 +1366,15 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             {Object.keys(tempValues).length}
           </div>
         )}
-
-        {hasUnsavedChanges && (
-          <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
-            <Button
-              variant="outline"
-              onClick={() => {
-                console.log("[v0] Cancel button clicked")
-                handleCancelAllChanges()
-              }}
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <X className="h-4 w-4" />
-              Cancel
-            </Button>
+        <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
+          <Button
+            onClick={handleSaveAsDraft}
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white"
+          >
+            <FileText className="h-4 w-4" />
+            Save as Draft
+          </Button>
+          {hasUnsavedChanges && (
             <Button
               onClick={(e) => {
                 console.log("[v0] Save button clicked - event:", e)
@@ -1462,13 +1388,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 handleSaveAllChanges()
               }}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={Object.keys(tempValues).length === 0}
             >
               <Save className="h-4 w-4" />
               Save Changes
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
@@ -1607,9 +1532,37 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </div>
 
-          <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
+          <Button
+            onClick={() => setShowHistory(!showHistory)}
+            className="fixed top-24 right-4 z-50 xl:hidden bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
+
+          {showHistory && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 xl:hidden"
+              onClick={() => setShowHistory(false)}
+            />
+          )}
+
+          <div
+            className={`
+              w-80 bg-white shadow-md rounded-lg p-4 max-h-[calc(100vh-120px)] overflow-y-auto
+              xl:sticky xl:top-24 xl:block
+              ${showHistory ? "fixed top-24 right-4 z-50" : "hidden"}
+              xl:${showHistory ? "block" : "block"}
+            `}
+          >
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Cost Estimate History</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Cost Estimate History</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="xl:hidden">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
                 {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
               </div>
@@ -1689,7 +1642,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         </div>
       ) : null}
 
-      {relatedCostEstimates.length > 1 && (
+      {relatedCostEstimates.length > 1 ? (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
@@ -1725,6 +1678,18 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 Next
               </Button>
             )}
+          </div>
+        </div>
+      ) : (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
+            <Button
+              onClick={() => setIsSendOptionsDialogOpen(true)}
+              disabled={costEstimate?.status !== "draft"}
+              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+            >
+              Send
+            </Button>
           </div>
         </div>
       )}

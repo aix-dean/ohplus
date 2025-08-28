@@ -58,8 +58,7 @@ import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
-import { createQuotation, createMultipleQuotations, generateQuotationNumber } from "@/lib/quotation-service"
-import { Check } from "lucide-react"
+import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -135,7 +134,6 @@ function SalesDashboardContent() {
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
-  const [isCreatingCostEstimate, setIsCreatingCostEstimate] = useState(false)
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
@@ -678,137 +676,6 @@ function SalesDashboardContent() {
     setIsDateRangeDialogOpen(true)
   }
 
-  const handleQuotationCreation = async (startDate: Date, endDate: Date) => {
-    console.log("[v0] handleQuotationCreation - userData:", userData)
-    console.log("[v0] handleQuotationCreation - userData.company_id:", userData?.company_id)
-
-    if (!user?.uid || !userData?.company_id) {
-      console.log("[v0] handleQuotationCreation - Missing auth data:", {
-        userUid: user?.uid,
-        userDataCompanyId: userData?.company_id,
-        userData: userData,
-      })
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create a quotation.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!selectedClientForProposal) {
-      toast({
-        title: "No Client Selected",
-        description: "Please select a client first.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (selectedSites.length === 0) {
-      toast({
-        title: "No sites selected",
-        description: "Please select at least one site for the quotation.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsCreatingCostEstimate(true)
-    try {
-      const clientData = selectedClientForProposal
-      const sitesData = selectedSites
-
-      const options = {
-        startDate,
-        endDate,
-        company_id: userData.company_id,
-        page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
-      }
-
-      let quotationIds: string[]
-
-      if (selectedSites.length > 1) {
-        // Create multiple quotations for multiple products
-        quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
-
-        toast({
-          title: "Quotations Created",
-          description: `Successfully created ${quotationIds.length} quotations for the selected products.`,
-        })
-      } else {
-        // Create single quotation for one product
-        const quotationData = {
-          quotation_number: generateQuotationNumber(),
-          client_name: clientData.name,
-          client_company_name: clientData.company,
-          client_email: clientData.email,
-          client_phone: clientData.phone,
-          client_address: clientData.address,
-          client_designation: clientData.designation,
-          client_industry: clientData.industry,
-          start_date: startDate,
-          end_date: endDate,
-          valid_until: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-          status: "draft",
-          created_by: user.uid,
-          seller_id: user.uid,
-          company_id: userData.company_id,
-          items: [
-            {
-              id: sitesData[0].id,
-              name: sitesData[0].name,
-              location: sitesData[0].location,
-              price: sitesData[0].price,
-              type: sitesData[0].type,
-              media_url: sitesData[0].image,
-              quantity: 1,
-              duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
-              item_total_amount: sitesData[0].price,
-              illumination: "10 units of 1000 watts metal Halide",
-              dimensions: "100ft (H) x 60ft (W)",
-            },
-          ],
-          total_amount: sitesData[0].price,
-          projectCompliance: {
-            signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-            signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-            poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-            finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-            paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          },
-        }
-
-        const quotationId = await createQuotation(quotationData)
-        quotationIds = [quotationId]
-
-        toast({
-          title: "Quotation Created",
-          description: "Quotation has been created successfully.",
-        })
-      }
-
-      // Navigate to the first quotation
-      router.push(`/sales/quotations/${quotationIds[0]}`)
-
-      // Reset states
-      setCeQuoteMode(false)
-      setSelectedSites([])
-      setSelectedClientForProposal(null)
-      setDashboardClientSearchTerm("")
-    } catch (error) {
-      console.error("Error creating quotation:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create quotation. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreatingCostEstimate(false)
-      setIsDateRangeDialogOpen(false)
-    }
-  }
-
   const openCreateQuotationDateDialog = () => {
     if (selectedSites.length === 0) {
       toast({
@@ -830,16 +697,15 @@ function SalesDashboardContent() {
     setIsDateRangeDialogOpen(true)
   }
 
-  const handleDatesSelected = async (startDate: Date, endDate: Date) => {
-    if (actionAfterDateSelection === "quotation") {
-      await handleQuotationCreation(startDate, endDate)
-      return
-    }
+  // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
+  const [isCreatingCostEstimate, setIsCreatingCostEstimate] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
-    // Cost estimate creation logic only
+  const handleDatesSelected = async (startDate: Date, endDate: Date) => {
     console.log("[v0] handleDatesSelected - userData:", userData)
     console.log("[v0] handleDatesSelected - userData.company_id:", userData?.company_id)
     console.log("[v0] handleDatesSelected - user:", user)
+    console.log("[v0] handleDatesSelected - actionAfterDateSelection:", actionAfterDateSelection)
 
     if (!user?.uid || !userData?.company_id) {
       console.log("[v0] handleDatesSelected - Missing auth data:", {
@@ -849,47 +715,148 @@ function SalesDashboardContent() {
       })
       toast({
         title: "Authentication Required",
-        description: "Please log in to create a cost estimate.",
+        description: `Please log in to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
       })
       return
+    }
+
+    if (actionAfterDateSelection === "quotation") {
+      // For quotations, check selectedSites
+      if (selectedSites.length === 0) {
+        toast({
+          title: "No Sites Selected",
+          description: "Please select at least one site to create a quotation.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      // For cost estimates, check selectedProducts
+      if (selectedProducts.length === 0) {
+        toast({
+          title: "No Products Selected",
+          description: "Please select at least one product to create a cost estimate.",
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     if (!selectedClientForProposal) {
       toast({
         title: "No Client Selected",
-        description: "Please select a client first.",
+        description: `Please select a client to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
       })
       return
     }
 
-    if (selectedSites.length === 0) {
-      toast({
-        title: "No sites selected",
-        description: "Please select at least one site for the cost estimate.",
-        variant: "destructive",
-      })
+    if (actionAfterDateSelection === "quotation") {
+      setIsCreatingDocument(true)
+      try {
+        const sitesData = selectedSites.map((site) => ({
+          id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+        }))
+
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          address: selectedClientForProposal.address,
+          designation: selectedClientForProposal.designation,
+          industry: selectedClientForProposal.industry,
+        }
+
+        const options = {
+          startDate,
+          endDate,
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+          created_by_first_name: userData.first_name,
+          created_by_last_name: userData.last_name,
+        }
+
+        console.log("[v0] handleDatesSelected - creating quotation with options:", options)
+
+        let quotationIds: string[]
+
+        if (selectedSites.length > 1) {
+          // Create multiple quotations for multiple sites
+          quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Quotations Created",
+            description: `Successfully created ${quotationIds.length} quotations for the selected sites.`,
+          })
+        } else {
+          // Create single quotation for one site
+          const quotationId = await createDirectQuotation(clientData, sitesData, user.uid, options)
+          quotationIds = [quotationId]
+
+          toast({
+            title: "Quotation Created",
+            description: "Quotation has been created successfully.",
+          })
+        }
+
+        // Navigate to the first quotation
+        router.push(`/sales/quotations/${quotationIds[0]}`)
+      } catch (error) {
+        console.error("Error creating quotation:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create quotation. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsCreatingDocument(false)
+        setIsDateRangeDialogOpen(false)
+      }
       return
     }
 
     setIsCreatingCostEstimate(true)
     try {
-      const clientData = selectedClientForProposal
-      const sitesData = selectedSites
+      const sitesData = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        location: product.location,
+        price: product.price,
+        type: product.type,
+        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
+      }))
+
+      const clientData = {
+        id: selectedClientForProposal.id,
+        name: selectedClientForProposal.contactPerson,
+        email: selectedClientForProposal.email,
+        company: selectedClientForProposal.company,
+        phone: selectedClientForProposal.phone,
+        address: selectedClientForProposal.address,
+        designation: selectedClientForProposal.designation,
+        industry: selectedClientForProposal.industry,
+      }
 
       const options = {
         startDate,
         endDate,
         company_id: userData.company_id,
-        page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
-      console.log("[v0] handleDatesSelected - Final options being passed:", options)
+      console.log("[v0] handleDatesSelected - options being passed:", options)
 
       let costEstimateIds: string[]
 
-      if (selectedSites.length > 1) {
+      if (selectedProducts.length > 1) {
         // Create multiple cost estimates for multiple products
         costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
 
@@ -910,12 +877,6 @@ function SalesDashboardContent() {
 
       // Navigate to the first cost estimate
       router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
-
-      // Reset states
-      setCeQuoteMode(false)
-      setSelectedSites([])
-      setSelectedClientForProposal(null)
-      setDashboardClientSearchTerm("")
     } catch (error) {
       console.error("Error creating cost estimate:", error)
       toast({
@@ -925,7 +886,7 @@ function SalesDashboardContent() {
       })
     } finally {
       setIsCreatingCostEstimate(false)
-      setIsDateRangeDialogOpen(false)
+      setShowDatePicker(false)
     }
   }
 
@@ -1022,12 +983,6 @@ function SalesDashboardContent() {
     setSelectedClientForProposal(null)
     setDashboardClientSearchTerm("")
   }
-
-  // Filter products based on whether they have a site code
-  const filteredProducts = products.filter((product) => {
-    const siteCode = getSiteCode(product)
-    return siteCode !== null && siteCode !== undefined && siteCode !== ""
-  })
 
   return (
     <div className="flex-1 p-4 md:p-6">
@@ -1459,112 +1414,24 @@ function SalesDashboardContent() {
                 {/* Grid View */}
                 {!loading && products.length > 0 && viewMode === "grid" && (
                   <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                    {filteredProducts.map((product) => (
-                      <div
+                    {products.map((product) => (
+                      <ProductCard
                         key={product.id}
-                        className={`relative border rounded-lg overflow-hidden transition-all duration-200 ${
-                          (proposalCreationMode && selectedProducts.some((p) => p.id === product.id)) ||
-                          (ceQuoteMode && selectedSites.some((p) => p.id === product.id))
-                            ? "ring-2 ring-blue-500 bg-blue-50"
-                            : "hover:shadow-md"
-                        }`}
-                        onClick={() => {
-                          if (proposalCreationMode) {
-                            handleProductSelect(product)
-                          } else if (ceQuoteMode) {
-                            handleSiteSelect(product)
-                          }
-                        }}
-                      >
-                        {/* Selection indicator */}
-                        {((proposalCreationMode && selectedProducts.some((p) => p.id === product.id)) ||
-                          (ceQuoteMode && selectedSites.some((p) => p.id === product.id))) && (
-                          <div className="absolute top-2 left-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center z-10">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-gray-500">Site Code: {product.siteCode || "N/A"}</span>
-                          </div>
-                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
-                          <p className="text-sm text-gray-600 mb-3">
-                            {product.unitPrice ? `₱${product.unitPrice.toLocaleString()}/month` : "Price not set"}
-                          </p>
-
-                          {!proposalCreationMode && !ceQuoteMode ? (
-                            <div className="space-y-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full bg-transparent"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Handle create proposal for individual product
-                                  setSelectedProducts([product])
-                                  setProposalCreationMode(true)
-                                }}
-                              >
-                                Create Proposal
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full bg-transparent"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Handle create cost estimate for individual product
-                                  setSelectedSites([product])
-                                  setCeMode(true)
-                                  setCeQuoteMode(true)
-                                  openCreateCostEstimateDateDialog()
-                                }}
-                              >
-                                Create Cost Estimate
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full bg-green-600 text-white hover:bg-green-700"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Handle create quotation for individual product
-                                  setSelectedSites([product])
-                                  setQuoteMode(true)
-                                  setCeQuoteMode(true)
-                                  openCreateQuotationDateDialog()
-                                }}
-                              >
-                                Create Quotation
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full bg-transparent"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Handle create report
-                                }}
-                              >
-                                Create Report
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full bg-transparent"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                // Handle create report when in selection mode
-                              }}
-                            >
-                              Create Report
-                            </Button>
-                          )}
-                        </div>
-                      </div>
+                        product={product}
+                        hasOngoingBooking={productsWithBookings[product.id] || false}
+                        onView={() => handleViewDetails(product.id)}
+                        onEdit={(e) => handleEditClick(product, e)}
+                        onDelete={(e) => handleDeleteClick(product, e)}
+                        isSelected={
+                          proposalCreationMode
+                            ? selectedProducts.some((p) => p.id === product.id)
+                            : selectedSites.some((p) => p.id === product.id)
+                        }
+                        onSelect={() =>
+                          proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                        }
+                        selectionMode={proposalCreationMode || ceQuoteMode}
+                      />
                     ))}
                   </ResponsiveCardGrid>
                 )}
