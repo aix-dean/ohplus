@@ -887,7 +887,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   </div>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
             </div>
             {hasMultipleSites ? (
               <>
