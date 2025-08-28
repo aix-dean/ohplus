@@ -24,7 +24,7 @@ const operators: Partner[] = [
 
 const dsps: Partner[] = [
   { id: "dsp1", name: "OOH!Shop", logo: "/ooh-shop-logo.png", lastActivity: "May 28, 2025" },
-  { id: "dsp2", name: "Vistar Meddia", logo: "/vistar-media-logo.png", lastActivity: "May 28, 2025" },
+  { id: "dsp2", name: "Vistar Media", logo: "/vistar-media-logo.png", lastActivity: "May 28, 2025" },
   { id: "dsp3", name: "Broadsign", logo: "/broadsign-logo.png", lastActivity: "May 28, 2025" },
   { id: "dsp4", name: "Moving Walls", logo: "/moving-walls-logo.png", lastActivity: "May 28, 2025" },
 ]
