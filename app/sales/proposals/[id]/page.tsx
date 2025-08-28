@@ -19,7 +19,6 @@ import {
   ImageIcon,
   Upload,
   Check,
-  XIcon,
   Minus,
   Send,
 } from "lucide-react"
@@ -1382,13 +1381,12 @@ export default function ProposalDetailsPage() {
                             {savingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save All Updated Prices"}
                           </Button>
                           <Button
-                            onClick={handleCancelPriceEdit}
-                            size="sm"
+                            onClick={() => setIsEditingPrice(false)}
                             variant="outline"
-                            className="p-1 h-8 w-8 bg-transparent"
-                            disabled={savingPrice}
+                            size="sm"
+                            className="px-3 py-1 h-8"
                           >
-                            <XIcon className="h-3 w-3" />
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
                       ) : (
