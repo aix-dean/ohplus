@@ -849,11 +849,6 @@ ${user?.email || ""}`)
       {/* Success Dialog */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="sm:max-w-[400px] text-center">
-          <div className="flex justify-end">
-            <Button variant="ghost" size="sm" onClick={handleSuccessDialogClose} className="h-6 w-6 p-0 rounded-full">
-              ×
-            </Button>
-          </div>
           <div className="space-y-4 pb-4">
             <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
@@ -868,9 +863,14 @@ ${user?.email || ""}`)
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
-              <p className="text-gray-600">You have successfully sent a proposal!</p>
+              <p className="text-gray-600">You have successfully sent a cost estimate!</p>
             </div>
           </div>
+          <DialogFooter>
+            <Button onClick={handleSuccessDialogClose} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

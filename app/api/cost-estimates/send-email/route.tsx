@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-// import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -31,12 +31,15 @@ export async function POST(request: NextRequest) {
       currentUserEmail: body.currentUserEmail,
       ccEmail: body.ccEmail,
       hasPreGeneratedPDF: !!body.preGeneratedPDF,
+      hasRelatedCostEstimates: !!body.relatedCostEstimates,
+      relatedCostEstimatesCount: body.relatedCostEstimates?.length || 0,
       hasUploadedFiles: !!body.uploadedFiles,
       uploadedFilesCount: body.uploadedFiles?.length || 0,
     })
 
     const {
       costEstimate,
+      relatedCostEstimates,
       clientEmail,
       subject,
       body: customBody,
@@ -307,14 +310,38 @@ export async function POST(request: NextRequest) {
 
     const attachments = []
 
-    // Add PDF attachment if available
-    if (pdfBase64) {
+    if (preGeneratedPDF) {
       attachments.push({
         filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.id}.pdf`,
-        content: pdfBase64,
+        content: preGeneratedPDF,
         type: "application/pdf",
       })
-      console.log("PDF attachment added to email")
+      console.log("Main PDF attachment added to email")
+    }
+
+    if (relatedCostEstimates && Array.isArray(relatedCostEstimates) && relatedCostEstimates.length > 1) {
+      console.log(`Generating PDFs for ${relatedCostEstimates.length} related cost estimates`)
+
+      for (let i = 0; i < relatedCostEstimates.length; i++) {
+        const estimate = relatedCostEstimates[i]
+        try {
+          console.log(`Generating PDF for related cost estimate ${i + 1}: ${estimate.id}`)
+          const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true)
+
+          if (typeof pdfBase64 === "string") {
+            const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 1}.pdf`
+            attachments.push({
+              filename: filename,
+              content: pdfBase64,
+              type: "application/pdf",
+            })
+            console.log(`Related PDF attachment ${i + 1} added:`, filename)
+          }
+        } catch (error) {
+          console.error(`Error generating PDF for related cost estimate ${i + 1}:`, error)
+          // Continue with other PDFs even if one fails
+        }
+      }
     }
 
     // Add uploaded file attachments if available
