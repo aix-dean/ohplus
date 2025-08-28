@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -39,18 +39,6 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
   const [dspSearch, setDspSearch] = useState("")
   const [isPartnerActionsDialogOpen, setIsPartnerActionsDialogOpen] = useState(false)
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
-
-  useEffect(() => {
-    const handleReopenDialog = () => {
-      setIsPartnerActionsDialogOpen(true)
-    }
-
-    window.addEventListener("reopenDialog", handleReopenDialog)
-
-    return () => {
-      window.removeEventListener("reopenDialog", handleReopenDialog)
-    }
-  }, [])
 
   const filteredOperators = operators.filter((partner) =>
     partner.name.toLowerCase().includes(operatorSearch.toLowerCase()),
