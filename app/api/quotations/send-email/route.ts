@@ -70,13 +70,37 @@ export async function POST(request: NextRequest) {
       attachments: emailAttachments,
     })
 
-    console.log("[v0] API: Email sent successfully:", emailResponse)
+    console.log("[v0] API: Email response:", emailResponse)
 
-    return NextResponse.json({
-      success: true,
-      message: "Email sent successfully",
-      emailId: emailResponse.data?.id,
-    })
+    if (emailResponse.error) {
+      console.error("[v0] API: Resend error:", emailResponse.error)
+      return NextResponse.json(
+        {
+          success: false,
+          error: emailResponse.error.message || "Email service error",
+          details: emailResponse.error,
+        },
+        { status: 400 },
+      )
+    }
+
+    if (emailResponse.data) {
+      console.log("[v0] API: Email sent successfully with ID:", emailResponse.data.id)
+      return NextResponse.json({
+        success: true,
+        message: "Email sent successfully",
+        emailId: emailResponse.data.id,
+      })
+    } else {
+      console.error("[v0] API: No data returned from Resend")
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email service did not return confirmation",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
     console.error("[v0] API: Error sending email:", error)
     return NextResponse.json(
