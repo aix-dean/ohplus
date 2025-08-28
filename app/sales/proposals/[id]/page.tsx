@@ -608,49 +608,20 @@ export default function ProposalDetailsPage() {
       }
 
       const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
 
-      if ("showSaveFilePicker" in window) {
-        try {
-          const fileHandle = await window.showSaveFilePicker({
-            suggestedName: `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`,
-            types: [
-              {
-                description: "PDF files",
-                accept: { "application/pdf": [".pdf"] },
-              },
-            ],
-          })
-
-          const writable = await fileHandle.createWritable()
-          await writable.write(blob)
-          await writable.close()
-
-          toast({
-            title: "Success",
-            description: "PDF saved successfully",
-          })
-        } catch (saveError) {
-          // User cancelled the save dialog
-          if (saveError.name !== "AbortError") {
-            throw saveError
-          }
-        }
-      } else {
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.style.display = "none"
-        a.href = url
-        a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-
-        toast({
-          title: "Success",
-          description: "PDF download initiated",
-        })
-      }
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully",
+      })
     } catch (error) {
       console.error("Error downloading PDF:", error)
       toast({
