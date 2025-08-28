@@ -72,12 +72,35 @@ OH PLUS
           title: "Proposal for AIX - 8/27/2025",
           client: {
             name: "AAA Company",
+            company: "AAA Company",
+            contactPerson: "J. King",
             email: "j.king@aix.ph",
             phone: "+639XXXXXXXXX",
+            address: "Kalayaan Flyover Site D, Metro Manila",
           },
+          products: [
+            {
+              id: "1",
+              name: "Billboard Advertisement - Kalayaan Flyover Site D",
+              type: "Billboard",
+              location: "Kalayaan Flyover Site D, EDSA",
+              price: 150000,
+              description: "Premium billboard location with high traffic visibility",
+              specs_rental: {
+                height: 6,
+                width: 12,
+                traffic_count: 50000,
+                audience_type: "Mixed demographics, professionals",
+              },
+            },
+          ],
+          totalAmount: 150000,
           status: "draft",
           createdAt: new Date(),
           updatedAt: new Date(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          notes: "Premium location with excellent visibility during peak hours",
+          customMessage: "Thank you for considering OH Plus for your advertising needs.",
         }
 
         setProposal(mockProposal)
