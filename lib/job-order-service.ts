@@ -300,6 +300,54 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
   }
 }
 
+// Get all job orders
+export async function getAllJobOrders(): Promise<JobOrder[]> {
+  try {
+    const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
+    const q = query(jobOrdersRef, orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const jobOrders: JobOrder[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotationId || "",
+        // Additional fields that might be in JobOrder type
+        jobOrderNumber: data.jobOrderNumber || data.joNumber || "",
+        type: data.joType || data.type || "",
+        assignedTo: data.assignTo || data.assignedTo || "",
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        priority: data.priority || "normal",
+        siteId: data.siteId || "",
+      } as JobOrder)
+    })
+
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching all job orders:", error)
+    return []
+  }
+}
+
 export function generateJONumber(): string {
   const timestamp = Date.now()
   const randomSuffix = Math.floor(Math.random() * 1000)
