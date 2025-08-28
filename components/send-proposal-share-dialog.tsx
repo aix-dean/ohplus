@@ -72,7 +72,11 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
             </div>
             <div className="flex-1">
               <div className="text-sm font-medium text-gray-500">{proposal.code}</div>
-              <div className="text-sm font-semibold text-gray-900">{proposal.title}</div>
+              <div className="text-sm font-semibold text-gray-900">
+                {proposal.products && proposal.products.length > 0
+                  ? `${proposal.products[0].name} (${proposal.products.length} Site${proposal.products.length !== 1 ? "s" : ""})`
+                  : proposal.title}
+              </div>
             </div>
           </div>
         </div>
