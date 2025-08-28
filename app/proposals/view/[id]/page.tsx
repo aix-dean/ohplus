@@ -9,7 +9,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import Image from "next/image"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
-import { generateProposalPDFWithSaveDialog } from "@/lib/pdf-service"
+import { generateProposalPDF } from "@/lib/pdf-service"
 import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
 import { useToast } from "@/hooks/use-toast"
 
@@ -54,7 +54,7 @@ function initializeFirebaseIfNeeded() {
 // Public PDF generation function using existing service
 async function generatePublicProposalPDF(proposal: Proposal) {
   try {
-    await generateProposalPDFWithSaveDialog(proposal)
+    await generateProposalPDF(proposal, false)
   } catch (error) {
     console.error("Error generating PDF:", error)
     throw error
@@ -133,25 +133,16 @@ export default function PublicProposalViewPage() {
       }
 
       toast({
-        title: "PDF Saved Successfully",
-        description: "The proposal PDF has been saved to your selected location.",
+        title: "PDF Downloaded",
+        description: "The proposal PDF has been generated and downloaded successfully.",
       })
     } catch (error) {
       console.error("Error generating PDF:", error)
-
-      if (error instanceof Error && error.message.includes("aborted")) {
-        toast({
-          title: "Save Cancelled",
-          description: "PDF save operation was cancelled by user.",
-          variant: "default",
-        })
-      } else {
-        toast({
-          title: "Save Failed",
-          description: "Failed to save PDF. Please try again.",
-          variant: "destructive",
-        })
-      }
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsGeneratingPDF(false)
     }
