@@ -621,7 +621,7 @@ export default function ProposalDetailsPage() {
 
       toast({
         title: "Success",
-        description: "PDF downloaded successfully!",
+        description: "PDF downloaded successfully! Check your downloads folder.",
       })
     } catch (error) {
       console.error("Error downloading PDF:", error)
@@ -1517,7 +1517,6 @@ export default function ProposalDetailsPage() {
             <>
               <Button
                 variant="outline"
-                onClick={() => handleUpdatePublicStatus("draft")}
                 className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
               >
                 <FileText className="h-5 w-5 mr-2" />
