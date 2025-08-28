@@ -2,18 +2,19 @@
 
 import type React from "react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload } from "lucide-react"
+import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalById } from "@/lib/proposal-service"
+import { emailService, type EmailTemplate } from "@/lib/email-service"
 
 interface ComposeEmailPageProps {
   params: {
@@ -29,10 +30,14 @@ interface Attachment {
   url?: string
 }
 
+interface ProposalEmailTemplate extends EmailTemplate {
+  template_type: "proposal" | "quotation" | "CE" | "report"
+}
+
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const { user } = useAuth() // Added auth context to get current user
+  const { user } = useAuth()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -59,13 +64,138 @@ OH PLUS
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
 
-  const [templates] = useState([
-    { id: 1, name: "Standard", type: "standard" },
-    { id: 2, name: "Proposal Template 4", type: "template" },
-    { id: 3, name: "Proposal Template 3", type: "template" },
-    { id: 4, name: "Proposal Template 2", type: "template" },
-    { id: 5, name: "Proposal Template 1", type: "template" },
-  ])
+  const [templates, setTemplates] = useState<ProposalEmailTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
+
+  const fetchProposalTemplates = async () => {
+    if (!user?.uid) return
+
+    try {
+      setTemplatesLoading(true)
+
+      const templatesRef = collection(db, "email_templates")
+      const q = query(
+        templatesRef,
+        where("userId", "==", user.uid),
+        where("template_type", "==", "proposal"),
+        orderBy("created", "desc"),
+      )
+
+      const querySnapshot = await getDocs(q)
+      const proposalTemplates: ProposalEmailTemplate[] = []
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        proposalTemplates.push({
+          id: doc.id,
+          name: data.name,
+          subject: data.subject,
+          body: data.body,
+          userId: data.userId,
+          created: data.created,
+          template_type: data.template_type || "proposal",
+        })
+      })
+
+      if (proposalTemplates.length === 0) {
+        await createDefaultProposalTemplates()
+        const newQuerySnapshot = await getDocs(q)
+        newQuerySnapshot.forEach((doc) => {
+          const data = doc.data()
+          proposalTemplates.push({
+            id: doc.id,
+            name: data.name,
+            subject: data.subject,
+            body: data.body,
+            userId: data.userId,
+            created: data.created,
+            template_type: data.template_type || "proposal",
+          })
+        })
+      }
+
+      setTemplates(proposalTemplates)
+    } catch (error) {
+      console.error("Error fetching proposal templates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load email templates",
+        variant: "destructive",
+      })
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }
+
+  const createDefaultProposalTemplates = async () => {
+    if (!user?.uid) return
+
+    const defaultProposalTemplates = [
+      {
+        name: "Standard Proposal",
+        subject: "Proposal: [Project Name] - [Company Name]",
+        body: `Dear [Client Name],
+
+I hope this email finds you well.
+
+Please find attached our detailed proposal for your upcoming project. We've carefully reviewed your requirements and prepared a comprehensive solution that aligns with your objectives.
+
+The proposal includes:
+- Detailed project scope and deliverables
+- Timeline and milestones
+- Pricing and payment terms
+- Our team's qualifications and experience
+
+We're excited about the opportunity to work with you and are confident that our approach will deliver exceptional results for your project.
+
+Please review the attached proposal and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
+
+Looking forward to your feedback!
+
+Best regards,
+[Your Name]
+[Your Position]
+OH PLUS
+[Contact Information]`,
+        userId: user.uid,
+        template_type: "proposal" as const,
+      },
+      {
+        name: "Follow-up Proposal",
+        subject: "Follow-up: Proposal for [Project Name]",
+        body: `Dear [Client Name],
+
+I wanted to follow up on the proposal we sent for [Project Name].
+
+I hope you've had a chance to review the attached proposal. We're very interested in working with you on this project and believe our solution offers excellent value for your investment.
+
+If you have any questions about our approach, timeline, or pricing, I'd be happy to schedule a call to discuss them in detail.
+
+We're also flexible and open to adjusting our proposal based on your feedback or any changes in your requirements.
+
+Please let me know your thoughts or if you need any additional information.
+
+Best regards,
+[Your Name]
+[Your Position]
+OH PLUS
+[Contact Information]`,
+        userId: user.uid,
+        template_type: "proposal" as const,
+      },
+    ]
+
+    try {
+      for (const template of defaultProposalTemplates) {
+        await addDoc(collection(db, "email_templates"), {
+          ...template,
+          created: serverTimestamp(),
+        })
+      }
+    } catch (error) {
+      console.error("Error creating default proposal templates:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchProposal = async () => {
@@ -80,7 +210,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
-          cc: "", // Removed hardcoded "akoymababaix.com" from CC field
+          cc: "",
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
@@ -99,6 +229,12 @@ OH PLUS
 
     fetchProposal()
   }, [params.id, toast])
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchProposalTemplates()
+    }
+  }, [user?.uid])
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
@@ -201,10 +337,8 @@ OH PLUS
         const attachment = attachments[i]
         try {
           if (attachment.file) {
-            // Real file upload (including generated PDFs)
             formData.append(`attachment_${i}`, attachment.file)
           } else if (attachment.url && attachment.type === "proposal") {
-            // Generate PDF from URL for proposal attachments
             const pdfResponse = await fetch(attachment.url)
             if (pdfResponse.ok) {
               const pdfBlob = await pdfResponse.blob()
@@ -241,7 +375,7 @@ OH PLUS
           cc: ccEmails.length > 0 ? ccEmails : null,
           updated: serverTimestamp(),
           userId: user?.uid || null,
-          email_type: "proposal", // Added email_type field for proposal emails
+          email_type: "proposal",
           attachments: attachments.map((att) => ({
             fileName: att.name,
             fileSize: att.file?.size || 0,
@@ -254,7 +388,6 @@ OH PLUS
         console.log("Email record saved successfully")
       } catch (emailRecordError) {
         console.error("Error saving email record:", emailRecordError)
-        // Don't fail the entire operation if email record saving fails
       }
 
       toast({
@@ -275,15 +408,20 @@ OH PLUS
     }
   }
 
-  const handleTemplateAction = (templateId: number, action: "copy" | "edit" | "delete") => {
+  const handleTemplateAction = (templateId: string, action: "copy" | "edit" | "delete") => {
     const template = templates.find((t) => t.id === templateId)
     if (!template) return
 
     switch (action) {
       case "copy":
+        setEmailData((prev) => ({
+          ...prev,
+          subject: template.subject,
+          message: template.body,
+        }))
         toast({
-          title: "Template copied",
-          description: `${template.name} has been copied to your clipboard.`,
+          title: "Template applied",
+          description: `${template.name} has been applied to your email.`,
         })
         break
       case "edit":
@@ -293,19 +431,68 @@ OH PLUS
         })
         break
       case "delete":
-        toast({
-          title: "Template deleted",
-          description: `${template.name} has been deleted.`,
-        })
+        handleDeleteTemplate(templateId)
         break
     }
   }
 
-  const handleAddTemplate = () => {
-    toast({
-      title: "Add template",
-      description: "Opening template creation dialog.",
-    })
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await emailService.deleteEmailTemplate(templateId)
+      await fetchProposalTemplates()
+      toast({
+        title: "Template deleted",
+        description: "The template has been deleted successfully.",
+      })
+    } catch (error) {
+      console.error("Error deleting template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete template",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddTemplate = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create templates",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const templateName = `Proposal Template ${templates.length + 1}`
+      const newTemplate = {
+        name: templateName,
+        subject: "New Proposal Template",
+        body: "Enter your proposal template content here...",
+        userId: user.uid,
+        template_type: "proposal" as const,
+      }
+
+      await addDoc(collection(db, "email_templates"), {
+        ...newTemplate,
+        created: serverTimestamp(),
+      })
+
+      await fetchProposalTemplates()
+
+      toast({
+        title: "Template created",
+        description: `${templateName} has been created successfully.`,
+      })
+    } catch (error) {
+      console.error("Error creating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleRemoveAttachment = (index: number) => {
@@ -325,7 +512,6 @@ OH PLUS
     if (!files) return
 
     Array.from(files).forEach((file) => {
-      // Check file size (limit to 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
@@ -345,7 +531,6 @@ OH PLUS
       setAttachments((prev) => [...prev, newAttachment])
     })
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -481,41 +666,52 @@ OH PLUS
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-gray-900 mb-4">Templates:</h3>
-                <div className="space-y-2">
-                  {templates.map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-700">{template.name}</span>
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleTemplateAction(template.id, "copy")}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleTemplateAction(template.id, "edit")}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleTemplateAction(template.id, "delete")}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                {templatesLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading templates...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <span className="text-sm text-gray-700">{template.name}</span>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleTemplateAction(template.id!, "copy")}
+                            className="h-6 w-6 p-0"
+                            title="Apply template"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleTemplateAction(template.id!, "edit")}
+                            className="h-6 w-6 p-0"
+                            title="Edit template"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleTemplateAction(template.id!, "delete")}
+                            className="h-6 w-6 p-0"
+                            title="Delete template"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
                 <Button onClick={handleAddTemplate} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
-                  +Add Template
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Template
                 </Button>
               </CardContent>
             </Card>
