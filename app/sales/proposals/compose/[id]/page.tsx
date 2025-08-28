@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalById } from "@/lib/proposal-service"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 
 interface ComposeEmailPageProps {
   params: {
@@ -66,6 +67,14 @@ OH PLUS
 
   const [templates, setTemplates] = useState<ProposalEmailTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(true)
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<ProposalEmailTemplate | null>(null)
+  const [editTemplateData, setEditTemplateData] = useState({
+    name: "",
+    subject: "",
+    body: "",
+  })
 
   const fetchProposalTemplates = async () => {
     if (!user?.uid) return
@@ -425,10 +434,13 @@ OH PLUS
         })
         break
       case "edit":
-        toast({
-          title: "Edit template",
-          description: `Opening ${template.name} for editing.`,
+        setEditingTemplate(template)
+        setEditTemplateData({
+          name: template.name,
+          subject: template.subject,
+          body: template.body,
         })
+        setEditDialogOpen(true)
         break
       case "delete":
         handleDeleteTemplate(templateId)
@@ -490,6 +502,43 @@ OH PLUS
       toast({
         title: "Error",
         description: "Failed to create template",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateTemplate = async () => {
+    if (!editingTemplate?.id || !user?.uid) {
+      toast({
+        title: "Error",
+        description: "Unable to update template",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const templateRef = doc(db, "email_templates", editingTemplate.id)
+      await updateDoc(templateRef, {
+        name: editTemplateData.name,
+        subject: editTemplateData.subject,
+        body: editTemplateData.body,
+        updated: serverTimestamp(),
+      })
+
+      await fetchProposalTemplates()
+      setEditDialogOpen(false)
+      setEditingTemplate(null)
+
+      toast({
+        title: "Template updated",
+        description: "The template has been updated successfully.",
+      })
+    } catch (error) {
+      console.error("Error updating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update template",
         variant: "destructive",
       })
     }
@@ -728,6 +777,49 @@ OH PLUS
           </Button>
         </div>
       </div>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Template Name:</label>
+              <Input
+                value={editTemplateData.name}
+                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter template name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+              <Input
+                value={editTemplateData.subject}
+                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, subject: e.target.value }))}
+                placeholder="Enter email subject"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Body:</label>
+              <Textarea
+                value={editTemplateData.body}
+                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, body: e.target.value }))}
+                placeholder="Enter email body"
+                className="min-h-[200px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateTemplate} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Update Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
