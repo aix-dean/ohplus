@@ -169,7 +169,6 @@ export function TreasuryGenerateQuotationDialog({
         client_designation: selectedClient.designation || "",
         client_address: selectedClient.address || "",
         client_phone: selectedClient.phone || "",
-        client_company_name: selectedClient.company || "", // Store company name in correct field
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         valid_until: validUntil.toISOString(),
