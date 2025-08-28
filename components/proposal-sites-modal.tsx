@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Check } from "lucide-react"
+import { Copy } from "lucide-react"
 import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
@@ -167,15 +167,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
                     </Badge>
                   )}
                 </div>
-
-                {/* Selection Indicator */}
-                {selectedSites.includes(product.id) && (
-                  <div className="absolute top-2 right-2">
-                    <div className="bg-green-600 rounded-full p-1">
-                      <Check className="h-3 w-3 text-white" />
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
