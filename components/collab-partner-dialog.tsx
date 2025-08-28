@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Search, X, MoreVertical } from "lucide-react"
 import Image from "next/image"
-import { UnderConstructionDialog } from "./under-construction-dialog"
+import { PartnerActionsDialog } from "./partner-actions-dialog"
 
 interface Partner {
   id: string
@@ -37,13 +37,19 @@ interface CollabPartnerDialogProps {
 export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProps) {
   const [operatorSearch, setOperatorSearch] = useState("")
   const [dspSearch, setDspSearch] = useState("")
-  const [isUnderConstructionDialogOpen, setIsUnderConstructionDialogOpen] = useState(false)
+  const [isPartnerActionsDialogOpen, setIsPartnerActionsDialogOpen] = useState(false)
+  const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
 
   const filteredOperators = operators.filter((partner) =>
     partner.name.toLowerCase().includes(operatorSearch.toLowerCase()),
   )
 
   const filteredDsps = dsps.filter((partner) => partner.name.toLowerCase().includes(dspSearch.toLowerCase()))
+
+  const handlePartnerClick = (partner: Partner) => {
+    setSelectedPartner(partner)
+    setIsPartnerActionsDialogOpen(true)
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -74,11 +80,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {filteredOperators.length > 0 ? (
                 filteredOperators.map((partner) => (
-                  <PartnerCard
-                    key={partner.id}
-                    partner={partner}
-                    setIsUnderConstructionDialogOpen={setIsUnderConstructionDialogOpen}
-                  />
+                  <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
                 ))
               ) : (
                 <p className="text-sm text-gray-500 text-center py-4">No operators found.</p>
@@ -107,11 +109,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {filteredDsps.length > 0 ? (
                 filteredDsps.map((partner) => (
-                  <PartnerCard
-                    key={partner.id}
-                    partner={partner}
-                    setIsUnderConstructionDialogOpen={setIsUnderConstructionDialogOpen}
-                  />
+                  <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
                 ))
               ) : (
                 <p className="text-sm text-gray-500 text-center py-4">No DSPs found.</p>
@@ -119,9 +117,10 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
             </div>
           </div>
         </div>
-        <UnderConstructionDialog
-          isOpen={isUnderConstructionDialogOpen}
-          onClose={() => setIsUnderConstructionDialogOpen(false)}
+        <PartnerActionsDialog
+          isOpen={isPartnerActionsDialogOpen}
+          onClose={() => setIsPartnerActionsDialogOpen(false)}
+          partner={selectedPartner}
         />
       </DialogContent>
     </Dialog>
@@ -130,12 +129,15 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
 
 function PartnerCard({
   partner,
-  setIsUnderConstructionDialogOpen,
-}: { partner: Partner; setIsUnderConstructionDialogOpen: any }) {
+  onPartnerClick,
+}: {
+  partner: Partner
+  onPartnerClick: (partner: Partner) => void
+}) {
   return (
     <Card
       className="flex items-center p-3 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => setIsUnderConstructionDialogOpen(true)}
+      onClick={() => onPartnerClick(partner)}
     >
       <div className="relative w-12 h-12 flex-shrink-0 mr-4">
         <Image
