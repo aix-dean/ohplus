@@ -474,44 +474,43 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     return (
       <div key={siteName} className="p-8 bg-white">
-        <div className="flex justify-between items-start mb-8">
-          {/* Company Logo and Name */}
-          <div className="flex items-center gap-4">
+        <div className="flex justify-between items-start mb-6">
+          {/* Left side - Company info */}
+          <div className="flex items-start gap-4">
             {companyData?.photo_url ? (
               <img
                 src={companyData.photo_url || "/placeholder.svg"}
                 alt="Company Logo"
-                className="h-16 w-auto object-contain"
+                className="h-12 w-auto object-contain mt-1"
               />
             ) : (
-              <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Building className="h-8 w-8 text-gray-400" />
+              <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center mt-1">
+                <Building className="h-6 w-6 text-gray-400" />
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {companyData?.name || "Golden Touch Imaging Specialist"}
-              </h1>
-              <p className="text-sm text-gray-600">
-                No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53
-              </p>
-              <p className="text-sm text-gray-600">email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
+              <h1 className="text-xl font-bold text-gray-900 mb-1">Golden Touch Imaging Specialist</h1>
+              <div className="text-sm text-gray-600 space-y-0.5">
+                <p>No. 727 General Solano St., San Miguel, Manila 1005. Telephone:</p>
+                <p>(02) 5310 1750 to 53</p>
+                <p>email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
+              </div>
             </div>
           </div>
 
-          {/* Client Info and RFQ Number */}
+          {/* Right side - Client info and date */}
           <div className="text-right">
             {isEditing && editingField === "client_name" ? (
               <Input
                 type="text"
                 value={tempValues.client_name || ""}
                 onChange={(e) => updateTempValues("client_name", e.target.value)}
-                className="w-64 h-8 text-base font-medium mb-2"
-                placeholder="Enter client name"
+                className="w-48 h-8 text-sm mb-1"
+                placeholder="Client Name"
               />
             ) : (
               <p
-                className={`text-base font-medium mb-1 ${
+                className={`text-sm font-medium mb-1 ${
                   isEditing
                     ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
                     : ""
@@ -528,12 +527,12 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 type="text"
                 value={tempValues.client_company || ""}
                 onChange={(e) => updateTempValues("client_company", e.target.value)}
-                className="w-64 h-8 text-base mb-2"
-                placeholder="Enter company name"
+                className="w-48 h-8 text-sm mb-2"
+                placeholder="COMPANY NAME"
               />
             ) : (
               <p
-                className={`text-base font-medium mb-2 ${
+                className={`text-sm font-medium mb-2 ${
                   isEditing
                     ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
                     : ""
@@ -545,12 +544,10 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               </p>
             )}
 
-            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotationNumber}</p>
-          </div>
-        </div>
+            <p className="text-sm font-medium mb-3">RFQ. No. {currentQuotation.quotationNumber}</p>
 
-        <div className="text-right mb-6">
-          <p className="text-base">{formatDate(new Date())}</p>
+            <p className="text-sm">{formatDate(new Date())}</p>
+          </div>
         </div>
 
         <div className="text-center mb-8">
