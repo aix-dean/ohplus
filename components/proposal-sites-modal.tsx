@@ -110,8 +110,8 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
             <div>
               <div className="font-medium text-gray-700 mb-2">Prepared for:</div>
               <div className="space-y-1 text-gray-600">
-                <div className="font-medium">{proposal.client?.contact || proposal.client?.name || "N/A"}</div>
-                <div>{proposal.client?.position || proposal.client?.title || "N/A"}</div>
+                <div className="font-medium">{proposal.client?.contactPerson || "N/A"}</div>
+                <div>{proposal.client?.designation || "N/A"}</div>
                 <div>{proposal.client?.company || "N/A"}</div>
                 <div>{proposal.client?.address || "N/A"}</div>
               </div>
