@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,8 @@ export default function ComposeEmailPage() {
   const { toast } = useToast()
   const { user, userData } = useAuth()
 
+  const dataFetched = useRef(false)
+
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
@@ -55,6 +57,8 @@ export default function ComposeEmailPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (dataFetched.current) return
+
       try {
         console.log("[v0] fetchData called with userData:", userData)
         console.log("[v0] userData.company_id:", userData?.company_id)
@@ -123,6 +127,8 @@ ${user?.email || ""}`)
           console.warn("No company_id available, continuing without templates")
           setTemplates([])
         }
+
+        dataFetched.current = true
       } catch (error) {
         console.error("Error fetching cost estimate:", error)
         toast({
@@ -135,13 +141,15 @@ ${user?.email || ""}`)
       }
     }
 
-    if (userData !== null && userData !== undefined) {
+    if (userData !== null && userData !== undefined && !dataFetched.current) {
       console.log("[v0] userData is available, calling fetchData")
       fetchData()
+    } else if (userData === null) {
+      setLoading(false)
     } else {
-      console.log("[v0] userData not yet available:", userData)
+      console.log("[v0] userData not yet available or data already fetched:", userData, dataFetched.current)
     }
-  }, [params.id, user, userData, toast])
+  }, [params.id, user, toast]) // Removed userData from dependency array to prevent infinite loops
 
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
@@ -419,7 +427,7 @@ ${user?.email || ""}`)
     router.push(`/sales/cost-estimates/${params.id}`)
   }
 
-  if (loading || userData === null) {
+  if (loading || userData === undefined) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
