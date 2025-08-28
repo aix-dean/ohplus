@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { emailService } from "@/lib/email-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -60,6 +61,22 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Resend error:", error)
       return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    try {
+      await emailService.createEmailRecord({
+        from: from,
+        to: to,
+        cc: cc,
+        subject: subject,
+        body: body,
+        email_type: "report",
+        userId: "system", // Default for general email API
+      })
+      console.log("Email record created successfully")
+    } catch (recordError) {
+      console.error("Failed to create email record:", recordError)
+      // Don't fail the API call if record creation fails
     }
 
     return NextResponse.json({ success: true, data })
