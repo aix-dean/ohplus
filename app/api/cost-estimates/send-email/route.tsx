@@ -40,10 +40,20 @@ export async function POST(request: NextRequest) {
     let pdfBase64 = null
     try {
       console.log("Generating PDF for email attachment...")
-      pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true) // true for base64 return
+
+      const pdfTimeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("PDF generation timeout")), 30000) // 30 second timeout
+      })
+
+      const pdfGenerationPromise = generateCostEstimatePDF(costEstimate, undefined, true)
+
+      pdfBase64 = await Promise.race([pdfGenerationPromise, pdfTimeoutPromise])
       console.log("PDF generated successfully for email attachment")
     } catch (pdfError) {
       console.error("Error generating PDF:", pdfError)
+      if (pdfError.message.includes("timeout")) {
+        console.error("PDF generation timed out - continuing without attachment")
+      }
       // Continue without PDF attachment if generation fails
     }
 

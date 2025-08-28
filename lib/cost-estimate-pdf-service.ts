@@ -33,14 +33,25 @@ const categoryLabels = {
 
 async function fetchCompanyData(companyId: string) {
   try {
-    const companyDoc = await getDoc(doc(db, "companies", companyId))
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Company data fetch timeout")), 10000) // 10 second timeout
+    })
+
+    const fetchPromise = getDoc(doc(db, "companies", companyId))
+
+    const companyDoc = (await Promise.race([fetchPromise, timeoutPromise])) as any
+
     if (companyDoc.exists()) {
       return companyDoc.data()
     }
     return null
   } catch (error) {
     console.error("Error fetching company data:", error)
-    return null
+    return {
+      company_name: "Golden Touch Imaging Specialist",
+      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+      phone: "Telephone: (02) 5310 1750 to 53",
+    }
   }
 }
 
