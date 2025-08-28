@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -48,6 +50,7 @@ export default function ComposeEmailPage() {
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -282,8 +285,33 @@ ${user?.email || ""}`)
     }
   }
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedFiles((prev) => [...prev, ...newFiles])
+
+      // Add file names to attachments list for display
+      const newAttachmentNames = newFiles.map((file) => file.name)
+      setAttachments((prev) => [...prev, ...newAttachmentNames])
+
+      toast({
+        title: "Files Added",
+        description: `${newFiles.length} file(s) added to attachments`,
+      })
+    }
+
+    // Reset the input
+    event.target.value = ""
+  }
+
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index))
+    const pdfAttachmentCount = relatedCostEstimates.length
+    if (index >= pdfAttachmentCount) {
+      const uploadedFileIndex = index - pdfAttachmentCount
+      setUploadedFiles((prev) => prev.filter((_, i) => i !== uploadedFileIndex))
+    }
   }
 
   const handleSendEmail = async () => {
@@ -313,6 +341,7 @@ ${user?.email || ""}`)
           subject: subject,
           body: body,
           attachments: attachments,
+          uploadedFiles: uploadedFiles,
         }),
       })
 
@@ -452,9 +481,25 @@ ${user?.email || ""}`)
                       </Button>
                     </div>
                   ))}
-                  <Button variant="link" className="text-blue-500 text-sm p-0 h-auto">
-                    +Add Attachment
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("file-upload")?.click()}
+                      className="text-blue-500 border-blue-200 hover:bg-blue-50"
+                    >
+                      <Paperclip className="h-4 w-4 mr-2" />
+                      Add Attachment
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
