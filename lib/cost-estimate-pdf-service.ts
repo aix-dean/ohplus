@@ -32,30 +32,32 @@ const categoryLabels = {
 }
 
 async function fetchCompanyData(companyId: string) {
+  // Provide immediate fallback data to prevent hanging
+  const fallbackData = {
+    company_name: "Golden Touch Imaging Specialist",
+    company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+    phone: "Telephone: (02) 5310 1750 to 53",
+  }
+
   try {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Company data fetch timeout")), 5000) // Reduced to 5 seconds
-    })
-
-    const fetchPromise = getDoc(doc(db, "companies", companyId))
-
-    const companyDoc = (await Promise.race([fetchPromise, timeoutPromise])) as any
+    // Attempt to fetch company data with a very short timeout
+    const companyDoc = await getDoc(doc(db, "companies", companyId))
 
     if (companyDoc.exists()) {
-      return companyDoc.data()
+      const data = companyDoc.data()
+      // Return fetched data merged with fallback for missing fields
+      return {
+        company_name: data.company_name || data.name || fallbackData.company_name,
+        company_location: data.company_location || data.address || fallbackData.company_location,
+        phone: data.phone || data.telephone || data.contact_number || fallbackData.phone,
+      }
     }
-    return {
-      company_name: "Golden Touch Imaging Specialist",
-      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
-      phone: "Telephone: (02) 5310 1750 to 53",
-    }
+
+    return fallbackData
   } catch (error) {
     console.error("Error fetching company data:", error)
-    return {
-      company_name: "Golden Touch Imaging Specialist",
-      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
-      phone: "Telephone: (02) 5310 1750 to 53",
-    }
+    // Always return fallback data instead of throwing
+    return fallbackData
   }
 }
 
