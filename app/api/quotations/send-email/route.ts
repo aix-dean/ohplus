@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Send email using Resend
     const emailResponse = await resend.emails.send({
-      from: currentUserEmail || "noreply@ohplus.aix.ph",
+      from: currentUserEmail || "noreply@ohplus.ph",
       to: recipients,
       subject: subject,
       html: emailBody.replace(/\n/g, "<br>"),
