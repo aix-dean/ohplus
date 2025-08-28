@@ -411,13 +411,14 @@ ${user?.email || ""}`)
         body: body,
         attachments: attachments,
         preGeneratedPDF: preGeneratedPDF,
+        uploadedFiles: uploadedFilesData,
       }
 
       console.log("[v0] Sending request with body:", {
         hasCostEstimate: !!requestBody.costEstimate,
         hasRelatedCostEstimates: !!requestBody.relatedCostEstimates,
         clientEmail: requestBody.clientEmail,
-        uploadedFilesCount: requestBody.uploadedFiles.length,
+        uploadedFilesCount: uploadedFilesData.length,
         hasPreGeneratedPDF: !!requestBody.preGeneratedPDF,
       })
 
