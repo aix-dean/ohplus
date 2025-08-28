@@ -10,8 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import {
   MoreVertical,
   FileText,
@@ -32,8 +31,9 @@ import { format } from "date-fns"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { CostEstimatesList } from "@/components/cost-estimates-list"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
+import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -41,13 +41,12 @@ function ProposalsPageContent() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
   const [activeTab, setActiveTab] = useState("proposals")
-
-  const [showCongratulations, setShowCongratulations] = useState(false)
 
   useEffect(() => {
     if (user?.uid) {
@@ -61,12 +60,11 @@ function ProposalsPageContent() {
 
   useEffect(() => {
     const success = searchParams.get("success")
-    if (success === "proposal-sent") {
-      setShowCongratulations(true)
-      // Clean up URL by removing the success parameter
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("success")
-      window.history.replaceState({}, "", newUrl.toString())
+    if (success === "email-sent") {
+      setShowSuccessDialog(true)
+      const url = new URL(window.location.href)
+      url.searchParams.delete("success")
+      window.history.replaceState({}, "", url.toString())
     }
   }, [searchParams])
 
@@ -87,7 +85,6 @@ function ProposalsPageContent() {
   const filterProposals = () => {
     let filtered = proposals
 
-    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(
         (proposal) =>
@@ -96,7 +93,6 @@ function ProposalsPageContent() {
       )
     }
 
-    // Filter by status
     if (statusFilter !== "all") {
       filtered = filtered.filter((proposal) => proposal.status === statusFilter)
     }
@@ -150,20 +146,17 @@ function ProposalsPageContent() {
   }
 
   const handleDownloadPDF = (proposal: Proposal) => {
-    // TODO: Implement PDF download
     console.log("Download PDF for proposal:", proposal.id)
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        {/* Header Section */}
         <div className="mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
             <div></div>
           </div>
 
-          {/* Filters */}
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-5">
               <div className="flex flex-col sm:flex-row gap-4">
@@ -197,7 +190,6 @@ function ProposalsPageContent() {
           </Card>
         </div>
 
-        {/* Tabs for Proposals and Cost Estimates */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="proposals">Proposals</TabsTrigger>
@@ -280,7 +272,6 @@ function ProposalsPageContent() {
                 </CardContent>
               </Card>
             ) : (
-              // Desktop Table View
               <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
                 <Table>
                   <TableHeader>
@@ -392,24 +383,16 @@ function ProposalsPageContent() {
         </Tabs>
       </div>
 
-      <Dialog open={showCongratulations} onOpenChange={setShowCongratulations}>
-        <DialogContent className="max-w-md mx-auto">
-          <div className="text-center py-6">
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
+          <div className="py-6">
             <div className="mb-4">
-              <img
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-vvi2zwxrr0BamUqUw6gPF2TPr7WPVr.png"
-                alt="Congratulations"
-                className="w-24 h-24 mx-auto"
-              />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Congratulations!</h2>
+              <div className="flex justify-center mb-4">
+                <div className="text-6xl">🎉</div>
+              </div>
+              <p className="text-gray-600">You have successfully sent a proposal!</p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
-            <p className="text-gray-600 mb-6">You have successfully sent a proposal!</p>
-            <Button
-              onClick={() => setShowCongratulations(false)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-            >
-              Continue
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
