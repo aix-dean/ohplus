@@ -36,6 +36,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
+import { ProposalHistory } from "@/components/proposal-history"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -967,527 +968,548 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-        {showTemplatesPanel && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Choose a Template</h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+      {/* Main content area */}
+      <div className="flex-1 flex">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+          {showTemplatesPanel && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h2 className="text-lg font-semibold text-gray-900">Choose a Template</h2>
+                  <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
 
-              <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
-                {showCreateForm ? (
-                  <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="template-name">Template Name</Label>
-                      <Input
-                        id="template-name"
-                        type="text"
-                        placeholder="Enter template name"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange("name", e.target.value)}
-                        required
-                      />
-                    </div>
+                <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
+                  {showCreateForm ? (
+                    <form onSubmit={handleFormSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="template-name">Template Name</Label>
+                        <Input
+                          id="template-name"
+                          type="text"
+                          placeholder="Enter template name"
+                          value={formData.name}
+                          onChange={(e) => handleInputChange("name", e.target.value)}
+                          required
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label>Background Image (Optional)</Label>
-                      {!selectedFile ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="background-upload"
-                            disabled={uploading}
-                          />
-                          <label htmlFor="background-upload" className="cursor-pointer">
-                            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                            <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                            <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center space-x-3">
-                              <ImageIcon className="h-8 w-8 text-blue-500" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleRemoveFile}
-                              className="text-gray-400 hover:text-gray-600"
+                      <div className="space-y-2">
+                        <Label>Background Image (Optional)</Label>
+                        {!selectedFile ? (
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              id="background-upload"
                               disabled={uploading}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          {filePreview && (
-                            <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                              <img
-                                src={filePreview || "/placeholder.svg"}
-                                alt="Background preview"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleBackToList}
-                        disabled={formLoading || uploading}
-                      >
-                        Back to Templates
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="bg-blue-600 hover:bg-blue-700"
-                        disabled={formLoading || uploading}
-                      >
-                        {formLoading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            {uploading ? "Uploading..." : "Creating..."}
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Template
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                ) : showBackgroundTemplates ? (
-                  <div>
-                    <div className="flex justify-between items-center mb-6">
-                      <p className="text-gray-600">Choose a background template</p>
-                      <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Template
-                      </Button>
-                    </div>
-
-                    {templatesLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                        <span className="ml-2 text-gray-600">Loading templates...</span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div
-                          className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group border-red-200 hover:border-red-300"
-                          onClick={handleRemoveBackground}
-                        >
-                          <div className="aspect-video bg-red-50 rounded-md flex items-center justify-center mb-3 group-hover:bg-red-100 transition-colors">
-                            <X className="h-12 w-12 text-red-400" />
-                          </div>
-                          <h3 className="font-medium text-red-600 truncate">Remove Background</h3>
-                          <p className="text-xs text-red-500 mt-1">Clear current background template</p>
-                        </div>
-
-                        {templates.length > 0 ? (
-                          templates.map((template) => (
-                            <div
-                              key={template.id}
-                              className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                              onClick={() => handleTemplateSelect(template)}
-                            >
-                              {template.background_url ? (
-                                <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
-                                  <img
-                                    src={template.background_url || "/placeholder.svg"}
-                                    alt={template.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
-                                  <ImageIcon className="h-12 w-12 text-gray-400" />
-                                </div>
-                              )}
-                              <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="col-span-full text-center py-8">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                              <Grid3X3 className="h-8 w-8 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
-                            <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
-                            <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
-                              <Plus className="h-4 w-4 mr-2" />
-                              Create Your First Template
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex gap-3 pt-4 border-t">
-                      <Button type="button" variant="outline" onClick={handleBackToTemplateOptions}>
-                        Back to Options
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-900 mb-3 block">Size:</Label>
-                      <div className="flex gap-2">
-                        {["A4", "Letter size", "Legal size"].map((size) => (
-                          <Button
-                            key={size}
-                            variant={selectedSize === size ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedSize(size)}
-                            className={selectedSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
-                          >
-                            {size}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-900 mb-3 block">Orientation:</Label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {[
-                          { name: "Square", aspect: "aspect-square" },
-                          { name: "Landscape", aspect: "aspect-video" },
-                          { name: "Portrait", aspect: "aspect-[3/4]" },
-                        ].map((orientation) => (
-                          <div
-                            key={orientation.name}
-                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
-                              selectedOrientation === orientation.name
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-gray-300"
-                            }`}
-                            onClick={() => setSelectedOrientation(orientation.name)}
-                          >
-                            <div className={`${orientation.aspect} bg-gray-100 rounded mb-2 mx-auto max-w-16`}></div>
-                            <span className="text-xs font-medium text-gray-700">{orientation.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {[
-                          {
-                            name: "1 per page",
-                            value: "1",
-                            layout: "grid-cols-1",
-                            description: "Single site per page",
-                          },
-                          {
-                            name: "2 per page",
-                            value: "2",
-                            layout: "grid-cols-2",
-                            description: "Two sites side by side",
-                          },
-                          {
-                            name: "4 per page",
-                            value: "4",
-                            layout: "grid-cols-2",
-                            description: "Four sites in grid layout",
-                          },
-                        ].map((layout) => (
-                          <div
-                            key={layout.value}
-                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
-                              selectedLayout === layout.value
-                                ? "border-blue-500 bg-blue-50 shadow-md scale-105"
-                                : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                            }`}
-                            onClick={() => {
-                              setSelectedLayout(layout.value)
-                              toast({
-                                title: "Layout Updated",
-                                description: `Switched to ${layout.name} layout`,
-                              })
-                            }}
-                          >
-                            <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
-                              <div className={`grid ${layout.layout} gap-0.5 h-full`}>
-                                {Array.from({ length: Number.parseInt(layout.value) }).map((_, i) => (
-                                  <div key={i} className="bg-gray-200 rounded-sm"></div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-xs font-medium text-gray-700 block">{layout.name}</span>
-                              <span className="text-xs text-gray-500 block">{layout.description}</span>
-                            </div>
-                            {selectedLayout === layout.value && (
-                              <div className="absolute top-2 right-2">
-                                <Check className="h-4 w-4 text-blue-500" />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={handleShowBackgroundTemplates}
-                        className="w-full mb-3 bg-transparent"
-                      >
-                        <ImageIcon className="h-4 w-4 mr-2" />
-                        Choose Background Template (Optional)
-                      </Button>
-                      {selectedTemplateBackground && (
-                        <div className="text-xs text-gray-600 text-center">Background template selected</div>
-                      )}
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <Button
-                        onClick={handleApplyTemplate}
-                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="fixed left-2 sm:left-4 md:left-20 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 sm:gap-4 z-50">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleTemplates}
-              variant="outline"
-              size="lg"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              <Grid3X3 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Templates</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleEdit}
-              variant="outline"
-              size="lg"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-              disabled={isEditingPrice}
-            >
-              <Edit className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Edit</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleDownload}
-              variant="outline"
-              size="lg"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              <Download className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Download</span>
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
-          style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
-        >
-          {Array.from({ length: getTotalPages() }, (_, index) => {
-            const pageNumber = index + 1
-            const pageContent = getPageContent(pageNumber)
-
-            return (
-              <div key={pageNumber} className={getPageContainerClass()}>
-                {selectedTemplateBackground && (
-                  <div
-                    className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
-                    style={{ backgroundImage: `url(${selectedTemplateBackground})` }}
-                  />
-                )}
-
-                {/* Content */}
-                <div className="relative z-10 p-4 md:p-6 bg-transparent">
-                  <div className="flex justify-between items-start mb-4 md:mb-6">
-                    <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
-                    <div className="text-right">
-                      <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">{getPageTitle(pageContent)}</h1>
-
-                      {isEditingPrice ? (
-                        <div className="flex items-center gap-2 justify-end">
-                          <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
-                            <span className="text-gray-600 mr-1">₱</span>
-                            <Input
-                              type="number"
-                              value={
-                                currentEditingPage === pageNumber ? editablePrice : getPagePrice(pageContent).toString()
-                              }
-                              onChange={(e) => {
-                                if (currentEditingPage !== pageNumber) {
-                                  setCurrentEditingPage(pageNumber)
-                                  setEditablePrice(e.target.value)
-                                } else {
-                                  setEditablePrice(e.target.value)
-                                }
-                              }}
-                              onFocus={() => {
-                                setCurrentEditingPage(pageNumber)
-                                setEditablePrice(getPagePrice(pageContent).toString())
-                              }}
-                              className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
-                              min="0"
-                              step="0.01"
-                              disabled={savingPrice}
                             />
+                            <label htmlFor="background-upload" className="cursor-pointer">
+                              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                            </label>
                           </div>
-                          {isEditingPrice && currentEditingPage && (
-                            <div className="flex items-center gap-2 ml-4">
+                        ) : (
+                          <div className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <ImageIcon className="h-8 w-8 text-blue-500" />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
+                              </div>
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  setIsEditingPrice(false)
-                                  setCurrentEditingPage(null)
-                                  setEditablePrice("")
-                                }}
-                                className="h-8 w-8 p-0"
+                                onClick={handleRemoveFile}
+                                className="text-gray-400 hover:text-gray-600"
+                                disabled={uploading}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                          ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Product content grid */}
-                  <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
-                    {pageContent.map((product, productIndex) => (
-                      <div key={product.id} className="space-y-4 transition-all duration-300">
-                        {/* Rest of product content */}
-                        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-                          <div className="flex-shrink-0">
-                            <div
-                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
-                                getSitesPerPage() === 1
-                                  ? "w-48 h-60 md:w-64 md:h-80"
-                                  : getSitesPerPage() === 2
-                                    ? "w-40 h-48 md:w-48 md:h-60"
-                                    : "w-32 h-40 md:w-36 md:h-44"
-                              }`}
-                            >
-                              {product.media && product.media.length > 0 ? (
+                            {filePreview && (
+                              <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
                                 <img
-                                  src={product.media[0].url || "/placeholder.svg"}
-                                  alt={product.name || "Product image"}
+                                  src={filePreview || "/placeholder.svg"}
+                                  alt="Background preview"
                                   className="w-full h-full object-cover"
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <ImageIcon
-                                    className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
-                                  />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleBackToList}
+                          disabled={formLoading || uploading}
+                        >
+                          Back to Templates
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="bg-blue-600 hover:bg-blue-700"
+                          disabled={formLoading || uploading}
+                        >
+                          {formLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              {uploading ? "Uploading..." : "Creating..."}
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Template
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : showBackgroundTemplates ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-6">
+                        <p className="text-gray-600">Choose a background template</p>
+                        <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Template
+                        </Button>
+                      </div>
+
+                      {templatesLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                          <span className="ml-2 text-gray-600">Loading templates...</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div
+                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group border-red-200 hover:border-red-300"
+                            onClick={handleRemoveBackground}
+                          >
+                            <div className="aspect-video bg-red-50 rounded-md flex items-center justify-center mb-3 group-hover:bg-red-100 transition-colors">
+                              <X className="h-12 w-12 text-red-400" />
+                            </div>
+                            <h3 className="font-medium text-red-600 truncate">Remove Background</h3>
+                            <p className="text-xs text-red-500 mt-1">Clear current background template</p>
+                          </div>
+
+                          {templates.length > 0 ? (
+                            templates.map((template) => (
+                              <div
+                                key={template.id}
+                                className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                                onClick={() => handleTemplateSelect(template)}
+                              >
+                                {template.background_url ? (
+                                  <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
+                                    <img
+                                      src={template.background_url || "/placeholder.svg"}
+                                      alt={template.name}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
+                                    <ImageIcon className="h-12 w-12 text-gray-400" />
+                                  </div>
+                                )}
+                                <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="col-span-full text-center py-8">
+                              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <Grid3X3 className="h-8 w-8 text-gray-400" />
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
+                              <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
+                              <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Your First Template
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={handleBackToTemplateOptions}>
+                          Back to Options
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Size:</Label>
+                        <div className="flex gap-2">
+                          {["A4", "Letter size", "Legal size"].map((size) => (
+                            <Button
+                              key={size}
+                              variant={selectedSize === size ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedSize(size)}
+                              className={selectedSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
+                            >
+                              {size}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Orientation:</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { name: "Square", aspect: "aspect-square" },
+                            { name: "Landscape", aspect: "aspect-video" },
+                            { name: "Portrait", aspect: "aspect-[3/4]" },
+                          ].map((orientation) => (
+                            <div
+                              key={orientation.name}
+                              className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
+                                selectedOrientation === orientation.name
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200 hover:border-gray-300"
+                              }`}
+                              onClick={() => setSelectedOrientation(orientation.name)}
+                            >
+                              <div className={`${orientation.aspect} bg-gray-100 rounded mb-2 mx-auto max-w-16`}></div>
+                              <span className="text-xs font-medium text-gray-700">{orientation.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            {
+                              name: "1 per page",
+                              value: "1",
+                              layout: "grid-cols-1",
+                              description: "Single site per page",
+                            },
+                            {
+                              name: "2 per page",
+                              value: "2",
+                              layout: "grid-cols-2",
+                              description: "Two sites side by side",
+                            },
+                            {
+                              name: "4 per page",
+                              value: "4",
+                              layout: "grid-cols-2",
+                              description: "Four sites in grid layout",
+                            },
+                          ].map((layout) => (
+                            <div
+                              key={layout.value}
+                              className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
+                                selectedLayout === layout.value
+                                  ? "border-blue-500 bg-blue-50 shadow-md scale-105"
+                                  : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                              }`}
+                              onClick={() => {
+                                setSelectedLayout(layout.value)
+                                toast({
+                                  title: "Layout Updated",
+                                  description: `Switched to ${layout.name} layout`,
+                                })
+                              }}
+                            >
+                              <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
+                                <div className={`grid ${layout.layout} gap-0.5 h-full`}>
+                                  {Array.from({ length: Number.parseInt(layout.value) }).map((_, i) => (
+                                    <div key={i} className="bg-gray-200 rounded-sm"></div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-xs font-medium text-gray-700 block">{layout.name}</span>
+                                <span className="text-xs text-gray-500 block">{layout.description}</span>
+                              </div>
+                              {selectedLayout === layout.value && (
+                                <div className="absolute top-2 right-2">
+                                  <Check className="h-4 w-4 text-blue-500" />
                                 </div>
                               )}
                             </div>
-                          </div>
+                          ))}
+                        </div>
+                      </div>
 
-                          <div className="flex-1 min-w-0">
-                            <h3
-                              className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
-                            >
-                              Location Map:
-                            </h3>
+                      <div className="border-t pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={handleShowBackgroundTemplates}
+                          className="w-full mb-3 bg-transparent"
+                        >
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          Choose Background Template (Optional)
+                        </Button>
+                        {selectedTemplateBackground && (
+                          <div className="text-xs text-gray-600 text-center">Background template selected</div>
+                        )}
+                      </div>
 
-                            {product.specs_rental?.location ? (
-                              <GoogleMap
-                                location={product.specs_rental.location}
-                                className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                      <div className="flex justify-end pt-4 border-t">
+                        <Button
+                          onClick={handleApplyTemplate}
+                          className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="fixed left-2 sm:left-4 md:left-20 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 sm:gap-4 z-50">
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleTemplates}
+                variant="outline"
+                size="lg"
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+              >
+                <Grid3X3 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Templates</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleEdit}
+                variant="outline"
+                size="lg"
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+                disabled={isEditingPrice}
+              >
+                <Edit className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Edit</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                size="lg"
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+              >
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Download</span>
+            </div>
+          </div>
+
+          <div
+            className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
+          >
+            {Array.from({ length: getTotalPages() }, (_, index) => {
+              const pageNumber = index + 1
+              const pageContent = getPageContent(pageNumber)
+
+              return (
+                <div key={pageNumber} className={getPageContainerClass()}>
+                  {selectedTemplateBackground && (
+                    <div
+                      className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
+                      style={{ backgroundImage: `url(${selectedTemplateBackground})` }}
+                    />
+                  )}
+
+                  {/* Content */}
+                  <div className="relative z-10 p-4 md:p-6 bg-transparent">
+                    <div className="flex justify-between items-start mb-4 md:mb-6">
+                      <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
+                      <div className="text-right">
+                        <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
+                          {getPageTitle(pageContent)}
+                        </h1>
+
+                        {isEditingPrice ? (
+                          <div className="flex items-center gap-2 justify-end">
+                            <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                              <span className="text-gray-600 mr-1">₱</span>
+                              <Input
+                                type="number"
+                                value={
+                                  currentEditingPage === pageNumber
+                                    ? editablePrice
+                                    : getPagePrice(pageContent).toString()
+                                }
+                                onChange={(e) => {
+                                  if (currentEditingPage !== pageNumber) {
+                                    setCurrentEditingPage(pageNumber)
+                                    setEditablePrice(e.target.value)
+                                  } else {
+                                    setEditablePrice(e.target.value)
+                                  }
+                                }}
+                                onFocus={() => {
+                                  setCurrentEditingPage(pageNumber)
+                                  setEditablePrice(getPagePrice(pageContent).toString())
+                                }}
+                                className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                                min="0"
+                                step="0.01"
+                                disabled={savingPrice}
                               />
-                            ) : (
-                              <div
-                                className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
-                              >
-                                <p className="text-gray-500 text-xs">Location not specified</p>
+                            </div>
+                            {isEditingPrice && currentEditingPage && (
+                              <div className="flex items-center gap-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsEditingPrice(false)
+                                    setCurrentEditingPage(null)
+                                    setEditablePrice("")
+                                  }}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
                             )}
+                          </div>
+                        ) : (
+                          <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
+                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                            <div
-                              className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
-                            >
-                              {product.specs_rental?.location && (
-                                <p>
-                                  <span className="font-semibold">Location:</span> {product.specs_rental.location}
-                                </p>
+                    {/* Product content grid */}
+                    <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
+                      {pageContent.map((product, productIndex) => (
+                        <div key={product.id} className="space-y-4 transition-all duration-300">
+                          {/* Rest of product content */}
+                          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                            <div className="flex-shrink-0">
+                              <div
+                                className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
+                                  getSitesPerPage() === 1
+                                    ? "w-48 h-60 md:w-64 md:h-80"
+                                    : getSitesPerPage() === 2
+                                      ? "w-40 h-48 md:w-48 md:h-60"
+                                      : "w-32 h-40 md:w-36 md:h-44"
+                                }`}
+                              >
+                                {product.media && product.media.length > 0 ? (
+                                  <img
+                                    src={product.media[0].url || "/placeholder.svg"}
+                                    alt={product.name || "Product image"}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <ImageIcon
+                                      className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <h3
+                                className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
+                              >
+                                Location Map:
+                              </h3>
+
+                              {product.specs_rental?.location ? (
+                                <GoogleMap
+                                  location={product.specs_rental.location}
+                                  className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                />
+                              ) : (
+                                <div
+                                  className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                >
+                                  <p className="text-gray-500 text-xs">Location not specified</p>
+                                </div>
                               )}
-                              {product.specs_rental?.traffic_count && (
+
+                              <div
+                                className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
+                              >
+                                {product.specs_rental?.location && (
+                                  <p>
+                                    <span className="font-semibold">Location:</span> {product.specs_rental.location}
+                                  </p>
+                                )}
+                                {product.specs_rental?.traffic_count && (
+                                  <p>
+                                    <span className="font-semibold">Traffic Count:</span>{" "}
+                                    {product.specs_rental.traffic_count.toLocaleString()} vehicles
+                                  </p>
+                                )}
+                                {product.specs_rental?.elevation !== undefined && (
+                                  <p>
+                                    <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
+                                    meters
+                                  </p>
+                                )}
+                                {product.specs_rental?.height && product.specs_rental?.width && (
+                                  <p>
+                                    <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
+                                    {product.specs_rental.width}ft
+                                  </p>
+                                )}
                                 <p>
-                                  <span className="font-semibold">Traffic Count:</span>{" "}
-                                  {product.specs_rental.traffic_count.toLocaleString()} vehicles
+                                  <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
                                 </p>
-                              )}
-                              {product.specs_rental?.elevation !== undefined && (
-                                <p>
-                                  <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
-                                  meters
-                                </p>
-                              )}
-                              {product.specs_rental?.height && product.specs_rental?.width && (
-                                <p>
-                                  <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
-                                  {product.specs_rental.width}ft
-                                </p>
-                              )}
-                              <p>
-                                <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
-                              </p>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+          <ProposalHistory
+            selectedClient={
+              proposal
+                ? {
+                    id: proposal.client.id || "",
+                    company: proposal.client.company,
+                    contactPerson: proposal.client.contactPerson,
+                  }
+                : null
+            }
+          />
         </div>
       </div>
 
@@ -1515,6 +1537,7 @@ export default function ProposalDetailsPage() {
           ) : (
             <>
               <Button
+                onClick={() => handleUpdatePublicStatus("draft")}
                 variant="outline"
                 className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
               >
