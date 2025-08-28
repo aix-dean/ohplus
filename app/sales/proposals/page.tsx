@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import {
   MoreVertical,
   FileText,
@@ -31,8 +32,8 @@ import { format } from "date-fns"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
-import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { CostEstimatesList } from "@/components/cost-estimates-list"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -42,8 +43,11 @@ function ProposalsPageContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
-  const [activeTab, setActiveTab] = useState("proposals") // State to manage active tab
+  const [activeTab, setActiveTab] = useState("proposals")
+
+  const [showCongratulations, setShowCongratulations] = useState(false)
 
   useEffect(() => {
     if (user?.uid) {
@@ -54,6 +58,17 @@ function ProposalsPageContent() {
   useEffect(() => {
     filterProposals()
   }, [proposals, searchTerm, statusFilter])
+
+  useEffect(() => {
+    const success = searchParams.get("success")
+    if (success === "proposal-sent") {
+      setShowCongratulations(true)
+      // Clean up URL by removing the success parameter
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("success")
+      window.history.replaceState({}, "", newUrl.toString())
+    }
+  }, [searchParams])
 
   const loadProposals = async () => {
     if (!user?.uid) return
@@ -185,8 +200,6 @@ function ProposalsPageContent() {
         {/* Tabs for Proposals and Cost Estimates */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            {" "}
-            {/* Adjusted grid-cols-2 for two tabs */}
             <TabsTrigger value="proposals">Proposals</TabsTrigger>
             <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
           </TabsList>
@@ -378,6 +391,28 @@ function ProposalsPageContent() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={showCongratulations} onOpenChange={setShowCongratulations}>
+        <DialogContent className="max-w-md mx-auto">
+          <div className="text-center py-6">
+            <div className="mb-4">
+              <img
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-vvi2zwxrr0BamUqUw6gPF2TPr7WPVr.png"
+                alt="Congratulations"
+                className="w-24 h-24 mx-auto"
+              />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
+            <p className="text-gray-600 mb-6">You have successfully sent a proposal!</p>
+            <Button
+              onClick={() => setShowCongratulations(false)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+            >
+              Continue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

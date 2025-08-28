@@ -399,12 +399,7 @@ OH PLUS
         console.error("Error saving email record:", emailRecordError)
       }
 
-      toast({
-        title: "Email sent!",
-        description: "Your proposal has been sent successfully.",
-      })
-
-      router.back()
+      router.push("/sales/proposals?success=proposal-sent")
     } catch (error) {
       console.error("Email sending error:", error)
       toast({
