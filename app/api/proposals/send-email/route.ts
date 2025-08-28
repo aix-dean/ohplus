@@ -21,9 +21,20 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Email data extracted:", { to: toJson, cc: ccJson, subject, proposalId })
 
-    // Parse JSON strings
-    const to = JSON.parse(toJson)
-    const cc = ccJson ? JSON.parse(ccJson) : undefined
+    if (!toJson || !subject || !body) {
+      console.error("[v0] Missing required fields")
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    // Parse JSON strings with error handling
+    let to, cc
+    try {
+      to = JSON.parse(toJson)
+      cc = ccJson ? JSON.parse(ccJson) : undefined
+    } catch (parseError) {
+      console.error("[v0] JSON parsing error:", parseError)
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+    }
 
     // Process file attachments
     const attachments = []
@@ -75,7 +86,6 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Email sent successfully, creating record...")
 
-    // Create email record with correct email_type for proposals
     try {
       const attachmentRecords = attachments.map((att) => ({
         fileName: att.filename,
@@ -89,26 +99,31 @@ export async function POST(request: NextRequest) {
         cc: cc,
         subject: subject,
         body: body,
-        email_type: "proposals", // Set correct email type for proposals
+        email_type: "proposals",
         status: "sent",
-        userId: "system", // Could be enhanced to get actual user ID
-        proposalId: proposalId, // Include proposal ID for proper categorization
+        userId: "system",
+        proposalId: proposalId,
         attachments: attachmentRecords.length > 0 ? attachmentRecords : undefined,
       })
 
       console.log("[v0] Email record created successfully:", recordId)
+
+      return NextResponse.json({
+        success: true,
+        data,
+        recordId: recordId,
+      })
     } catch (recordError) {
       console.error("[v0] Failed to create email record:", recordError)
-      // Don't fail the API call if record creation fails
+      return NextResponse.json({
+        success: true,
+        data,
+        warning: "Email sent but record creation failed",
+      })
     }
-
-    console.log("[v0] Proposal email process completed successfully")
-    return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error("[v0] Send proposal email error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send email" },
-      { status: 500 },
-    )
+    const errorMessage = error instanceof Error ? error.message : "Failed to send email"
+    return NextResponse.json({ error: errorMessage, success: false }, { status: 500 })
   }
 }

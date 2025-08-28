@@ -257,16 +257,33 @@ OH PLUS
         body: formData,
       })
 
-      const result = await response.json()
+      let result
+      try {
+        const responseText = await response.text()
+        console.log("[v0] Raw response:", responseText)
+
+        // Try to parse as JSON
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("[v0] Failed to parse response as JSON:", parseError)
+
+        // If response is not JSON, it's likely an HTML error page
+        if (!response.ok) {
+          throw new Error(`Server error (${response.status}): Unable to send email. Please try again.`)
+        }
+
+        // If response is OK but not JSON, treat as success
+        result = { success: true }
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send email")
+        throw new Error(result.error || `Server error (${response.status}): Failed to send email`)
       }
 
       console.log("[v0] Email sent successfully!")
       toast({
         title: "Email sent!",
-        description: "Your proposal has been sent successfully.",
+        description: result.warning || "Your proposal has been sent successfully.",
       })
 
       router.back()
