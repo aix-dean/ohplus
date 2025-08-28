@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { X, Copy, Check } from "lucide-react"
+import { Copy, Check } from "lucide-react"
 import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
@@ -116,9 +116,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
               className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
             >
               {selectedSites.length === proposal.products.length ? "Deselect All" : "Select All"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
-              <X className="h-4 w-4" />
             </Button>
           </div>
         </DialogHeader>
