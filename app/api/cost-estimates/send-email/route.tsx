@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
     `
 
     const emailData: any = {
-      from: "OH Plus <noreply@ohplus.com>",
+      from: "OH Plus <noreply@quotations.ohplus.ph>",
       to: [clientEmail],
       subject: subject,
       html: emailHtml,
@@ -293,7 +293,7 @@ export async function POST(request: NextRequest) {
     try {
       const emailDoc = {
         to: clientEmail,
-        from: currentUserEmail || "noreply@ohplus.com",
+        from: currentUserEmail || "noreply@quotations.ohplus.ph",
         cc: ccEmailsArray,
         subject: subject,
         body: body,
