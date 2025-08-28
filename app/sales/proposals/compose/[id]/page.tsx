@@ -80,7 +80,7 @@ OH PLUS
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
-          cc: "akoymababaix.com",
+          cc: "", // Removed hardcoded "akoymababaix.com" from CC field
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
