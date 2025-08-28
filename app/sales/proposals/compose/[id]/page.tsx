@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload } from "lucide-react"
+import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context" // Added auth context for user ID
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalById } from "@/lib/proposal-service"
+import { emailService, type EmailTemplate } from "@/lib/email-service" // Added email service import
 
 interface ComposeEmailPageProps {
   params: {
@@ -30,6 +32,7 @@ interface Attachment {
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth() // Added auth context usage
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -55,14 +58,8 @@ OH PLUS
   })
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
-
-  const [templates] = useState([
-    { id: 1, name: "Standard", type: "standard" },
-    { id: 2, name: "Proposal Template 4", type: "template" },
-    { id: 3, name: "Proposal Template 3", type: "template" },
-    { id: 4, name: "Proposal Template 2", type: "template" },
-    { id: 5, name: "Proposal Template 1", type: "template" },
-  ])
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]) // Changed to use EmailTemplate interface
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null) // Added selected template state
 
   useEffect(() => {
     const fetchProposal = async () => {
@@ -94,8 +91,32 @@ OH PLUS
       }
     }
 
+    const fetchTemplates = async () => {
+      if (!user?.uid) return
+
+      try {
+        const proposalTemplates = await emailService.getEmailTemplatesByType(user.uid, "PROPOSALS")
+        if (proposalTemplates.length === 0) {
+          // Create default proposal templates if none exist
+          await emailService.createDefaultTemplates(user.uid)
+          const newTemplates = await emailService.getEmailTemplatesByType(user.uid, "PROPOSALS")
+          setTemplates(newTemplates)
+        } else {
+          setTemplates(proposalTemplates)
+        }
+      } catch (error) {
+        console.error("Error fetching templates:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load email templates",
+          variant: "destructive",
+        })
+      }
+    }
+
     fetchProposal()
-  }, [params.id, toast])
+    fetchTemplates()
+  }, [params.id, toast, user?.uid])
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
@@ -241,37 +262,82 @@ OH PLUS
     }
   }
 
-  const handleTemplateAction = (templateId: number, action: "copy" | "edit" | "delete") => {
+  const handleTemplateAction = async (templateId: string, action: "copy" | "edit" | "delete") => {
     const template = templates.find((t) => t.id === templateId)
     if (!template) return
 
     switch (action) {
       case "copy":
+        setEmailData((prev) => ({
+          ...prev,
+          subject: template.subject,
+          message: template.body,
+        }))
+        setSelectedTemplate(templateId)
         toast({
-          title: "Template copied",
-          description: `${template.name} has been copied to your clipboard.`,
+          title: "Template applied",
+          description: `${template.name} has been applied to your email.`,
         })
         break
       case "edit":
+        // TODO: Implement edit template dialog
         toast({
           title: "Edit template",
           description: `Opening ${template.name} for editing.`,
         })
         break
       case "delete":
-        toast({
-          title: "Template deleted",
-          description: `${template.name} has been deleted.`,
-        })
+        try {
+          await emailService.deleteEmailTemplate(templateId)
+          setTemplates((prev) => prev.filter((t) => t.id !== templateId))
+          toast({
+            title: "Template deleted",
+            description: `${template.name} has been deleted.`,
+          })
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to delete template",
+            variant: "destructive",
+          })
+        }
         break
     }
   }
 
-  const handleAddTemplate = () => {
-    toast({
-      title: "Add template",
-      description: "Opening template creation dialog.",
-    })
+  const handleAddTemplate = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create templates",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const newTemplateId = await emailService.createEmailTemplate({
+        name: `New Proposal Template ${templates.length + 1}`,
+        subject: "New Proposal Template Subject",
+        body: "New proposal template body...",
+        type: "PROPOSALS",
+        userId: user.uid,
+      })
+
+      const updatedTemplates = await emailService.getEmailTemplatesByType(user.uid, "PROPOSALS")
+      setTemplates(updatedTemplates)
+
+      toast({
+        title: "Template created",
+        description: "New proposal template has been created.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleRemoveAttachment = (index: number) => {
@@ -450,29 +516,32 @@ OH PLUS
                 <div className="space-y-2">
                   {templates.map((template) => (
                     <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-700">{template.name}</span>
+                      <span className="text-sm text-gray-700 flex-1 truncate">{template.name}</span>
                       <div className="flex items-center space-x-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTemplateAction(template.id, "copy")}
-                          className="h-6 w-6 p-0"
+                          onClick={() => handleTemplateAction(template.id!, "copy")}
+                          className="h-6 w-6 p-0 hover:bg-blue-100"
+                          title="Apply template"
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTemplateAction(template.id, "edit")}
-                          className="h-6 w-6 p-0"
+                          onClick={() => handleTemplateAction(template.id!, "edit")}
+                          className="h-6 w-6 p-0 hover:bg-yellow-100"
+                          title="Edit template"
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTemplateAction(template.id, "delete")}
-                          className="h-6 w-6 p-0"
+                          onClick={() => handleTemplateAction(template.id!, "delete")}
+                          className="h-6 w-6 p-0 hover:bg-red-100"
+                          title="Delete template"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -480,8 +549,12 @@ OH PLUS
                     </div>
                   ))}
                 </div>
-                <Button onClick={handleAddTemplate} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
-                  +Add Template
+                <Button
+                  onClick={handleAddTemplate}
+                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Template
                 </Button>
               </CardContent>
             </Card>
