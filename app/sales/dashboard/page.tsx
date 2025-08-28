@@ -53,13 +53,12 @@ import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
-import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
+import { createDirectCostEstimate, createMultipleCostEstimates } from "@/lib/cost-estimate-service" // Import createMultipleCostEstimates function
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
-import type { QuotationProduct } from "@/lib/types/quotation"
 import { CheckCircle } from "lucide-react"
+import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -699,145 +698,229 @@ function SalesDashboardContent() {
   }
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
+  const [isCreatingCostEstimate, setIsCreatingCostEstimate] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+
   const handleDatesSelected = async (startDate: Date, endDate: Date) => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    console.log("[v0] handleDatesSelected - userData:", userData)
+    console.log("[v0] handleDatesSelected - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleDatesSelected - user:", user)
+    console.log("[v0] handleDatesSelected - actionAfterDateSelection:", actionAfterDateSelection)
+
+    if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleDatesSelected - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
-        title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        title: "Authentication Required",
+        description: `Please log in to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
       })
       return
     }
 
-    setIsCreatingDocument(true)
-    setIsDateRangeDialogOpen(false) // Close dialog immediately
+    if (actionAfterDateSelection === "quotation") {
+      // For quotations, check selectedSites
+      if (selectedSites.length === 0) {
+        toast({
+          title: "No Sites Selected",
+          description: "Please select at least one site to create a quotation.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      // For cost estimates, check selectedProducts
+      if (selectedProducts.length === 0) {
+        toast({
+          title: "No Products Selected",
+          description: "Please select at least one product to create a cost estimate.",
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
-    try {
-      if (actionAfterDateSelection === "cost_estimate") {
-        const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          designation: selectedClientForProposal.designation,
-          address: selectedClientForProposal.address,
-          industry: selectedClientForProposal.industry,
-        }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: `Please select a client to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
+        variant: "destructive",
+      })
+      return
+    }
 
+    if (actionAfterDateSelection === "quotation") {
+      setIsCreatingDocument(true)
+      try {
         const sitesData = selectedSites.map((site) => ({
           id: site.id,
           name: site.name,
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
-        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          address: selectedClientForProposal.address,
+          designation: selectedClientForProposal.designation,
+          industry: selectedClientForProposal.industry,
+        }
+
+        const options = {
           startDate,
           endDate,
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+          created_by_first_name: userData.first_name,
+          created_by_last_name: userData.last_name,
+        }
+
+        console.log("[v0] handleDatesSelected - creating quotation with options:", options)
+
+        let quotationIds: string[]
+
+        if (selectedSites.length > 1) {
+          // Create multiple quotations for multiple sites
+          quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Quotations Created",
+            description: `Successfully created ${quotationIds.length} quotations for the selected sites.`,
+          })
+        } else {
+          // Create single quotation for one site
+          const quotationId = await createDirectQuotation(clientData, sitesData, user.uid, options)
+          quotationIds = [quotationId]
+
+          toast({
+            title: "Quotation Created",
+            description: "Quotation has been created successfully.",
+          })
+        }
+
+        // Navigate to the first quotation
+        router.push(`/sales/quotations/${quotationIds[0]}`)
+      } catch (error) {
+        console.error("Error creating quotation:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create quotation. Please try again.",
+          variant: "destructive",
         })
+      } finally {
+        setIsCreatingDocument(false)
+        setIsDateRangeDialogOpen(false)
+      }
+      return
+    }
+
+    setIsCreatingCostEstimate(true)
+    try {
+      const sitesData = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        location: product.location,
+        price: product.price,
+        type: product.type,
+        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
+      }))
+
+      const clientData = {
+        id: selectedClientForProposal.id,
+        name: selectedClientForProposal.contactPerson,
+        email: selectedClientForProposal.email,
+        company: selectedClientForProposal.company,
+        phone: selectedClientForProposal.phone,
+        address: selectedClientForProposal.address,
+        designation: selectedClientForProposal.designation,
+        industry: selectedClientForProposal.industry,
+      }
+
+      const options = {
+        startDate,
+        endDate,
+        company_id: userData.company_id,
+        page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
+      }
+
+      console.log("[v0] handleDatesSelected - options being passed:", options)
+
+      let costEstimateIds: string[]
+
+      if (selectedProducts.length > 1) {
+        // Create multiple cost estimates for multiple products
+        costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+
+        toast({
+          title: "Cost Estimates Created",
+          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
+        })
+      } else {
+        // Create single cost estimate for one product
+        const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
+        costEstimateIds = [costEstimateId]
 
         toast({
           title: "Cost Estimate Created",
-          description: "Your cost estimate has been created successfully.",
+          description: "Cost estimate has been created successfully.",
         })
-        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
-      } else if (actionAfterDateSelection === "quotation") {
-        // Prepare products for quotation
-        const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
-          product_id: site.id,
-          name: site.name,
-          location: site.specs_rental?.location || site.light?.location || "N/A",
-          price: site.price || 0, // This is the monthly price
-          type: site.type || "Unknown",
-          site_code: getSiteCode(site) || "N/A",
-          media_url: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-        }))
-
-        // Calculate total amount for all selected products
-        const { durationDays, totalAmount } = calculateQuotationTotal(
-          startDate.toISOString(),
-          endDate.toISOString(),
-          quotationItems,
-        )
-
-        const validUntil = new Date()
-        validUntil.setDate(validUntil.getDate() + 5) // Valid for 5 days
-
-        const quotationData = {
-          quotation_number: generateQuotationNumber(),
-          items: quotationItems, // Pass the array of products
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          total_amount: totalAmount,
-          valid_until: validUntil,
-          duration_days: durationDays,
-          status: "draft" as const, // Default status
-          created_by: user.uid,
-          created_by_first_name: userData?.first_name || "",
-          created_by_last_name: userData?.last_name || "",
-          seller_id: user.uid, // Current user as seller
-          company_id: userData?.company_id || "", // Company ID from user data
-          client_name: selectedClientForProposal.contactPerson,
-          client_email: selectedClientForProposal.email,
-          client_id: selectedClientForProposal.id,
-          client_company_name: selectedClientForProposal.company || "",
-          client_designation: selectedClientForProposal.designation || "", // Add client designation
-          client_address: selectedClientForProposal.address || "", // Add client address
-          client_phone: selectedClientForProposal.phone || "", // Add client phone
-        }
-
-        console.log("Final quotationData object being sent:", quotationData)
-
-        const newQuotationId = await createQuotation(quotationData)
-
-        toast({
-          title: "Quotation Created",
-          description: "Your quotation has been created successfully.",
-        })
-        router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error: any) {
-      console.error("Error creating document:", error)
+
+      // Navigate to the first cost estimate
+      router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
+    } catch (error) {
+      console.error("Error creating cost estimate:", error)
       toast({
         title: "Error",
-        description: `Failed to create document: ${error.message || "Unknown error"}`,
+        description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsCreatingDocument(false)
-      setCeQuoteMode(false)
-      setSelectedSites([])
-      setSelectedClientForProposal(null)
-      setActionAfterDateSelection(null)
+      setIsCreatingCostEstimate(false)
+      setShowDatePicker(false)
     }
   }
 
   const handleSkipDates = async () => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    console.log("[v0] handleSkipDates - userData:", userData)
+    console.log("[v0] handleSkipDates - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleSkipDates - user:", user)
+
+    if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleSkipDates - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
-        title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        title: "Authentication Required",
+        description: "Please log in to create a cost estimate.",
         variant: "destructive",
       })
       return
     }
 
     setIsCreatingDocument(true)
-    setIsDateRangeDialogOpen(false) // Close dialog immediately
-
     try {
       if (actionAfterDateSelection === "cost_estimate") {
         const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          designation: selectedClientForProposal.designation,
-          address: selectedClientForProposal.address,
-          industry: selectedClientForProposal.industry,
+          id: selectedClientForProposal!.id,
+          name: selectedClientForProposal!.contactPerson,
+          email: selectedClientForProposal!.email,
+          company: selectedClientForProposal!.company,
+          phone: selectedClientForProposal!.phone,
+          address: selectedClientForProposal!.address,
+          designation: selectedClientForProposal!.designation,
+          industry: selectedClientForProposal!.industry,
         }
 
         const sitesData = selectedSites.map((site) => ({
@@ -846,18 +929,41 @@ function SalesDashboardContent() {
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
-        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+        const options = {
           startDate: undefined,
           endDate: undefined,
-        })
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        }
 
-        toast({
-          title: "Cost Estimate Created",
-          description: "Your cost estimate has been created successfully without dates.",
-        })
-        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+        console.log("[v0] handleSkipDates - options being passed:", options)
+
+        if (selectedSites.length === 1) {
+          // Single site - create one document
+          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Cost Estimate Created",
+            description: "Your cost estimate has been created successfully without dates.",
+          })
+          router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+        } else {
+          // Multiple sites - create separate documents for each site
+          const newCostEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Cost Estimates Created",
+            description: `${newCostEstimateIds.length} cost estimates have been created successfully without dates - one for each selected site.`,
+          })
+
+          // Navigate to the first cost estimate
+          if (newCostEstimateIds.length > 0) {
+            router.push(`/sales/cost-estimates/${newCostEstimateIds[0]}`)
+          }
+        }
       }
     } catch (error) {
       console.error("Error creating cost estimate:", error)

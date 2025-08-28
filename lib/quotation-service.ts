@@ -773,3 +773,260 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
     throw new Error("Failed to copy quotation: " + error.message)
   }
 }
+
+export async function createDirectQuotation(
+  clientData: any,
+  sitesData: any[],
+  userId: string,
+  options: {
+    startDate?: Date
+    endDate?: Date
+    company_id: string
+    page_id?: string
+    created_by_first_name?: string
+    created_by_last_name?: string
+  },
+): Promise<string> {
+  try {
+    if (sitesData.length === 0) {
+      throw new Error("No sites provided for quotation creation")
+    }
+
+    const site = sitesData[0] // Use the first (and should be only) site
+    const quotationNumber = generateQuotationNumber()
+
+    // Calculate duration and total if dates are provided
+    let durationDays = 30 // Default duration
+    let totalAmount = site.price || 0
+
+    if (options.startDate && options.endDate) {
+      const start = new Date(options.startDate)
+      const end = new Date(options.endDate)
+      durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      totalAmount = (site.price || 0) * durationDays
+    }
+
+    const pageId = options.page_id || `PAGE-${Date.now()}`
+
+    const quotationData: Omit<Quotation, "id"> = {
+      quotation_number: quotationNumber,
+      client_name: clientData.name,
+      client_email: clientData.email,
+      client_company_name: clientData.company,
+      client_phone: clientData.phone,
+      client_address: clientData.address,
+      status: "draft",
+      created_by: userId,
+      seller_id: userId,
+      company_id: options.company_id,
+      page_id: pageId,
+      page_number: 1, // Single document gets page number 1
+      created_by_first_name: options.created_by_first_name,
+      created_by_last_name: options.created_by_last_name,
+      start_date: options.startDate?.toISOString().split("T")[0],
+      end_date: options.endDate?.toISOString().split("T")[0],
+      duration_days: durationDays,
+      total_amount: totalAmount,
+      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      items: [
+        {
+          id: site.id, // This serves as the product_id
+          name: site.name,
+          location: site.location,
+          price: site.price || 0,
+          type: site.type,
+          duration_days: durationDays,
+          item_total_amount: totalAmount,
+          media_url: site.image,
+          product_id: site.id,
+        },
+      ],
+      projectCompliance: {
+        signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+      },
+    }
+
+    return await createQuotation(quotationData)
+  } catch (error: any) {
+    console.error("Error creating direct quotation:", error)
+    throw new Error("Failed to create quotation: " + error.message)
+  }
+}
+
+export async function createMultipleQuotations(
+  clientData: any,
+  sitesData: any[],
+  userId: string,
+  options: {
+    startDate?: Date
+    endDate?: Date
+    company_id: string
+    page_id?: string
+    created_by_first_name?: string
+    created_by_last_name?: string
+  },
+): Promise<string[]> {
+  try {
+    if (sitesData.length === 0) {
+      throw new Error("No sites provided for quotation creation")
+    }
+
+    const quotationIds: string[] = []
+    const baseQuotationNumber = generateQuotationNumber()
+    const pageId = options.page_id || `PAGE-${Date.now()}`
+
+    // Calculate duration if dates are provided
+    let durationDays = 30 // Default duration
+    if (options.startDate && options.endDate) {
+      const start = new Date(options.startDate)
+      const end = new Date(options.endDate)
+      durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    }
+
+    // Create a separate quotation for each site
+    for (let i = 0; i < sitesData.length; i++) {
+      const site = sitesData[i]
+      const quotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+      const totalAmount = (site.price || 0) * durationDays
+
+      const quotationData: Omit<Quotation, "id"> = {
+        quotation_number: quotationNumber,
+        client_name: clientData.name,
+        client_email: clientData.email,
+        client_company_name: clientData.company,
+        client_phone: clientData.phone,
+        client_address: clientData.address,
+        status: "draft",
+        created_by: userId,
+        seller_id: userId,
+        company_id: options.company_id,
+        page_id: pageId, // Same page_id for all documents in the batch
+        page_number: i + 1, // Sequential page numbers (1, 2, 3, etc.)
+        created_by_first_name: options.created_by_first_name,
+        created_by_last_name: options.created_by_last_name,
+        start_date: options.startDate?.toISOString().split("T")[0],
+        end_date: options.endDate?.toISOString().split("T")[0],
+        duration_days: durationDays,
+        total_amount: totalAmount,
+        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        items: [
+          {
+            id: site.id, // This serves as the product_id
+            name: site.name,
+            location: site.location,
+            price: site.price || 0,
+            type: site.type,
+            duration_days: durationDays,
+            item_total_amount: totalAmount,
+            media_url: site.image,
+            product_id: site.id,
+          },
+        ],
+        projectCompliance: {
+          signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        },
+      }
+
+      const quotationId = await createQuotation(quotationData)
+      quotationIds.push(quotationId)
+    }
+
+    return quotationIds
+  } catch (error: any) {
+    console.error("Error creating multiple quotations:", error)
+    throw new Error("Failed to create quotations: " + error.message)
+  }
+}
+
+// Get quotations by product ID (for history sidebar)
+export async function getQuotationsByProductId(productId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
+
+      // Check if any item in this quotation matches the product ID
+      const hasMatchingProduct = quotation.items.some((item) => item.id === productId)
+
+      if (hasMatchingProduct) {
+        quotations.push(quotation)
+      }
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by product ID:", error)
+    return []
+  }
+}
+
+// Get quotations by page ID (for pagination between related documents)
+export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("page_id", "==", pageId), orderBy("page_number", "asc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by page ID:", error)
+    return []
+  }
+}
+
+// Get quotations by client ID
+export async function getQuotationsByClientId(clientId: string): Promise<Quotation[]> {
+  try {
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("client.id", "==", clientId))
+    const querySnapshot = await getDocs(q)
+
+    const quotations: Quotation[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        startDate: data.startDate?.toDate() || new Date(),
+        endDate: data.endDate?.toDate() || new Date(),
+        validUntil: data.validUntil?.toDate(),
+      } as Quotation)
+    })
+
+    return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  } catch (error) {
+    console.error("Error fetching quotations by client ID:", error)
+    throw error
+  }
+}
