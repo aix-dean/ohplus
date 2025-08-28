@@ -208,6 +208,7 @@ OH PLUS
     }
 
     setSending(true)
+    console.log("[v0] Starting email send process...")
 
     try {
       const formData = new FormData()
@@ -227,7 +228,9 @@ OH PLUS
 
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
+      formData.append("proposalId", params.id)
 
+      console.log("[v0] Processing attachments...")
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
         try {
@@ -244,11 +247,12 @@ OH PLUS
             }
           }
         } catch (error) {
-          console.error(`Error processing attachment ${attachment.name}:`, error)
+          console.error(`[v0] Error processing attachment ${attachment.name}:`, error)
         }
       }
 
-      const response = await fetch("/api/send-email", {
+      console.log("[v0] Calling proposal email API...")
+      const response = await fetch("/api/proposals/send-email", {
         method: "POST",
         body: formData,
       })
@@ -259,6 +263,7 @@ OH PLUS
         throw new Error(result.error || "Failed to send email")
       }
 
+      console.log("[v0] Email sent successfully!")
       toast({
         title: "Email sent!",
         description: "Your proposal has been sent successfully.",
@@ -266,7 +271,7 @@ OH PLUS
 
       router.back()
     } catch (error) {
-      console.error("Email sending error:", error)
+      console.error("[v0] Email sending error:", error)
       toast({
         title: "Failed to send",
         description: error instanceof Error ? error.message : "Could not send the email. Please try again.",
