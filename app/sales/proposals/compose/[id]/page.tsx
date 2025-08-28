@@ -11,6 +11,7 @@ import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload } from "lucide-reac
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
+import { getProposalById } from "@/lib/proposal-service"
 
 interface ComposeEmailPageProps {
   params: {
@@ -66,52 +67,21 @@ OH PLUS
   useEffect(() => {
     const fetchProposal = async () => {
       try {
-        const mockProposal: Proposal = {
-          id: params.id,
-          code: "AIX",
-          title: "Proposal for AIX - 8/27/2025",
-          client: {
-            name: "AAA Company",
-            company: "AAA Company",
-            contactPerson: "J. King",
-            email: "j.king@aix.ph",
-            phone: "+639XXXXXXXXX",
-            address: "Kalayaan Flyover Site D, Metro Manila",
-          },
-          products: [
-            {
-              id: "1",
-              name: "Billboard Advertisement - Kalayaan Flyover Site D",
-              type: "Billboard",
-              location: "Kalayaan Flyover Site D, EDSA",
-              price: 150000,
-              description: "Premium billboard location with high traffic visibility",
-              specs_rental: {
-                height: 6,
-                width: 12,
-                traffic_count: 50000,
-                audience_type: "Mixed demographics, professionals",
-              },
-            },
-          ],
-          totalAmount: 150000,
-          status: "draft",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-          notes: "Premium location with excellent visibility during peak hours",
-          customMessage: "Thank you for considering OH Plus for your advertising needs.",
+        const proposalData = await getProposalById(params.id)
+
+        if (!proposalData) {
+          throw new Error("Proposal not found")
         }
 
-        setProposal(mockProposal)
+        setProposal(proposalData)
         setEmailData((prev) => ({
           ...prev,
-          to: mockProposal.client.email,
+          to: proposalData.client.email,
           cc: "akoymababaix.com",
-          subject: `Proposal: Proposal for ${mockProposal.code} | Kalayaan Flyover Site D - ${mockProposal.code} - OH Plus`,
+          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
-        await generateProposalPDFs(mockProposal)
+        await generateProposalPDFs(proposalData)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
