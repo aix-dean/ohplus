@@ -68,9 +68,12 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
         <div className="px-6 pb-4">
           <div className="flex items-center space-x-3">
             <div className="w-16 h-12 rounded-lg overflow-hidden flex-shrink-0">
-              {proposal.products && proposal.products.length > 0 && proposal.products[0].image ? (
+              {proposal.products &&
+              proposal.products.length > 0 &&
+              proposal.products[0].media &&
+              proposal.products[0].media.length > 0 ? (
                 <img
-                  src={proposal.products[0].image || "/placeholder.svg"}
+                  src={proposal.products[0].media[0].url || "/placeholder.svg"}
                   alt={proposal.products[0].name}
                   className="w-full h-full object-cover"
                 />
