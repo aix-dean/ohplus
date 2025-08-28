@@ -1495,14 +1495,23 @@ export default function ProposalDetailsPage() {
       {!loading && proposal && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
           {isEditingPrice ? (
-            <Button
-              onClick={handleSavePrice}
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-              disabled={savingPrice}
-            >
-              {savingPrice ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
-              Save
-            </Button>
+            <>
+              <Button
+                onClick={() => setIsEditingPrice(false)}
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePrice}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+                disabled={savingPrice}
+              >
+                {savingPrice ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
+            </>
           ) : (
             <>
               <Button
