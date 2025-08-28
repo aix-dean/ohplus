@@ -69,7 +69,7 @@ export default function ReportViewPage() {
         date: new Date().toISOString().split("T")[0],
         location: product.location || "Guadalupe Viejo",
         assignedTo: "Team A",
-        sales: "aixymbiosis@aix.com",
+        sales: "aixymbiosis@ohplus.ph",
         completionPercentage: 100,
         bookingDates: {
           start: "2025-05-20",
@@ -84,7 +84,7 @@ export default function ReportViewPage() {
         ],
         created: new Date().toISOString(),
         createdBy: user?.uid || "",
-        createdByName: user?.email || "aixymbiosis@aix.com",
+        createdByName: user?.email || "aixymbiosis@ohplus.ph",
       }
 
       // Generate and download PDF
@@ -122,7 +122,7 @@ export default function ReportViewPage() {
       date: new Date().toISOString().split("T")[0],
       location: product.location || "Guadalupe Viejo",
       assignedTo: "Team A",
-      sales: "aixymbiosis@aix.com",
+      sales: "aixymbiosis@ohplus.ph",
       completionPercentage: 100,
       bookingDates: {
         start: "2025-05-20",
@@ -137,7 +137,7 @@ export default function ReportViewPage() {
       ],
       created: new Date().toISOString(),
       createdBy: user?.uid || "",
-      createdByName: user?.email || "aixymbiosis@aix.com",
+      createdByName: user?.email || "aixymbiosis@ohplus.ph",
     }
 
     if (option === "email") {
@@ -176,7 +176,7 @@ export default function ReportViewPage() {
     date: new Date().toISOString().split("T")[0],
     location: product.location || "Guadalupe Viejo",
     assignedTo: "Team A",
-    sales: "aixymbiosis@aix.com",
+    sales: "aixymbiosis@ohplus.ph",
     completionPercentage: 100,
     bookingDates: {
       start: "2025-05-20",
@@ -191,7 +191,7 @@ export default function ReportViewPage() {
     ],
     created: new Date().toISOString(),
     createdBy: user?.uid || "",
-    createdByName: user?.email || "aixymbiosis@aix.com",
+    createdByName: user?.email || "aixymbiosis@ohplus.ph",
   }
 
   return (
@@ -301,7 +301,7 @@ export default function ReportViewPage() {
                   <span className="font-semibold">Technology:</span> N/A
                 </div>
                 <div>
-                  <span className="font-semibold">Sales:</span> aixymbiosis@aix.com
+                  <span className="font-semibold">Sales:</span> aixymbiosis@ohplus.ph
                 </div>
               </div>
             </div>
@@ -344,7 +344,7 @@ export default function ReportViewPage() {
           <div>
             <h3 className="font-semibold mb-2">Prepared by:</h3>
             <div className="text-sm text-gray-600">
-              <div>aixymbiosis@aix.com</div>
+              <div>aixymbiosis@ohplus.ph</div>
               <div>LOGISTICS</div>
               <div>July 10, 2025</div>
             </div>
