@@ -31,9 +31,20 @@ export async function POST(request: NextRequest) {
       currentUserEmail: body.currentUserEmail,
       ccEmail: body.ccEmail,
       hasPreGeneratedPDF: !!body.preGeneratedPDF,
+      hasUploadedFiles: !!body.uploadedFiles,
+      uploadedFilesCount: body.uploadedFiles?.length || 0,
     })
 
-    const { costEstimate, clientEmail, subject, body: customBody, currentUserEmail, ccEmail, preGeneratedPDF } = body
+    const {
+      costEstimate,
+      clientEmail,
+      subject,
+      body: customBody,
+      currentUserEmail,
+      ccEmail,
+      preGeneratedPDF,
+      uploadedFiles,
+    } = body
 
     if (!costEstimate || !clientEmail) {
       console.error("Missing required fields:", { costEstimate: !!costEstimate, clientEmail: !!clientEmail })
@@ -294,26 +305,47 @@ export async function POST(request: NextRequest) {
 
     console.log("Attempting to send email to:", clientEmail)
 
-    // Prepare email data with optional PDF attachment
-    const emailData: any = {
-      from: "OH Plus <noreply@ohplus.ph>",
-      to: [clientEmail],
-      subject: finalSubject, // Use the final subject
-      html: finalBody, // Use the final body
-      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
-      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
-    }
+    const attachments = []
 
     // Add PDF attachment if available
     if (pdfBase64) {
-      emailData.attachments = [
-        {
-          filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.id}.pdf`,
-          content: pdfBase64,
-          type: "application/pdf",
-        },
-      ]
+      attachments.push({
+        filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.id}.pdf`,
+        content: pdfBase64,
+        type: "application/pdf",
+      })
       console.log("PDF attachment added to email")
+    }
+
+    // Add uploaded file attachments if available
+    if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+      uploadedFiles.forEach((file, index) => {
+        if (file.filename && file.content && file.type) {
+          attachments.push({
+            filename: file.filename,
+            content: file.content,
+            type: file.type,
+          })
+          console.log(`Uploaded file attachment ${index + 1} added:`, file.filename)
+        }
+      })
+    }
+
+    console.log(`Total attachments prepared: ${attachments.length}`)
+
+    // Prepare email data with all attachments
+    const emailData: any = {
+      from: "OH Plus <noreply@ohplus.ph>",
+      to: [clientEmail],
+      subject: finalSubject,
+      html: finalBody,
+      reply_to: currentUserEmail ? [currentUserEmail] : undefined,
+      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
+    }
+
+    if (attachments.length > 0) {
+      emailData.attachments = attachments
+      console.log(`${attachments.length} attachment(s) added to email`)
     }
 
     const { data, error } = await resend.emails.send(emailData)
@@ -334,7 +366,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data,
-      message: pdfBase64 ? "Email sent successfully with PDF attachment" : "Email sent successfully",
+      message:
+        attachments.length > 0
+          ? `Email sent successfully with ${attachments.length} attachment(s)`
+          : "Email sent successfully",
     })
   } catch (error) {
     console.error("Email sending error:", error)

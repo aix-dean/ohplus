@@ -475,21 +475,53 @@ ${user?.email || ""}`)
 
     setDownloadingPDF(index)
     try {
-      await generateCostEstimateEmailPDF(targetEstimate, true, userDataForPDF)
-      toast({
-        title: "PDF Downloaded",
-        description: `${attachment} has been downloaded successfully.`,
-      })
+      const pdfBase64 = await generateCostEstimateEmailPDF(targetEstimate, true, userDataForPDF)
+
+      if (typeof pdfBase64 === "string") {
+        // Create blob URL and open in new tab
+        const byteCharacters = atob(pdfBase64)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: "application/pdf" })
+        const url = URL.createObjectURL(blob)
+
+        // Open PDF in new tab
+        window.open(url, "_blank")
+
+        // Clean up the URL after a short delay
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+        toast({
+          title: "PDF Opened",
+          description: `${attachment} has been opened in a new tab.`,
+        })
+      }
     } catch (error) {
-      console.error("Error downloading PDF:", error)
+      console.error("Error opening PDF:", error)
       toast({
         title: "Error",
-        description: "Failed to download PDF. Please try again.",
+        description: "Failed to open PDF. Please try again.",
         variant: "destructive",
       })
     } finally {
       setDownloadingPDF(null)
     }
+  }
+
+  const handleViewUploadedFile = (file: File) => {
+    const url = URL.createObjectURL(file)
+    window.open(url, "_blank")
+
+    // Clean up the URL after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    toast({
+      title: "File Opened",
+      description: `${file.name} has been opened in a new tab.`,
+    })
   }
 
   const handleSuccessDialogClose = () => {
@@ -610,7 +642,12 @@ ${user?.email || ""}`)
                   {uploadedFiles.map((file, index) => (
                     <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
                       <Paperclip className="h-4 w-4 text-gray-500" />
-                      <span className="flex-1 text-sm text-gray-700">{file.name}</span>
+                      <button
+                        className="flex-1 text-sm text-left text-gray-700 hover:text-blue-600 hover:underline"
+                        onClick={() => handleViewUploadedFile(file)}
+                      >
+                        {file.name}
+                      </button>
                       <Button
                         variant="ghost"
                         size="sm"
