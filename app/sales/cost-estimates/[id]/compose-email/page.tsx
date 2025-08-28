@@ -41,6 +41,7 @@ export default function ComposeEmailPage() {
   const [sending, setSending] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
   const [preGeneratedPDF, setPreGeneratedPDF] = useState<string | null>(null)
+  const [preGeneratedPDFs, setPreGeneratedPDFs] = useState<Array<{ filename: string; content: string }>>([]) // Add state for storing all pre-generated PDFs
   const [pdfGenerating, setPdfGenerating] = useState(false)
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
@@ -63,13 +64,14 @@ export default function ComposeEmailPage() {
     userDataRef.current = userData
   }, [userData])
 
-  const preGeneratePDF = useCallback(
-    async (estimate: CostEstimate) => {
-      if (!estimate) return
+  const preGenerateAllPDFs = useCallback(
+    // Update preGeneratePDF to handle multiple PDFs
+    async (mainEstimate: CostEstimate, relatedEstimates: CostEstimate[]) => {
+      if (!mainEstimate) return
 
       setPdfGenerating(true)
       try {
-        console.log("[v0] Pre-generating PDF for email attachment...")
+        console.log("[v0] Pre-generating all PDFs for email attachments...")
         const currentUserData = userDataRef.current
         const userDataForPDF = currentUserData
           ? {
@@ -80,16 +82,59 @@ export default function ComposeEmailPage() {
             }
           : undefined
 
-        const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
-        if (typeof pdfBase64 === "string") {
-          setPreGeneratedPDF(pdfBase64)
-          console.log("[v0] PDF pre-generated successfully for email")
+        const allPDFs: Array<{ filename: string; content: string }> = []
+
+        // Generate PDF for main estimate
+        try {
+          const mainPdfBase64 = await generateCostEstimateEmailPDF(mainEstimate, true, userDataForPDF)
+          if (typeof mainPdfBase64 === "string") {
+            const mainFilename = `QU-SU-${mainEstimate.costEstimateNumber}_${mainEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
+            allPDFs.push({
+              filename: mainFilename,
+              content: mainPdfBase64,
+            })
+            setPreGeneratedPDF(mainPdfBase64) // Keep for backward compatibility
+            console.log("[v0] Main PDF pre-generated successfully")
+          }
+        } catch (error) {
+          console.error("[v0] Error generating main PDF:", error)
+        }
+
+        // Generate PDFs for all related estimates
+        for (let i = 0; i < relatedEstimates.length; i++) {
+          const estimate = relatedEstimates[i]
+          try {
+            console.log(`[v0] Generating PDF ${i + 1}/${relatedEstimates.length} for estimate:`, estimate.id)
+            const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
+            if (typeof pdfBase64 === "string") {
+              const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 1}.pdf`
+              allPDFs.push({
+                filename,
+                content: pdfBase64,
+              })
+              console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
+            }
+          } catch (error) {
+            console.error(`[v0] Error generating PDF for estimate ${estimate.id}:`, error)
+            // Continue with other PDFs even if one fails
+          }
+        }
+
+        setPreGeneratedPDFs(allPDFs)
+        console.log(`[v0] All PDFs pre-generated successfully. Total: ${allPDFs.length}`)
+
+        if (allPDFs.length === 0) {
+          toast({
+            title: "PDF Generation Warning",
+            description: "No PDFs could be generated. Email will be sent without PDF attachments.",
+            variant: "destructive",
+          })
         }
       } catch (error) {
-        console.error("[v0] Error pre-generating PDF:", error)
+        console.error("[v0] Error pre-generating PDFs:", error)
         toast({
           title: "PDF Generation Warning",
-          description: "PDF could not be pre-generated. Email will be sent without PDF attachment.",
+          description: "Some PDFs could not be generated. Email may be sent with fewer attachments.",
           variant: "destructive",
         })
       } finally {
@@ -113,10 +158,9 @@ export default function ComposeEmailPage() {
       const estimate = await getCostEstimate(id)
       setCostEstimate(estimate)
 
-      await preGeneratePDF(estimate)
-
+      let related: CostEstimate[] = []
       if (estimate?.page_id) {
-        const related = await getCostEstimatesByPageId(estimate.page_id)
+        related = await getCostEstimatesByPageId(estimate.page_id)
         setRelatedCostEstimates(related)
 
         const attachmentNames = related.map(
@@ -125,11 +169,14 @@ export default function ComposeEmailPage() {
         )
         setPdfAttachments(attachmentNames)
       } else {
+        related = [estimate]
         setRelatedCostEstimates([estimate])
         setPdfAttachments([
           `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
         ])
       }
+
+      await preGenerateAllPDFs(estimate, related)
 
       setToEmail(estimate.client?.email || "")
       setCcEmail(user?.email || "")
@@ -188,7 +235,7 @@ ${user?.email || ""}`)
     } finally {
       setLoading(false)
     }
-  }, [params.id, user, toast, preGeneratePDF])
+  }, [params.id, user, toast, preGenerateAllPDFs])
 
   useEffect(() => {
     if (userData && !isInitialized && !dataFetched.current) {
@@ -379,7 +426,7 @@ ${user?.email || ""}`)
     try {
       console.log("[v0] Starting email send process...")
       console.log("[v0] Uploaded files count:", uploadedFiles.length)
-      console.log("[v0] Pre-generated PDF available:", !!preGeneratedPDF)
+      console.log("[v0] Pre-generated PDFs available:", preGeneratedPDFs.length)
 
       const uploadedFilesData =
         uploadedFiles.length > 0
@@ -405,11 +452,10 @@ ${user?.email || ""}`)
 
       console.log("[v0] Processed uploaded files:", uploadedFilesData.length)
 
-      const allAttachments = [...pdfAttachments, ...uploadedFiles.map((f) => f.name)]
+      const allAttachments = [...preGeneratedPDFs.map((pdf) => pdf.filename), ...uploadedFiles.map((f) => f.name)]
 
       const requestBody = {
         costEstimate: costEstimate,
-        relatedCostEstimates: relatedCostEstimates,
         clientEmail: toEmail,
         client: costEstimate.client,
         currentUserEmail: user?.email,
@@ -417,16 +463,15 @@ ${user?.email || ""}`)
         subject: subject,
         body: body,
         attachments: allAttachments,
-        preGeneratedPDF: preGeneratedPDF,
+        preGeneratedPDFs: preGeneratedPDFs, // Send all pre-generated PDFs
         uploadedFiles: uploadedFilesData,
       }
 
       console.log("[v0] Sending request with body:", {
         hasCostEstimate: !!requestBody.costEstimate,
-        hasRelatedCostEstimates: !!requestBody.relatedCostEstimates,
         clientEmail: requestBody.clientEmail,
         uploadedFilesCount: uploadedFilesData.length,
-        hasPreGeneratedPDF: !!requestBody.preGeneratedPDF,
+        preGeneratedPDFsCount: preGeneratedPDFs.length,
         totalAttachments: allAttachments.length,
       })
 
@@ -462,24 +507,13 @@ ${user?.email || ""}`)
   }
 
   const handleDownloadAttachment = async (attachment: string, index: number) => {
-    if (!costEstimate || !relatedCostEstimates[index]) return
+    if (preGeneratedPDFs[index]) {
+      // Update attachment viewing to use pre-generated PDFs
+      try {
+        const pdfData = preGeneratedPDFs[index]
 
-    const targetEstimate = relatedCostEstimates[index]
-    const userDataForPDF = user
-      ? {
-          first_name: user.displayName?.split(" ")[0] || "",
-          last_name: user.displayName?.split(" ").slice(1).join(" ") || "",
-          email: user.email || "",
-        }
-      : undefined
-
-    setDownloadingPDF(index)
-    try {
-      const pdfBase64 = await generateCostEstimateEmailPDF(targetEstimate, true, userDataForPDF)
-
-      if (typeof pdfBase64 === "string") {
         // Create blob URL and open in new tab
-        const byteCharacters = atob(pdfBase64)
+        const byteCharacters = atob(pdfData.content)
         const byteNumbers = new Array(byteCharacters.length)
         for (let i = 0; i < byteCharacters.length; i++) {
           byteNumbers[i] = byteCharacters.charCodeAt(i)
@@ -498,16 +532,14 @@ ${user?.email || ""}`)
           title: "PDF Opened",
           description: `${attachment} has been opened in a new tab.`,
         })
+      } catch (error) {
+        console.error("Error opening PDF:", error)
+        toast({
+          title: "Error",
+          description: "Failed to open PDF. Please try again.",
+          variant: "destructive",
+        })
       }
-    } catch (error) {
-      console.error("Error opening PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to open PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setDownloadingPDF(null)
     }
   }
 
@@ -551,10 +583,14 @@ ${user?.email || ""}`)
           </Button>
           <h1 className="text-xl font-semibold">Compose Email</h1>
           {pdfGenerating && (
-            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Preparing PDF...</div>
+            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+              Preparing {relatedCostEstimates.length} PDF(s)...
+            </div>
           )}
-          {preGeneratedPDF && (
-            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">PDF Ready</div>
+          {preGeneratedPDFs.length > 0 && !pdfGenerating && (
+            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+              {preGeneratedPDFs.length} PDF(s) Ready
+            </div>
           )}
         </div>
       </div>
@@ -608,30 +644,26 @@ ${user?.email || ""}`)
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Attachments:</Label>
                 <div className="space-y-2">
-                  {preGeneratedPDF && (
-                    <div className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200">
-                      <Paperclip className="h-4 w-4 text-green-600" />
-                      <span className="flex-1 text-sm text-green-800">Cost Estimate PDF (Ready for email)</span>
-                    </div>
-                  )}
-
-                  {pdfAttachments.map((attachment, index) => (
+                  {preGeneratedPDFs.map((pdf, index) => (
                     <div
                       key={`pdf-${index}`}
-                      className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200"
+                      className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200"
                     >
-                      <Paperclip className="h-4 w-4 text-blue-500" />
+                      <Paperclip className="h-4 w-4 text-green-600" />
                       <button
-                        className="flex-1 text-sm text-left text-blue-600 hover:text-blue-800 hover:underline"
-                        onClick={() => handleDownloadAttachment(attachment, index)}
+                        className="flex-1 text-sm text-left text-green-800 hover:text-green-900 hover:underline"
+                        onClick={() => handleDownloadAttachment(pdf.filename, index)}
                         disabled={downloadingPDF === index}
                       >
-                        {downloadingPDF === index ? "Downloading..." : attachment}
+                        {downloadingPDF === index ? "Opening..." : pdf.filename}
                       </button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removePdfAttachment(index)}
+                        onClick={() => {
+                          setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
+                          setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+                        }}
                         className="h-6 w-6 p-0"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -735,7 +767,11 @@ ${user?.email || ""}`)
             disabled={sending || !toEmail || !subject || pdfGenerating}
             className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
           >
-            {sending ? "Sending..." : pdfGenerating ? "Preparing PDF..." : "Send Email"}
+            {sending
+              ? "Sending..."
+              : pdfGenerating
+                ? `Preparing ${relatedCostEstimates.length} PDF(s)...`
+                : "Send Email"}
           </Button>
         </div>
       </div>

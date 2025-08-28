@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -30,22 +29,19 @@ export async function POST(request: NextRequest) {
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
       ccEmail: body.ccEmail,
-      hasPreGeneratedPDF: !!body.preGeneratedPDF,
-      hasRelatedCostEstimates: !!body.relatedCostEstimates,
-      relatedCostEstimatesCount: body.relatedCostEstimates?.length || 0,
+      preGeneratedPDFsCount: body.preGeneratedPDFs?.length || 0, // Updated to use preGeneratedPDFs array
       hasUploadedFiles: !!body.uploadedFiles,
       uploadedFilesCount: body.uploadedFiles?.length || 0,
     })
 
     const {
       costEstimate,
-      relatedCostEstimates,
       clientEmail,
       subject,
       body: customBody,
       currentUserEmail,
       ccEmail,
-      preGeneratedPDF,
+      preGeneratedPDFs, // Use preGeneratedPDFs array instead of single PDF and relatedCostEstimates
       uploadedFiles,
     } = body
 
@@ -78,12 +74,7 @@ export async function POST(request: NextRequest) {
 
     const costEstimateUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
 
-    const pdfBase64 = preGeneratedPDF || null
-    if (preGeneratedPDF) {
-      console.log("Using pre-generated PDF for email attachment")
-    } else {
-      console.log("No pre-generated PDF available, email will be sent without PDF attachment")
-    }
+    console.log(`Using ${preGeneratedPDFs?.length || 0} pre-generated PDFs for email attachments`)
 
     console.log("Generated cost estimate URL:", costEstimateUrl)
 
@@ -270,10 +261,10 @@ export async function POST(request: NextRequest) {
             </div>
 
             ${
-              pdfBase64
+              preGeneratedPDFs && preGeneratedPDFs.length > 0
                 ? `
             <div class="attachment-note">
-              📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document attached to this email for your convenience.
+              📎 <strong>PDF${preGeneratedPDFs.length > 1 ? "s" : ""} Attached:</strong> You'll find the complete cost estimate document${preGeneratedPDFs.length > 1 ? "s" : ""} attached to this email for your convenience.
             </div>
             `
                 : ""
@@ -310,38 +301,17 @@ export async function POST(request: NextRequest) {
 
     const attachments = []
 
-    if (preGeneratedPDF) {
-      attachments.push({
-        filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.id}.pdf`,
-        content: preGeneratedPDF,
-        type: "application/pdf",
-      })
-      console.log("Main PDF attachment added to email")
-    }
-
-    if (relatedCostEstimates && Array.isArray(relatedCostEstimates) && relatedCostEstimates.length > 1) {
-      console.log(`Generating PDFs for ${relatedCostEstimates.length} related cost estimates`)
-
-      for (let i = 0; i < relatedCostEstimates.length; i++) {
-        const estimate = relatedCostEstimates[i]
-        try {
-          console.log(`Generating PDF for related cost estimate ${i + 1}: ${estimate.id}`)
-          const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true)
-
-          if (typeof pdfBase64 === "string") {
-            const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 1}.pdf`
-            attachments.push({
-              filename: filename,
-              content: pdfBase64,
-              type: "application/pdf",
-            })
-            console.log(`Related PDF attachment ${i + 1} added:`, filename)
-          }
-        } catch (error) {
-          console.error(`Error generating PDF for related cost estimate ${i + 1}:`, error)
-          // Continue with other PDFs even if one fails
+    if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
+      preGeneratedPDFs.forEach((pdf, index) => {
+        if (pdf.filename && pdf.content) {
+          attachments.push({
+            filename: pdf.filename,
+            content: pdf.content,
+            type: "application/pdf",
+          })
+          console.log(`Pre-generated PDF attachment ${index + 1} added:`, pdf.filename)
         }
-      }
+      })
     }
 
     // Add uploaded file attachments if available
