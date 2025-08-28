@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { emailLoggingService } from "@/lib/email-logging-service"
+import { createEmailRecord } from "@/lib/email-record-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -60,50 +60,30 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend error:", error)
-
-      try {
-        await emailLoggingService.logEmail({
-          from: from,
-          to: to,
-          cc: cc,
-          subject: subject,
-          body: body,
-          userId: "system", // You may want to pass actual user ID from request
-          email_type: "report", // Default to report for general email API
-          attachments: attachments.map((att) => ({
-            fileName: att.filename,
-            fileSize: att.content.length,
-            fileType: "application/octet-stream", // Default type
-            fileUrl: "", // Not available for uploaded files
-          })),
-          status: "failed",
-        })
-      } catch (logError) {
-        console.error("Failed to log failed email:", logError)
-      }
-
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     try {
-      await emailLoggingService.logEmail({
+      const attachmentRecords = attachments.map((att) => ({
+        fileName: att.filename,
+        fileSize: att.content.length,
+        fileType: "application/octet-stream", // Default type, could be enhanced
+      }))
+
+      await createEmailRecord({
         from: from,
-        to: to,
+        to: Array.isArray(to) ? to : [to],
         cc: cc,
         subject: subject,
         body: body,
-        userId: "system", // You may want to pass actual user ID from request
-        email_type: "report", // Default to report for general email API
-        attachments: attachments.map((att) => ({
-          fileName: att.filename,
-          fileSize: att.content.length,
-          fileType: "application/octet-stream", // Default type
-          fileUrl: "", // Not available for uploaded files
-        })),
+        email_type: "report", // General email API used primarily for reports
         status: "sent",
+        userId: "system", // Could be enhanced to get actual user ID
+        attachments: attachmentRecords.length > 0 ? attachmentRecords : undefined,
       })
-    } catch (logError) {
-      console.error("Failed to log successful email:", logError)
+    } catch (recordError) {
+      console.error("Failed to create email record:", recordError)
+      // Don't fail the API call if record creation fails
     }
 
     return NextResponse.json({ success: true, data })

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { generateProposalPDF } from "@/lib/pdf-service"
-import { emailLoggingService } from "@/lib/email-logging-service"
+import { createEmailRecord } from "@/lib/email-record-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -322,33 +322,6 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend API error:", error)
-
-      try {
-        await emailLoggingService.logEmail({
-          from: "noreply@ohplus.ph",
-          to: [clientEmail],
-          cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
-          subject: finalSubject,
-          body: typeof finalBody === "string" ? finalBody : finalBody.replace(/<[^>]*>/g, ""), // Strip HTML for logging
-          userId: proposal.userId || "system",
-          email_type: "proposals",
-          proposalId: proposal.id,
-          attachments: pdfBase64
-            ? [
-                {
-                  fileName: `${(proposal.title || "Proposal").replace(/[^a-z0-9]/gi, "_")}_${proposal.id}.pdf`,
-                  fileSize: Math.round(pdfBase64.length * 0.75), // Approximate PDF size
-                  fileType: "application/pdf",
-                  fileUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/proposals/generate-pdf?id=${proposal.id}`,
-                },
-              ]
-            : undefined,
-          status: "failed",
-        })
-      } catch (logError) {
-        console.error("Failed to log failed email:", logError)
-      }
-
       return NextResponse.json(
         {
           success: false,
@@ -360,29 +333,29 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await emailLoggingService.logEmail({
+      await createEmailRecord({
         from: "noreply@ohplus.ph",
         to: [clientEmail],
         cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
         subject: finalSubject,
-        body: typeof finalBody === "string" ? finalBody : finalBody.replace(/<[^>]*>/g, ""), // Strip HTML for logging
-        userId: proposal.userId || "system",
+        body: finalBody,
         email_type: "proposals",
+        status: "sent",
+        userId: currentUserEmail || "system",
         proposalId: proposal.id,
         attachments: pdfBase64
           ? [
               {
                 fileName: `${(proposal.title || "Proposal").replace(/[^a-z0-9]/gi, "_")}_${proposal.id}.pdf`,
-                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate PDF size
+                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate PDF size from base64
                 fileType: "application/pdf",
-                fileUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/proposals/generate-pdf?id=${proposal.id}`,
               },
             ]
           : undefined,
-        status: "sent",
       })
-    } catch (logError) {
-      console.error("Failed to log successful email:", logError)
+    } catch (recordError) {
+      console.error("Failed to create email record:", recordError)
+      // Don't fail the API call if record creation fails
     }
 
     console.log("Email sent successfully:", data)

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { getQuotationById } from "@/lib/quotation-service" // Import to fetch quotation details
-import { emailLoggingService } from "@/lib/email-logging-service"
+import { createEmailRecord } from "@/lib/email-record-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -173,23 +173,6 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend API error:", error)
-
-      try {
-        await emailLoggingService.logEmail({
-          from: "noreply@resend.dev",
-          to: [toEmail],
-          cc: ccEmail ? ccEmail.split(",").map((email: string) => email.trim()) : undefined,
-          subject: subject,
-          body: emailBody,
-          userId: "system", // You may want to pass actual user ID
-          email_type: "quotation",
-          quotationId: quotationId,
-          status: "failed",
-        })
-      } catch (logError) {
-        console.error("Failed to log failed email:", logError)
-      }
-
       return NextResponse.json(
         {
           error: "Failed to send email",
@@ -200,19 +183,20 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await emailLoggingService.logEmail({
+      await createEmailRecord({
         from: "noreply@resend.dev",
         to: [toEmail],
         cc: ccEmail ? ccEmail.split(",").map((email: string) => email.trim()) : undefined,
         subject: subject,
-        body: emailBody,
-        userId: "system", // You may want to pass actual user ID
+        body: emailHtml,
         email_type: "quotation",
-        quotationId: quotationId,
         status: "sent",
+        userId: replyToEmail || "system",
+        quotationId: quotationId,
       })
-    } catch (logError) {
-      console.error("Failed to log successful email:", logError)
+    } catch (recordError) {
+      console.error("Failed to create email record:", recordError)
+      // Don't fail the API call if record creation fails
     }
 
     console.log("Email sent successfully:", data)
