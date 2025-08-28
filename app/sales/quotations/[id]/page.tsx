@@ -46,6 +46,7 @@ import {
 import { generateQuotationPDF } from "@/lib/quotation-pdf-service" // Use quotation PDF service
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Use quotation success dialog
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
+import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 
 interface CompanyData {
   id: string
@@ -207,14 +208,30 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     try {
       if (userData?.company_id) {
         // Fetch company data logic here
-        setCompanyData({
-          name: "Golden Touch Imaging Specialist",
-          photo_url: "/oh-plus-logo.png",
-          id: userData?.company_id,
-        })
+        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+        if (companyDoc.exists()) {
+          const companyInfo = companyDoc.data() as CompanyData
+          setCompanyData({
+            ...companyInfo,
+            id: userData.company_id,
+          })
+        } else {
+          // Fallback if company not found
+          setCompanyData({
+            name: "Company Name",
+            photo_url: "/oh-plus-logo.png",
+            id: userData?.company_id,
+          })
+        }
       }
     } catch (error) {
       console.error("Error fetching company data:", error)
+      // Set fallback data on error
+      setCompanyData({
+        name: "Company Name",
+        photo_url: "/oh-plus-logo.png",
+        id: userData?.company_id,
+      })
     }
   }
 
