@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ export default function ComposeEmailPage() {
   const { user, userData } = useAuth()
 
   const dataFetched = useRef(false)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
@@ -55,38 +56,37 @@ export default function ComposeEmailPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (dataFetched.current) return
+  const fetchData = useCallback(async () => {
+    if (dataFetched.current || !userData) return
 
-      try {
-        console.log("[v0] fetchData called with userData:", userData)
-        console.log("[v0] userData.company_id:", userData?.company_id)
+    try {
+      console.log("[v0] fetchData called with userData:", userData)
+      console.log("[v0] userData.company_id:", userData?.company_id)
 
-        const id = params.id as string
-        const estimate = await getCostEstimate(id)
-        setCostEstimate(estimate)
+      const id = params.id as string
+      const estimate = await getCostEstimate(id)
+      setCostEstimate(estimate)
 
-        if (estimate?.page_id) {
-          const related = await getCostEstimatesByPageId(estimate.page_id)
-          setRelatedCostEstimates(related)
+      if (estimate?.page_id) {
+        const related = await getCostEstimatesByPageId(estimate.page_id)
+        setRelatedCostEstimates(related)
 
-          const attachmentNames = related.map(
-            (est, index) =>
-              `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
-          )
-          setAttachments(attachmentNames)
-        } else {
-          setRelatedCostEstimates([estimate])
-          setAttachments([
-            `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
-          ])
-        }
+        const attachmentNames = related.map(
+          (est, index) =>
+            `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
+        )
+        setAttachments(attachmentNames)
+      } else {
+        setRelatedCostEstimates([estimate])
+        setAttachments([
+          `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
+        ])
+      }
 
-        setToEmail(estimate.client?.email || "")
-        setCcEmail(user?.email || "")
-        setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
-        setBody(`Hi ${estimate.client?.contactPerson || estimate.client?.company || "Valued Client"},
+      setToEmail(estimate.client?.email || "")
+      setCcEmail(user?.email || "")
+      setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
+      setBody(`Hi ${estimate.client?.contactPerson || estimate.client?.company || "Valued Client"},
 
 I hope you're doing well!
 
@@ -101,55 +101,55 @@ OH Plus
 ${userData?.phone_number || ""}
 ${user?.email || ""}`)
 
-        const companyId = userData?.company_id || estimate?.company_id
-        console.log("[v0] Final companyId being used:", companyId)
+      const companyId = userData?.company_id || estimate?.company_id
+      console.log("[v0] Final companyId being used:", companyId)
 
-        if (companyId) {
-          try {
-            console.log("[v0] Using company_id:", companyId)
-            const userTemplates = await emailService.getEmailTemplates(companyId)
-            if (userTemplates.length === 0) {
-              await emailService.createDefaultTemplates(companyId)
-              const newTemplates = await emailService.getEmailTemplates(companyId)
-              setTemplates(newTemplates)
-            } else {
-              setTemplates(userTemplates)
-            }
-          } catch (error) {
-            console.error("Error fetching templates:", error)
-            setTemplates([])
+      if (companyId) {
+        try {
+          console.log("[v0] Using company_id:", companyId)
+          const userTemplates = await emailService.getEmailTemplates(companyId)
+          if (userTemplates.length === 0) {
+            await emailService.createDefaultTemplates(companyId)
+            const newTemplates = await emailService.getEmailTemplates(companyId)
+            setTemplates(newTemplates)
+          } else {
+            setTemplates(userTemplates)
           }
-        } else {
-          console.error("Company ID not found in user data or cost estimate")
-          console.log("[v0] userData:", userData)
-          console.log("[v0] estimate company_id:", estimate?.company_id)
-
-          console.warn("No company_id available, continuing without templates")
+        } catch (error) {
+          console.error("Error fetching templates:", error)
           setTemplates([])
         }
+      } else {
+        console.error("Company ID not found in user data or cost estimate")
+        console.log("[v0] userData:", userData)
+        console.log("[v0] estimate company_id:", estimate?.company_id)
 
-        dataFetched.current = true
-      } catch (error) {
-        console.error("Error fetching cost estimate:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load cost estimate data",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
+        console.warn("No company_id available, continuing without templates")
+        setTemplates([])
       }
-    }
 
-    if (userData !== null && userData !== undefined && !dataFetched.current) {
+      dataFetched.current = true
+      setIsInitialized(true)
+    } catch (error) {
+      console.error("Error fetching cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load cost estimate data",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [params.id, userData, user, toast])
+
+  useEffect(() => {
+    if (userData && !isInitialized) {
       console.log("[v0] userData is available, calling fetchData")
       fetchData()
     } else if (userData === null) {
       setLoading(false)
-    } else {
-      console.log("[v0] userData not yet available or data already fetched:", userData, dataFetched.current)
     }
-  }, [params.id, user, toast]) // Removed userData from dependency array to prevent infinite loops
+  }, [userData, isInitialized, fetchData])
 
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
@@ -335,52 +335,74 @@ ${user?.email || ""}`)
 
     setSending(true)
     try {
-      const uploadedFilesData = await Promise.all(
-        uploadedFiles.map(async (file) => {
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = () => {
-              const result = reader.result as string
-              resolve(result.split(",")[1]) // Remove data:type;base64, prefix
-            }
-            reader.readAsDataURL(file)
-          })
+      console.log("[v0] Starting email send process...")
+      console.log("[v0] Uploaded files count:", uploadedFiles.length)
 
-          return {
-            filename: file.name,
-            content: base64,
-            type: file.type,
-          }
-        }),
-      )
+      const uploadedFilesData =
+        uploadedFiles.length > 0
+          ? await Promise.all(
+              uploadedFiles.map(async (file) => {
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    const result = reader.result as string
+                    resolve(result.split(",")[1]) // Remove data:type;base64, prefix
+                  }
+                  reader.readAsDataURL(file)
+                })
+
+                return {
+                  filename: file.name,
+                  content: base64,
+                  type: file.type,
+                }
+              }),
+            )
+          : []
+
+      console.log("[v0] Processed uploaded files:", uploadedFilesData.length)
+
+      const requestBody = {
+        costEstimate: costEstimate,
+        relatedCostEstimates: relatedCostEstimates,
+        clientEmail: toEmail,
+        client: costEstimate.client,
+        currentUserEmail: user?.email,
+        ccEmail: ccEmail,
+        subject: subject,
+        body: body,
+        attachments: attachments,
+        uploadedFiles: uploadedFilesData,
+      }
+
+      console.log("[v0] Sending request with body:", {
+        hasCostEstimate: !!requestBody.costEstimate,
+        hasRelatedCostEstimates: !!requestBody.relatedCostEstimates,
+        clientEmail: requestBody.clientEmail,
+        uploadedFilesCount: requestBody.uploadedFiles.length,
+      })
 
       const response = await fetch("/api/cost-estimates/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          costEstimate: costEstimate,
-          relatedCostEstimates: relatedCostEstimates,
-          clientEmail: toEmail,
-          client: costEstimate.client,
-          currentUserEmail: user?.email,
-          ccEmail: ccEmail,
-          subject: subject,
-          body: body,
-          attachments: attachments,
-          uploadedFiles: uploadedFilesData, // Send processed file data instead of File objects
-        }),
+        body: JSON.stringify(requestBody),
       })
 
+      console.log("[v0] Response status:", response.status)
+
       const result = await response.json()
+      console.log("[v0] Response result:", result)
+
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to send email")
       }
 
+      console.log("[v0] Email sent successfully!")
       setShowSuccessDialog(true)
     } catch (error) {
-      console.error("Error sending email:", error)
+      console.error("[v0] Error sending email:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to send email. Please try again.",
