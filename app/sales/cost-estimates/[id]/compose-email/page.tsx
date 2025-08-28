@@ -65,7 +65,6 @@ export default function ComposeEmailPage() {
   }, [userData])
 
   const preGenerateAllPDFs = useCallback(
-    // Update preGeneratePDF to handle multiple PDFs
     async (mainEstimate: CostEstimate, relatedEstimates: CostEstimate[]) => {
       if (!mainEstimate) return
 
@@ -100,14 +99,16 @@ export default function ComposeEmailPage() {
           console.error("[v0] Error generating main PDF:", error)
         }
 
-        // Generate PDFs for all related estimates
-        for (let i = 0; i < relatedEstimates.length; i++) {
-          const estimate = relatedEstimates[i]
+        const uniqueRelatedEstimates = relatedEstimates.filter((estimate) => estimate.id !== mainEstimate.id)
+
+        // Generate PDFs for unique related estimates only
+        for (let i = 0; i < uniqueRelatedEstimates.length; i++) {
+          const estimate = uniqueRelatedEstimates[i]
           try {
-            console.log(`[v0] Generating PDF ${i + 1}/${relatedEstimates.length} for estimate:`, estimate.id)
+            console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedEstimates.length} for estimate:`, estimate.id)
             const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
             if (typeof pdfBase64 === "string") {
-              const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 1}.pdf`
+              const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 2}.pdf`
               allPDFs.push({
                 filename,
                 content: pdfBase64,
@@ -163,13 +164,17 @@ export default function ComposeEmailPage() {
         related = await getCostEstimatesByPageId(estimate.page_id)
         setRelatedCostEstimates(related)
 
-        const attachmentNames = related.map(
-          (est, index) =>
-            `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
-        )
+        const uniqueRelated = related.filter((est) => est.id !== estimate.id)
+        const attachmentNames = [
+          `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
+          ...uniqueRelated.map(
+            (est, index) =>
+              `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 2}.pdf`,
+          ),
+        ]
         setPdfAttachments(attachmentNames)
       } else {
-        related = [estimate]
+        related = []
         setRelatedCostEstimates([estimate])
         setPdfAttachments([
           `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
