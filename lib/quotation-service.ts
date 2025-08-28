@@ -1161,3 +1161,5 @@ export async function getQuotationsByClientId(clientId: string): Promise<Quotati
     throw error
   }
 }
+
+export { getQuotationById as getQuotation }
