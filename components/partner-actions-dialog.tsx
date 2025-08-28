@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Phone, Mail, Globe } from "lucide-react"
+import { Phone, Mail, Globe } from "lucide-react"
 
 interface Partner {
   id: string
@@ -41,12 +41,8 @@ export function PartnerActionsDialog({ isOpen, onClose, partner }: PartnerAction
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[280px] p-0 gap-0">
-        <div className="relative p-6">
-          <Button variant="ghost" size="icon" className="absolute right-2 top-2 h-6 w-6 rounded-full" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-
-          <div className="space-y-3 pt-4">
+        <div className="p-6">
+          <div className="space-y-3">
             <Button
               onClick={handleCall}
               className="w-full bg-green-500 hover:bg-green-600 text-white rounded-full py-3 h-auto"
