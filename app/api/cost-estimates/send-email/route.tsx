@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Request body received:", {
       hasCostEstimate: !!body.costEstimate,
+      hasCostEstimateIds: !!body.costEstimateIds,
       hasClientEmail: !!body.clientEmail,
       costEstimateId: body.costEstimate?.id,
       customSubject: body.subject,
@@ -35,7 +36,8 @@ export async function POST(request: NextRequest) {
     })
 
     const {
-      costEstimate,
+      costEstimate: singleCostEstimate,
+      costEstimateIds,
       clientEmail,
       client,
       currentUserEmail,
@@ -45,10 +47,50 @@ export async function POST(request: NextRequest) {
       attachments,
     } = body
 
-    if (!costEstimate || !clientEmail || !client || !subject || !customBody) {
+    if ((!singleCostEstimate && !costEstimateIds) || !clientEmail || !client || !subject || !customBody) {
       console.error("Missing required fields")
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
+
+    const costEstimates = []
+
+    if (costEstimateIds && Array.isArray(costEstimateIds)) {
+      // Fetch multiple cost estimates
+      console.log("Fetching multiple cost estimates:", costEstimateIds)
+      for (const id of costEstimateIds) {
+        try {
+          const docRef = doc(db, "costEstimates", id)
+          const docSnap = await getDoc(docRef)
+          if (docSnap.exists()) {
+            costEstimates.push({ id: docSnap.id, ...docSnap.data() })
+          }
+        } catch (fetchError) {
+          console.error(`Error fetching cost estimate ${id}:`, fetchError)
+        }
+      }
+    } else if (singleCostEstimate?.id) {
+      // Fetch single cost estimate or use provided data
+      try {
+        const docRef = doc(db, "costEstimates", singleCostEstimate.id)
+        const docSnap = await getDoc(docRef)
+        if (docSnap.exists()) {
+          costEstimates.push({ id: docSnap.id, ...docSnap.data() })
+        } else {
+          // Use provided data if not found in database
+          costEstimates.push(singleCostEstimate)
+        }
+      } catch (fetchError) {
+        console.error("Error fetching cost estimate:", fetchError)
+        costEstimates.push(singleCostEstimate)
+      }
+    }
+
+    if (costEstimates.length === 0) {
+      console.error("No cost estimates found")
+      return NextResponse.json({ error: "No cost estimates found" }, { status: 404 })
+    }
+
+    console.log(`Processing ${costEstimates.length} cost estimate(s)`)
 
     // Validate email format for 'To'
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -73,17 +115,42 @@ export async function POST(request: NextRequest) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
 
-    let pdfBase64 = null
-    try {
-      console.log("Generating PDF for email attachment...")
-      pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true) // Simple single PDF generation
-      console.log("PDF generated successfully for email attachment")
-    } catch (pdfError) {
-      console.error("Error generating PDF:", pdfError)
-      // Continue without PDF attachment if generation fails
+    const pdfAttachments = []
+    const attachmentInfo = []
+
+    for (let i = 0; i < costEstimates.length; i++) {
+      const costEstimate = costEstimates[i]
+      try {
+        console.log(`Generating PDF ${i + 1} for cost estimate:`, costEstimate.id)
+        const pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true)
+
+        if (pdfBase64) {
+          const filename = `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`
+
+          pdfAttachments.push({
+            filename,
+            content: pdfBase64,
+            type: "application/pdf",
+          })
+
+          attachmentInfo.push({
+            fileName: filename,
+            fileSize: Math.round(pdfBase64.length * 0.75),
+            fileType: "application/pdf",
+            fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${filename}`,
+          })
+
+          console.log(`PDF ${i + 1} generated successfully`)
+        }
+      } catch (pdfError) {
+        console.error(`Error generating PDF ${i + 1}:`, pdfError)
+        // Continue with other PDFs if one fails
+      }
     }
+
+    const primaryCostEstimate = costEstimates[0]
+    const totalEstimatedCost = costEstimates.reduce((sum, ce) => sum + (ce.totalAmount || 0), 0)
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -232,35 +299,35 @@ export async function POST(request: NextRequest) {
               <div class="cost-estimate-summary">
                 <h3 style="margin-top: 0; color: #1f2937;">Cost Estimate Summary</h3>
                 <div class="summary-item">
-                  <span class="summary-label">Estimate Title:</span>
-                  <span class="summary-value">${costEstimate.title || "Custom Cost Estimate"}</span>
+                  <span class="summary-label">Number of Estimates:</span>
+                  <span class="summary-value">${costEstimates.length} cost estimate${costEstimates.length > 1 ? "s" : ""}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">Number of Line Items:</span>
-                  <span class="summary-value">${costEstimate.lineItems?.length || 0} cost components</span>
+                  <span class="summary-label">Total Line Items:</span>
+                  <span class="summary-value">${costEstimates.reduce((sum, ce) => sum + (ce.lineItems?.length || 0), 0)} cost components</span>
                 </div>
                 <div class="summary-item">
                   <span class="summary-label">Created Date:</span>
-                  <span class="summary-value">${new Date(costEstimate.createdAt).toLocaleDateString()}</span>
+                  <span class="summary-value">${new Date(primaryCostEstimate.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
 
               <div class="total-amount">
-                Total Estimated Cost: ₱${(costEstimate.totalAmount || 0).toLocaleString()}
+                Total Estimated Cost: ₱${totalEstimatedCost.toLocaleString()}
               </div>
 
               ${
-                pdfBase64
+                pdfAttachments.length > 0
                   ? `
               <div class="attachment-note">
-                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document attached to this email for your convenience.
+                📎 <strong>PDF${pdfAttachments.length > 1 ? "s" : ""} Attached:</strong> You'll find ${pdfAttachments.length > 1 ? "the complete cost estimate documents" : "the complete cost estimate document"} attached to this email for your convenience.
               </div>
               `
                   : ""
               }
 
               <div class="action-button">
-                <a href="${costEstimateUrl}" class="btn">View Full Cost Estimate Online</a>
+                <a href="${baseUrl}/cost-estimates/view/${primaryCostEstimate.id}" class="btn">View Cost Estimate${costEstimates.length > 1 ? "s" : ""} Online</a>
               </div>
 
               <p>This detailed cost estimate includes all aspects of your advertising campaign. We believe this estimate provides excellent value and aligns with your marketing objectives.</p>
@@ -299,16 +366,9 @@ export async function POST(request: NextRequest) {
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
     }
 
-    // Add PDF attachment if generated successfully
-    if (pdfBase64) {
-      emailData.attachments = [
-        {
-          filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
-          content: pdfBase64,
-          type: "application/pdf",
-        },
-      ]
-      console.log("PDF attachment added to email")
+    if (pdfAttachments.length > 0) {
+      emailData.attachments = pdfAttachments
+      console.log(`${pdfAttachments.length} PDF attachment(s) added to email`)
     }
 
     const { data, error } = await resend.emails.send(emailData)
@@ -335,26 +395,18 @@ export async function POST(request: NextRequest) {
         subject: subject,
         body: customBody,
         status: "sent",
+        type: "cost estimate", // Added type field
         created: serverTimestamp(),
         sentAt: serverTimestamp(),
         updated: serverTimestamp(),
-        userId: costEstimate.created_by || "",
-        reportId: costEstimate.id,
+        userId: primaryCostEstimate.created_by || "",
+        reportId: primaryCostEstimate.id,
         templateId: "",
-        attachments: pdfBase64
-          ? [
-              {
-                fileName: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
-                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate size from base64
-                fileType: "application/pdf",
-                fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
-              },
-            ]
-          : [],
+        attachments: attachmentInfo,
       }
 
       await addDoc(collection(db, "emails"), emailDoc)
-      console.log("Email document created in emails collection")
+      console.log("Email document created in emails collection with type: cost estimate")
     } catch (emailDocError) {
       console.error("Error creating email document:", emailDocError)
       // Don't fail the request if email doc creation fails
@@ -363,9 +415,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data,
-      message: pdfBase64
-        ? "Email sent successfully with PDF attachment"
-        : "Email sent successfully without PDF attachment",
+      message:
+        pdfAttachments.length > 0
+          ? `Email sent successfully with ${pdfAttachments.length} PDF attachment(s)`
+          : "Email sent successfully without PDF attachments",
     })
   } catch (error) {
     console.error("Email sending error:", error)
