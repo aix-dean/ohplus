@@ -25,10 +25,8 @@ import {
   Loader2,
   LayoutGrid,
   Pencil,
-  CalendarIcon,
   Save,
   X,
-
   Building,
   History,
 } from "lucide-react"
@@ -45,7 +43,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { generateQuotationPDF, generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service" // Use quotation PDF service
+import { generateQuotationPDF } from "@/lib/quotation-pdf-service" // Use quotation PDF service
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Use quotation success dialog
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 
@@ -476,14 +474,33 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     return (
       <div key={siteName} className="p-8 bg-white">
-        {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-6">Golden Touch Imaging Specialist</h1>
-        </div>
-
-        {/* Client and RFQ Info */}
         <div className="flex justify-between items-start mb-8">
-          <div className="text-left">
+          {/* Company Logo and Name */}
+          <div className="flex items-center gap-4">
+            {companyData?.photo_url ? (
+              <img
+                src={companyData.photo_url || "/placeholder.svg"}
+                alt="Company Logo"
+                className="h-16 w-auto object-contain"
+              />
+            ) : (
+              <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Building className="h-8 w-8 text-gray-400" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {companyData?.name || "Golden Touch Imaging Specialist"}
+              </h1>
+              <p className="text-sm text-gray-600">
+                No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53
+              </p>
+              <p className="text-sm text-gray-600">email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
+            </div>
+          </div>
+
+          {/* Client Info and RFQ Number */}
+          <div className="text-right">
             {isEditing && editingField === "client_name" ? (
               <Input
                 type="text"
@@ -511,12 +528,12 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 type="text"
                 value={tempValues.client_company || ""}
                 onChange={(e) => updateTempValues("client_company", e.target.value)}
-                className="w-64 h-8 text-base"
+                className="w-64 h-8 text-base mb-2"
                 placeholder="Enter company name"
               />
             ) : (
               <p
-                className={`text-base font-medium ${
+                className={`text-base font-medium mb-2 ${
                   isEditing
                     ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
                     : ""
@@ -527,24 +544,32 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </p>
             )}
-          </div>
-          <div className="text-right">
-            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotationNumber}</p>{" "}
+
+            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotationNumber}</p>
           </div>
         </div>
 
-        {/* Company Header */}
+        <div className="text-right mb-6">
+          <p className="text-base">{formatDate(new Date())}</p>
+        </div>
+
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-4">GOLDEN TOUCH IMAGING SPECIALIST</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            {items[0]?.siteLocation || item?.location || "SITE NAME"} QUOTATION
+          </h2>
+        </div>
+
+        <div className="mb-8">
           <p className="text-base mb-2">Good Day! Thank you for considering Golden Touch for your business needs.</p>
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
         </div>
+
         {/* Site Details - Updated for quotation data structure */}
         <div className="mb-8 space-y-3">
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Site Location:</span>
-            <span className="font-bold">{items[0]?.siteLocation || "Site Location"}</span>
+            <span className="font-bold">{items[0]?.siteLocation || item?.location || "Site Location"}</span>
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Type:</span>
@@ -575,11 +600,14 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Lease Rate/Month:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
+            <span className="font-bold">PHP {(items[0]?.price || 0).toLocaleString()} (Exclusive of VAT)</span>
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Total Lease:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
+            <span className="font-bold">
+              PHP {((items[0]?.price || 0) * Math.ceil((currentQuotation.durationDays || 180) / 30)).toLocaleString()}{" "}
+              (Exclusive of VAT)
+            </span>
           </div>
         </div>
 
@@ -605,10 +633,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="text-base">x {Math.ceil((currentQuotation.durationDays || 180) / 30)} months</span>
             <div className="text-right">
               <div className="text-lg font-bold">
-                PHP {((items[0]?.price || 0) * Math.ceil((currentQuotation.durationDays || 180) / 30)).toLocaleString()}
+                {((items[0]?.price || 0) * Math.ceil((currentQuotation.durationDays || 180) / 30)).toLocaleString()}
               </div>
               <div className="text-lg font-bold">
-                PHP{" "}
                 {(
                   (items[0]?.price || 0) *
                   Math.ceil((currentQuotation.durationDays || 180) / 30) *
@@ -616,7 +643,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 ).toLocaleString()}
               </div>
               <div className="text-lg font-bold">
-                PHP{" "}
                 {(
                   (items[0]?.price || 0) *
                   Math.ceil((currentQuotation.durationDays || 180) / 30) *
@@ -653,17 +679,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Date */}
-        <div className="mb-8 text-right">
-          <p className="text-base">{formatDate(new Date())}</p>
-        </div>
-
-        {/* Site Location Header */}
-        <div className="mb-8 text-center">
-          <h3 className="text-xl font-bold">{item.location} QUOTATION</h3>
-        </div>
-
-        {/* Signature Section - Updated for quotation signatures */}
         <div className="mb-8">
           <div className="flex justify-between items-start">
             {/* Left side - Company signature */}
@@ -887,22 +902,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         <div className="flex gap-6 items-start">
           <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
-                {companyData?.photo_url ? (
-                  <img
-                    src={companyData.photo_url || "/placeholder.svg"}
-                    alt="Company Logo"
-                    className="h-16 w-auto object-contain"
-                  />
-                ) : (
-                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Building className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
-            </div>
             {hasMultipleSites ? (
               <>
                 {renderQuotationBlock(
@@ -974,7 +973,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                       </span>
                     </div>
                   </div>
-                )}
+                ))}
                 {currentQuotation.client_phone && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
