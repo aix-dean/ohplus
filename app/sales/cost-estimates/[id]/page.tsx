@@ -1,11 +1,17 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getCostEstimate, updateCostEstimateStatus, updateCostEstimate } from "@/lib/cost-estimate-service"
+import {
+  getCostEstimate,
+  updateCostEstimate,
+  getCostEstimatesByPageId,
+  getCostEstimatesByClientId, // Import new function
+  updateCostEstimateStatus, // Import updateCostEstimateStatus
+} from "@/lib/cost-estimate-service"
 import type {
   CostEstimate,
   CostEstimateClient,
@@ -32,6 +38,7 @@ import {
   Save,
   X,
   Building,
+  History,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -65,14 +72,35 @@ interface CompanyData {
   contact_person?: string
   email?: string
   phone?: string
-  social_media?: {
-    facebook?: string
-    instagram?: string
-    youtube?: string
-  }
+  social_media?: any
   created_by?: string
   created?: Date
   updated?: Date
+}
+
+const formatCompanyAddress = (companyData: CompanyData | null): string => {
+  if (!companyData) return ""
+
+  // Model 1: company_location as string (e.g., "727 Gen Solano St Manila")
+  if (companyData.company_location && typeof companyData.company_location === "string") {
+    return companyData.company_location
+  }
+
+  // Model 2: address as object with city, province, street
+  if (companyData.address && typeof companyData.address === "object") {
+    const { street, city, province } = companyData.address
+    const addressParts = [street, city, province].filter(
+      (part) => part && part.trim() !== "" && !part.toLowerCase().includes("default"),
+    )
+    return addressParts.join(", ")
+  }
+
+  // Model 3: address as string
+  if (companyData.address && typeof companyData.address === "string") {
+    return companyData.address
+  }
+
+  return ""
 }
 
 // Helper function to generate QR code URL
@@ -96,15 +124,17 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
-export default function CostEstimateDetailsPage({ params }: { params: { id: string } }) {
+export default function CostEstimatePage({ params }: { params: { id: string } }) {
+  const { id: costEstimateId } = params
   const router = useRouter()
   const { user, userData } = useAuth()
 
   const { toast } = useToast()
 
-  const costEstimateId = params.id
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
+  const [relatedCostEstimates, setRelatedCostEstimates] = useState<CostEstimate[]>([])
+  const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
@@ -125,10 +155,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
-
+  const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     console.log("[v0] Save button visibility check:", {
@@ -281,6 +313,18 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
           }
           break
+
+        case "size":
+          updatedCostEstimate.size = newValue
+          break
+
+        case "signatureName":
+          updatedCostEstimate.signatureName = newValue
+          break
+
+        case "signaturePosition":
+          updatedCostEstimate.signaturePosition = newValue
+          break
       }
     })
 
@@ -375,6 +419,7 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           id: companyDoc.id,
           name: companyDataResult.name,
           company_location: companyDataResult.company_location || companyDataResult.address,
+          address: companyDataResult.address,
           company_website: companyDataResult.company_website || companyDataResult.website,
           photo_url: companyDataResult.photo_url,
           contact_person: companyDataResult.contact_person,
@@ -399,6 +444,22 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     }
   }
 
+  const fetchClientHistory = useCallback(async () => {
+    if (!costEstimate?.client?.id) return
+
+    setLoadingHistory(true)
+    try {
+      const history = await getCostEstimatesByClientId(costEstimate.client.id)
+      // Filter out current cost estimate from history
+      const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
+      setClientHistory(filteredHistory)
+    } catch (error) {
+      console.error("Error fetching client history:", error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [costEstimate?.client?.id, costEstimate?.id])
+
   useEffect(() => {
     const fetchCostEstimateData = async () => {
       if (!costEstimateId) return
@@ -408,7 +469,22 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
         const ce = await getCostEstimate(costEstimateId)
         if (ce) {
           setCostEstimate(ce)
-          setEditableCostEstimate(ce) // Initialize editable state
+          setEditableCostEstimate(ce)
+
+          console.log("[v0] Current cost estimate page_id:", ce.page_id)
+
+          if (ce.page_id) {
+            const relatedCEs = await getCostEstimatesByPageId(ce.page_id)
+            console.log("[v0] Related cost estimates found:", relatedCEs.length, relatedCEs)
+            setRelatedCostEstimates(relatedCEs)
+            // Find current page index
+            const currentIndex = relatedCEs.findIndex((rce) => rce.id === ce.id)
+            console.log("[v0] Current page index:", currentIndex)
+            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+          } else {
+            console.log("[v0] No page_id found for this cost estimate")
+          }
+
           if (ce.proposalId) {
             const linkedProposal = await getProposal(ce.proposalId)
             setProposal(linkedProposal)
@@ -445,6 +521,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   }, [user, userData])
 
   useEffect(() => {
+    if (costEstimate?.client?.id) {
+      fetchClientHistory()
+    }
+  }, [fetchClientHistory])
+
+  useEffect(() => {
     const fetchProjectData = async () => {
       // Simulate fetching project data
       setProjectData({
@@ -469,6 +551,10 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       }
     }
   }, [isSendEmailDialogOpen, costEstimate, user])
+
+  const handleSendEmail = () => {
+    router.push(`/sales/cost-estimates/${params.id}/compose-email`)
+  }
 
   const handleSendEmailConfirm = async () => {
     if (!costEstimate || !user?.uid) return
@@ -595,10 +681,6 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
   const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
-    // Check if there are multiple sites
-    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-    const sites = Object.keys(siteGroups)
-
     const userDataForPDF = userData
       ? {
           first_name: userData.first_name || "",
@@ -606,6 +688,36 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           email: userData.email || "",
         }
       : undefined
+
+    // Check if there are multiple related cost estimates (same page_id)
+    if (relatedCostEstimates.length > 1) {
+      setDownloadingPDF(true)
+      try {
+        // Download all related cost estimates as separate PDFs
+        for (let i = 0; i < relatedCostEstimates.length; i++) {
+          const estimate = relatedCostEstimates[i]
+          await generateCostEstimatePDF(estimate, undefined, false, userDataForPDF)
+        }
+        toast({
+          title: "PDFs Generated",
+          description: `${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
+        })
+      } catch (error) {
+        console.error("Error downloading multiple PDFs:", error)
+        toast({
+          title: "Error",
+          description: "Failed to generate PDFs. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setDownloadingPDF(false)
+      }
+      return
+    }
+
+    // Check if current cost estimate has multiple sites
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
 
     if (sites.length > 1) {
       setDownloadingPDF(true)
@@ -813,6 +925,21 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     }
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "sent":
+        return "bg-blue-100 text-blue-800"
+      case "accepted":
+        return "bg-green-100 text-green-800"
+      case "declined":
+        return "bg-red-100 text-red-800"
+      case "revised":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   const handleNextProduct = () => {
     if (!costEstimate) return
     const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
@@ -825,6 +952,25 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
     const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
     const totalProducts = Object.keys(siteGroups).length
     setCurrentProductIndex((prev) => (prev - 1 + totalProducts) % totalProducts)
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPageIndex > 0) {
+      const prevCostEstimate = relatedCostEstimates[currentPageIndex - 1]
+      router.push(`/sales/cost-estimates/${prevCostEstimate.id}`)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPageIndex < relatedCostEstimates.length - 1) {
+      const nextCostEstimate = relatedCostEstimates[currentPageIndex + 1]
+      router.push(`/sales/cost-estimates/${nextCostEstimate.id}`)
+    }
+  }
+
+  const handlePageSelect = (pageIndex: number) => {
+    const selectedCostEstimate = relatedCostEstimates[pageIndex]
+    router.push(`/sales/cost-estimates/${selectedCostEstimate.id}`)
   }
 
   if (loading) {
@@ -938,10 +1084,35 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
       ? rentalItem.unitPrice
       : siteTotal / (costEstimate?.durationDays ? costEstimate.durationDays / 30 : 1)
 
+    const handleSaveAsDraft = async () => {
+      if (!costEstimate) return
+
+      try {
+        // Update the cost estimate status to "draft"
+        await updateCostEstimateStatus(costEstimate.id, "draft")
+
+        // Update the local state to reflect the change
+        setCostEstimate((prev) => (prev ? { ...prev, status: "draft" } : null))
+        setEditableCostEstimate((prev) => (prev ? { ...prev, status: "draft" } : null))
+
+        toast({
+          title: "Saved as Draft",
+          description: "Cost estimate saved as draft successfully.",
+        })
+      } catch (error) {
+        console.error("Error saving as draft:", error)
+        toast({
+          title: "Error",
+          description: "Failed to save as draft. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }
+
     return (
       <div key={siteName} className={`${hasMultipleSites && pageNumber > 1 ? "page-break-before" : ""}`}>
         <div className="p-6 sm:p-8 border-b">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex justify-between items-start mb-6 mx-4">
             <div>
               <p className="text-sm text-gray-600 mb-2">
                 {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
@@ -958,13 +1129,14 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           </div>
 
           <div className="text-center mb-8">
-            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle} COST ESTIMATE</h2>
+            {/* Updated title to remove uppercase COST ESTIMATE */}
+            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle}</h2>
           </div>
 
           <div className="mb-6 p-4 text-center">
             <p className="text-gray-800 font-medium">
-              Good Day! Thank you for considering Golden Touch for your business needs. We are pleased to submit our
-              quotation for your requirements:
+              Good Day! Thank you for considering {companyData?.name || "Golden Touch"} for your business needs. We are
+              pleased to submit our cost estimate for your requirements:
             </p>
           </div>
 
@@ -978,34 +1150,26 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Site Location</span>
-              <span className="text-gray-700">: {siteName}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.notes || siteName}</span>
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Type</span>
               <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
             </div>
-            {siteLineItems[0] && (
-              <div className="flex">
-                <span className="w-4 text-center">•</span>
-                <span className="font-medium text-gray-700 w-32">Size</span>
-                <span className="text-gray-700">: {siteLineItems[0].notes || "Standard Size"}</span>
-              </div>
-            )}
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
-              <span className="font-medium text-gray-700 w-32">Contract Duration</span>
+              <span className="font-medium text-gray-700 w-32">Size</span>
               <span className="text-gray-700">: </span>
-              {isEditing && editingField === "durationDays" ? (
+              {isEditing && editingField === "size" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
-                    type="number"
-                    value={tempValues.durationDays || ""}
-                    onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
-                    className="w-20 h-6 text-sm"
-                    placeholder="Days"
+                    type="text"
+                    value={tempValues.size || ""}
+                    onChange={(e) => updateTempValues("size", e.target.value)}
+                    className="w-48 h-6 text-sm"
+                    placeholder="Enter size"
                   />
-                  <span className="text-sm text-gray-600">days</span>
                 </div>
               ) : (
                 <span
@@ -1014,10 +1178,10 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                       ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
-                  onClick={() => isEditing && handleFieldEdit("durationDays", costEstimate?.durationDays)}
-                  title={isEditing ? "Click to edit duration" : ""}
+                  onClick={() => isEditing && handleFieldEdit("size", costEstimate?.size || "")}
+                  title={isEditing ? "Click to edit size" : ""}
                 >
-                  {formatDurationDisplay(costEstimate?.durationDays)}
+                  {costEstimate?.size || ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1032,14 +1196,14 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                     type="date"
                     value={tempValues.startDate ? format(tempValues.startDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
-                    className="w-32 h-6 text-sm"
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
-                  <span>-</span>
+                  <span className="text-gray-500">-</span>
                   <Input
                     type="date"
                     value={tempValues.endDate ? format(tempValues.endDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
-                    className="w-32 h-6 text-sm"
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
                 </div>
               ) : (
@@ -1058,8 +1222,9 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                   }
                   title={isEditing ? "Click to edit contract period" : ""}
                 >
-                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : "N/A"} -{" "}
-                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : "N/A"}
+                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : ""}
+                  {costEstimate?.startDate && costEstimate?.endDate ? " - " : ""}
+                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1171,75 +1336,28 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             </div>
           </div>
 
-          <div className="mb-8">
-            <h3 className="font-semibold text-gray-900 mb-3">Terms and Conditions:</h3>
-            <div className="space-y-2 text-sm text-gray-700">
-              <p>1. Quotation validity: 5 working days.</p>
-              <p>
-                2. Availability of the site is on first-come-first-served basis only. Only official documents such as
-                P.O.'s, Media Orders, signed quotation, & contracts are accepted in order to be booked the site.
-              </p>
-              <p>3. To book the site, one (1) month advance and one (2) months security deposit.</p>
-              <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
-              <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-              <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
-            </div>
-          </div>
-
-          <div className="mt-12 mb-8">
-            <div className="flex justify-between items-start">
-              {/* Left side - Company signature */}
-              <div className="w-1/2">
-                <p className="text-sm text-gray-700 mb-8">Very truly yours,</p>
-                <div className="mb-2">
-                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-                </div>
-                <p className="text-sm font-medium text-gray-900">
-                  {userData?.first_name} {userData?.last_name}
-                </p>
-                <p className="text-sm text-gray-600">Account Manager</p>
-              </div>
-
-              {/* Right side - Client conforme */}
-              <div className="w-1/2 pl-8">
-                <p className="text-sm text-gray-700 mb-8">Conforme:</p>
-                <div className="mb-2">
-                  <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-                </div>
-                <p className="text-sm font-medium text-gray-900">{costEstimate?.client.name || "Client Name"}</p>
-                <p className="text-sm text-gray-600">{costEstimate?.client.company || "Client Company"}</p>
-                <p className="text-sm text-gray-500 italic mt-2">
-                  This signed quotation serves as an
-                  <br />
-                  official document for billing purposes
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="text-center text-xs text-gray-500">
-              <p className="flex items-center justify-center gap-2 mb-2">
-                <span>{companyData?.company_location || companyData?.address || ""}</span>
-                {companyData?.phone && (
-                  <>
-                    <span>•</span>
-                    <span>phone: {companyData.phone}</span>
-                  </>
-                )}
-              </p>
-              {costEstimate?.validUntil && (
-                <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+          {/* Footer */}
+          <div className="text-center text-xs text-gray-500 border-t pt-4">
+            <p className="flex items-center justify-center gap-2 mb-2">
+              <span>{formatCompanyAddress(companyData)}</span>
+              {companyData?.phone && (
+                <>
+                  <span>•</span>
+                  <span>phone: {companyData.phone}</span>
+                </>
               )}
-              <p className="mt-1">
-                © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
+            </p>
+            {costEstimate?.validUntil && (
+              <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
+            )}
+            <p className="mt-1">
+              © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
+            </p>
+            {hasMultipleSites && (
+              <p className="mt-2 font-medium">
+                Page {pageNumber} of {totalPages}
               </p>
-              {hasMultipleSites && (
-                <p className="mt-2 font-medium">
-                  Page {pageNumber} of {totalPages}
-                </p>
-              )}
-            </div>
+            )}
           </div>
         </div>
         {process.env.NODE_ENV === "development" && (
@@ -1248,20 +1366,15 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             {Object.keys(tempValues).length}
           </div>
         )}
-
-        {hasUnsavedChanges && (
-          <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
-            <Button
-              variant="outline"
-              onClick={() => {
-                console.log("[v0] Cancel button clicked")
-                handleCancelAllChanges()
-              }}
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <X className="h-4 w-4" />
-              Cancel
-            </Button>
+        <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
+          <Button
+            onClick={handleSaveAsDraft}
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white"
+          >
+            <FileText className="h-4 w-4" />
+            Save as Draft
+          </Button>
+          {hasUnsavedChanges && (
             <Button
               onClick={(e) => {
                 console.log("[v0] Save button clicked - event:", e)
@@ -1275,13 +1388,12 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
                 handleSaveAllChanges()
               }}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={Object.keys(tempValues).length === 0}
             >
               <Save className="h-4 w-4" />
               Save Changes
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
@@ -1364,59 +1476,132 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           </Button>
         </div>
 
-        <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              {companyData?.photo_url ? (
-                <img
-                  src={companyData.photo_url || "/placeholder.svg"}
-                  alt="Company Logo"
-                  className="h-16 w-auto object-contain"
-                />
-              ) : (
-                <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Building className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
+        <div className="flex gap-6 items-start">
+          <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center mb-4">
+                {companyData?.photo_url ? (
+                  <img
+                    src={companyData.photo_url || "/placeholder.svg"}
+                    alt="Company Logo"
+                    className="h-16 w-auto object-contain"
+                  />
+                ) : (
+                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Building className="h-8 w-8 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+
+            {hasMultipleSites ? (
+              <>
+                {renderCostEstimationBlock(
+                  siteNames[currentProductIndex],
+                  siteGroups[siteNames[currentProductIndex]],
+                  currentProductIndex + 1,
+                )}
+              </>
+            ) : (
+              // Render single page for single site (original behavior)
+              renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+            )}
+
+            {proposal && (
+              <div className="p-6 sm:p-8 border-t border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Linked Proposal
+                </h2>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-lg font-semibold">{proposal.title}</p>
+                    <p className="text-gray-600">
+                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                    </p>
+                    <Button
+                      variant="link"
+                      className="p-0 mt-2"
+                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
+                    >
+                      View Proposal
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
 
-          {hasMultipleSites ? (
-            <>
-              {renderCostEstimationBlock(
-                siteNames[currentProductIndex],
-                siteGroups[siteNames[currentProductIndex]],
-                currentProductIndex + 1,
-              )}
-            </>
-          ) : (
-            // Render single page for single site (original behavior)
-            renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+          <Button
+            onClick={() => setShowHistory(!showHistory)}
+            className="fixed top-24 right-4 z-50 xl:hidden bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
+
+          {showHistory && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 xl:hidden"
+              onClick={() => setShowHistory(false)}
+            />
           )}
 
-          {proposal && (
-            <div className="p-6 sm:p-8 border-t border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                Linked Proposal
-              </h2>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-lg font-semibold">{proposal.title}</p>
-                  <p className="text-gray-600">
-                    Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                  </p>
-                  <Button
-                    variant="link"
-                    className="p-0 mt-2"
-                    onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                  >
-                    View Proposal
-                  </Button>
-                </CardContent>
-              </Card>
+          <div
+            className={`
+              w-80 bg-white shadow-md rounded-lg p-4 max-h-[calc(100vh-120px)] overflow-y-auto
+              xl:sticky xl:top-24 xl:block
+              ${showHistory ? "fixed top-24 right-4 z-50" : "hidden"}
+              xl:${showHistory ? "block" : "block"}
+            `}
+          >
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Cost Estimate History</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="xl:hidden">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
+                {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
+              </div>
             </div>
-          )}
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : clientHistory.length > 0 ? (
+              <div className="space-y-3">
+                {clientHistory.map((historyItem) => (
+                  <div
+                    key={historyItem.id}
+                    onClick={() => router.push(`/sales/cost-estimates/${historyItem.id}`)}
+                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="text-sm font-medium text-gray-900 mb-1">
+                      {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
+                    </div>
+                    <div className="text-sm text-red-600 font-medium mb-2">
+                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                    </div>
+                    <div className="flex justify-end">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(historyItem.status)}`}
+                      >
+                        {historyItem.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-sm">No other cost estimates found for this client</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1455,30 +1640,61 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
             )}
           </Button>
         </div>
-      ) : (
-        costEstimate.status === "draft" && (
-          <div className="fixed bottom-6 right-6 flex space-x-4">
+      ) : null}
+
+      {relatedCostEstimates.length > 1 ? (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
-              onClick={() => handleUpdatePublicStatus("draft")} // Explicitly save as draft
               variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              size="sm"
+              onClick={handlePreviousPage}
+              disabled={currentPageIndex === 0}
+              className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
             >
-              <FileText className="h-5 w-5 mr-2" />
-              Save as Draft
+              Previous
             </Button>
+
+            <div className="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
+              {currentPageIndex + 1}/{relatedCostEstimates.length}
+            </div>
+
+            {currentPageIndex === relatedCostEstimates.length - 1 ? (
+              <Button
+                onClick={() => setIsSendOptionsDialogOpen(true)}
+                disabled={costEstimate?.status !== "draft"}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+              >
+                Send
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPageIndex === relatedCostEstimates.length - 1}
+                className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the new options dialog
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+              onClick={() => setIsSendOptionsDialogOpen(true)}
+              disabled={costEstimate?.status !== "draft"}
+              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
             >
-              <Send className="h-5 w-5 mr-2" />
               Send
             </Button>
           </div>
-        )
+        </div>
       )}
 
-      {/* Floating Navigation for Multiple Sites */}
-      {hasMultipleSites && (
+      {hasMultipleSites && relatedCostEstimates.length <= 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
             <Button
@@ -1516,8 +1732,8 @@ export default function CostEstimateDetailsPage({ params }: { params: { id: stri
           onOpenChange={setIsSendOptionsDialogOpen}
           costEstimate={costEstimate}
           onEmailClick={() => {
-            setIsSendOptionsDialogOpen(false) // Close options dialog
-            setIsSendEmailDialogOpen(true) // Open email dialog
+            setIsSendOptionsDialogOpen(false)
+            handleSendEmail()
           }}
         />
       )}

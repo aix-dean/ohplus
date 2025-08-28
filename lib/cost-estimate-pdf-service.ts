@@ -1,5 +1,7 @@
 import jsPDF from "jspdf"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Helper function to safely convert dates
 function safeToDate(dateValue: any): Date {
@@ -29,13 +31,92 @@ const categoryLabels = {
   Maintenance: "Maintenance",
 }
 
+async function fetchCompanyData(companyId: string) {
+  // Provide immediate fallback data to prevent hanging
+  const fallbackData = {
+    company_name: "Golden Touch Imaging Specialist",
+    company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+    phone: "Telephone: (02) 5310 1750 to 53",
+  }
+
+  try {
+    // Attempt to fetch company data with a very short timeout
+    const companyDoc = await getDoc(doc(db, "companies", companyId))
+
+    if (companyDoc.exists()) {
+      const data = companyDoc.data()
+      // Return fetched data merged with fallback for missing fields
+      return {
+        company_name: data.company_name || data.name || fallbackData.company_name,
+        company_location: data.company_location || data.address || fallbackData.company_location,
+        phone: data.phone || data.telephone || data.contact_number || fallbackData.phone,
+      }
+    }
+
+    return fallbackData
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    // Always return fallback data instead of throwing
+    return fallbackData
+  }
+}
+
+function formatCompanyAddress(companyData: any): string {
+  if (!companyData) return ""
+
+  // Handle company_location field (string format)
+  if (companyData.company_location && typeof companyData.company_location === "string") {
+    return companyData.company_location
+  }
+
+  // Handle address object format
+  if (companyData.address && typeof companyData.address === "object") {
+    const { street, city, province } = companyData.address
+    const addressParts = []
+
+    // Filter out default placeholder values
+    if (street && street !== "Default Street" && street.trim()) {
+      addressParts.push(street)
+    }
+    if (city && city !== "Default City" && city.trim()) {
+      addressParts.push(city)
+    }
+    if (province && province !== "Default Province" && province.trim()) {
+      addressParts.push(province)
+    }
+
+    return addressParts.join(", ")
+  }
+
+  // Handle address as string
+  if (companyData.address && typeof companyData.address === "string") {
+    return companyData.address
+  }
+
+  return ""
+}
+
+function formatCompanyPhone(companyData: any): string {
+  if (!companyData) return ""
+
+  // Try different phone field names
+  const phoneFields = ["phone", "telephone", "contact_number"]
+  for (const field of phoneFields) {
+    if (companyData[field] && companyData[field].trim()) {
+      return companyData[field]
+    }
+  }
+
+  return ""
+}
+
 /**
  * Generate separate PDF files for each site in a cost estimate
  */
 export async function generateSeparateCostEstimatePDFs(
   costEstimate: CostEstimate,
   selectedPages?: string[],
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<void> {
   try {
     // Group line items by site based on the site rental items
@@ -139,364 +220,350 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<string | void> {
   try {
-    const pdf = new jsPDF("p", "mm", "a4")
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 15
-    const contentWidth = pageWidth - margin * 2
-    let yPosition = margin
-
-    // Convert dates safely
-    const createdAt = safeToDate(costEstimate.createdAt)
-    const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
-    const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
-
-    // Get site information from line items
-    const siteRentalItems = costEstimate.lineItems.filter(
-      (item) =>
-        item.category.includes("Billboard Rental") || item.category.includes("LED") || item.category.includes("Static"),
-    )
-
-    // Get the first site rental item for main details
-    const primarySite = siteRentalItems[0]
-    const siteName = primarySite?.description || costEstimate.title
-    const siteLocation = primarySite?.notes?.replace("Location: ", "") || siteName
-
-    // Calculate totals from actual line items
-    const subtotal = costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
-    const vatRate = 0.12
-    const vatAmount = subtotal * vatRate
-    const totalWithVat = subtotal + vatAmount
-
-    // Calculate monthly rate and duration from actual data
-    const exactDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
-    const primaryRentalItem = siteRentalItems[0]
-    // Use the actual unit price from the rental item, not calculated rate
-    const monthlyRate = primaryRentalItem ? primaryRentalItem.unitPrice : 0
-
-    const calculateDurationDisplay = (durationDays: number | null | undefined): string => {
-      if (!durationDays) return "1 month"
-      const months = Math.floor(durationDays / 30)
-      const days = durationDays % 30
-      if (months === 0) {
-        return days === 1 ? "1 day" : `${days} days`
-      } else if (days === 0) {
-        return months === 1 ? "1 month" : `${months} months`
-      } else {
-        const monthText = months === 1 ? "month" : "months"
-        const dayText = days === 1 ? "day" : "days"
-        return `${months} ${monthText} and ${days} ${dayText}`
-      }
-    }
-
-    // Group line items by site for multi-site handling
-    const groupLineItemsBySite = (lineItems: any[]) => {
-      const siteGroups: { [key: string]: any[] } = {}
-
-      lineItems.forEach((item) => {
-        if (item.category.includes("Billboard Rental")) {
-          const siteName = item.description
-          if (!siteGroups[siteName]) {
-            siteGroups[siteName] = []
-          }
-          siteGroups[siteName].push(item)
-
-          const siteId = item.id
-          const relatedItems = lineItems.filter(
-            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
-          )
-          siteGroups[siteName].push(...relatedItems)
-        }
-      })
-
-      if (Object.keys(siteGroups).length === 0) {
-        siteGroups["Single Site"] = lineItems
-      } else {
-        // Handle orphaned items
-        const groupedItemIds = new Set()
-        Object.values(siteGroups).forEach((items) => {
-          items.forEach((item) => groupedItemIds.add(item.id))
-        })
-
-        const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
-        if (orphanedItems.length > 0) {
-          const siteNames = Object.keys(siteGroups)
-          siteNames.forEach((siteName) => {
-            const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
-            siteGroups[siteName].push(...orphanedCopies)
-          })
-        }
-      }
-
-      return siteGroups
-    }
-
-    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-    const sites = Object.keys(siteGroups)
-    const isMultipleSites = sites.length > 1
-
-    const sitesToProcess =
-      selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
-
-    if (sitesToProcess.length === 0) {
-      throw new Error("No sites selected for PDF generation")
-    }
-
-    // Process each site
-    sitesToProcess.forEach(async (siteName, siteIndex) => {
-      if (siteIndex > 0) {
-        pdf.addPage()
-        yPosition = margin
-      }
-
-      const siteLineItems = siteGroups[siteName] || []
-      const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-
-      const originalSiteIndex = sites.indexOf(siteName)
-      const ceNumber = isMultipleSites
-        ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
-        : costEstimate.costEstimateNumber || costEstimate.id
-
-      // Client name and company (top left)
-      pdf.setFontSize(11)
-      pdf.setFont("helvetica", "bold")
-      pdf.setTextColor(0, 0, 0)
-      pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
-      yPosition += 5
-      pdf.setFont("helvetica", "normal")
-      pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
-      yPosition += 10
-
-      // RFQ Number (top right)
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(`RFQ. No. ${ceNumber}`, pageWidth - margin - 40, yPosition - 15)
-
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(
-        createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-        pageWidth - margin - 40,
-        yPosition - 10,
-      )
-
-      // Greeting message - positioned prominently at top
-      pdf.setFontSize(11)
-      pdf.setFont("helvetica", "normal")
-      const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
-      const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
-
-      // Calculate center position for each line
-      const line1Width = pdf.getTextWidth(greetingLine1)
-      const line2Width = pdf.getTextWidth(greetingLine2)
-      const centerX = pageWidth / 2
-
-      pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
-      yPosition += 5
-      pdf.text(greetingLine2, centerX - line2Width / 2, yPosition)
-      yPosition += 15
-
-      // "Details as follows:" section
-      pdf.setFontSize(11)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Details as follows:", margin, yPosition)
-      yPosition += 8
-
-      // Bullet points section with exact formatting
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-
-      // Extract size information from line items or use default
-      const sizeInfo = siteLineItems[0]?.notes?.includes("Location:")
-        ? "100ft (H) x 60ft (W)"
-        : siteLineItems[0]?.notes || "100ft (H) x 60ft (W)"
-
-      const bulletPoints = [
-        { label: "Site Location", value: siteLocation },
-        { label: "Type", value: "Billboard" },
-        { label: "Size", value: sizeInfo },
-        { label: "Contract Duration", value: calculateDurationDisplay(costEstimate.durationDays) },
-        {
-          label: "Contract Period",
-          value: `${startDate ? startDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "June 15, 2025"} - ${endDate ? endDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "December 14, 2025"}`,
-        },
-        { label: "Proposal to", value: costEstimate?.client?.company || "Client Company" },
-        { label: "Illumination", value: `${siteLineItems[0]?.quantity || 10} units of 1000 watts metal Halide` },
-        { label: "Lease Rate/Month", value: "(Exclusive of VAT)" },
-        { label: "Total Lease", value: "(Exclusive of VAT)" },
-      ]
-
-      bulletPoints.forEach((point) => {
-        pdf.text("•", margin, yPosition)
-        pdf.setFont("helvetica", "bold")
-        pdf.text(`${point.label}:`, margin + 5, yPosition)
-        pdf.setFont("helvetica", "normal")
-
-        // Special handling for lease rate values
-        if (point.label === "Lease Rate/Month") {
-          pdf.text(
-            `${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
-            margin + 65,
-            yPosition,
-          )
-        } else if (point.label === "Total Lease") {
-          pdf.text(
-            `${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP     ${point.value}`,
-            margin + 65,
-            yPosition,
-          )
-        } else {
-          pdf.text(point.value, margin + 65, yPosition)
-        }
-        yPosition += 6
-      })
-
-      yPosition += 5
-
-      // Calculation breakdown section with exact formatting
-      pdf.setFontSize(10)
-      const siteRentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
-
-      const actualMonthlyRate = siteRentalItem ? siteRentalItem.unitPrice : 0
-      const actualDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
-      const calculatedTotal = actualMonthlyRate * actualDurationInMonths
-      const formattedDuration = calculateDurationDisplay(costEstimate.durationDays)
-      const siteVatAmount = calculatedTotal * 0.12
-      const siteTotalWithVat = calculatedTotal + siteVatAmount
-
-      // Lease rate calculation - using actual monthly rate
-      pdf.text("Lease rate per month", margin + 5, yPosition)
-      pdf.text(
-        `${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-        pageWidth - margin - 40,
-        yPosition,
-      )
-      yPosition += 6
-
-      pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
-      pdf.text(
-        `${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-        pageWidth - margin - 40,
-        yPosition,
-      )
-      yPosition += 6
-
-      pdf.text("12 % VAT", margin + 5, yPosition)
-      pdf.text(
-        `${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-        pageWidth - margin - 40,
-        yPosition,
-      )
-      yPosition += 8
-
-      // Total line
-      pdf.setFont("helvetica", "bold")
-      pdf.text("TOTAL", margin + 5, yPosition)
-      pdf.text(
-        `${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}PHP`,
-        pageWidth - margin - 40,
-        yPosition,
-      )
-      yPosition += 10
-
-      // Note about free material changes
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(9)
-      pdf.text(`Note: free two (2) change material for ${formattedDuration} rental`, margin, yPosition)
-      yPosition += 10
-
-      // Terms and Conditions section with exact formatting
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(11)
-      pdf.text("Terms and Conditions:", margin, yPosition)
-      yPosition += 8
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(10)
-      const terms = [
-        "1. Quotation validity:  5 working days.",
-        "2. Availability of the site is on first-come-first-served-basis only. Only offical documents such as P.O's,",
-        "    Media Orders, signed quotation, & contracts are accepted in order to booked the site.",
-        "3. To book the site, one (1) month advance and one (2) months security deposit",
-        "    payment dated 7 days before the start of rental is required.",
-        "4. Final artwork should be approved ten (10) days before the contract period",
-        "5. Print is exclusively for Golden Touch Imaging Specialist Only.",
-      ]
-
-      terms.forEach((term) => {
-        pdf.text(term, margin, yPosition)
-        yPosition += 6
-      })
-
-      yPosition += 15
-
-      // Signature section with exact formatting
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-
-      // "Very truly yours," and "Conforme:" on same line
-      pdf.text("Very truly yours,", margin, yPosition)
-      pdf.text("C o n f o r m e:", margin + contentWidth / 2, yPosition)
-      yPosition += 20
-
-      // Names
-      pdf.setFont("helvetica", "normal")
-      const userFullName =
-        userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : "Account Manager"
-      pdf.text(userFullName, margin, yPosition)
-      pdf.text(costEstimate.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
-      yPosition += 6
-
-      // Titles/Companies
-      pdf.setFont("helvetica", "normal")
-      pdf.text(costEstimate.position || "Position", margin, yPosition)
-      pdf.text(costEstimate.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
-      yPosition += 10
-
-      // Billing purpose note
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "normal")
-      pdf.text("This signed Quotation serves as an", margin + contentWidth / 2, yPosition)
-      yPosition += 4
-      pdf.text("official document for billing purposes", margin + contentWidth / 2, yPosition)
-      yPosition += 15
-
-      // Footer with company details only - no description text
-      pdf.setFontSize(8)
-      pdf.setTextColor(100, 100, 100)
-      pdf.text(
-        "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
-        margin,
-        pageHeight - 20,
-      )
-      pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", margin, pageHeight - 15)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 second timeout
     })
 
-    // Return base64 or download PDF
-    if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
-    } else {
-      const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
-      const sitesSuffix =
-        selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
-          ? `_selected-${selectedPages.length}-sites`
-          : sites.length > 1 && sitesToProcess.length === 1
-            ? `_${sitesToProcess[0].replace(/[^a-z0-9]/gi, "_").toLowerCase()}`
-            : sites.length > 1
-              ? `_all-${sites.length}-sites`
-              : ""
-      const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
+    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, returnBase64, userData)
 
-      console.log("[v0] Attempting to download PDF:", fileName)
-      pdf.save(fileName)
-      console.log("[v0] PDF download triggered successfully")
-    }
+    return await Promise.race([pdfGenerationPromise, timeoutPromise])
   } catch (error) {
-    console.error("Error generating Cost Estimate PDF:", error)
-    throw new Error("Failed to generate Cost Estimate PDF")
+    console.error("Error generating PDF:", error)
+    throw error
+  }
+}
+
+async function generatePDFInternal(
+  costEstimate: CostEstimate,
+  selectedPages?: string[],
+  returnBase64 = false,
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+): Promise<string | void> {
+  const pdf = new jsPDF("p", "mm", "a4")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 15
+  const contentWidth = pageWidth - margin * 2
+  let yPosition = margin
+
+  // Convert dates safely
+  const createdAt = safeToDate(costEstimate.createdAt)
+  const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
+  const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
+
+  // Get site information from line items
+  const siteRentalItems = costEstimate.lineItems.filter(
+    (item) =>
+      item.category.includes("Billboard Rental") || item.category.includes("LED") || item.category.includes("Static"),
+  )
+
+  // Get the first site rental item for main details
+  const primarySite = siteRentalItems[0]
+  const siteName = primarySite?.description || costEstimate.title
+  const siteLocation = primarySite?.notes?.replace("Location: ", "") || siteName
+
+  // Calculate totals from actual line items
+  const subtotal = costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
+  const vatRate = 0.12
+  const vatAmount = subtotal * vatRate
+  const totalWithVat = subtotal + vatAmount
+
+  // Calculate monthly rate and duration from actual data
+  const exactDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
+  const primaryRentalItem = siteRentalItems[0]
+  // Use the actual unit price from the rental item, not calculated rate
+  const monthlyRate = primaryRentalItem ? primaryRentalItem.unitPrice : 0
+
+  const calculateDurationDisplay = (durationDays: number | null | undefined): string => {
+    if (!durationDays) return "1 month"
+    const months = Math.floor(durationDays / 30)
+    const days = durationDays % 30
+    if (months === 0) {
+      return days === 1 ? "1 day" : `${days} days`
+    } else if (days === 0) {
+      return months === 1 ? "1 month" : `${months} months`
+    } else {
+      const monthText = months === 1 ? "month" : "months"
+      const dayText = days === 1 ? "day" : "days"
+      return `${months} ${monthText} and ${days} ${dayText}`
+    }
+  }
+
+  const groupLineItemsBySite = (lineItems: any[]) => {
+    const siteGroups: { [key: string]: any[] } = {}
+
+    // Process each line item only once
+    const processedIds = new Set<string>()
+
+    lineItems.forEach((item) => {
+      if (processedIds.has(item.id)) return // Skip already processed items
+      processedIds.add(item.id)
+
+      if (item.category.includes("Billboard Rental")) {
+        const siteName = item.description
+        if (!siteGroups[siteName]) {
+          siteGroups[siteName] = []
+        }
+        siteGroups[siteName].push(item)
+
+        const siteId = item.id
+        const relatedItems = lineItems.filter(
+          (relatedItem) =>
+            relatedItem.id.includes(siteId) && relatedItem.id !== siteId && !processedIds.has(relatedItem.id),
+        )
+        relatedItems.forEach((relatedItem) => processedIds.add(relatedItem.id))
+        siteGroups[siteName].push(...relatedItems)
+      }
+    })
+
+    if (Object.keys(siteGroups).length === 0) {
+      siteGroups["Single Site"] = lineItems
+    }
+
+    return siteGroups
+  }
+
+  const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+  const sites = Object.keys(siteGroups)
+  const isMultipleSites = sites.length > 1
+
+  const sitesToProcess =
+    selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
+
+  if (sitesToProcess.length === 0) {
+    throw new Error("No sites selected for PDF generation")
+  }
+
+  let companyData = null
+  if (userData?.company_id || costEstimate.company_id) {
+    const companyId = userData?.company_id || costEstimate.company_id
+    companyData = await fetchCompanyData(companyId)
+  }
+
+  for (let siteIndex = 0; siteIndex < sitesToProcess.length; siteIndex++) {
+    const siteName = sitesToProcess[siteIndex]
+
+    if (siteIndex > 0) {
+      pdf.addPage()
+      yPosition = margin
+    }
+
+    const siteLineItems = siteGroups[siteName] || []
+    const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
+
+    const originalSiteIndex = sites.indexOf(siteName)
+    const ceNumber = isMultipleSites
+      ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
+      : costEstimate.costEstimateNumber || costEstimate.id
+
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const companyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
+    const companyNameWidth = pdf.getTextWidth(companyName)
+    const companyNameX = pageWidth / 2 - companyNameWidth / 2
+    pdf.text(companyName, companyNameX, yPosition)
+    yPosition += 15
+
+    // Client name and company (top left)
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
+    yPosition += 5
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
+    yPosition += 10
+
+    // RFQ Number (top right)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    const rfqText = `RFQ. No. ${ceNumber}`
+    const rfqTextWidth = pdf.getTextWidth(rfqText)
+    const rfqX = pageWidth - margin - rfqTextWidth
+    pdf.text(rfqText, rfqX, yPosition - 15)
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    const dateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    const dateTextWidth = pdf.getTextWidth(dateText)
+    const dateX = pageWidth - margin - dateTextWidth
+    pdf.text(dateText, dateX, yPosition - 10)
+
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const titleText = isMultipleSites
+      ? `Cost Estimate for ${siteName}`
+      : costEstimate.title ||
+        `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+    const titleWidth = pdf.getTextWidth(titleText)
+    const titleX = pageWidth / 2 - titleWidth / 2
+    pdf.text(titleText, titleX, yPosition)
+
+    // Add underline to title
+    pdf.setLineWidth(0.5)
+    pdf.line(titleX, yPosition + 2, titleX + titleWidth, yPosition + 2)
+    yPosition += 15
+
+    // Greeting message - positioned prominently at top
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+    const greetingLine1 = `Good Day! Thank you for considering ${companyName} for your business needs.`
+    const greetingLine2 = "We are pleased to submit our cost estimate for your requirements:"
+
+    // Calculate center position for each line
+    const centerX = pageWidth / 2
+    const line1Width = pdf.getTextWidth(greetingLine1)
+    const line2Width = pdf.getTextWidth(greetingLine2)
+
+    pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
+    yPosition += 5
+    pdf.text(greetingLine2, centerX - line2Width / 2, yPosition)
+    yPosition += 15
+
+    // "Details as follows:" section
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Details as follows:", margin, yPosition)
+    yPosition += 8
+
+    // Bullet points section with exact formatting
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+
+    // Extract size information from line items or use default
+    const sizeInfo = siteLineItems[0]?.notes?.includes("Location:")
+      ? "100ft (H) x 60ft (W)"
+      : siteLineItems[0]?.notes || "100ft (H) x 60ft (W)"
+
+    const bulletPoints = [
+      { label: "Site Location", value: siteLocation },
+      { label: "Type", value: "Billboard" },
+      { label: "Size", value: sizeInfo },
+      { label: "Contract Duration", value: calculateDurationDisplay(costEstimate.durationDays) },
+      {
+        label: "Contract Period",
+        value: `${startDate ? startDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "June 15, 2025"} - ${endDate ? endDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "December 14, 2025"}`,
+      },
+      { label: "Proposal to", value: costEstimate?.client?.company || "Client Company" },
+      { label: "Illumination", value: `${siteLineItems[0]?.quantity || 10} units of 1000 watts metal Halide` },
+      { label: "Lease Rate/Month", value: "(Exclusive of VAT)" },
+      { label: "Total Lease", value: "(Exclusive of VAT)" },
+    ]
+
+    bulletPoints.forEach((point) => {
+      pdf.text("•", margin, yPosition)
+      pdf.setFont("helvetica", "bold")
+      pdf.text(`${point.label}:`, margin + 5, yPosition)
+      pdf.setFont("helvetica", "normal")
+
+      // Special handling for lease rate values
+      if (point.label === "Lease Rate/Month") {
+        pdf.text(
+          `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
+          margin + 65,
+          yPosition,
+        )
+      } else if (point.label === "Total Lease") {
+        pdf.text(
+          `PHP ${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
+          margin + 65,
+          yPosition,
+        )
+      } else {
+        pdf.text(point.value, margin + 65, yPosition)
+      }
+      yPosition += 6
+    })
+
+    yPosition += 5
+
+    // Calculation breakdown section with exact formatting
+    pdf.setFontSize(10)
+    const siteRentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+
+    const actualMonthlyRate = siteRentalItem ? siteRentalItem.unitPrice : 0
+    const actualDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
+    const calculatedTotal = actualMonthlyRate * actualDurationInMonths
+    const formattedDuration = calculateDurationDisplay(costEstimate.durationDays)
+    const siteVatAmount = calculatedTotal * 0.12
+    const siteTotalWithVat = calculatedTotal + siteVatAmount
+
+    // Lease rate calculation - using actual monthly rate
+    pdf.text("Lease rate per month", margin + 5, yPosition)
+    pdf.text(
+      `PHP ${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      pageWidth - margin - 40,
+      yPosition,
+    )
+    yPosition += 6
+
+    pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
+    pdf.text(
+      `PHP ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      pageWidth - margin - 40,
+      yPosition,
+    )
+    yPosition += 6
+
+    pdf.text("12 % VAT", margin + 5, yPosition)
+    pdf.text(
+      `PHP ${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      pageWidth - margin - 40,
+      yPosition,
+    )
+    yPosition += 8
+
+    // Total line
+    pdf.setFont("helvetica", "bold")
+    pdf.text("TOTAL", margin + 5, yPosition)
+    pdf.text(
+      `PHP ${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      pageWidth - margin - 40,
+      yPosition,
+    )
+    yPosition += 10
+
+    pdf.setFontSize(8)
+    pdf.setTextColor(100, 100, 100)
+
+    // Format company address and phone
+    const companyAddress = formatCompanyAddress(companyData)
+    const companyPhone = formatCompanyPhone(companyData)
+
+    // Create footer text with fallback to default values
+    const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
+    const footerText = addressText
+
+    // Calculate text width and center the footer
+    const footerTextWidth = pdf.getTextWidth(footerText)
+    const footerX = pageWidth / 2 - footerTextWidth / 2
+
+    pdf.text(footerText, footerX, pageHeight - 15)
+  }
+
+  // Return base64 or download PDF
+  if (returnBase64) {
+    return pdf.output("datauristring").split(",")[1]
+  } else {
+    const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
+    const sitesSuffix =
+      selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
+        ? `_selected-${selectedPages.length}-sites`
+        : sites.length > 1 && sitesToProcess.length === 1
+          ? `_${sitesToProcess[0].replace(/[^a-z0-9]/gi, "_").toLowerCase()}`
+          : sites.length > 1
+            ? `_all-${sites.length}-sites`
+            : ""
+    const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
+
+    console.log("[v0] Attempting to download PDF:", fileName)
+    pdf.save(fileName)
+    console.log("[v0] PDF download triggered successfully")
   }
 }
 
@@ -506,7 +573,7 @@ export async function generateCostEstimatePDF(
 export async function generateDetailedCostEstimatePDF(
   costEstimate: CostEstimate,
   returnBase64 = false,
-  userData?: { first_name?: string; last_name?: string; email?: string }, // Updated to use first_name and last_name for consistency
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -522,6 +589,21 @@ export async function generateDetailedCostEstimatePDF(
     const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
     const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
 
+    let companyData = null
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      companyData = await fetchCompanyData(companyId)
+    }
+
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const detailedCompanyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
+    const detailedCompanyNameWidth = pdf.getTextWidth(detailedCompanyName)
+    const detailedCompanyNameX = pageWidth / 2 - detailedCompanyNameWidth / 2
+    pdf.text(detailedCompanyName, detailedCompanyNameX, yPosition)
+    yPosition += 15
+
     // Client name and company (top left)
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
@@ -535,26 +617,42 @@ export async function generateDetailedCostEstimatePDF(
     // RFQ Number (top right)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`, pageWidth - margin - 40, yPosition - 15)
+    const detailedRfqText = `RFQ. No. ${costEstimate.costEstimateNumber || costEstimate.id}`
+    const detailedRfqTextWidth = pdf.getTextWidth(detailedRfqText)
+    const detailedRfqX = pageWidth - margin - detailedRfqTextWidth
+    pdf.text(detailedRfqText, detailedRfqX, yPosition - 15)
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.text(
-      createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-      pageWidth - margin - 40,
-      yPosition - 10,
-    )
+    const detailedDateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    const detailedDateTextWidth = pdf.getTextWidth(detailedDateText)
+    const detailedDateX = pageWidth - margin - detailedDateTextWidth
+    pdf.text(detailedDateText, detailedDateX, yPosition - 10)
+
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    const detailedTitleText =
+      costEstimate.title || `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
+    const detailedTitleWidth = pdf.getTextWidth(detailedTitleText)
+    const detailedTitleX = pageWidth / 2 - detailedTitleWidth / 2
+    pdf.text(detailedTitleText, detailedTitleX, yPosition)
+
+    // Add underline to title
+    pdf.setLineWidth(0.5)
+    pdf.line(detailedTitleX, yPosition + 2, detailedTitleX + detailedTitleWidth, yPosition + 2)
+    yPosition += 15
 
     // Greeting message - positioned prominently at top
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    const greetingLine1 = "Good Day! Thank you for considering Golden Touch for your business needs."
-    const greetingLine2 = "We are pleased to submit our quotation for your requirements:"
+    const greetingLine1 = `Good Day! Thank you for considering ${detailedCompanyName} for your business needs.`
+    const greetingLine2 = "We are pleased to submit our cost estimate for your requirements:"
 
     // Calculate center position for each line
+    const centerX = pageWidth / 2
     const line1Width = pdf.getTextWidth(greetingLine1)
     const line2Width = pdf.getTextWidth(greetingLine2)
-    const centerX = pageWidth / 2
 
     pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
     yPosition += 5
@@ -716,12 +814,22 @@ export async function generateDetailedCostEstimatePDF(
       yPosition += noteLines.length * 5 + 10
     }
 
-    // Footer
     yPosition = pageHeight - 30
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
-    pdf.text(`© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`, margin, yPosition)
+
+    // Format company address and phone
+    const companyAddress = formatCompanyAddress(companyData)
+    const companyPhone = formatCompanyPhone(companyData)
+    const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
+    const footerText = addressText
+
+    // Center the footer text
+    const footerTextWidth = pdf.getTextWidth(footerText)
+    const footerX = pageWidth / 2 - footerTextWidth / 2
+
+    pdf.text(footerText, footerX, yPosition)
 
     // Return base64 or download PDF
     if (returnBase64) {

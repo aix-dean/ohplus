@@ -53,13 +53,12 @@ import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
-import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
+import { createDirectCostEstimate, createMultipleCostEstimates } from "@/lib/cost-estimate-service" // Import createMultipleCostEstimates function
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
-import type { QuotationProduct } from "@/lib/types/quotation"
 import { CheckCircle } from "lucide-react"
+import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -699,145 +698,228 @@ function SalesDashboardContent() {
   }
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
+  const [isCreatingCostEstimate, setIsCreatingCostEstimate] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+
   const handleDatesSelected = async (startDate: Date, endDate: Date) => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    console.log("[v0] handleDatesSelected - userData:", userData)
+    console.log("[v0] handleDatesSelected - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleDatesSelected - user:", user)
+    console.log("[v0] handleDatesSelected - actionAfterDateSelection:", actionAfterDateSelection)
+
+    if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleDatesSelected - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
-        title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        title: "Authentication Required",
+        description: `Please log in to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
       })
       return
     }
 
-    setIsCreatingDocument(true)
-    setIsDateRangeDialogOpen(false) // Close dialog immediately
+    if (actionAfterDateSelection === "quotation") {
+      // For quotations, check selectedSites
+      if (selectedSites.length === 0) {
+        toast({
+          title: "No Sites Selected",
+          description: "Please select at least one site to create a quotation.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      // For cost estimates, check selectedProducts
+      if (selectedProducts.length === 0) {
+        toast({
+          title: "No Products Selected",
+          description: "Please select at least one product to create a cost estimate.",
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
-    try {
-      if (actionAfterDateSelection === "cost_estimate") {
-        const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          designation: selectedClientForProposal.designation,
-          address: selectedClientForProposal.address,
-          industry: selectedClientForProposal.industry,
-        }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: `Please select a client to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
+        variant: "destructive",
+      })
+      return
+    }
 
+    if (actionAfterDateSelection === "quotation") {
+      setIsCreatingDocument(true)
+      try {
         const sitesData = selectedSites.map((site) => ({
           id: site.id,
           name: site.name,
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
-        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          address: selectedClientForProposal.address,
+          designation: selectedClientForProposal.designation,
+          industry: selectedClientForProposal.industry,
+        }
+
+        const options = {
           startDate,
           endDate,
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+          created_by_first_name: userData.first_name,
+          created_by_last_name: userData.last_name,
+        }
+
+        console.log("[v0] handleDatesSelected - creating quotation with options:", options)
+
+        let quotationIds: string[]
+
+        if (selectedSites.length > 1) {
+          // Create multiple quotations for multiple sites
+          quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Quotations Created",
+            description: `Successfully created ${quotationIds.length} quotations for the selected sites.`,
+          })
+        } else {
+          // Create single quotation for one site
+          const quotationId = await createDirectQuotation(clientData, sitesData, user.uid, options)
+          quotationIds = [quotationId]
+
+          toast({
+            title: "Quotation Created",
+            description: "Quotation has been created successfully.",
+          })
+        }
+
+        // Navigate to the first quotation
+        router.push(`/sales/quotations/${quotationIds[0]}`)
+      } catch (error) {
+        console.error("Error creating quotation:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create quotation. Please try again.",
+          variant: "destructive",
         })
+      } finally {
+        setIsCreatingDocument(false)
+        setIsDateRangeDialogOpen(false)
+      }
+      return
+    }
+    setIsCreatingCostEstimate(true)
+    try {
+      const sitesData = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        location: product.location,
+        price: product.price,
+        type: product.type,
+        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
+      }))
+
+      const clientData = {
+        id: selectedClientForProposal.id,
+        name: selectedClientForProposal.contactPerson,
+        email: selectedClientForProposal.email,
+        company: selectedClientForProposal.company,
+        phone: selectedClientForProposal.phone,
+        address: selectedClientForProposal.address,
+        designation: selectedClientForProposal.designation,
+        industry: selectedClientForProposal.industry,
+      }
+
+      const options = {
+        startDate,
+        endDate,
+        company_id: userData.company_id,
+        page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
+      }
+
+      console.log("[v0] handleDatesSelected - options being passed:", options)
+
+      let costEstimateIds: string[]
+
+      if (selectedProducts.length > 1) {
+        // Create multiple cost estimates for multiple products
+        costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+
+        toast({
+          title: "Cost Estimates Created",
+          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
+        })
+      } else {
+        // Create single cost estimate for one product
+        const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
+        costEstimateIds = [costEstimateId]
 
         toast({
           title: "Cost Estimate Created",
-          description: "Your cost estimate has been created successfully.",
+          description: "Cost estimate has been created successfully.",
         })
-        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
-      } else if (actionAfterDateSelection === "quotation") {
-        // Prepare products for quotation
-        const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
-          product_id: site.id,
-          name: site.name,
-          location: site.specs_rental?.location || site.light?.location || "N/A",
-          price: site.price || 0, // This is the monthly price
-          type: site.type || "Unknown",
-          site_code: getSiteCode(site) || "N/A",
-          media_url: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-        }))
-
-        // Calculate total amount for all selected products
-        const { durationDays, totalAmount } = calculateQuotationTotal(
-          startDate.toISOString(),
-          endDate.toISOString(),
-          quotationItems,
-        )
-
-        const validUntil = new Date()
-        validUntil.setDate(validUntil.getDate() + 5) // Valid for 5 days
-
-        const quotationData = {
-          quotation_number: generateQuotationNumber(),
-          items: quotationItems, // Pass the array of products
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          total_amount: totalAmount,
-          valid_until: validUntil,
-          duration_days: durationDays,
-          status: "draft" as const, // Default status
-          created_by: user.uid,
-          created_by_first_name: userData?.first_name || "",
-          created_by_last_name: userData?.last_name || "",
-          seller_id: user.uid, // Current user as seller
-          company_id: userData?.company_id || "", // Company ID from user data
-          client_name: selectedClientForProposal.contactPerson,
-          client_email: selectedClientForProposal.email,
-          client_id: selectedClientForProposal.id,
-          client_company_name: selectedClientForProposal.company || "",
-          client_designation: selectedClientForProposal.designation || "", // Add client designation
-          client_address: selectedClientForProposal.address || "", // Add client address
-          client_phone: selectedClientForProposal.phone || "", // Add client phone
-        }
-
-        console.log("Final quotationData object being sent:", quotationData)
-
-        const newQuotationId = await createQuotation(quotationData)
-
-        toast({
-          title: "Quotation Created",
-          description: "Your quotation has been created successfully.",
-        })
-        router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error: any) {
-      console.error("Error creating document:", error)
+
+      // Navigate to the first cost estimate
+      router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
+    } catch (error) {
+      console.error("Error creating cost estimate:", error)
       toast({
         title: "Error",
-        description: `Failed to create document: ${error.message || "Unknown error"}`,
+        description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsCreatingDocument(false)
-      setCeQuoteMode(false)
-      setSelectedSites([])
-      setSelectedClientForProposal(null)
-      setActionAfterDateSelection(null)
+      setIsCreatingCostEstimate(false)
+      setShowDatePicker(false)
     }
   }
 
   const handleSkipDates = async () => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    console.log("[v0] handleSkipDates - userData:", userData)
+    console.log("[v0] handleSkipDates - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleSkipDates - user:", user)
+
+    if (!user?.uid || !userData?.company_id) {
+      console.log("[v0] handleSkipDates - Missing auth data:", {
+        userUid: user?.uid,
+        userDataCompanyId: userData?.company_id,
+        userData: userData,
+      })
       toast({
-        title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        title: "Authentication Required",
+        description: "Please log in to create a cost estimate.",
         variant: "destructive",
       })
       return
     }
 
     setIsCreatingDocument(true)
-    setIsDateRangeDialogOpen(false) // Close dialog immediately
-
     try {
       if (actionAfterDateSelection === "cost_estimate") {
         const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          designation: selectedClientForProposal.designation,
-          address: selectedClientForProposal.address,
-          industry: selectedClientForProposal.industry,
+          id: selectedClientForProposal!.id,
+          name: selectedClientForProposal!.contactPerson,
+          email: selectedClientForProposal!.email,
+          company: selectedClientForProposal!.company,
+          phone: selectedClientForProposal!.phone,
+          address: selectedClientForProposal!.address,
+          designation: selectedClientForProposal!.designation,
+          industry: selectedClientForProposal!.industry,
         }
 
         const sitesData = selectedSites.map((site) => ({
@@ -846,18 +928,41 @@ function SalesDashboardContent() {
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
-        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+        const options = {
           startDate: undefined,
           endDate: undefined,
-        })
+          company_id: userData.company_id,
+          page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        }
 
-        toast({
-          title: "Cost Estimate Created",
-          description: "Your cost estimate has been created successfully without dates.",
-        })
-        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+        console.log("[v0] handleSkipDates - options being passed:", options)
+
+        if (selectedSites.length === 1) {
+          // Single site - create one document
+          const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Cost Estimate Created",
+            description: "Your cost estimate has been created successfully without dates.",
+          })
+          router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+        } else {
+          // Multiple sites - create separate documents for each site
+          const newCostEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
+
+          toast({
+            title: "Cost Estimates Created",
+            description: `${newCostEstimateIds.length} cost estimates have been created successfully without dates - one for each selected site.`,
+          })
+
+          // Navigate to the first cost estimate
+          if (newCostEstimateIds.length > 0) {
+            router.push(`/sales/cost-estimates/${newCostEstimateIds[0]}`)
+          }
+        }
       }
     } catch (error) {
       console.error("Error creating cost estimate:", error)
@@ -879,721 +984,830 @@ function SalesDashboardContent() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      {loading ? (
-        // Skeleton Loading State
-        <div className="flex flex-col gap-5">
-          {/* Header Skeleton */}
-          <div className="flex justify-between items-center">
-            <div>
-              <Skeleton className="h-8 w-64 mb-2" />
-              <Skeleton className="h-4 w-48" />
-            </div>
+    <div className="h-screen overflow-hidden flex flex-col">
+      {proposalCreationMode && (
+        <div className="flex items-center justify-between p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelProposalCreationMode}
+              className="p-1 hover:bg-gray-100"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-lg font-semibold text-gray-900">Select Sites</h2>
           </div>
-
-          {/* Search and Actions Bar Skeleton */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-between">
-            <Skeleton className="h-10 w-full sm:w-96" />
-            <div className="flex gap-3">
-              <Skeleton className="h-10 w-20" />
-              <Skeleton className="h-10 w-20" />
-              <Skeleton className="h-10 w-20" />
-            </div>
-          </div>
-
-          {/* Filters Skeleton (if applicable, otherwise can be removed) */}
-          <div className="flex gap-3">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-
-          {/* Grid View Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-            {Array(8)
-              .fill(0)
-              .map((_, i) => (
-                <div key={i} className="border rounded-lg overflow-hidden">
-                  <Skeleton className="h-48 w-full" />
-                  <div className="p-4">
-                    <Skeleton className="h-4 w-1/3 mb-2" />
-                    <Skeleton className="h-4 w-2/3 mb-4" />
-                    <Skeleton className="h-4 w-1/2 mb-2" />
-                    <Skeleton className="h-4 w-1/4" />
-                  </div>
-                </div>
-              ))}
-          </div>
+          <Button
+            size="sm"
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md"
+            onClick={() => setIsCollabPartnerDialogOpen(true)}
+          >
+            + Collab
+          </Button>
         </div>
-      ) : (
-        // Actual Dashboard Content
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-6",
-            // Only apply two-column layout when proposalCreationMode is true
-            proposalCreationMode && "lg:grid-cols-[1fr_300px]",
-          )}
-        >
-          {/* Left Column: Main Dashboard Content */}
-          <div className="flex flex-col gap-4 md:gap-6">
-            {/* Header with title, actions, and search box */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-xl md:text-2xl font-bold">
-                  {userData?.first_name
-                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                    : "Dashboard"}
-                </h1>
-                {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
-                {!(proposalCreationMode || ceQuoteMode) && (
-                  <div className="w-full sm:w-64 md:w-80">
-                    <SearchBox
-                      onSearchResults={handleSearchResults}
-                      onSearchError={handleSearchError}
-                      onSearchLoading={handleSearchLoading}
-                      onSearchClear={handleSearchClear}
-                      userId={user?.uid}
-                    />
-                  </div>
-                )}
-              </div>
+      )}
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                {/* Proposal Creation Mode Controls (on dashboard) */}
-                {proposalCreationMode && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-sm text-blue-700">
-                      {selectedClientForProposal ? (
-                        <>
-                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                        </>
-                      ) : (
-                        "Select a client"
-                      )}
-                      {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
-                    </span>
-                    <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-
-                {/* CE/Quote Mode Controls (on dashboard) */}
-                {ceQuoteMode && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-sm text-blue-700">
-                      {selectedClientForProposal ? (
-                        <>
-                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                        </>
-                      ) : (
-                        "Select a client"
-                      )}
-                      {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
-                    </span>
-                    <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-
-                {/* Action Buttons (only visible when not in any selection mode) */}
-                {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
-                  <div className="flex gap-2">
-                    <Button onClick={handleInitiateProposalFlow} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      Planning & Proposals
-                    </Button>
-                    <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      CE
-                    </Button>
-                    <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                      Quote
-                    </Button>
-                    <Button
-                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      onClick={() => setIsCollabPartnerDialogOpen(true)}
-                    >
-                      Collab
-                    </Button>
-                    <Button
-                      onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
-                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                    >
-                      Job Order
-                    </Button>
-                  </div>
-                )}
-
-                {!isMobile && (
-                  <div className="border rounded-md p-1 flex">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="icon"
-                      className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      <LayoutGrid size={18} />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="icon"
-                      className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                      onClick={() => setViewMode("list")}
-                    >
-                      <List size={18} />
-                    </Button>
-                  </div>
-                )}
+      {/* Main content area */}
+      <div className="flex-1 overflow-hidden">
+        {loading ? (
+          // Skeleton Loading State
+          <div className="flex flex-col gap-5">
+            {/* Header Skeleton */}
+            <div className="flex justify-between items-center">
+              <div>
+                <Skeleton className="h-8 w-64 mb-2" />
+                <Skeleton className="h-4 w-48" />
               </div>
             </div>
 
-            {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
-            {(proposalCreationMode || ceQuoteMode) && (
-              <div className="relative w-full max-w-xs" ref={clientSearchRef}>
-                <div className="relative">
-                  <Input
-                    placeholder="Search or select client..."
-                    value={
-                      selectedClientForProposal
-                        ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
-                        : dashboardClientSearchTerm
-                    }
-                    onChange={(e) => {
-                      setDashboardClientSearchTerm(e.target.value)
-                      setSelectedClientForProposal(null)
-                    }}
-                    onFocus={() => {
-                      setIsClientDropdownOpen(true)
-                      if (selectedClientForProposal) {
-                        setDashboardClientSearchTerm("")
-                      }
-                    }}
-                    className={cn(
-                      "pr-10 h-9 text-sm",
-                      (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
-                    )}
-                  />
-                  {isSearchingDashboardClients && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+            {/* Search and Actions Bar Skeleton */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between">
+              <Skeleton className="h-10 w-full sm:w-96" />
+              <div className="flex gap-3">
+                <Skeleton className="h-10 w-20" />
+                <Skeleton className="h-10 w-20" />
+                <Skeleton className="h-10 w-20" />
+              </div>
+            </div>
+
+            {/* Filters Skeleton (if applicable, otherwise can be removed) */}
+            <div className="flex gap-3">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-32" />
+            </div>
+
+            {/* Grid View Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+              {Array(8)
+                .fill(0)
+                .map((_, i) => (
+                  <div key={i} className="border rounded-lg overflow-hidden">
+                    <Skeleton className="h-48 w-full" />
+                    <div className="p-4">
+                      <Skeleton className="h-4 w-1/3 mb-2" />
+                      <Skeleton className="h-4 w-2/3 mb-4" />
+                      <Skeleton className="h-4 w-1/2 mb-2" />
+                      <Skeleton className="h-4 w-1/4" />
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        ) : (
+          // Actual Dashboard Content
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-6 h-full",
+              // Only apply two-column layout when proposalCreationMode is true
+              proposalCreationMode && "lg:grid-cols-[1fr_300px]",
+            )}
+          >
+            {/* Left Column: Main Dashboard Content */}
+            <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
+              {/* Header with title, actions, and search box */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex flex-col gap-2">
+                  {!proposalCreationMode && (
+                    <h1 className="text-xl md:text-2xl font-bold">
+                      {userData?.first_name
+                        ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                        : "Dashboard"}
+                    </h1>
+                  )}
+                  {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
+                  {!(proposalCreationMode || ceQuoteMode) && (
+                    <div className="w-full sm:w-64 md:w-80">
+                      <SearchBox
+                        onSearchResults={handleSearchResults}
+                        onSearchError={handleSearchError}
+                        onSearchLoading={handleSearchLoading}
+                        onSearchClear={handleSearchClear}
+                        userId={user?.uid}
+                      />
+                    </div>
                   )}
                 </div>
-                {/* Results dropdown */}
-                {isClientDropdownOpen && (
-                  <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
-                    <div className="p-2">
-                      {/* Always show "Add New Client" option at the top */}
-                      <div
-                        className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                        onClick={() => setIsNewClientDialogOpen(true)}
-                      >
-                        <PlusCircle className="h-4 w-4 text-blue-500" />
-                        <span className="font-medium text-blue-700">Add New Client</span>
-                      </div>
 
-                      {dashboardClientSearchResults.length > 0 ? (
-                        dashboardClientSearchResults.map((result) => (
-                          <div
-                            key={result.id}
-                            className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                            onClick={() => handleClientSelectOnDashboard(result)}
-                          >
-                            <div>
-                              <p className="font-medium">
-                                {result.name} ({result.company})
-                              </p>
-                              <p className="text-xs text-gray-500">{result.email}</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-2">
+                  {/* Proposal Creation Mode Controls (on dashboard) */}
+                  {proposalCreationMode && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-sm text-blue-700">
+                        {selectedClientForProposal ? (
+                          <>
+                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                          </>
+                        ) : (
+                          "Select a client"
+                        )}
+                        {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* CE/Quote Mode Controls (on dashboard) */}
+                  {ceQuoteMode && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-sm text-blue-700">
+                        {selectedClientForProposal ? (
+                          <>
+                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                          </>
+                        ) : (
+                          "Select a client"
+                        )}
+                        {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Action Buttons (only visible when not in any selection mode) */}
+                  {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleInitiateProposalFlow}
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      >
+                        Planning & Proposals
+                      </Button>
+                      <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                        CE
+                      </Button>
+                      <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                        Quote
+                      </Button>
+                      <Button
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                        onClick={() => setIsCollabPartnerDialogOpen(true)}
+                      >
+                        Collab
+                      </Button>
+                      <Button
+                        onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      >
+                        Job Order
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isMobile && (
+                    <div className="border rounded-md p-1 flex">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="icon"
+                        className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                        onClick={() => setViewMode("grid")}
+                      >
+                        <LayoutGrid size={18} />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="icon"
+                        className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                        onClick={() => setViewMode("list")}
+                      >
+                        <List size={18} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
+              {(proposalCreationMode || ceQuoteMode) && (
+                <div className="relative w-full max-w-xs mt-1" ref={clientSearchRef}>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search or select client..."
+                      value={
+                        selectedClientForProposal
+                          ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
+                          : dashboardClientSearchTerm
+                      }
+                      onChange={(e) => {
+                        setDashboardClientSearchTerm(e.target.value)
+                        setSelectedClientForProposal(null)
+                      }}
+                      onFocus={() => {
+                        setIsClientDropdownOpen(true)
+                        if (selectedClientForProposal) {
+                          setDashboardClientSearchTerm("")
+                        }
+                      }}
+                      className={cn(
+                        "pr-10 h-9 text-sm",
+                        (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
+                      )}
+                    />
+                    {isSearchingDashboardClients && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                    )}
+                  </div>
+                  {/* Results dropdown */}
+                  {isClientDropdownOpen && (
+                    <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+                      <div className="p-2">
+                        {/* Always show "Add New Client" option at the top */}
+                        <div
+                          className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                          onClick={() => setIsNewClientDialogOpen(true)}
+                        >
+                          <PlusCircle className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium text-blue-700">Add New Client</span>
+                        </div>
+
+                        {dashboardClientSearchResults.length > 0 ? (
+                          dashboardClientSearchResults.map((result) => (
+                            <div
+                              key={result.id}
+                              className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                              onClick={() => handleClientSelectOnDashboard(result)}
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {result.name} ({result.company})
+                                </p>
+                                <p className="text-xs text-gray-500">{result.email}</p>
+                              </div>
+                              {selectedClientForProposal?.id === result.id && (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              )}
                             </div>
-                            {selectedClientForProposal?.id === result.id && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                        ))
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-2">
+                            {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                              ? `No clients found for "${dashboardClientSearchTerm}".`
+                              : "Start typing to search for clients."}
+                          </p>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Search Results View */}
+              {isSearching && (
+                <div className="flex flex-col gap-4">
+                  {/* Search Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
+                        <ArrowLeft size={16} />
+                      </Button>
+                      <h2 className="text-base md:text-lg font-medium truncate">
+                        Results for "{searchQuery}" ({searchResults.length})
+                      </h2>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
+                      <Filter size={14} />
+                      <span>Filter</span>
+                    </Button>
+                  </div>
+
+                  {/* Search Error */}
+                  {searchError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{searchError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 ? (
+                    <div>
+                      {viewMode === "grid" ? (
+                        // Grid View for Search Results
+                        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                          {searchResults.map((result) => (
+                            <Card
+                              key={result.objectID}
+                              className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                              onClick={() => handleSearchResultClick(result)}
+                            >
+                              <div className="h-48 bg-gray-200 relative">
+                                <Image
+                                  src={result.image_url || "/abstract-geometric-sculpture.png"}
+                                  alt={result.name || "Search result"}
+                                  fill
+                                  className="object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/abstract-geometric-sculpture.png"
+                                    target.className = "opacity-50 object-contain"
+                                  }}
+                                />
+                              </div>
+
+                              <CardContent className="p-4">
+                                <div className="flex flex-col">
+                                  {result.site_code && (
+                                    <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
+                                  )}
+
+                                  <h3 className="font-semibold line-clamp-1">{result.name}</h3>
+
+                                  {result.price && (
+                                    <div className="mt-2 text-sm font-medium text-green-700">
+                                      ₱{Number(result.price).toLocaleString()}
+                                    </div>
+                                  )}
+
+                                  {result.location && (
+                                    <div className="mt-1 text-xs text-gray-500 flex items-center">
+                                      <MapPin size={12} className="mr-1 flex-shrink-0" />
+                                      <span className="truncate">{result.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </ResponsiveCardGrid>
                       ) : (
-                        <p className="text-sm text-gray-500 text-center py-2">
-                          {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                            ? `No clients found for "${dashboardClientSearchTerm}".`
-                            : "Start typing to search for clients."}
-                        </p>
+                        // List View for Search Results - Only show on tablet and desktop
+                        !isMobile && (
+                          <div className="border rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[80px]">Image</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="hidden md:table-cell">Location</TableHead>
+                                    <TableHead>Price</TableHead>
+                                    <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {searchResults.map((result) => (
+                                    <TableRow
+                                      key={result.objectID}
+                                      className="cursor-pointer hover:bg-gray-50"
+                                      onClick={() => handleSearchResultClick(result)}
+                                    >
+                                      <TableCell>
+                                        <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                          {result.image_url ? (
+                                            <Image
+                                              src={result.image_url || "/placeholder.svg"}
+                                              alt={result.name || "Search result"}
+                                              width={48}
+                                              height={48}
+                                              className="h-full w-full object-cover"
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement
+                                                target.src = "/abstract-geometric-sculpture.png"
+                                                target.className = "opacity-50"
+                                              }}
+                                            />
+                                          ) : (
+                                            <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                              <MapPin size={16} className="text-gray-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-medium">{result.name}</TableCell>
+                                      <TableCell>
+                                        <Badge
+                                          variant="outline"
+                                          className={
+                                            result.type?.toLowerCase() === "product" ||
+                                            result.type?.toLowerCase() === "rental"
+                                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                                              : result.type?.toLowerCase() === "client"
+                                                ? "bg-green-50 text-green-700 border-green-200"
+                                                : "bg-purple-50 text-purple-700 border-purple-200"
+                                          }
+                                        >
+                                          {result.type || "Unknown"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="hidden md:table-cell">
+                                        {result.location || "Unknown location"}
+                                      </TableCell>
+                                      <TableCell>
+                                        {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
+                                      </TableCell>
+                                      <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )
                       )}
                     </div>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Search Results View */}
-            {isSearching && (
-              <div className="flex flex-col gap-4">
-                {/* Search Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
-                      <ArrowLeft size={16} />
-                    </Button>
-                    <h2 className="text-base md:text-lg font-medium truncate">
-                      Results for "{searchQuery}" ({searchResults.length})
-                    </h2>
-                  </div>
-                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
-                    <Filter size={14} />
-                    <span>Filter</span>
-                  </Button>
+                  ) : (
+                    // No Search Results
+                    <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                      <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <Search size={24} className="text-gray-400" />
+                      </div>
+                      <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
+                      <p className="text-sm text-gray-500 mb-4 px-4">
+                        No items match your search for "{searchQuery}". Try using different keywords.
+                      </p>
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {/* Search Error */}
-                {searchError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{searchError}</AlertDescription>
-                  </Alert>
-                )}
+              {/* Regular Dashboard Content - Only show when not searching */}
+              {!isSearching && (
+                <>
+                  {/* Empty state */}
+                  {!loading && products.length === 0 && (
+                    <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                      <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <MapPin size={24} className="text-gray-400" />
+                      </div>
+                      <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
+                      <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
+                    </div>
+                  )}
 
-                {/* Search Results */}
-                {searchResults.length > 0 ? (
-                  <div>
-                    {viewMode === "grid" ? (
-                      // Grid View for Search Results
+                  {/* Grid View */}
+                  {!loading && products.length > 0 && viewMode === "grid" && (
+                    <div className="flex-1 overflow-y-auto">
                       <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                        {searchResults.map((result) => (
-                          <Card
-                            key={result.objectID}
-                            className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                            onClick={() => handleSearchResultClick(result)}
-                          >
-                            <div className="h-48 bg-gray-200 relative">
-                              <Image
-                                src={result.image_url || "/abstract-geometric-sculpture.png"}
-                                alt={result.name || "Search result"}
-                                fill
-                                className="object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.src = "/abstract-geometric-sculpture.png"
-                                  target.className = "opacity-50 object-contain"
-                                }}
-                              />
-                            </div>
-
-                            <CardContent className="p-4">
-                              <div className="flex flex-col">
-                                {result.site_code && (
-                                  <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
-                                )}
-
-                                <h3 className="font-semibold line-clamp-1">{result.name}</h3>
-
-                                {result.price && (
-                                  <div className="mt-2 text-sm font-medium text-green-700">
-                                    ₱{Number(result.price).toLocaleString()}
-                                  </div>
-                                )}
-
-                                {result.location && (
-                                  <div className="mt-1 text-xs text-gray-500 flex items-center">
-                                    <MapPin size={12} className="mr-1 flex-shrink-0" />
-                                    <span className="truncate">{result.location}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
+                        {products.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            hasOngoingBooking={productsWithBookings[product.id] || false}
+                            onView={() => handleViewDetails(product.id)}
+                            onEdit={(e) => handleEditClick(product, e)}
+                            onDelete={(e) => handleDeleteClick(product, e)}
+                            isSelected={
+                              proposalCreationMode
+                                ? selectedProducts.some((p) => p.id === product.id)
+                                : selectedSites.some((p) => p.id === product.id)
+                            }
+                            onSelect={() =>
+                              proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                            }
+                            selectionMode={proposalCreationMode || ceQuoteMode}
+                          />
                         ))}
                       </ResponsiveCardGrid>
-                    ) : (
-                      // List View for Search Results - Only show on tablet and desktop
-                      !isMobile && (
-                        <div className="border rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[80px]">Image</TableHead>
-                                  <TableHead>Name</TableHead>
-                                  <TableHead>Type</TableHead>
-                                  <TableHead className="hidden md:table-cell">Location</TableHead>
-                                  <TableHead>Price</TableHead>
-                                  <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {searchResults.map((result) => (
-                                  <TableRow
-                                    key={result.objectID}
-                                    className="cursor-pointer hover:bg-gray-50"
-                                    onClick={() => handleSearchResultClick(result)}
-                                  >
-                                    <TableCell>
-                                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                                        {result.image_url ? (
+                    </div>
+                  )}
+
+                  {/* List View - Only show on tablet and desktop */}
+                  {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[80px]">Image</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="hidden md:table-cell">Location</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {products.map((product) => (
+                                <TableRow
+                                  key={product.id}
+                                  className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                                  onClick={() => {
+                                    if (proposalCreationMode) {
+                                      handleProductSelect(product)
+                                    } else if (ceQuoteMode) {
+                                      handleSiteSelect(product)
+                                    } else {
+                                      handleViewDetails(product.id)
+                                    }
+                                  }}
+                                >
+                                  <TableCell>
+                                    <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                      {product.media && product.media.length > 0 ? (
+                                        <>
                                           <Image
-                                            src={result.image_url || "/placeholder.svg"}
-                                            alt={result.name || "Search result"}
+                                            src={product.media[0].url || "/placeholder.svg"}
+                                            alt={product.name || "Product image"}
                                             width={48}
                                             height={48}
-                                            className="h-full w-full object-cover"
+                                            className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
                                             onError={(e) => {
                                               const target = e.target as HTMLImageElement
                                               target.src = "/abstract-geometric-sculpture.png"
                                               target.className = "opacity-50"
                                             }}
                                           />
-                                        ) : (
-                                          <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                            <MapPin size={16} className="text-gray-400" />
-                                          </div>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="font-medium">{result.name}</TableCell>
-                                    <TableCell>
-                                      <Badge
-                                        variant="outline"
-                                        className={
-                                          result.type?.toLowerCase() === "product" ||
-                                          result.type?.toLowerCase() === "rental"
-                                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                                            : result.type?.toLowerCase() === "client"
-                                              ? "bg-green-50 text-green-700 border-green-200"
-                                              : "bg-purple-50 text-purple-700 border-purple-200"
-                                        }
-                                      >
-                                        {result.type || "Unknown"}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                      {result.location || "Unknown location"}
-                                    </TableCell>
-                                    <TableCell>
-                                      {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  // No Search Results
-                  <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
-                    <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                      <Search size={24} className="text-gray-400" />
-                    </div>
-                    <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
-                    <p className="text-sm text-gray-500 mb-4 px-4">
-                      No items match your search for "{searchQuery}". Try using different keywords.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Regular Dashboard Content - Only show when not searching */}
-            {!isSearching && (
-              <>
-                {/* Empty state */}
-                {!loading && products.length === 0 && (
-                  <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
-                    <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                      <MapPin size={24} className="text-gray-400" />
-                    </div>
-                    <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
-                    <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
-                  </div>
-                )}
-
-                {/* Grid View */}
-                {!loading && products.length > 0 && viewMode === "grid" && (
-                  <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                    {products.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        hasOngoingBooking={productsWithBookings[product.id] || false}
-                        onView={() => handleViewDetails(product.id)}
-                        onEdit={(e) => handleEditClick(product, e)}
-                        onDelete={(e) => handleDeleteClick(product, e)}
-                        isSelected={
-                          proposalCreationMode
-                            ? selectedProducts.some((p) => p.id === product.id)
-                            : selectedSites.some((p) => p.id === product.id)
-                        }
-                        onSelect={() =>
-                          proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
-                        }
-                        selectionMode={proposalCreationMode || ceQuoteMode}
-                      />
-                    ))}
-                  </ResponsiveCardGrid>
-                )}
-
-                {/* List View - Only show on tablet and desktop */}
-                {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[80px]">Image</TableHead>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead className="hidden md:table-cell">Location</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {products.map((product) => (
-                            <TableRow
-                              key={product.id}
-                              className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
-                              onClick={() => {
-                                if (proposalCreationMode) {
-                                  handleProductSelect(product)
-                                } else if (ceQuoteMode) {
-                                  handleSiteSelect(product)
-                                } else {
-                                  handleViewDetails(product.id)
-                                }
-                              }}
-                            >
-                              <TableCell>
-                                <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                                  {product.media && product.media.length > 0 ? (
-                                    <>
-                                      <Image
-                                        src={product.media[0].url || "/placeholder.svg"}
-                                        alt={product.name || "Product image"}
-                                        width={48}
-                                        height={48}
-                                        className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement
-                                          target.src = "/abstract-geometric-sculpture.png"
-                                          target.className = "opacity-50"
-                                        }}
-                                      />
-                                    </>
-                                  ) : (
-                                    <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                      <MapPin size={16} className="text-gray-400" />
+                                        </>
+                                      ) : (
+                                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                          <MapPin size={16} className="text-gray-400" />
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{product.name}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    product.type?.toLowerCase() === "rental"
-                                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                                      : "bg-purple-50 text-purple-700 border-purple-200"
-                                  }
-                                >
-                                  {product.type || "Unknown"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {product.specs_rental?.location || product.light?.location || "Unknown location"}
-                              </TableCell>
-                              <TableCell>
-                                {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
-                              <TableCell>
-                                {product.type?.toLowerCase() === "rental" &&
-                                  (productsWithBookings[product.id] ? (
-                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                      <CalendarIcon className="mr-1 h-3 w-3" /> Booked
+                                  </TableCell>
+                                  <TableCell className="font-medium">{product.name}</TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        product.type?.toLowerCase() === "rental"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : "bg-purple-50 text-purple-700 border-purple-200"
+                                      }
+                                    >
+                                      {product.type || "Unknown"}
                                     </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      <CheckCircle2 className="mr-1 h-3 w-3" /> Available
-                                    </Badge>
-                                  ))}
-                              </TableCell>
-                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                {/* Edit and delete buttons removed */}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Loading More Indicator */}
-                {loadingMore && (
-                  <div className="flex justify-center my-4">
-                    <div className="flex items-center gap-2">
-                      <Loader2 size={18} className="animate-spin" />
-                      <span>Loading more...</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Pagination Controls */}
-                {!loading && products.length > 0 && (
-                  <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-                    <div className="text-sm text-gray-500 flex items-center">
-                      {loadingCount ? (
-                        <div className="flex items-center">
-                          <Loader2 size={14} className="animate-spin mr-2" />
-                          <span>Calculating pages...</span>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                                  </TableCell>
+                                  <TableCell>
+                                    {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
+                                  <TableCell>
+                                    {product.type?.toLowerCase() === "rental" &&
+                                      (productsWithBookings[product.id] ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-amber-50 text-amber-700 border-amber-200"
+                                        >
+                                          <CalendarIcon className="mr-1 h-3 w-3" /> Booked
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-green-50 text-green-700 border-green-200"
+                                        >
+                                          <CheckCircle2 className="mr-1 h-3 w-3" /> Available
+                                        </Badge>
+                                      ))}
+                                  </TableCell>
+                                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    {/* Edit and delete buttons removed */}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         </div>
-                      ) : (
-                        <span>
-                          Page {currentPage} of {totalPages} ({products.length} items)
-                        </span>
-                      )}
+                      </div>
                     </div>
+                  )}
 
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToPreviousPage}
-                        disabled={currentPage === 1}
-                        className="h-8 w-8 p-0 bg-transparent"
-                      >
-                        <ChevronLeft size={16} />
-                      </Button>
+                  {/* Loading More Indicator */}
+                  {loadingMore && (
+                    <div className="flex justify-center my-4">
+                      <div className="flex items-center gap-2">
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Loading more...</span>
+                      </div>
+                    </div>
+                  )}
 
-                      {/* Page numbers - Hide on mobile */}
-                      <div className="hidden sm:flex items-center gap-1">
-                        {getPageNumbers().map((page, index) =>
-                          page === "..." ? (
-                            <span key={`ellipsis-${index}`} className="px-2">
-                              ...
-                            </span>
-                          ) : (
-                            <Button
-                              key={`page-${page}`}
-                              variant={currentPage === page ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => goToPage(page as number)}
-                              className="h-8 w-8 p-0"
-                            >
-                              {page}
-                            </Button>
-                          ),
+                  {/* Pagination Controls */}
+                  {!loading && products.length > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                      <div className="text-sm text-gray-500 flex items-center">
+                        {loadingCount ? (
+                          <div className="flex items-center">
+                            <Loader2 size={14} className="animate-spin mr-2" />
+                            <span>Calculating pages...</span>
+                          </div>
+                        ) : (
+                          <span>
+                            Page {currentPage} of {totalPages} ({products.length} items)
+                          </span>
                         )}
                       </div>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToNextPage}
-                        disabled={currentPage >= totalPages}
-                        className="h-8 w-8 p-0"
-                      >
-                        <ChevronRight size={16} />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={goToPreviousPage}
+                          disabled={currentPage === 1}
+                          className="h-8 w-8 p-0 bg-transparent"
+                        >
+                          <ChevronLeft size={16} />
+                        </Button>
+
+                        {/* Page numbers - Hide on mobile */}
+                        <div className="hidden sm:flex items-center gap-1">
+                          {getPageNumbers().map((page, index) =>
+                            page === "..." ? (
+                              <span key={`ellipsis-${index}`} className="px-2">
+                                ...
+                              </span>
+                            ) : (
+                              <Button
+                                key={`page-${page}`}
+                                variant={currentPage === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => goToPage(page as number)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {page}
+                              </Button>
+                            ),
+                          )}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={goToNextPage}
+                          disabled={currentPage >= totalPages}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ChevronRight size={16} />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Right Column: Proposal History - Conditionally rendered */}
+            {proposalCreationMode && (
+              <div className="flex flex-col gap-4 pt-4 md:pt-6">
+                <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
+              </div>
             )}
           </div>
+        )}
 
-          {/* Right Column: Proposal History - Conditionally rendered */}
-          {proposalCreationMode && (
-            <div className="flex flex-col gap-4">
-              <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
-            </div>
-          )}
-        </div>
-      )}
+        {/* Create Proposal Button - Fixed position when in proposal mode */}
+        {proposalCreationMode && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            <Button
+              onClick={handleConfirmProposalCreation}
+              disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+              className={`px-8 py-3 text-lg font-semibold transition-all duration-200 ${
+                selectedClientForProposal && selectedProducts.length > 0
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-gray-400 text-gray-600 cursor-not-allowed"
+              }`}
+            >
+              {isCreatingProposal ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Proposal"
+              )}
+            </Button>
+          </div>
+        )}
 
-      {ceMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
-          <Button
-            onClick={openCreateCostEstimateDateDialog}
-            className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
-            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-          >
-            {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Calculator className="h-4 w-4" />
-                Create Cost Estimate
-              </>
+        {/* CE/Quote Button - Fixed position when in CE mode */}
+        {ceQuoteMode && selectedSites.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            {ceMode && (
+              <Button
+                onClick={openCreateCostEstimateDateDialog}
+                className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-4 w-4" />
+                    Create Cost Estimate
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
-        </div>
-      )}
-
-      {quoteMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
-          <Button
-            onClick={openCreateQuotationDateDialog}
-            className="gap-2 bg-green-600 text-white hover:bg-green-700"
-            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-          >
-            {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4" />
-                Create Quotation
-              </>
+            {quoteMode && (
+              <Button
+                onClick={openCreateQuotationDateDialog}
+                className="gap-2 bg-green-600 text-white hover:bg-green-700"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Create Quotation
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Date Range Selection Dialog */}
-      <DateRangeCalendarDialog
-        isOpen={isDateRangeDialogOpen}
-        onClose={() => setIsDateRangeDialogOpen(false)}
-        onSelectDates={handleDatesSelected}
-        onSkipDates={handleSkipDates}
-        selectedSiteIds={selectedSites.map((site) => site.id)}
-        selectedClientId={selectedClientForProposal?.id}
-        showSkipButton={actionAfterDateSelection === "cost_estimate"}
-      />
+        {ceMode && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+            <Button
+              onClick={openCreateCostEstimateDateDialog}
+              className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Calculator className="h-4 w-4" />
+                  Create Cost Estimate
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Product"
-        description="This product will be removed from your dashboard. This action cannot be undone."
-        itemName={productToDelete?.name}
-      />
+        {quoteMode && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
+            <Button
+              onClick={openCreateQuotationDateDialog}
+              className="gap-2 bg-green-600 text-white hover:bg-green-700"
+              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+            >
+              {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Create Quotation
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
-      {/* Collab Partner Selection Dialog */}
-      <CollabPartnerDialog isOpen={isCollabPartnerDialogOpen} onClose={() => setIsCollabPartnerDialogOpen(false)} />
+        {/* Date Range Selection Dialog */}
+        <DateRangeCalendarDialog
+          isOpen={isDateRangeDialogOpen}
+          onClose={() => setIsDateRangeDialogOpen(false)}
+          onSelectDates={handleDatesSelected}
+          onSkipDates={handleSkipDates}
+          selectedSiteIds={selectedSites.map((site) => site.id)}
+          selectedClientId={selectedClientForProposal?.id}
+          showSkipButton={actionAfterDateSelection === "cost_estimate"}
+        />
 
-      {/* New Client Dialog (now using ClientDialog) */}
-      <ClientDialog
-        open={isNewClientDialogOpen}
-        onOpenChange={setIsNewClientDialogOpen}
-        onSuccess={(newClient) => {
-          setIsNewClientDialogOpen(false)
-          handleClientSelectOnDashboard(newClient)
-          toast({
-            title: "Client Added",
-            description: `${newClient.name} (${newClient.company}) has been added.`,
-            variant: "success",
-          })
-        }}
-      />
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Product"
+          description="This product will be removed from your dashboard. This action cannot be undone."
+          itemName={productToDelete?.name}
+        />
+
+        {/* Collab Partner Selection Dialog */}
+        <CollabPartnerDialog isOpen={isCollabPartnerDialogOpen} onClose={() => setIsCollabPartnerDialogOpen(false)} />
+
+        {/* New Client Dialog (now using ClientDialog) */}
+        <ClientDialog
+          open={isNewClientDialogOpen}
+          onOpenChange={setIsNewClientDialogOpen}
+          onSuccess={(newClient) => {
+            setIsNewClientDialogOpen(false)
+            handleClientSelectOnDashboard(newClient)
+            toast({
+              title: "Client Added",
+              description: `${newClient.name} (${newClient.company}) has been added.`,
+              variant: "success",
+            })
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -1603,7 +1817,7 @@ export default function SalesDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="sales">
-      <div>
+      <div className="h-screen overflow-hidden">
         <SalesDashboardContent />
 
         {/* Render SalesChatWidget without the floating button */}
