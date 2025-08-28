@@ -580,11 +580,57 @@ export default function ProposalDetailsPage() {
     // Don't set currentEditingPage here - let individual pages handle their own editing
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (!proposal) {
+      toast({
+        title: "Error",
+        description: "No proposal data available",
+        variant: "destructive",
+      })
+      return
+    }
+
     toast({
       title: "Download",
-      description: "Downloading proposal...",
+      description: "Generating PDF...",
     })
+
+    try {
+      const response = await fetch("/api/proposals/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ proposal }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = `proposal-${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully",
+      })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to download PDF",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleTemplateSelect = async (template: any) => {
