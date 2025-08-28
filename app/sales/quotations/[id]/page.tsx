@@ -475,9 +475,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     return (
       <div key={siteName} className="p-8 bg-white">
         {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-6">Golden Touch Imaging Specialist</h1>
-        </div>
+        <div className="text-center mb-8"></div>
 
         {/* Client and RFQ Info */}
         <div className="flex justify-between items-start mb-8">
@@ -535,10 +533,10 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Company Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-4">
-            {currentQuotation?.items?.[0]?.name || "GOLDEN TOUCH IMAGING SPECIALIST"}
-          </h2>
-          <p className="text-base mb-2">Good Day! Thank you for considering Golden Touch for your business needs.</p>
+          <h2 className="text-2xl font-bold mb-4">{companyData?.name || "COMPANY NAME"}</h2>
+          <p className="text-base mb-2">
+            Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
+          </p>
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
         </div>
@@ -663,7 +661,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Site Location Header */}
         <div className="mb-8 text-center">
-          <h3 className="text-xl font-bold">{item.location} QUOTATION</h3>
+          <h3 className="text-xl font-bold">QUOTATION</h3>
         </div>
 
         {/* Signature Section - Updated for quotation signatures */}
