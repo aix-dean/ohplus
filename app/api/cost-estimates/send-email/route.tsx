@@ -78,9 +78,18 @@ export async function POST(request: NextRequest) {
 
     // Use custom subject and body if provided, otherwise fall back to default
     const finalSubject = subject || `Cost Estimate: ${costEstimate.title || "Custom Advertising Solution"} - OH Plus`
-    const finalBody =
-      customBody ||
-      `
+
+    // Format custom body as HTML if provided
+    const formattedCustomBody = customBody
+      ? customBody
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line)
+          .map((line) => `<p>${line}</p>`)
+          .join("")
+      : `<p>We are excited to present you with a detailed cost estimate tailored to your specific advertising needs. Our team has carefully prepared this estimate to help you plan your marketing investment.</p>`
+
+    const finalBody = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -207,6 +216,10 @@ export async function POST(request: NextRequest) {
             color: #92400e;
             text-align: center;
           }
+          .custom-message {
+            margin: 20px 0;
+            line-height: 1.6;
+          }
         </style>
       </head>
       <body>
@@ -221,7 +234,9 @@ export async function POST(request: NextRequest) {
               Dear ${costEstimate.client?.contactPerson || costEstimate.client?.company || "Valued Client"},
             </div>
 
-            <p>We are excited to present you with a detailed cost estimate tailored to your specific advertising needs. Our team has carefully prepared this estimate to help you plan your marketing investment.</p>
+            <div class="custom-message">
+              ${formattedCustomBody}
+            </div>
 
             <div class="cost-estimate-summary">
               <h3 style="margin-top: 0; color: #1f2937;">Cost Estimate Summary</h3>
@@ -244,17 +259,6 @@ export async function POST(request: NextRequest) {
             </div>
 
             ${
-              costEstimate.customMessage
-                ? `
-            <div class="message">
-              <strong>Personal Message:</strong><br>
-              ${costEstimate.customMessage}
-            </div>
-            `
-                : ""
-            }
-
-            ${
               pdfBase64
                 ? `
             <div class="attachment-note">
@@ -267,8 +271,6 @@ export async function POST(request: NextRequest) {
             <div class="action-button">
               <a href="${costEstimateUrl}" class="btn">View Full Cost Estimate Online</a>
             </div>
-
-            <p>We believe this cost estimate offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>
 
             <div class="contact-info">
               <strong>Ready to get started?</strong><br>
