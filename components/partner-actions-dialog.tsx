@@ -24,18 +24,33 @@ export function PartnerActionsDialog({ isOpen, onClose, partner }: PartnerAction
     // Add call functionality here
     console.log(`Calling ${partner.name}`)
     onClose()
+    // Reopen dialog after a brief delay
+    setTimeout(() => {
+      const event = new CustomEvent("reopenDialog")
+      window.dispatchEvent(event)
+    }, 100)
   }
 
   const handleEmail = () => {
     // Add email functionality here
     console.log(`Emailing ${partner.name}`)
     onClose()
+    // Reopen dialog after a brief delay
+    setTimeout(() => {
+      const event = new CustomEvent("reopenDialog")
+      window.dispatchEvent(event)
+    }, 100)
   }
 
   const handleVisitWebsite = () => {
     // Add visit website functionality here
     console.log(`Visiting ${partner.name} website`)
     onClose()
+    // Reopen dialog after a brief delay
+    setTimeout(() => {
+      const event = new CustomEvent("reopenDialog")
+      window.dispatchEvent(event)
+    }, 100)
   }
 
   return (
