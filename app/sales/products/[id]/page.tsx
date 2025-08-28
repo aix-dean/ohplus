@@ -721,11 +721,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           <h1 className="text-xl font-semibold">Site Information</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="bg-red-500 text-white px-3 py-1 rounded-full hover:bg-red-600 border-red-500"
-            onClick={() => setMarketplaceDialogOpen(true)}
-          >
+          <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]" onClick={() => setMarketplaceDialogOpen(true)}>
             Marketplace
           </Button>
         </div>
