@@ -589,6 +589,17 @@ export default function ProposalDetailsPage() {
       return
     }
 
+    const defaultFileName = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`
+    const customFileName = prompt("Enter filename for your PDF (without .pdf extension):", defaultFileName)
+
+    // If user cancels the prompt, don't proceed with download
+    if (customFileName === null) {
+      return
+    }
+
+    // Use the custom filename or fallback to default if empty
+    const finalFileName = customFileName.trim() || defaultFileName
+
     toast({
       title: "Download",
       description: "Generating PDF...",
@@ -608,7 +619,7 @@ export default function ProposalDetailsPage() {
       }
 
       const blob = await response.blob()
-      const fileName = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      const fileName = `${finalFileName}.pdf`
 
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -622,7 +633,7 @@ export default function ProposalDetailsPage() {
 
       toast({
         title: "Success",
-        description: "PDF downloaded successfully to your downloads folder",
+        description: `PDF "${fileName}" downloaded successfully to your downloads folder`,
       })
     } catch (error) {
       console.error("Error downloading PDF:", error)
