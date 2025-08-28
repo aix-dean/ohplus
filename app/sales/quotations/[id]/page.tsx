@@ -533,7 +533,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Company Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-4">{companyData?.name || "COMPANY NAME"}</h2>
           <p className="text-base mb-2">
             Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
           </p>
