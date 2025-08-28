@@ -609,55 +609,20 @@ export default function ProposalDetailsPage() {
 
       const blob = await response.blob()
 
-      if ("showSaveFilePicker" in window) {
-        try {
-          const fileHandle = await window.showSaveFilePicker({
-            suggestedName: `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`,
-            types: [
-              {
-                description: "PDF files",
-                accept: {
-                  "application/pdf": [".pdf"],
-                },
-              },
-            ],
-          })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
 
-          const writable = await fileHandle.createWritable()
-          await writable.write(blob)
-          await writable.close()
-
-          toast({
-            title: "Success",
-            description: "PDF saved successfully!",
-          })
-        } catch (err) {
-          if (err.name !== "AbortError") {
-            throw err
-          }
-          // User cancelled the save dialog
-          toast({
-            title: "Cancelled",
-            description: "PDF download was cancelled",
-          })
-        }
-      } else {
-        // Fallback for browsers that don't support File System Access API
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.style.display = "none"
-        a.href = url
-        a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-
-        toast({
-          title: "Success",
-          description: "PDF downloaded successfully!",
-        })
-      }
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully!",
+      })
     } catch (error) {
       console.error("Error downloading PDF:", error)
       toast({
@@ -1552,6 +1517,7 @@ export default function ProposalDetailsPage() {
             <>
               <Button
                 variant="outline"
+                onClick={() => handleUpdatePublicStatus("draft")}
                 className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
               >
                 <FileText className="h-5 w-5 mr-2" />
