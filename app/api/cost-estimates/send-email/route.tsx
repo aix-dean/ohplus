@@ -8,19 +8,45 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("Cost estimate email API route called")
+
+    // Check if API key exists
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not found in environment variables")
+      return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
+    }
+
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError)
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+
+    console.log("Request body received:", {
+      hasCostEstimate: !!body.costEstimate,
+      hasClientEmail: !!body.clientEmail,
+      costEstimateId: body.costEstimate?.id,
+      customSubject: body.subject,
+      customBody: body.body,
+      currentUserEmail: body.currentUserEmail,
+      ccEmail: body.ccEmail,
+    })
+
     const {
       costEstimate,
-      relatedCostEstimates,
       clientEmail,
       client,
       currentUserEmail,
       ccEmail,
       subject,
-      body,
+      body: customBody,
       attachments,
-    } = await request.json()
+    } = body
 
-    if (!costEstimate || !clientEmail || !client || !subject || !body) {
+    if (!costEstimate || !clientEmail || !client || !subject || !customBody) {
+      console.error("Missing required fields")
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
 
@@ -49,43 +75,14 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
 
-    const pdfAttachments = []
-    const costEstimatesToProcess =
-      relatedCostEstimates && relatedCostEstimates.length > 0 ? relatedCostEstimates : [costEstimate]
-
+    let pdfBase64 = null
     try {
-      console.log("Generating PDFs for email attachments...")
-
-      for (let i = 0; i < costEstimatesToProcess.length; i++) {
-        const estimate = costEstimatesToProcess[i]
-
-        try {
-          const pdfTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 seconds per PDF
-          })
-
-          const pdfGenerationPromise = generateCostEstimatePDF(estimate, undefined, true)
-          const pdfBase64 = await Promise.race([pdfGenerationPromise, pdfTimeoutPromise])
-
-          if (pdfBase64) {
-            const pdfFileName = `${(estimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${estimate.costEstimateNumber || estimate.id}.pdf`
-            pdfAttachments.push({
-              filename: pdfFileName,
-              content: pdfBase64,
-              type: "application/pdf",
-            })
-            console.log(`PDF ${i + 1}/${costEstimatesToProcess.length} generated successfully`)
-          }
-        } catch (pdfError) {
-          console.error(`Error generating PDF ${i + 1}:`, pdfError)
-          // Continue with other PDFs even if one fails
-        }
-      }
-
-      console.log(`Generated ${pdfAttachments.length} PDF attachments successfully`)
-    } catch (error) {
-      console.error("Error generating PDFs:", error)
-      // Continue without attachments if PDF generation fails completely
+      console.log("Generating PDF for email attachment...")
+      pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true) // Simple single PDF generation
+      console.log("PDF generated successfully for email attachment")
+    } catch (pdfError) {
+      console.error("Error generating PDF:", pdfError)
+      // Continue without PDF attachment if generation fails
     }
 
     const emailHtml = `
@@ -230,7 +227,7 @@ export async function POST(request: NextRequest) {
                 Dear ${client.contactPerson || client.company || "Valued Client"},
               </div>
 
-              <p>${body.replace(/\n/g, "<br>")}</p>
+              <p>${customBody.replace(/\n/g, "<br>")}</p>
 
               <div class="cost-estimate-summary">
                 <h3 style="margin-top: 0; color: #1f2937;">Cost Estimate Summary</h3>
@@ -253,10 +250,10 @@ export async function POST(request: NextRequest) {
               </div>
 
               ${
-                pdfAttachments.length > 0
+                pdfBase64
                   ? `
               <div class="attachment-note">
-                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document(s) attached to this email for your convenience.
+                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document attached to this email for your convenience.
               </div>
               `
                   : ""
@@ -266,7 +263,7 @@ export async function POST(request: NextRequest) {
                 <a href="${costEstimateUrl}" class="btn">View Full Cost Estimate Online</a>
               </div>
 
-              <p>This detailed cost estimate includes all aspects of your advertising campaign, from media costs to production and installation. We believe this estimate provides excellent value and aligns with your marketing objectives.</p>
+              <p>This detailed cost estimate includes all aspects of your advertising campaign. We believe this estimate provides excellent value and aligns with your marketing objectives.</p>
 
               <div class="contact-info">
                 <strong>Questions about this estimate?</strong><br>
@@ -274,7 +271,7 @@ export async function POST(request: NextRequest) {
                 📞 Phone: +63 123 456 7890
               </div>
 
-              <p>Thank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!</p>
+              <p>Thank you for considering OH Plus for your advertising needs. We look forward to working with you!</p>
 
               <p style="margin-bottom: 0;">
                 Best regards,<br>
@@ -291,6 +288,8 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
+    console.log("Attempting to send email to:", clientEmail)
+
     const emailData: any = {
       from: "OH Plus <noreply@ohplus.ph>",
       to: [clientEmail],
@@ -300,17 +299,33 @@ export async function POST(request: NextRequest) {
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
     }
 
-    if (pdfAttachments.length > 0) {
-      emailData.attachments = pdfAttachments
-      console.log(`${pdfAttachments.length} PDF attachments added to email`)
+    // Add PDF attachment if generated successfully
+    if (pdfBase64) {
+      emailData.attachments = [
+        {
+          filename: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
+          content: pdfBase64,
+          type: "application/pdf",
+        },
+      ]
+      console.log("PDF attachment added to email")
     }
 
     const { data, error } = await resend.emails.send(emailData)
 
     if (error) {
       console.error("Resend error:", error)
-      return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to send email",
+          details: error.message || "Unknown error from email service",
+        },
+        { status: 500 },
+      )
     }
+
+    console.log("Email sent successfully:", data)
 
     try {
       const emailDoc = {
@@ -318,7 +333,7 @@ export async function POST(request: NextRequest) {
         from: currentUserEmail || "noreply@ohplus.ph",
         cc: ccEmailsArray,
         subject: subject,
-        body: body,
+        body: customBody,
         status: "sent",
         created: serverTimestamp(),
         sentAt: serverTimestamp(),
@@ -326,12 +341,16 @@ export async function POST(request: NextRequest) {
         userId: costEstimate.created_by || "",
         reportId: costEstimate.id,
         templateId: "",
-        attachments: pdfAttachments.map((attachment, index) => ({
-          fileName: attachment.filename,
-          fileSize: Math.round(attachment.content.length * 0.75), // Approximate size from base64
-          fileType: "application/pdf",
-          fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${attachment.filename}`,
-        })),
+        attachments: pdfBase64
+          ? [
+              {
+                fileName: `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
+                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate size from base64
+                fileType: "application/pdf",
+                fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
+              },
+            ]
+          : [],
       }
 
       await addDoc(collection(db, "emails"), emailDoc)
@@ -344,15 +363,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data,
-      message:
-        pdfAttachments.length > 0
-          ? `Email sent successfully with ${pdfAttachments.length} PDF attachment(s)`
-          : "Email sent successfully without PDF attachments",
+      message: pdfBase64
+        ? "Email sent successfully with PDF attachment"
+        : "Email sent successfully without PDF attachment",
     })
   } catch (error) {
-    console.error("Error sending cost estimate email:", error)
+    console.error("Email sending error:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        success: false,
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error occurred",
+      },
       { status: 500 },
     )
   }
