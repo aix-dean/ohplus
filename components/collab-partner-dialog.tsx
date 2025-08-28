@@ -48,83 +48,86 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
 
   const handlePartnerClick = (partner: Partner) => {
     setSelectedPartner(partner)
+    onClose() // Close the partner selection dialog first
     setIsPartnerActionsDialogOpen(true)
-    onClose()
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Choose a partner</DialogTitle>
-          <DialogDescription>Select an operator or DSP to collaborate with.</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-          {/* Operators Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Operators</h2>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search operators..."
-                value={operatorSearch}
-                onChange={(e) => setOperatorSearch(e.target.value)}
-                className="pl-9 pr-8"
-              />
-              {operatorSearch && (
-                <X
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 cursor-pointer hover:text-gray-700"
-                  onClick={() => setOperatorSearch("")}
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Choose a partner</DialogTitle>
+            <DialogDescription>Select an operator or DSP to collaborate with.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            {/* Operators Section */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Operators</h2>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search operators..."
+                  value={operatorSearch}
+                  onChange={(e) => setOperatorSearch(e.target.value)}
+                  className="pl-9 pr-8"
                 />
-              )}
+                {operatorSearch && (
+                  <X
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 cursor-pointer hover:text-gray-700"
+                    onClick={() => setOperatorSearch("")}
+                  />
+                )}
+              </div>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {filteredOperators.length > 0 ? (
+                  filteredOperators.map((partner) => (
+                    <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No operators found.</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {filteredOperators.length > 0 ? (
-                filteredOperators.map((partner) => (
-                  <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-4">No operators found.</p>
-              )}
-            </div>
-          </div>
 
-          {/* DSPs Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4">DSPs</h2>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search DSPs..."
-                value={dspSearch}
-                onChange={(e) => setDspSearch(e.target.value)}
-                className="pl-9 pr-8"
-              />
-              {dspSearch && (
-                <X
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 cursor-pointer hover:text-gray-700"
-                  onClick={() => setDspSearch("")}
+            {/* DSPs Section */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">DSPs</h2>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search DSPs..."
+                  value={dspSearch}
+                  onChange={(e) => setDspSearch(e.target.value)}
+                  className="pl-9 pr-8"
                 />
-              )}
-            </div>
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {filteredDsps.length > 0 ? (
-                filteredDsps.map((partner) => (
-                  <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-4">No DSPs found.</p>
-              )}
+                {dspSearch && (
+                  <X
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 cursor-pointer hover:text-gray-700"
+                    onClick={() => setDspSearch("")}
+                  />
+                )}
+              </div>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {filteredDsps.length > 0 ? (
+                  filteredDsps.map((partner) => (
+                    <PartnerCard key={partner.id} partner={partner} onPartnerClick={handlePartnerClick} />
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No DSPs found.</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <PartnerActionsDialog
-          isOpen={isPartnerActionsDialogOpen}
-          onClose={() => setIsPartnerActionsDialogOpen(false)}
-          partner={selectedPartner}
-        />
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <PartnerActionsDialog
+        isOpen={isPartnerActionsDialogOpen}
+        onClose={() => setIsPartnerActionsDialogOpen(false)}
+        partner={selectedPartner}
+      />
+    </>
   )
 }
 
