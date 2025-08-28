@@ -31,6 +31,7 @@ export default function ComposeEmailPage() {
   const { user, userData } = useAuth()
 
   const dataFetched = useRef(false)
+  const userDataRef = useRef(userData)
   const [isInitialized, setIsInitialized] = useState(false)
 
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
@@ -54,9 +55,13 @@ export default function ComposeEmailPage() {
   const [ccEmail, setCcEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+
+  useEffect(() => {
+    userDataRef.current = userData
+  }, [userData])
 
   const preGeneratePDF = useCallback(
     async (estimate: CostEstimate) => {
@@ -65,12 +70,13 @@ export default function ComposeEmailPage() {
       setPdfGenerating(true)
       try {
         console.log("[v0] Pre-generating PDF for email attachment...")
-        const userDataForPDF = userData
+        const currentUserData = userDataRef.current
+        const userDataForPDF = currentUserData
           ? {
-              first_name: userData.first_name || user?.displayName?.split(" ")[0] || "",
-              last_name: userData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
-              email: userData.email || user?.email || "",
-              company_id: userData.company_id,
+              first_name: currentUserData.first_name || user?.displayName?.split(" ")[0] || "",
+              last_name: currentUserData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
+              email: currentUserData.email || user?.email || "",
+              company_id: currentUserData.company_id,
             }
           : undefined
 
@@ -90,15 +96,18 @@ export default function ComposeEmailPage() {
         setPdfGenerating(false)
       }
     },
-    [userData, user, toast],
+    [user, toast],
   )
 
   const fetchData = useCallback(async () => {
-    if (dataFetched.current || !userData) return
+    if (dataFetched.current) return
+
+    const currentUserData = userDataRef.current
+    if (!currentUserData) return
 
     try {
-      console.log("[v0] fetchData called with userData:", userData)
-      console.log("[v0] userData.company_id:", userData?.company_id)
+      console.log("[v0] fetchData called with userData:", currentUserData)
+      console.log("[v0] userData.company_id:", currentUserData?.company_id)
 
       const id = params.id as string
       const estimate = await getCostEstimate(id)
@@ -114,10 +123,10 @@ export default function ComposeEmailPage() {
           (est, index) =>
             `QU-SU-${est.costEstimateNumber}_${est.client?.company || "Client"}_Cost_Estimate_Page_${est.page_number || index + 1}.pdf`,
         )
-        setAttachments(attachmentNames)
+        setPdfAttachments(attachmentNames)
       } else {
         setRelatedCostEstimates([estimate])
-        setAttachments([
+        setPdfAttachments([
           `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate.pdf`,
         ])
       }
@@ -137,10 +146,10 @@ Best regards,
 ${user?.displayName || "Sales Executive"}
 Sales Executive
 OH Plus
-${userData?.phone_number || ""}
+${currentUserData?.phone_number || ""}
 ${user?.email || ""}`)
 
-      const companyId = userData?.company_id || estimate?.company_id
+      const companyId = currentUserData?.company_id || estimate?.company_id
       console.log("[v0] Final companyId being used:", companyId)
 
       if (companyId) {
@@ -160,7 +169,7 @@ ${user?.email || ""}`)
         }
       } else {
         console.error("Company ID not found in user data or cost estimate")
-        console.log("[v0] userData:", userData)
+        console.log("[v0] userData:", currentUserData)
         console.log("[v0] estimate company_id:", estimate?.company_id)
 
         console.warn("No company_id available, continuing without templates")
@@ -179,10 +188,10 @@ ${user?.email || ""}`)
     } finally {
       setLoading(false)
     }
-  }, [params.id, userData, user, toast, preGeneratePDF])
+  }, [params.id, user, toast, preGeneratePDF])
 
   useEffect(() => {
-    if (userData && !isInitialized) {
+    if (userData && !isInitialized && !dataFetched.current) {
       console.log("[v0] userData is available, calling fetchData")
       fetchData()
     } else if (userData === null) {
@@ -339,9 +348,6 @@ ${user?.email || ""}`)
       const newFiles = Array.from(files)
       setUploadedFiles((prev) => [...prev, ...newFiles])
 
-      const newAttachmentNames = newFiles.map((file) => file.name)
-      setAttachments((prev) => [...prev, ...newAttachmentNames])
-
       toast({
         title: "Files Added",
         description: `${newFiles.length} file(s) added to attachments`,
@@ -351,13 +357,12 @@ ${user?.email || ""}`)
     event.target.value = ""
   }
 
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-    const pdfAttachmentCount = relatedCostEstimates.length
-    if (index >= pdfAttachmentCount) {
-      const uploadedFileIndex = index - pdfAttachmentCount
-      setUploadedFiles((prev) => prev.filter((_, i) => i !== uploadedFileIndex))
-    }
+  const removePdfAttachment = (index: number) => {
+    setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeUploadedFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSendEmail = async () => {
@@ -400,6 +405,8 @@ ${user?.email || ""}`)
 
       console.log("[v0] Processed uploaded files:", uploadedFilesData.length)
 
+      const allAttachments = [...pdfAttachments, ...uploadedFiles.map((f) => f.name)]
+
       const requestBody = {
         costEstimate: costEstimate,
         relatedCostEstimates: relatedCostEstimates,
@@ -409,7 +416,7 @@ ${user?.email || ""}`)
         ccEmail: ccEmail,
         subject: subject,
         body: body,
-        attachments: attachments,
+        attachments: allAttachments,
         preGeneratedPDF: preGeneratedPDF,
         uploadedFiles: uploadedFilesData,
       }
@@ -420,6 +427,7 @@ ${user?.email || ""}`)
         clientEmail: requestBody.clientEmail,
         uploadedFilesCount: uploadedFilesData.length,
         hasPreGeneratedPDF: !!requestBody.preGeneratedPDF,
+        totalAttachments: allAttachments.length,
       })
 
       const response = await fetch("/api/cost-estimates/send-email", {
@@ -574,9 +582,13 @@ ${user?.email || ""}`)
                       <span className="flex-1 text-sm text-green-800">Cost Estimate PDF (Ready for email)</span>
                     </div>
                   )}
-                  {attachments.map((attachment, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                      <Paperclip className="h-4 w-4 text-gray-500" />
+
+                  {pdfAttachments.map((attachment, index) => (
+                    <div
+                      key={`pdf-${index}`}
+                      className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200"
+                    >
+                      <Paperclip className="h-4 w-4 text-blue-500" />
                       <button
                         className="flex-1 text-sm text-left text-blue-600 hover:text-blue-800 hover:underline"
                         onClick={() => handleDownloadAttachment(attachment, index)}
@@ -584,11 +596,32 @@ ${user?.email || ""}`)
                       >
                         {downloadingPDF === index ? "Downloading..." : attachment}
                       </button>
-                      <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)} className="h-6 w-6 p-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePdfAttachment(index)}
+                        className="h-6 w-6 p-0"
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
+
+                  {uploadedFiles.map((file, index) => (
+                    <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                      <Paperclip className="h-4 w-4 text-gray-500" />
+                      <span className="flex-1 text-sm text-gray-700">{file.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeUploadedFile(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
