@@ -49,6 +49,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
   const handlePartnerClick = (partner: Partner) => {
     setSelectedPartner(partner)
     setIsPartnerActionsDialogOpen(true)
+    onClose()
   }
 
   return (
