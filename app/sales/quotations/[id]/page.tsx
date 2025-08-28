@@ -542,10 +542,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         {/* Site Details - Updated for quotation data structure */}
         <div className="mb-8 space-y-3">
           <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Site Location:</span>
-            <span className="font-bold">{items[0]?.location || "Site Location"}</span>
-          </div>
-          <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Type:</span>
             <span className="font-bold">{items[0]?.type || "Billboard"}</span>
           </div>
@@ -636,7 +632,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Terms and Conditions */}
         <div className="mb-8">
-          <h3 className="text-lg font-bold mb-4">Terms and Conditions:</h3>
+          <h3 className="text-lg font-bold mb-4 pb-1 border-b border-gray-200 font-[Calibri]">Terms and Conditions:</h3>
           <div className="space-y-2 text-sm">
             <p>1. Quotation validity: 5 working days.</p>
             <p>
@@ -651,16 +647,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <p>4. Final artwork should be approved ten (10) days before the contract period</p>
             <p>5. Print is exclusively for {companyData?.name || "Golden Touch Imaging Specialist"} Only.</p>
           </div>
-        </div>
-
-        {/* Date */}
-        <div className="mb-8 text-right">
-          <p className="text-base">{formatDate(new Date())}</p>
-        </div>
-
-        {/* Site Location Header */}
-        <div className="mb-8 text-center">
-          <h3 className="text-xl font-bold">QUOTATION</h3>
         </div>
 
         {/* Signature Section - Updated for quotation signatures */}
