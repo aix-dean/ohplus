@@ -1498,7 +1498,7 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
 
-        <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+        <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto">
           <ProposalHistory
             selectedClient={
               proposal
