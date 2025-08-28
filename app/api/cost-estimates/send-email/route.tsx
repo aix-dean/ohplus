@@ -8,7 +8,17 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail, subject, body } = await request.json()
+    const {
+      costEstimate,
+      relatedCostEstimates,
+      clientEmail,
+      client,
+      currentUserEmail,
+      ccEmail,
+      subject,
+      body,
+      attachments,
+    } = await request.json()
 
     if (!costEstimate || !clientEmail || !client || !subject || !body) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
@@ -39,25 +49,43 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
 
-    let pdfBase64 = null
-    let pdfFileName = ""
+    const pdfAttachments = []
+    const costEstimatesToProcess =
+      relatedCostEstimates && relatedCostEstimates.length > 0 ? relatedCostEstimates : [costEstimate]
+
     try {
-      console.log("Generating PDF for email attachment...")
+      console.log("Generating PDFs for email attachments...")
 
-      const pdfTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("PDF generation timeout")), 30000)
-      })
+      for (let i = 0; i < costEstimatesToProcess.length; i++) {
+        const estimate = costEstimatesToProcess[i]
 
-      const pdfGenerationPromise = generateCostEstimatePDF(costEstimate, undefined, true)
+        try {
+          const pdfTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 seconds per PDF
+          })
 
-      pdfBase64 = await Promise.race([pdfGenerationPromise, pdfTimeoutPromise])
-      pdfFileName = `${(costEstimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${costEstimate.costEstimateNumber || costEstimate.id}.pdf`
-      console.log("PDF generated successfully for email attachment")
-    } catch (pdfError) {
-      console.error("Error generating PDF:", pdfError)
-      if (pdfError.message.includes("timeout")) {
-        console.error("PDF generation timed out - continuing without attachment")
+          const pdfGenerationPromise = generateCostEstimatePDF(estimate, undefined, true)
+          const pdfBase64 = await Promise.race([pdfGenerationPromise, pdfTimeoutPromise])
+
+          if (pdfBase64) {
+            const pdfFileName = `${(estimate.title || "Cost_Estimate").replace(/[^a-z0-9]/gi, "_")}_${estimate.costEstimateNumber || estimate.id}.pdf`
+            pdfAttachments.push({
+              filename: pdfFileName,
+              content: pdfBase64,
+              type: "application/pdf",
+            })
+            console.log(`PDF ${i + 1}/${costEstimatesToProcess.length} generated successfully`)
+          }
+        } catch (pdfError) {
+          console.error(`Error generating PDF ${i + 1}:`, pdfError)
+          // Continue with other PDFs even if one fails
+        }
       }
+
+      console.log(`Generated ${pdfAttachments.length} PDF attachments successfully`)
+    } catch (error) {
+      console.error("Error generating PDFs:", error)
+      // Continue without attachments if PDF generation fails completely
     }
 
     const emailHtml = `
@@ -225,10 +253,10 @@ export async function POST(request: NextRequest) {
               </div>
 
               ${
-                pdfBase64
+                pdfAttachments.length > 0
                   ? `
               <div class="attachment-note">
-                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document attached to this email for your convenience.
+                📎 <strong>PDF Attached:</strong> You'll find the complete cost estimate document(s) attached to this email for your convenience.
               </div>
               `
                   : ""
@@ -272,15 +300,9 @@ export async function POST(request: NextRequest) {
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
     }
 
-    if (pdfBase64) {
-      emailData.attachments = [
-        {
-          filename: pdfFileName,
-          content: pdfBase64,
-          type: "application/pdf",
-        },
-      ]
-      console.log("PDF attachment added to email")
+    if (pdfAttachments.length > 0) {
+      emailData.attachments = pdfAttachments
+      console.log(`${pdfAttachments.length} PDF attachments added to email`)
     }
 
     const { data, error } = await resend.emails.send(emailData)
@@ -304,16 +326,12 @@ export async function POST(request: NextRequest) {
         userId: costEstimate.created_by || "",
         reportId: costEstimate.id,
         templateId: "",
-        attachments: pdfBase64
-          ? [
-              {
-                fileName: pdfFileName,
-                fileSize: Math.round(pdfBase64.length * 0.75), // Approximate size from base64
-                fileType: "application/pdf",
-                fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${pdfFileName}`,
-              },
-            ]
-          : [],
+        attachments: pdfAttachments.map((attachment, index) => ({
+          fileName: attachment.filename,
+          fileSize: Math.round(attachment.content.length * 0.75), // Approximate size from base64
+          fileType: "application/pdf",
+          fileUrl: `blob:https://preview-jp-logistics-report-kzrng30razvmqc8sgkTm.userusercontent.net/${attachment.filename}`,
+        })),
       }
 
       await addDoc(collection(db, "emails"), emailDoc)
@@ -326,9 +344,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data,
-      message: pdfBase64
-        ? "Email sent successfully with PDF attachment"
-        : "Email sent successfully without PDF attachment",
+      message:
+        pdfAttachments.length > 0
+          ? `Email sent successfully with ${pdfAttachments.length} PDF attachment(s)`
+          : "Email sent successfully without PDF attachments",
     })
   } catch (error) {
     console.error("Error sending cost estimate email:", error)
