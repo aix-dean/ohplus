@@ -67,8 +67,18 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
         {/* Proposal Preview */}
         <div className="px-6 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="w-16 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <div className="text-white text-xs font-bold">{proposal.code || "PROP"}</div>
+            <div className="w-16 h-12 rounded-lg overflow-hidden flex-shrink-0">
+              {proposal.products && proposal.products.length > 0 && proposal.products[0].image ? (
+                <img
+                  src={proposal.products[0].image || "/placeholder.svg"}
+                  alt={proposal.products[0].name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <div className="text-white text-xs font-bold">{proposal.code || "PROP"}</div>
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <div className="text-sm font-medium text-gray-500">{proposal.code}</div>
