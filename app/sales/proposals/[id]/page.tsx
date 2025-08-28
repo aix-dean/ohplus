@@ -590,6 +590,12 @@ export default function ProposalDetailsPage() {
       return
     }
 
+    console.log("[v0] Frontend - Proposal ID:", proposal.id)
+    console.log("[v0] Frontend - Proposal Title:", proposal.title)
+    console.log("[v0] Frontend - Products Count:", proposal.products?.length || 0)
+    console.log("[v0] Frontend - Products Data:", JSON.stringify(proposal.products, null, 2))
+    console.log("[v0] Frontend - Total Amount:", proposal.totalAmount)
+
     toast({
       title: "Download",
       description: "Generating PDF...",
