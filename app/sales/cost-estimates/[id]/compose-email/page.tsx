@@ -19,7 +19,7 @@ import {
 import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
-import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
@@ -39,6 +39,8 @@ export default function ComposeEmailPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState<number | null>(null)
+  const [preGeneratedPDF, setPreGeneratedPDF] = useState<string | null>(null)
+  const [pdfGenerating, setPdfGenerating] = useState(false)
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
   const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false)
@@ -56,6 +58,41 @@ export default function ComposeEmailPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
+  const preGeneratePDF = useCallback(
+    async (estimate: CostEstimate) => {
+      if (!estimate) return
+
+      setPdfGenerating(true)
+      try {
+        console.log("[v0] Pre-generating PDF for email attachment...")
+        const userDataForPDF = userData
+          ? {
+              first_name: userData.first_name || user?.displayName?.split(" ")[0] || "",
+              last_name: userData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
+              email: userData.email || user?.email || "",
+              company_id: userData.company_id,
+            }
+          : undefined
+
+        const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
+        if (typeof pdfBase64 === "string") {
+          setPreGeneratedPDF(pdfBase64)
+          console.log("[v0] PDF pre-generated successfully for email")
+        }
+      } catch (error) {
+        console.error("[v0] Error pre-generating PDF:", error)
+        toast({
+          title: "PDF Generation Warning",
+          description: "PDF could not be pre-generated. Email will be sent without PDF attachment.",
+          variant: "destructive",
+        })
+      } finally {
+        setPdfGenerating(false)
+      }
+    },
+    [userData, user, toast],
+  )
+
   const fetchData = useCallback(async () => {
     if (dataFetched.current || !userData) return
 
@@ -66,6 +103,8 @@ export default function ComposeEmailPage() {
       const id = params.id as string
       const estimate = await getCostEstimate(id)
       setCostEstimate(estimate)
+
+      await preGeneratePDF(estimate)
 
       if (estimate?.page_id) {
         const related = await getCostEstimatesByPageId(estimate.page_id)
@@ -140,7 +179,7 @@ ${user?.email || ""}`)
     } finally {
       setLoading(false)
     }
-  }, [params.id, userData, user, toast])
+  }, [params.id, userData, user, toast, preGeneratePDF])
 
   useEffect(() => {
     if (userData && !isInitialized) {
@@ -300,7 +339,6 @@ ${user?.email || ""}`)
       const newFiles = Array.from(files)
       setUploadedFiles((prev) => [...prev, ...newFiles])
 
-      // Add file names to attachments list for display
       const newAttachmentNames = newFiles.map((file) => file.name)
       setAttachments((prev) => [...prev, ...newAttachmentNames])
 
@@ -310,7 +348,6 @@ ${user?.email || ""}`)
       })
     }
 
-    // Reset the input
     event.target.value = ""
   }
 
@@ -337,6 +374,7 @@ ${user?.email || ""}`)
     try {
       console.log("[v0] Starting email send process...")
       console.log("[v0] Uploaded files count:", uploadedFiles.length)
+      console.log("[v0] Pre-generated PDF available:", !!preGeneratedPDF)
 
       const uploadedFilesData =
         uploadedFiles.length > 0
@@ -346,7 +384,7 @@ ${user?.email || ""}`)
                   const reader = new FileReader()
                   reader.onload = () => {
                     const result = reader.result as string
-                    resolve(result.split(",")[1]) // Remove data:type;base64, prefix
+                    resolve(result.split(",")[1])
                   }
                   reader.readAsDataURL(file)
                 })
@@ -372,7 +410,7 @@ ${user?.email || ""}`)
         subject: subject,
         body: body,
         attachments: attachments,
-        uploadedFiles: uploadedFilesData,
+        preGeneratedPDF: preGeneratedPDF,
       }
 
       console.log("[v0] Sending request with body:", {
@@ -380,6 +418,7 @@ ${user?.email || ""}`)
         hasRelatedCostEstimates: !!requestBody.relatedCostEstimates,
         clientEmail: requestBody.clientEmail,
         uploadedFilesCount: requestBody.uploadedFiles.length,
+        hasPreGeneratedPDF: !!requestBody.preGeneratedPDF,
       })
 
       const response = await fetch("/api/cost-estimates/send-email", {
@@ -427,7 +466,7 @@ ${user?.email || ""}`)
 
     setDownloadingPDF(index)
     try {
-      await generateCostEstimatePDF(targetEstimate, undefined, false, userDataForPDF)
+      await generateCostEstimateEmailPDF(targetEstimate, true, userDataForPDF)
       toast({
         title: "PDF Downloaded",
         description: `${attachment} has been downloaded successfully.`,
@@ -450,7 +489,14 @@ ${user?.email || ""}`)
   }
 
   if (loading || userData === undefined) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="text-lg">Loading...</div>
+          {pdfGenerating && <div className="text-sm text-gray-600">Preparing PDF for email attachment...</div>}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -463,6 +509,12 @@ ${user?.email || ""}`)
             Back
           </Button>
           <h1 className="text-xl font-semibold">Compose Email</h1>
+          {pdfGenerating && (
+            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Preparing PDF...</div>
+          )}
+          {preGeneratedPDF && (
+            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">PDF Ready</div>
+          )}
         </div>
       </div>
 
@@ -515,6 +567,12 @@ ${user?.email || ""}`)
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Attachments:</Label>
                 <div className="space-y-2">
+                  {preGeneratedPDF && (
+                    <div className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200">
+                      <Paperclip className="h-4 w-4 text-green-600" />
+                      <span className="flex-1 text-sm text-green-800">Cost Estimate PDF (Ready for email)</span>
+                    </div>
+                  )}
                   {attachments.map((attachment, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
                       <Paperclip className="h-4 w-4 text-gray-500" />
@@ -603,10 +661,10 @@ ${user?.email || ""}`)
         <div className="flex justify-end mt-6">
           <Button
             onClick={handleSendEmail}
-            disabled={sending || !toEmail || !subject}
+            disabled={sending || !toEmail || !subject || pdfGenerating}
             className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
           >
-            {sending ? "Sending..." : "Send Email"}
+            {sending ? "Sending..." : pdfGenerating ? "Preparing PDF..." : "Send Email"}
           </Button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+// import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
       ccEmail: body.ccEmail,
+      hasPreGeneratedPDF: !!body.preGeneratedPDF,
     })
 
-    const { costEstimate, clientEmail, subject, body: customBody, currentUserEmail, ccEmail } = body
+    const { costEstimate, clientEmail, subject, body: customBody, currentUserEmail, ccEmail, preGeneratedPDF } = body
 
     if (!costEstimate || !clientEmail) {
       console.error("Missing required fields:", { costEstimate: !!costEstimate, clientEmail: !!clientEmail })
@@ -63,15 +64,11 @@ export async function POST(request: NextRequest) {
 
     const costEstimateUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
 
-    // Generate PDF as base64 for attachment
-    let pdfBase64 = null
-    try {
-      console.log("Generating PDF for email attachment...")
-      pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true) // true for base64 return
-      console.log("PDF generated successfully for email attachment")
-    } catch (pdfError) {
-      console.error("Error generating PDF:", pdfError)
-      // Continue without PDF attachment if generation fails
+    const pdfBase64 = preGeneratedPDF || null
+    if (preGeneratedPDF) {
+      console.log("Using pre-generated PDF for email attachment")
+    } else {
+      console.log("No pre-generated PDF available, email will be sent without PDF attachment")
     }
 
     console.log("Generated cost estimate URL:", costEstimateUrl)
@@ -307,7 +304,7 @@ export async function POST(request: NextRequest) {
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
     }
 
-    // Add PDF attachment if generated successfully
+    // Add PDF attachment if available
     if (pdfBase64) {
       emailData.attachments = [
         {
