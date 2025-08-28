@@ -535,7 +535,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Company Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-4">GOLDEN TOUCH IMAGING SPECIALIST</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            {currentQuotation?.items?.[0]?.name || "GOLDEN TOUCH IMAGING SPECIALIST"}
+          </h2>
           <p className="text-base mb-2">Good Day! Thank you for considering Golden Touch for your business needs.</p>
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
