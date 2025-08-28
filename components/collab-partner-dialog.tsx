@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Search, X, MoreVertical } from "lucide-react"
 import Image from "next/image"
 import { PartnerActionsDialog } from "./partner-actions-dialog"
+import { UnderConstructionDialog } from "./under-construction-dialog"
 
 interface Partner {
   id: string
@@ -39,6 +40,7 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
   const [dspSearch, setDspSearch] = useState("")
   const [isPartnerActionsDialogOpen, setIsPartnerActionsDialogOpen] = useState(false)
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
+  const [isUnderConstructionDialogOpen, setIsUnderConstructionDialogOpen] = useState(false)
 
   const filteredOperators = operators.filter((partner) =>
     partner.name.toLowerCase().includes(operatorSearch.toLowerCase()),
@@ -126,6 +128,15 @@ export function CollabPartnerDialog({ isOpen, onClose }: CollabPartnerDialogProp
         isOpen={isPartnerActionsDialogOpen}
         onClose={() => setIsPartnerActionsDialogOpen(false)}
         partner={selectedPartner}
+        onActionClick={() => {
+          setIsPartnerActionsDialogOpen(false)
+          setIsUnderConstructionDialogOpen(true)
+        }}
+      />
+
+      <UnderConstructionDialog
+        isOpen={isUnderConstructionDialogOpen}
+        onClose={() => setIsUnderConstructionDialogOpen(false)}
       />
     </>
   )

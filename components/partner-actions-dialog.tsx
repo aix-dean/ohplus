@@ -15,30 +15,25 @@ interface PartnerActionsDialogProps {
   isOpen: boolean
   onClose: () => void
   partner: Partner | null
+  onActionClick?: () => void
 }
 
-export function PartnerActionsDialog({ isOpen, onClose, partner }: PartnerActionsDialogProps) {
+export function PartnerActionsDialog({ isOpen, onClose, partner, onActionClick }: PartnerActionsDialogProps) {
   if (!partner) return null
 
   const handleCall = () => {
     console.log(`Calling ${partner.name}`)
-    // In a real app, this would initiate a phone call or show contact details
-    // For now, just close the dialog
-    onClose()
+    onActionClick?.()
   }
 
   const handleEmail = () => {
     console.log(`Emailing ${partner.name}`)
-    // In a real app, this would open an email composer or send dialog
-    // For now, just close the dialog
-    onClose()
+    onActionClick?.()
   }
 
   const handleVisitWebsite = () => {
     console.log(`Visiting ${partner.name} website`)
-    // In a real app, this would open the partner's website in a new tab
-    // For now, just close the dialog
-    onClose()
+    onActionClick?.()
   }
 
   return (
