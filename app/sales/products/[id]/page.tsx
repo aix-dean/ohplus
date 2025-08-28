@@ -1194,21 +1194,21 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
           <div className="flex gap-4 py-4 justify-center">
             {/* OOH!Shop */}
-            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
-                <Image src="/ooh-shop-logo.png" alt="OOH!Shop logo" width={48} height={48} className="object-contain" />
+            <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-20 h-20 rounded-lg flex items-center justify-center mb-2 bg-white">
+                <Image src="/ooh-shop-logo.png" alt="OOH!Shop logo" width={64} height={64} className="object-contain" />
               </div>
               <span className="text-sm font-medium">OOH!Shop</span>
             </button>
 
             {/* Vistar Media */}
-            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+            <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-20 h-20 rounded-lg flex items-center justify-center mb-2 bg-white">
                 <Image
                   src="/vistar-media-logo.png"
                   alt="Vistar Media logo"
-                  width={48}
-                  height={48}
+                  width={64}
+                  height={64}
                   className="object-contain"
                 />
               </div>
@@ -1216,13 +1216,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </button>
 
             {/* Broadsign */}
-            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+            <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-20 h-20 rounded-lg flex items-center justify-center mb-2 bg-white">
                 <Image
                   src="/broadsign-logo.png"
                   alt="Broadsign logo"
-                  width={48}
-                  height={48}
+                  width={64}
+                  height={64}
                   className="object-contain"
                 />
               </div>
@@ -1230,13 +1230,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </button>
 
             {/* Moving Walls */}
-            <button className="flex flex-col items-center p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-2 bg-white border">
+            <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-20 h-20 rounded-lg flex items-center justify-center mb-2 bg-white">
                 <Image
                   src="/moving-walls-logo.png"
                   alt="Moving Walls logo"
-                  width={48}
-                  height={48}
+                  width={64}
+                  height={64}
                   className="object-contain"
                 />
               </div>
