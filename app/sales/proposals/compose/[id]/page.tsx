@@ -222,6 +222,8 @@ OH PLUS
           cc: "",
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
+
+        await generateProposalPDFs(proposalData)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
@@ -242,6 +244,57 @@ OH PLUS
       fetchProposalTemplates()
     }
   }, [user?.uid])
+
+  const generateProposalPDFs = async (proposalData: Proposal) => {
+    try {
+      const response = await fetch(`/api/proposals/generate-pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ proposal: proposalData }),
+      })
+
+      if (response.ok) {
+        const pdfBlob = await response.blob()
+        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
+        const pdfFile = new File([pdfBlob], fileName, {
+          type: "application/pdf",
+        })
+
+        const proposalPDFs: Attachment[] = [
+          {
+            name: fileName,
+            size: formatFileSize(pdfBlob.size),
+            type: "proposal",
+            file: pdfFile,
+          },
+        ]
+
+        setAttachments(proposalPDFs)
+      } else {
+        throw new Error("Failed to generate PDF")
+      }
+    } catch (error) {
+      console.error("Error generating proposal PDFs:", error)
+      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
+      const fallbackPDFs: Attachment[] = [
+        {
+          name: fallbackFileName,
+          size: "2.3 MB",
+          type: "proposal",
+          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf`,
+        },
+      ]
+      setAttachments(fallbackPDFs)
+
+      toast({
+        title: "Warning",
+        description: "Could not generate proposal PDF. Using fallback attachment.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleBack = () => {
     router.back()
@@ -266,48 +319,56 @@ OH PLUS
       return
     }
 
-    if (!proposal) {
-      toast({
-        title: "Error",
-        description: "Proposal data not available.",
-        variant: "destructive",
-      })
-      return
-    }
-
     setSending(true)
 
     try {
-      const emailPayload = {
-        proposal: proposal,
-        clientEmail: emailData.to.trim(),
-        subject: emailData.subject,
-        body: emailData.message,
-        currentUserEmail: user?.email,
-        ccEmail: emailData.cc.trim() || undefined,
+      const formData = new FormData()
+
+      const toEmails = emailData.to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email)
+      const ccEmails = emailData.cc
+        ? emailData.cc
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email)
+        : []
+
+      formData.append("to", JSON.stringify(toEmails))
+      if (ccEmails.length > 0) {
+        formData.append("cc", JSON.stringify(ccEmails))
+      }
+      formData.append("subject", emailData.subject)
+      formData.append("body", emailData.message)
+
+      for (let i = 0; i < attachments.length; i++) {
+        const attachment = attachments[i]
+        try {
+          if (attachment.file) {
+            formData.append(`attachment_${i}`, attachment.file)
+          } else if (attachment.url && attachment.type === "proposal") {
+            const pdfResponse = await fetch(attachment.url)
+            if (pdfResponse.ok) {
+              const pdfBlob = await pdfResponse.blob()
+              const pdfFile = new File([pdfBlob], attachment.name, { type: "application/pdf" })
+              formData.append(`attachment_${i}`, pdfFile)
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing attachment ${attachment.name}:`, error)
+        }
       }
 
-      console.log("[v0] Sending email with payload:", {
-        hasProposal: !!emailPayload.proposal,
-        clientEmail: emailPayload.clientEmail,
-        subject: emailPayload.subject,
-        hasCustomBody: !!emailPayload.body,
-        currentUserEmail: emailPayload.currentUserEmail,
-        ccEmail: emailPayload.ccEmail,
-      })
-
-      const response = await fetch("/api/proposals/send-email", {
+      const response = await fetch("/api/send-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
+        body: formData,
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || result.details || "Failed to send email")
+        throw new Error(result.error || "Failed to send email")
       }
 
       try {
@@ -319,38 +380,28 @@ OH PLUS
           sentAt: serverTimestamp(),
           status: "sent",
           subject: emailData.subject,
-          to: emailData.to
-            .split(",")
-            .map((email) => email.trim())
-            .filter(Boolean),
-          cc: emailData.cc
-            ? emailData.cc
-                .split(",")
-                .map((email) => email.trim())
-                .filter(Boolean)
-            : null,
+          to: toEmails,
+          cc: ccEmails.length > 0 ? ccEmails : null,
           updated: serverTimestamp(),
           userId: user?.uid || null,
           email_type: "proposal",
-          attachments: [
-            {
-              fileName: `${(proposal.title || "Proposal").replace(/[^a-z0-9]/gi, "_")}_${proposal.id}.pdf`,
-              fileSize: 0,
-              fileType: "application/pdf",
-              fileUrl: null,
-            },
-          ],
+          attachments: attachments.map((att) => ({
+            fileName: att.name,
+            fileSize: att.file?.size || 0,
+            fileType: att.file?.type || "application/pdf",
+            fileUrl: att.url || null,
+          })),
         }
 
         await addDoc(collection(db, "emails"), emailRecord)
-        console.log("[v0] Email record saved successfully")
+        console.log("Email record saved successfully")
       } catch (emailRecordError) {
         console.error("Error saving email record:", emailRecordError)
       }
 
       toast({
         title: "Email sent!",
-        description: result.message || "Your proposal has been sent successfully with PDF attachment.",
+        description: "Your proposal has been sent successfully.",
       })
 
       router.push("/sales/proposals?success=email-sent")

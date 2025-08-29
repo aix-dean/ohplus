@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
 
     // Extract email data
-    const from = "noreply@ohplus.ph" // Changed from email address
+    const from = "OH Plus <noreply@ohplus.ph>"
     const toJson = formData.get("to") as string
     const ccJson = formData.get("cc") as string
     const subject = formData.get("subject") as string
