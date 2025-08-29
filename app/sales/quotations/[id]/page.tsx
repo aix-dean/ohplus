@@ -799,9 +799,8 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Signature Section */}
-        <div className="flex justify-between items-start max-w-4xl mx-auto mb-8">
-          <div className="text-left flex-1">
+        <div className="grid grid-cols-2 gap-8 mb-8">
+          <div className="text-left">
             <p className="mb-16">Very truly yours,</p>
             {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
               <div className="space-y-2">
@@ -846,19 +845,19 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   }
                   title={isEditing ? "Click to edit position" : ""}
                 >
-                  {currentQuotation?.signature_position || "Position"}
+                  {currentQuotation?.signature_position || "Account Manager"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
               </div>
             )}
           </div>
-          <div className="text-right flex-1">
-            <p className="mb-16">C o n f o r m e:</p>
+          <div className="text-right">
+            <p className="mb-16">Conforme:</p>
             <div className="border-b border-gray-400 w-48 mb-2 ml-auto"></div>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
             <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
-            <p className="text-xs mt-4 text-gray-600">
-              This signed Quotation serves as an
+            <p className="text-xs mt-4 text-gray-600 italic">
+              This signed quotation serves as an
               <br />
               official document for billing purposes
             </p>
