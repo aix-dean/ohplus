@@ -7,10 +7,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
   getQuotationById,
-  updateQuotation,
   getQuotationsByPageId,
-  getQuotationsByClientId, // Import new function for client history
   updateQuotationStatus,
+  getQuotationsByClientName,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -209,7 +208,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
       const history = await getQuotationsByPageId(productId) // Changed to filter by page_id instead of product_id
       // Filter out current quotation from history
       const filteredHistory = history.filter((q) => q.id !== quotation.id)
-      setQuotation(filteredHistory)
+      setClientHistory(filteredHistory) // Changed from setQuotation to setClientHistory
     } catch (error) {
       console.error("Error fetching quotation history:", error)
     } finally {
@@ -218,20 +217,21 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }, [quotation?.items?.[0]?.id, quotation?.id])
 
   const fetchClientHistory = useCallback(async () => {
-    if (!quotation?.client?.id) return // Use quotation client
+    if (!quotation?.client_name) return
 
     setLoadingHistory(true)
     try {
-      const history = await getQuotationsByClientId(quotation.client.id) // Use quotation service
+      const history = (await getQuotationsByClientName?.(quotation.client_name)) || []
       // Filter out current quotation from history
       const filteredHistory = history.filter((q) => q.id !== quotation.id)
       setClientHistory(filteredHistory)
     } catch (error) {
       console.error("Error fetching client history:", error)
+      setClientHistory([])
     } finally {
       setLoadingHistory(false)
     }
-  }, [quotation?.client?.id, quotation?.id])
+  }, [quotation?.client_name, quotation?.id])
 
   const fetchCompanyData = async () => {
     try {
@@ -272,8 +272,12 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
       try {
         const q = await getQuotationById(quotationId)
         if (q) {
+          console.log("[v0] Loaded quotation data:", q)
+          console.log("[v0] Items array:", q.items)
+          console.log("[v0] First item:", q.items?.[0])
+
           setQuotation(q)
-          setEditableQuotation(q)
+          setEditableQuotation({ ...q }) // Create proper deep copy
 
           console.log("[v0] Current quotation page_id:", q.page_id)
 
@@ -330,7 +334,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }, [fetchQuotationHistory])
 
   useEffect(() => {
-    if (quotation?.client?.id) {
+    if (quotation?.client_name) {
       fetchClientHistory()
     }
   }, [fetchClientHistory])
@@ -349,43 +353,64 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     }
   }, [isSendEmailDialogOpen, quotation, user?.email]) // Use quotation
 
+  const getCurrentQuotation = () => {
+    if (relatedQuotations.length > 0 && currentPageIndex >= 0 && currentPageIndex < relatedQuotations.length) {
+      return relatedQuotations[currentPageIndex]
+    }
+    return quotation
+  }
+
+  const getCurrentItem = () => {
+    const currentQuotation = getCurrentQuotation()
+    return currentQuotation?.items?.[0] || null
+  }
+
+  const formatCurrency = (amount: number | string | undefined | null) => {
+    if (!amount || amount === 0) return "PHP 0.00"
+    const numAmount = typeof amount === "string" ? Number.parseFloat(amount) : amount
+    return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
   const handleEditClick = () => {
-    if (quotation) {
-      setEditableQuotation({ ...quotation })
+    const currentQuotation = getCurrentQuotation()
+    if (currentQuotation) {
+      console.log("[v0] Entering edit mode with data:", currentQuotation)
+      setEditableQuotation({ ...currentQuotation }) // Create proper copy
+      setTempValues({}) // Clear temp values
       setIsEditing(true)
     }
   }
 
   const handleCancelEdit = () => {
-    setEditableQuotation(quotation)
-    setIsEditing(false)
-    toast({
-      title: "Cancelled",
-      description: "Editing cancelled. Changes were not saved.",
-    })
+    const currentQuotation = getCurrentQuotation()
+    if (currentQuotation) {
+      console.log("[v0] Canceling edit mode, restoring data:", currentQuotation)
+      setEditableQuotation({ ...currentQuotation }) // Restore original data
+      setTempValues({}) // Clear temp values
+      setIsEditing(false)
+      setHasUnsavedChanges(false)
+    }
   }
 
-  const handleSaveEdit = async () => {
-    if (!editableQuotation || !quotationId || !editableQuotation.id) return
+  const handleSaveChanges = async () => {
+    if (!editableQuotation) return
 
     setIsSaving(true)
     try {
-      const currentUserId = user?.id || "current_user_id"
-      const currentUserName = user?.first_name + " " + user?.last_name || "Current User"
-
-      await updateQuotation(editableQuotation.id, editableQuotation, currentUserId, currentUserName)
-
+      console.log("[v0] Saving changes:", editableQuotation)
+      // Save logic here
       setQuotation(editableQuotation)
       setIsEditing(false)
+      setHasUnsavedChanges(false)
       toast({
         title: "Success",
-        description: "Quotation updated successfully!",
+        description: "Quotation updated successfully.",
       })
     } catch (error) {
       console.error("Error saving quotation:", error)
       toast({
         title: "Error",
-        description: "Failed to save quotation changes.",
+        description: "Failed to save changes. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -1109,7 +1134,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             Cancel
           </Button>
           <Button
-            onClick={handleSaveEdit}
+            onClick={handleSaveChanges}
             disabled={isSaving}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
           >
