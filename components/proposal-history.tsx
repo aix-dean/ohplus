@@ -10,7 +10,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
 import { format } from "date-fns"
 import { FileText } from "lucide-react"
-import { ProposalSitesModal } from "./proposal-sites-modal"
+import { ProposalContentDialog } from "./proposal-content-dialog"
 
 interface ProposalHistoryProps {
   selectedClient?: {
@@ -118,12 +118,7 @@ export function ProposalHistory({ selectedClient, onCopySites }: ProposalHistory
         </CardContent>
       </Card>
 
-      <ProposalSitesModal
-        proposal={selectedProposal}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onCopySites={onCopySites}
-      />
+      <ProposalContentDialog proposal={selectedProposal} isOpen={isModalOpen} onClose={handleCloseModal} />
     </>
   )
 }
