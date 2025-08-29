@@ -819,10 +819,10 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
       quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation) // Changed products to items
     })
 
-    return quotations
+    return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   } catch (error) {
     console.error("Error fetching quotations by created_by ID:", error)
-    return []
+    throw error
   }
 }
 
@@ -934,7 +934,8 @@ export async function createDirectQuotation(
       const start = new Date(options.startDate)
       const end = new Date(options.endDate)
       durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      totalAmount = (site.price || 0) * durationDays
+      const dailyRate = (site.price || 0) / 30
+      totalAmount = dailyRate * durationDays
     }
 
     const pageId = options.page_id || `PAGE-${Date.now()}`
@@ -1022,7 +1023,8 @@ export async function createMultipleQuotations(
     for (let i = 0; i < sitesData.length; i++) {
       const site = sitesData[i]
       const quotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
-      const totalAmount = (site.price || 0) * durationDays
+      const dailyRate = (site.price || 0) / 30
+      const totalAmount = dailyRate * durationDays
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
