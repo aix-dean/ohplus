@@ -75,7 +75,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
         .cta-button {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
+            color: #1a365d; /* Changed text color from white to dark blue for better contrast */
             text-decoration: none;
             padding: 14px 30px;
             border-radius: 25px;
