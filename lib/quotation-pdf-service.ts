@@ -244,20 +244,130 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
   pdf.save(fileName)
 }
 
-export const generateSeparateQuotationPDFs = async (quotation: Quotation, companyData?: any) => {
-  if (!quotation.items || quotation.items.length <= 1) {
-    return generateQuotationPDF(quotation, companyData)
-  }
+/**
+ * Generate separate PDF files for multiple quotations with the same page_id
+ * Similar to cost estimate's generateSeparateCostEstimatePDFs function
+ */
+export const generateSeparateQuotationPDFsByPageId = async (
+  quotations: Quotation[],
+  selectedQuotations?: string[],
+  companyData?: any,
+): Promise<void> => {
+  try {
+    console.log(
+      "[v0] Generating separate PDFs for quotations:",
+      quotations.map((q) => q.id),
+    )
 
-  // Generate separate PDF for each item
-  for (let i = 0; i < quotation.items.length; i++) {
-    const item = quotation.items[i]
-    const singleItemQuotation: Quotation = {
-      ...quotation,
-      items: [item],
+    // Filter quotations if specific ones are selected
+    const quotationsToProcess =
+      selectedQuotations && selectedQuotations.length > 0
+        ? quotations.filter((q) => selectedQuotations.includes(q.id || ""))
+        : quotations
+
+    if (quotationsToProcess.length === 0) {
+      throw new Error("No quotations selected for PDF generation")
     }
 
-    await generateQuotationPDF(singleItemQuotation, companyData)
+    // Generate separate PDF for each quotation with unique numbering
+    for (let i = 0; i < quotationsToProcess.length; i++) {
+      const quotation = quotationsToProcess[i]
+
+      // Create unique quotation number with suffix if multiple quotations
+      const baseQuotationNumber = quotation.quotation_number || quotation.id?.slice(-8) || "QT-000"
+      const uniqueQuotationNumber =
+        quotations.length > 1
+          ? `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+          : baseQuotationNumber
+
+      // Create modified quotation with unique number
+      const modifiedQuotation: Quotation = {
+        ...quotation,
+        quotation_number: uniqueQuotationNumber,
+      }
+
+      // Generate PDF for this quotation
+      await generateQuotationPDF(modifiedQuotation, companyData)
+
+      // Add small delay between downloads to ensure proper file naming
+      if (i < quotationsToProcess.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+
+    console.log("[v0] Successfully generated", quotationsToProcess.length, "separate quotation PDFs")
+  } catch (error) {
+    console.error("Error generating separate quotation PDFs:", error)
+    throw error
+  }
+}
+
+/**
+ * Generate quotation PDFs with multi-page support
+ * Handles both single quotations and multiple quotations with the same page_id
+ */
+export const generateQuotationPDFsWithMultiPageSupport = async (
+  quotations: Quotation | Quotation[],
+  selectedQuotations?: string[],
+  companyData?: any,
+  returnBase64 = false,
+): Promise<string | void> => {
+  try {
+    // Handle single quotation
+    if (!Array.isArray(quotations)) {
+      if (returnBase64) {
+        return await generateQuotationEmailPDF(quotations, true, undefined, companyData)
+      } else {
+        return await generateQuotationPDF(quotations, companyData)
+      }
+    }
+
+    // Handle multiple quotations
+    if (quotations.length === 1) {
+      const quotation = quotations[0]
+      if (returnBase64) {
+        return await generateQuotationEmailPDF(quotation, true, undefined, companyData)
+      } else {
+        return await generateQuotationPDF(quotation, companyData)
+      }
+    }
+
+    // Generate separate PDFs for multiple quotations
+    if (returnBase64) {
+      // For email, generate PDF for the first quotation only
+      const firstQuotation = quotations[0]
+      return await generateQuotationEmailPDF(firstQuotation, true, undefined, companyData)
+    } else {
+      // Generate separate PDFs for each quotation
+      await generateSeparateQuotationPDFsByPageId(quotations, selectedQuotations, companyData)
+    }
+  } catch (error) {
+    console.error("Error generating quotation PDFs with multi-page support:", error)
+    throw error
+  }
+}
+
+export const generateSeparateQuotationPDFs = async (quotation: Quotation, companyData?: any) => {
+  // If quotation has multiple items, generate separate PDF for each item
+  if (quotation.items && quotation.items.length > 1) {
+    for (let i = 0; i < quotation.items.length; i++) {
+      const item = quotation.items[i]
+      const singleItemQuotation: Quotation = {
+        ...quotation,
+        items: [item],
+        quotation_number: `${quotation.quotation_number || quotation.id?.slice(-8)}-${String.fromCharCode(65 + i)}`,
+      }
+
+      await generateQuotationPDF(singleItemQuotation, companyData)
+
+      // Add small delay between downloads
+      if (i < quotation.items.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+  } else {
+    // Single item, generate normal PDF
+    return generateQuotationPDF(quotation, companyData)
   }
 }
 
