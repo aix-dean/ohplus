@@ -75,13 +75,20 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
         .cta-button {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #1a365d; /* Changed text color from white to dark blue for better contrast */
+            color: #ffffff !important;
             text-decoration: none;
             padding: 14px 30px;
             border-radius: 25px;
             font-weight: 600;
             font-size: 16px;
             transition: transform 0.2s ease;
+        }
+        .cta-button:link,
+        .cta-button:visited,
+        .cta-button:hover,
+        .cta-button:active {
+            color: #ffffff !important;
+            text-decoration: none !important;
         }
         .footer {
             background-color: #f8f9fa;
