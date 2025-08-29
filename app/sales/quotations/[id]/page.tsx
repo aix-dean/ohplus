@@ -136,6 +136,20 @@ const formatDuration = (days: number) => {
   return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
 }
 
+const safeFormatNumber = (value: any, options?: Intl.NumberFormatOptions): string => {
+  if (value === null || value === undefined || isNaN(Number(value))) return "0.00"
+  const numValue = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (isNaN(numValue)) return "0.00"
+  return numValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
+}
+
+const formatCurrency = (amount: number | string | undefined | null) => {
+  if (!amount || amount === 0) return "PHP 0.00"
+  const numAmount = typeof amount === "string" ? Number.parseFloat(amount) : amount
+  if (isNaN(numAmount)) return "PHP 0.00"
+  return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 export default function QuotationPage({ params }: { params: { id: string } }) {
   const { id: quotationId } = params
   const router = useRouter()
@@ -363,12 +377,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const getCurrentItem = () => {
     const currentQuotation = getCurrentQuotation()
     return currentQuotation?.items?.[0] || null
-  }
-
-  const formatCurrency = (amount: number | string | undefined | null) => {
-    if (!amount || amount === 0) return "PHP 0.00"
-    const numAmount = typeof amount === "string" ? Number.parseFloat(amount) : amount
-    return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   const handleEditClick = () => {
@@ -727,7 +735,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
                 title={isEditing ? "Click to edit lease rate" : ""}
               >
-                {(items[0]?.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                : PHP {safeFormatNumber(items[0]?.price || 0)} (Exclusive of VAT)
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
@@ -737,8 +745,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Total Lease</span>
             <span className="text-gray-700">
-              : PHP {(item?.item_total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of
-              VAT)
+              : PHP {safeFormatNumber(item?.item_total_amount || 0)} (Exclusive of VAT)
             </span>
           </div>
         </div>
@@ -748,29 +755,20 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-700">Lease rate per month</span>
-              <span className="text-gray-900">
-                PHP {(items[0]?.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
+              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.price || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">x {formatDuration(currentQuotation.duration_days || 180)}</span>
-              <span className="text-gray-900">
-                PHP {(items[0]?.item_total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
+              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.item_total_amount || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">12% VAT</span>
-              <span className="text-gray-900">
-                PHP {((items[0]?.item_total_amount || 0) * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
+              <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 0.12)}</span>
             </div>
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between font-bold text-lg">
                 <span className="text-gray-900">TOTAL</span>
-                <span className="text-gray-900">
-                  PHP{" "}
-                  {((items[0]?.item_total_amount || 0) * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
+                <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 1.12)}</span>
               </div>
             </div>
           </div>
@@ -1058,10 +1056,11 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
-                      {historyItem.quotationNumber || historyItem.id.slice(-8)} {/* Use quotationNumber */}
+                      {historyItem.quotation_number || historyItem.id.slice(-8)}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                      PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)}
+                      /month
                     </div>
                     <div className="flex justify-end">
                       <span
