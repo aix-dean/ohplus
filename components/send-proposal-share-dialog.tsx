@@ -8,7 +8,6 @@ import { Mail, MessageCircle, Phone, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import type { Proposal } from "@/lib/types/proposal"
-
 interface SendProposalShareDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -19,7 +18,6 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
   const { toast } = useToast()
   const router = useRouter()
   const [proposalUrl] = useState(`https://ohplus.ph/proposals/view/${proposal.id}`)
-
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(proposalUrl)
@@ -55,7 +53,6 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
     const message = encodeURIComponent(`Please review our proposal: ${proposalUrl}`)
     window.open(`https://m.me/?text=${message}`)
   }
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[400px] p-0">
