@@ -497,6 +497,8 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         {/* Client and RFQ Info */}
         <div className="flex justify-between items-start mb-8">
           <div className="text-left">
+            <p className="text-base font-medium mb-2">{format(new Date(), "MMMM dd, yyyy")}</p>
+
             {isEditing && editingField === "client_name" ? (
               <Input
                 type="text"
