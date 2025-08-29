@@ -301,16 +301,6 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
             </Button>
           </div>
         </div>
-
-        <div className="flex items-center justify-between p-6 border-t bg-white">
-          <div className="flex-1" />
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="px-6 bg-transparent">
-              Save as Draft
-            </Button>
-            <Button className="px-8 bg-green-500 hover:bg-green-600">Send</Button>
-          </div>
-        </div>
       </DialogContent>
     </Dialog>
   )
