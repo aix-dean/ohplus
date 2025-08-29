@@ -59,7 +59,8 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
   }
 
   const handleViewProposal = () => {
-    setIsViewerOpen(true)
+    onClose() // Close the share dialog first
+    setIsViewerOpen(true) // Then open the viewer dialog
   }
 
   return (
