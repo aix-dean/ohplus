@@ -350,6 +350,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const handleEditClick = () => {
     if (quotation) {
       setEditableQuotation({ ...quotation })
+      setTempValues({}) // Clear temp values to show original data
       setIsEditing(true)
     }
   }
@@ -571,7 +572,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Contract Duration:</span>
-            <span className="font-bold">{Math.ceil((currentQuotation.duration_days || 180) / 30)} MONTHS</span>
+            <span className="font-bold">{formatDuration(currentQuotation.duration_days || 180)}</span>
           </div>
           <div className="flex items-start">
             <span className="font-medium w-40 flex-shrink-0">● Contract Period:</span>
