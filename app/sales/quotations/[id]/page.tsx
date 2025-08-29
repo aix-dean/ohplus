@@ -25,10 +25,8 @@ import {
   Loader2,
   LayoutGrid,
   Pencil,
-  CalendarIcon,
   Save,
   X,
-
   Building,
   History,
 } from "lucide-react"
@@ -45,7 +43,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { generateQuotationPDF, generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service" // Use quotation PDF service
+import { generateQuotationPDF } from "@/lib/quotation-pdf-service" // Use quotation PDF service
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Use quotation success dialog
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 
@@ -322,7 +320,14 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     if (isSendEmailDialogOpen && quotation) {
       setEmailSubject(`Quotation: ${quotation.title || "Custom Quotation"} - OH Plus`) // Updated subject
       setEmailBody(
-        `Dear ${quotation.client?.contactPerson || quotation.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed quotation for your advertising campaign. Please find the full quotation attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`, // Updated email body
+        `Dear ${quotation.client?.contactPerson || quotation.client?.company || "Valued Client"},
+
+We are pleased to provide you with a detailed quotation for your advertising campaign. Please find the full quotation attached and accessible via the link below.
+
+Thank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!
+
+Best regards,
+The OH Plus Team`,
       )
       if (user?.email) {
         setCcEmail(user.email)
@@ -974,7 +979,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                       </span>
                     </div>
                   </div>
-                )}
+                ))}
                 {currentQuotation.client_phone && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
