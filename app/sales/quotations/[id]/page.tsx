@@ -799,9 +799,8 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Signature Section with editable fields */}
-        <div className="flex justify-between items-start">
-          <div className="text-left">
+        <div className="flex justify-between items-start max-w-4xl mx-auto">
+          <div className="text-left flex-1">
             <p className="mb-16">Very truly yours,</p>
             {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
               <div className="space-y-2">
@@ -851,7 +850,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               </div>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-right flex-1">
             <p className="mb-16">C o n f o r m e:</p>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
             <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
