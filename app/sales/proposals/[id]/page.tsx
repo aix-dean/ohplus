@@ -1509,6 +1509,7 @@ export default function ProposalDetailsPage() {
                   }
                 : null
             }
+            useProposalViewer={true}
           />
         </div>
       </div>

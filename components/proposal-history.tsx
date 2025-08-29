@@ -10,7 +10,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
 import { format } from "date-fns"
 import { FileText } from "lucide-react"
-import { ProposalContentDialog } from "./proposal-content-dialog"
+import { ProposalSitesModal } from "./proposal-sites-modal"
 
 interface ProposalHistoryProps {
   selectedClient?: {
@@ -19,9 +19,10 @@ interface ProposalHistoryProps {
     contactPerson: string
   } | null
   onCopySites?: (sites: Product[]) => void
+  useProposalViewer?: boolean
 }
 
-export function ProposalHistory({ selectedClient, onCopySites }: ProposalHistoryProps) {
+export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
@@ -118,7 +119,13 @@ export function ProposalHistory({ selectedClient, onCopySites }: ProposalHistory
         </CardContent>
       </Card>
 
-      <ProposalContentDialog proposal={selectedProposal} isOpen={isModalOpen} onClose={handleCloseModal} />
+      <ProposalSitesModal
+        proposal={selectedProposal}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onCopySites={onCopySites}
+        useProposalViewer={useProposalViewer}
+      />
     </>
   )
 }

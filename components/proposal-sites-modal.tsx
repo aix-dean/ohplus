@@ -11,19 +11,31 @@ import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
 import { toast } from "sonner"
+import { ProposalPagesViewerDialog } from "./proposal-pages-viewer-dialog"
 
 interface ProposalSitesModalProps {
   proposal: Proposal | null
   isOpen: boolean
   onClose: () => void
   onCopySites?: (sites: Product[]) => void
+  useProposalViewer?: boolean
 }
 
-export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: ProposalSitesModalProps) {
+export function ProposalSitesModal({
+  proposal,
+  isOpen,
+  onClose,
+  onCopySites,
+  useProposalViewer = false,
+}: ProposalSitesModalProps) {
   const [selectedSites, setSelectedSites] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
 
   if (!proposal) return null
+
+  if (useProposalViewer) {
+    return <ProposalPagesViewerDialog proposal={proposal} isOpen={isOpen} onClose={onClose} />
+  }
 
   const handleSiteToggle = (siteId: string) => {
     setSelectedSites((prev) => (prev.includes(siteId) ? prev.filter((id) => id !== siteId) : [...prev, siteId]))
@@ -46,7 +58,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
     const selectedProducts = proposal.products.filter((product) => selectedSites.includes(product.id))
 
     if (onCopySites) {
-      // Convert proposal products to Product format for dashboard
       const dashboardProducts: Product[] = selectedProducts.map((product) => ({
         id: product.id,
         name: product.name,
@@ -60,7 +71,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
         },
         light: product.light || {},
         site_code: product.site_code,
-        // Add other required Product fields with defaults
         created_at: new Date(),
         updated_at: new Date(),
         uploaded_by: "",
@@ -148,7 +158,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
                 }`}
                 onClick={() => handleSiteToggle(product.id)}
               >
-                {/* Checkbox */}
                 <div className="absolute top-2 left-2 z-10">
                   <Checkbox
                     checked={selectedSites.includes(product.id)}
@@ -157,7 +166,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
                   />
                 </div>
 
-                {/* Site Image */}
                 <div className="aspect-video bg-gray-100 rounded-md mb-3 overflow-hidden">
                   {product.media && product.media.length > 0 ? (
                     <img
@@ -172,7 +180,6 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
                   )}
                 </div>
 
-                {/* Site Info */}
                 <div className="space-y-1">
                   <div className="text-xs text-gray-500 font-medium">{product.site_code || product.id}</div>
                   <div className="font-medium text-sm line-clamp-2">{product.name}</div>
