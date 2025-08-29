@@ -170,6 +170,36 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [tempValues, setTempValues] = useState<Record<string, any>>({})
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  const handleFieldEdit = (fieldName: string, currentValue: any) => {
+    setEditingField(fieldName)
+    setTempValues({ ...tempValues, [fieldName]: currentValue })
+    setHasUnsavedChanges(true)
+  }
+
+  const updateTempValues = (fieldName: string, newValue: any) => {
+    const updatedTempValues = { ...tempValues, [fieldName]: newValue }
+    setTempValues(updatedTempValues)
+
+    // Update the editable quotation with the new value
+    if (editableQuotation) {
+      if (fieldName === "price" && editableQuotation.items?.[0]) {
+        setEditableQuotation({
+          ...editableQuotation,
+          items: editableQuotation.items.map((item, index) => (index === 0 ? { ...item, price: newValue } : item)),
+        })
+      } else {
+        setEditableQuotation({
+          ...editableQuotation,
+          [fieldName]: newValue,
+        })
+      }
+    }
+  }
+
   const fetchQuotationHistory = useCallback(async () => {
     if (!quotation?.items?.[0]?.id) return
 
@@ -510,7 +540,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "SITE NAME"} QUOTATION</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"}</h1>
         </div>
 
         {/* Greeting */}
@@ -534,16 +564,29 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Size</span>
             <span className="text-gray-700">: </span>
-            {isEditing ? (
-              <Input
-                name="size"
-                value={editableQuotation?.size || ""}
-                onChange={handleChange}
-                className="w-48 h-6 text-sm ml-1"
-                placeholder="Enter size"
-              />
+            {isEditing && editingField === "size" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="text"
+                  value={tempValues.size || ""}
+                  onChange={(e) => updateTempValues("size", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder="Enter size"
+                />
+              </div>
             ) : (
-              <span className="text-gray-700">{currentQuotation?.size || "100ft (H) x 60ft (W)"}</span>
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("size", currentQuotation?.size || "")}
+                title={isEditing ? "Click to edit size" : ""}
+              >
+                {currentQuotation?.size || "100ft (H) x 60ft (W)"}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
             )}
           </div>
 
@@ -551,17 +594,30 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Contract Duration</span>
             <span className="text-gray-700">: </span>
-            {isEditing ? (
-              <Input
-                name="duration_days"
-                type="number"
-                value={editableQuotation?.duration_days || ""}
-                onChange={handleChange}
-                className="w-24 h-6 text-sm ml-1"
-                placeholder="Days"
-              />
+            {isEditing && editingField === "duration_days" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="number"
+                  value={tempValues.duration_days || ""}
+                  onChange={(e) => updateTempValues("duration_days", Number.parseInt(e.target.value) || 0)}
+                  className="w-24 h-6 text-sm"
+                  placeholder="Days"
+                />
+                <span className="text-sm text-gray-600">days</span>
+              </div>
             ) : (
-              <span className="text-gray-700">{formatDuration(currentQuotation?.duration_days || 0)}</span>
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("duration_days", currentQuotation?.duration_days || 0)}
+                title={isEditing ? "Click to edit contract duration" : ""}
+              >
+                {formatDuration(currentQuotation?.duration_days || 0)}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
             )}
           </div>
 
@@ -569,29 +625,42 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Contract Period</span>
             <span className="text-gray-700">: </span>
-            {isEditing ? (
+            {isEditing && editingField === "contractPeriod" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
                   type="date"
-                  value={
-                    editableQuotation?.start_date ? format(new Date(editableQuotation.start_date), "yyyy-MM-dd") : ""
-                  }
-                  onChange={(e) => handleDateChange(new Date(e.target.value), "start_date")}
-                  className="w-36 h-6 text-sm"
+                  value={tempValues.start_date ? format(new Date(tempValues.start_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => updateTempValues("start_date", new Date(e.target.value))}
+                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
                 />
                 <span className="text-gray-500">-</span>
                 <Input
                   type="date"
-                  value={editableQuotation?.end_date ? format(new Date(editableQuotation.end_date), "yyyy-MM-dd") : ""}
-                  onChange={(e) => handleDateChange(new Date(e.target.value), "end_date")}
-                  className="w-36 h-6 text-sm"
+                  value={tempValues.end_date ? format(new Date(tempValues.end_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => updateTempValues("end_date", new Date(e.target.value))}
+                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
                 />
               </div>
             ) : (
-              <span className="text-gray-700">
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() =>
+                  isEditing &&
+                  handleFieldEdit("contractPeriod", {
+                    start_date: currentQuotation?.start_date,
+                    end_date: currentQuotation?.end_date,
+                  })
+                }
+                title={isEditing ? "Click to edit contract period" : ""}
+              >
                 {currentQuotation?.start_date ? format(new Date(currentQuotation.start_date), "MMMM d, yyyy") : ""}
                 {currentQuotation?.start_date && currentQuotation?.end_date ? " - " : ""}
                 {currentQuotation?.end_date ? format(new Date(currentQuotation.end_date), "MMMM d, yyyy") : ""}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
           </div>
@@ -612,28 +681,29 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
             <span className="text-gray-700">: PHP </span>
-            {isEditing ? (
+            {isEditing && editingField === "price" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
-                  name="price"
                   type="number"
-                  value={editableQuotation?.items?.[0]?.price || ""}
-                  onChange={(e) => {
-                    const newPrice = Number.parseFloat(e.target.value) || 0
-                    setEditableQuotation((prev) => ({
-                      ...prev!,
-                      items:
-                        prev!.items?.map((item, index) => (index === 0 ? { ...item, price: newPrice } : item)) || [],
-                    }))
-                  }}
+                  value={tempValues.price || ""}
+                  onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
                   className="w-32 h-6 text-sm"
                   placeholder="0.00"
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>
             ) : (
-              <span className="text-gray-700">
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
+                title={isEditing ? "Click to edit lease rate" : ""}
+              >
                 {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
           </div>
@@ -710,27 +780,51 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         <div className="flex justify-between items-start">
           <div className="text-left">
             <p className="mb-16">Very truly yours,</p>
-            {isEditing ? (
+            {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
               <div className="space-y-2">
                 <Input
-                  name="signature_name"
-                  value={editableQuotation?.signature_name || ""}
-                  onChange={handleChange}
+                  type="text"
+                  value={tempValues.signature_name || ""}
+                  onChange={(e) => updateTempValues("signature_name", e.target.value)}
                   className="w-48 h-6 text-sm"
                   placeholder="Enter name"
                 />
                 <Input
-                  name="signature_position"
-                  value={editableQuotation?.signature_position || ""}
-                  onChange={handleChange}
+                  type="text"
+                  value={tempValues.signature_position || ""}
+                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
                   className="w-48 h-6 text-sm"
                   placeholder="Enter position"
                 />
               </div>
             ) : (
               <div>
-                <p className="font-medium">{currentQuotation?.signature_name || "Mathew Espanto"}</p>
-                <p className="text-sm">{currentQuotation?.signature_position || "Account Management"}</p>
+                <p
+                  className={`font-medium ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
+                  onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
+                  title={isEditing ? "Click to edit name" : ""}
+                >
+                  {currentQuotation?.signature_name || "Mathew Espanto"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </p>
+                <p
+                  className={`text-sm ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")
+                  }
+                  title={isEditing ? "Click to edit position" : ""}
+                >
+                  {currentQuotation?.signature_position || "Account Management"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </p>
               </div>
             )}
           </div>
