@@ -270,7 +270,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         const q = await getQuotationById(quotationId) // Use quotation service
         if (q) {
           setQuotation(q)
-          setEditableQuotation(q)
+          setEditableQuotation(q) // Set editable copy when fetching data
 
           console.log("[v0] Current quotation page_id:", q.page_id) // Log quotation page_id
 
@@ -350,7 +350,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const handleEditClick = () => {
     if (quotation) {
       setEditableQuotation({ ...quotation })
-      setTempValues({}) // Clear temp values to show original data
       setIsEditing(true)
     }
   }
@@ -804,7 +803,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     )
   }
 
-  const currentQuotation = editableQuotation || quotation
+  const currentQuotation = isEditing ? editableQuotation : quotation
   const hasMultipleSites = currentQuotation?.items && currentQuotation.items.length > 1
 
   return (
