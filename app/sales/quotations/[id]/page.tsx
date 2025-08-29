@@ -602,41 +602,33 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         </div>
 
         {/* Pricing Table - Updated for quotation pricing */}
-        <div className="mb-8">
-          <div className="">
-            <div className="grid grid-cols-3 bg-gray-100">
-              <div className="p-3 font-bold text-center">Lease rate per month</div>
-              <div className="p-3 font-bold text-center">12% VAT</div>
-              <div className="p-3 font-bold text-center">TOTAL</div>
+        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-700">Lease rate per month</span>
+              <span className="text-gray-900">
+                PHP {(items[0]?.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
             </div>
-            <div className="grid grid-cols-3">
-              <div className="p-3 text-center font-bold">PHP {(items[0]?.price || 0).toLocaleString()}</div>
-              <div className="p-3 text-center font-bold">PHP {((items[0]?.price || 0) * 0.12).toLocaleString()}</div>
-              <div className="p-3 text-center font-bold">PHP {((items[0]?.price || 0) * 1.12).toLocaleString()}</div>
+            <div className="flex justify-between">
+              <span className="text-gray-700">x {formatDuration(currentQuotation.duration_days || 180)}</span>
+              <span className="text-gray-900">
+                PHP {(items[0]?.item_total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
             </div>
-          </div>
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-base">x {Math.ceil((currentQuotation.duration_days || 180) / 30)} months</span>
-            <div className="text-right">
-              <div className="text-lg font-bold">
-                PHP{" "}
-                {((items[0]?.price || 0) * Math.ceil((currentQuotation.duration_days || 180) / 30)).toLocaleString()}
-              </div>
-              <div className="text-lg font-bold">
-                PHP{" "}
-                {(
-                  (items[0]?.price || 0) *
-                  Math.ceil((currentQuotation.duration_days || 180) / 30) *
-                  0.12
-                ).toLocaleString()}
-              </div>
-              <div className="text-lg font-bold">
-                PHP{" "}
-                {(
-                  (items[0]?.price || 0) *
-                  Math.ceil((currentQuotation.duration_days || 180) / 30) *
-                  1.12
-                ).toLocaleString()}
+            <div className="flex justify-between">
+              <span className="text-gray-700">12% VAT</span>
+              <span className="text-gray-900">
+                PHP {((items[0]?.item_total_amount || 0) * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <div className="flex justify-between font-bold text-lg">
+                <span className="text-gray-900">TOTAL</span>
+                <span className="text-gray-900">
+                  PHP{" "}
+                  {((items[0]?.item_total_amount || 0) * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
               </div>
             </div>
           </div>
