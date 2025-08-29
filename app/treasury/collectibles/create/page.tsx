@@ -9,13 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, PlusCircle, Loader2, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ClientDialog } from "@/components/client-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
+import { getQuotationById } from "@/lib/quotation-service"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 interface CollectibleFormData {
   type: "sites" | "supplies"
@@ -32,10 +37,12 @@ interface CollectibleFormData {
   proceed_next_collection: boolean
   next_collection_bir_2307?: File | null
   next_collection_status: "pending" | "collected" | "overdue"
+  quotation_id?: string
   // Sites specific fields
   booking_no?: string
   site?: string
   covered_period?: string
+  covered_period_range?: DateRange
   bir_2307?: File | null
   collection_date?: string
   // Supplies specific fields
@@ -70,7 +77,9 @@ const initialFormData: CollectibleFormData = {
 export default function CreateTreasuryCollectiblePage() {
   const [formData, setFormData] = useState<CollectibleFormData>(initialFormData)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
   const [clientSearchTerm, setClientSearchTerm] = useState("")
@@ -82,6 +91,8 @@ export default function CreateTreasuryCollectiblePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [hasLoadedQuotationData, setHasLoadedQuotationData] = useState(false)
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -116,6 +127,118 @@ export default function CreateTreasuryCollectiblePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const fromQuotation = searchParams.get("from_quotation")
+    if (fromQuotation === "true" && !hasLoadedQuotationData) {
+      const clientName = searchParams.get("client_name") || ""
+      const totalAmount = Number.parseFloat(searchParams.get("total_amount") || "0")
+      const quotationNumber = searchParams.get("quotation_number") || ""
+      const quotationId = searchParams.get("quotation_id") || ""
+
+      const loadQuotationData = async () => {
+        if (quotationId) {
+          try {
+            const quotationData = await getQuotationById(quotationId)
+            if (quotationData && quotationData.start_date && quotationData.end_date) {
+              const formatDateOnly = (dateString: string) => {
+                const date = new Date(dateString)
+                return date.toISOString().split("T")[0]
+              }
+
+              const startDate = formatDateOnly(quotationData.start_date)
+              const endDate = formatDateOnly(quotationData.end_date)
+              const coveredPeriod = `${startDate} - ${endDate}`
+
+              const coveredPeriodRange: DateRange = {
+                from: new Date(quotationData.start_date),
+                to: new Date(quotationData.end_date),
+              }
+
+              let siteCode = ""
+              if (quotationData.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData.items && quotationData.items.length > 0) {
+                // If quotation has items, get site_code from first item
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
+
+              setFormData((prev) => ({
+                ...prev,
+                client_name: clientName,
+                total_amount: totalAmount,
+                net_amount: totalAmount,
+                type: "sites",
+                status: "pending",
+                quotation_id: quotationId,
+                covered_period: coveredPeriod,
+                covered_period_range: coveredPeriodRange,
+                site: siteCode, // Auto-fill site field with quotation site code
+              }))
+            } else {
+              let siteCode = ""
+              if (quotationData?.site_code) {
+                siteCode = quotationData.site_code
+              } else if (quotationData?.items && quotationData.items.length > 0) {
+                const firstItem = quotationData.items[0]
+                if (firstItem.site_code) {
+                  siteCode = firstItem.site_code
+                }
+              }
+
+              setFormData((prev) => ({
+                ...prev,
+                client_name: clientName,
+                total_amount: totalAmount,
+                net_amount: totalAmount,
+                type: "sites",
+                status: "pending",
+                quotation_id: quotationId,
+                site: siteCode, // Auto-fill site field with quotation site code
+              }))
+            }
+          } catch (error) {
+            console.error("Error fetching quotation data:", error)
+            setFormData((prev) => ({
+              ...prev,
+              client_name: clientName,
+              total_amount: totalAmount,
+              net_amount: totalAmount,
+              type: "sites",
+              status: "pending",
+              quotation_id: quotationId,
+            }))
+          }
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            client_name: clientName,
+            total_amount: totalAmount,
+            net_amount: totalAmount,
+            type: "sites",
+            status: "pending",
+            quotation_id: quotationId,
+          }))
+        }
+
+        if (clientName) {
+          setClientSearchTerm(clientName)
+        }
+
+        toast({
+          title: "Quotation Data Loaded",
+          description: `Form has been pre-populated with data from quotation ${quotationNumber}`,
+        })
+
+        setHasLoadedQuotationData(true)
+      }
+
+      loadQuotationData()
+    }
+  }, [searchParams, hasLoadedQuotationData])
+
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
@@ -136,7 +259,6 @@ export default function CreateTreasuryCollectiblePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file type
       const allowedTypes = [
         "application/pdf",
         "application/msword",
@@ -181,13 +303,11 @@ export default function CreateTreasuryCollectiblePage() {
     setSubmitError(null)
 
     try {
-      // Upload BIR 2307 file if present
       let bir2307Url = ""
       if (formData.bir_2307 && formData.bir_2307 instanceof File) {
         bir2307Url = await uploadFileToFirebaseStorage(formData.bir_2307, "treasury_collectibles/bir_2307/")
       }
 
-      // Upload Next Collection BIR 2307 file if present and proceed_next_collection is true
       let nextBir2307Url = ""
       if (
         formData.proceed_next_collection &&
@@ -220,7 +340,6 @@ export default function CreateTreasuryCollectiblePage() {
         company_id: user?.company_id || user?.uid || "",
       }
 
-      // Add type-specific fields
       if (formData.type === "sites") {
         if (formData.booking_no) collectibleData.booking_no = formData.booking_no
         if (formData.site) collectibleData.site = formData.site
@@ -237,17 +356,19 @@ export default function CreateTreasuryCollectiblePage() {
         if (formData.net_amount_collection) collectibleData.net_amount_collection = formData.net_amount_collection
       }
 
-      // Add next collection fields only if proceed_next_collection is true
       if (formData.proceed_next_collection) {
         if (formData.next_collection_date) collectibleData.next_collection_date = formData.next_collection_date
         if (nextBir2307Url) collectibleData.next_bir_2307 = nextBir2307Url
         if (formData.next_collection_status) collectibleData.next_status = formData.next_collection_status
       }
 
+      if (formData.quotation_id) {
+        collectibleData.quotation_id = formData.quotation_id
+      }
+
       const docRef = await addDoc(collection(db, "collectibles"), collectibleData)
       console.log("Treasury collectible created with ID:", docRef.id)
 
-      // Navigate back to treasury collectibles list
       router.push("/treasury/collectibles")
     } catch (error) {
       console.error("Error creating treasury collectible:", error)
@@ -257,9 +378,17 @@ export default function CreateTreasuryCollectiblePage() {
     }
   }
 
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      covered_period_range: range,
+      covered_period:
+        range?.from && range?.to ? `${format(range.from, "yyyy-MM-dd")} - ${format(range.to, "yyyy-MM-dd")}` : "",
+    }))
+  }
+
   const renderFormFields = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Base Fields */}
       <div className="space-y-2">
         <Label htmlFor="type">Type</Label>
         <Select value={formData.type} onValueChange={(value) => handleInputChange("type", value)}>
@@ -279,11 +408,15 @@ export default function CreateTreasuryCollectiblePage() {
           <div className="relative">
             <Input
               placeholder="Search or select client..."
-              value={selectedClient ? selectedClient.company || selectedClient.name : clientSearchTerm}
+              value={
+                selectedClient
+                  ? selectedClient.company || selectedClient.name
+                  : clientSearchTerm || formData.client_name
+              }
               onChange={(e) => {
                 setClientSearchTerm(e.target.value)
                 setSelectedClient(null)
-                setFormData((prev) => ({ ...prev, client_name: "" }))
+                setFormData((prev) => ({ ...prev, client_name: e.target.value }))
               }}
               onFocus={() => {
                 setIsClientDropdownOpen(true)
@@ -298,11 +431,9 @@ export default function CreateTreasuryCollectiblePage() {
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
             )}
           </div>
-          {/* Results dropdown */}
           {isClientDropdownOpen && (
             <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
               <div className="p-2">
-                {/* Always show "Add New Client" option at the top */}
                 <div
                   className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
                   onClick={() => setIsNewClientDialogOpen(true)}
@@ -340,7 +471,6 @@ export default function CreateTreasuryCollectiblePage() {
         </div>
       </div>
 
-      {/* ... existing form fields ... */}
       <div className="space-y-2">
         <Label htmlFor="net_amount">Net Amount</Label>
         <Input
@@ -432,7 +562,6 @@ export default function CreateTreasuryCollectiblePage() {
         </Select>
       </div>
 
-      {/* Conditional Fields based on type */}
       {formData.type === "sites" && (
         <>
           <div className="space-y-2">
@@ -449,11 +578,11 @@ export default function CreateTreasuryCollectiblePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="covered_period">Covered Period</Label>
-            <Input
-              id="covered_period"
-              type="date"
-              value={formData.covered_period || ""}
-              onChange={(e) => handleInputChange("covered_period", e.target.value)}
+            <DateRangePicker
+              value={formData.covered_period_range}
+              onChange={handleDateRangeChange}
+              placeholder="Select date range"
+              className="w-full"
             />
           </div>
           <div className="space-y-2">
@@ -685,7 +814,11 @@ export default function CreateTreasuryCollectiblePage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Create Treasury Collectible</h1>
-          <p className="text-muted-foreground">Add a new treasury collectible record</p>
+          <p className="text-muted-foreground">
+            {searchParams.get("from_quotation") === "true"
+              ? `Creating collectible from quotation ${searchParams.get("quotation_number") || ""}`
+              : "Add a new treasury collectible record"}
+          </p>
         </div>
       </div>
 

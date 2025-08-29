@@ -60,6 +60,10 @@ export type Proposal = {
   createdBy: string
   companyId?: string | null // Add company_id field
   campaignId?: string | null
+  templateSize?: string
+  templateOrientation?: string
+  templateLayout?: string
+  templateBackground?: string
   status:
     | "draft"
     | "sent"

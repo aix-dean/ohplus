@@ -391,6 +391,8 @@ export async function updateProposal(
       throw new Error("Firestore not initialized")
     }
 
+    console.log("[v0] Updating proposal with data:", data) // Added debug logging
+
     const proposalRef = doc(db, "proposals", proposalId)
 
     // Prepare data for Firestore update, handling nested objects
@@ -403,6 +405,22 @@ export async function updateProposal(
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.customMessage !== undefined) updateData.customMessage = data.customMessage
     if (data.proposalNumber !== undefined) updateData.proposalNumber = data.proposalNumber // Add update for proposalNumber
+    if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount
+
+    if (data.templateSize !== undefined) updateData.templateSize = data.templateSize
+    if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
+    if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
+    if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
+
+    if (data.products !== undefined) {
+      updateData.products = data.products
+      // Recalculate total amount when products are updated
+      const totalAmount = data.products.reduce((sum, product) => {
+        const price = typeof product.price === "string" ? Number.parseFloat(product.price) : product.price
+        return sum + (isNaN(price) ? 0 : price)
+      }, 0)
+      updateData.totalAmount = totalAmount
+    }
 
     // Handle client object updates
     if (data.client) {
@@ -417,13 +435,17 @@ export async function updateProposal(
         updateData["client.campaignObjective"] = data.client.campaignObjective
     }
 
+    console.log("[v0] Final update data being sent to Firestore:", updateData) // Added debug logging
+
     await updateDoc(proposalRef, updateData)
+
+    console.log("[v0] Firestore update completed successfully") // Added debug logging
 
     // Log the activity
     await logProposalStatusChanged(proposalId, "updated", "updated", userId, userName) // Re-using status change log for general update
     console.log(`Proposal ${proposalId} updated by ${userName}`)
   } catch (error) {
-    console.error("Error updating proposal:", error)
+    console.error("[v0] Error updating proposal:", error) // Added debug prefix
     throw error
   }
 }

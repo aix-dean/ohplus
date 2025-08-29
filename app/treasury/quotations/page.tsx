@@ -10,7 +10,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { FileText } from "lucide-react"
+import { FileText, PlusCircle } from "lucide-react"
+import { getClientById } from "@/lib/client-service"
 
 export default function TreasuryQuotationsPage() {
   const { user } = useAuth()
@@ -80,6 +81,34 @@ export default function TreasuryQuotationsPage() {
     }
   }
 
+  const handleCreateCollectible = async (quotation: any) => {
+    let clientName = quotation.client_name || ""
+
+    if (quotation.client_id) {
+      try {
+        const clientData = await getClientById(quotation.client_id)
+        if (clientData && clientData.company) {
+          clientName = clientData.company
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    const params = new URLSearchParams({
+      from_quotation: "true",
+      client_name: clientName,
+      total_amount: quotation.total_amount?.toString() || "0",
+      quotation_number: quotation.quotation_number || "",
+      quotation_id: quotation.id || "",
+      client_email: quotation.client_email || "",
+      client_phone: quotation.client_phone || "",
+      client_address: quotation.client_address || "",
+    })
+
+    router.push(`/treasury/collectibles/create?${params.toString()}`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -135,15 +164,26 @@ export default function TreasuryQuotationsPage() {
                         <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
                         <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
                         <TableCell className="py-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewPDF(quotation)}
-                            className="text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            <FileText className="h-3 w-3 mr-1" />
-                            View PDF
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewPDF(quotation)}
+                              className="text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              View PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCreateCollectible(quotation)}
+                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                            >
+                              <PlusCircle className="h-3 w-3 mr-1" />
+                              Create Collectible
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
