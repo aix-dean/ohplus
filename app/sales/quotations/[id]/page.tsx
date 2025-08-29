@@ -799,7 +799,8 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        <div className="flex justify-between items-start max-w-4xl mx-auto">
+        {/* Signature Section */}
+        <div className="flex justify-between items-start max-w-4xl mx-auto mb-8">
           <div className="text-left flex-1">
             <p className="mb-16">Very truly yours,</p>
             {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
@@ -821,6 +822,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <div>
+                <div className="border-b border-gray-400 w-48 mb-2"></div>
                 <p
                   className={`font-medium ${
                     isEditing
@@ -830,7 +832,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
                   title={isEditing ? "Click to edit name" : ""}
                 >
-                  {currentQuotation?.signature_name || "Mathew Espanto"}
+                  {currentQuotation?.signature_name || "AIX Xymbiosis"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
                 <p
@@ -844,7 +846,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   }
                   title={isEditing ? "Click to edit position" : ""}
                 >
-                  {currentQuotation?.signature_position || "Account Management"}
+                  {currentQuotation?.signature_position || "Position"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
               </div>
@@ -852,10 +854,21 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
           <div className="text-right flex-1">
             <p className="mb-16">C o n f o r m e:</p>
+            <div className="border-b border-gray-400 w-48 mb-2 ml-auto"></div>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
             <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
-            <p className="text-xs mt-4">This signed Quotation serves as an official document for billing purposes</p>
+            <p className="text-xs mt-4 text-gray-600">
+              This signed Quotation serves as an
+              <br />
+              official document for billing purposes
+            </p>
           </div>
+        </div>
+
+        <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
+          <p>{formatCompanyAddress(companyData)}</p>
+          {companyData?.phone && <p>Telephone: {companyData.phone}</p>}
+          {companyData?.email && <p>Email: {companyData.email}</p>}
         </div>
       </div>
     )
