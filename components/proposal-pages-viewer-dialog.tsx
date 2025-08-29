@@ -1,11 +1,116 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useRef, useEffect } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, ChevronLeft, ChevronRight } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, ImageIcon, Loader2 } from "lucide-react"
 import { format } from "date-fns"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import type { Proposal } from "@/lib/types/proposal"
+
+const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState(false)
+
+  useEffect(() => {
+    const initializeMaps = async () => {
+      try {
+        await loadGoogleMaps()
+        await initializeMap()
+      } catch (error) {
+        console.error("Error loading Google Maps:", error)
+        setMapError(true)
+      }
+    }
+
+    const initializeMap = async () => {
+      if (!mapRef.current || !window.google) return
+
+      try {
+        const geocoder = new window.google.maps.Geocoder()
+
+        geocoder.geocode({ address: location }, (results, status) => {
+          if (status === "OK" && results && results[0]) {
+            const map = new window.google.maps.Map(mapRef.current!, {
+              center: results[0].geometry.location,
+              zoom: 15,
+              disableDefaultUI: true,
+              gestureHandling: "none",
+              zoomControl: false,
+              mapTypeControl: false,
+              scaleControl: false,
+              streetViewControl: false,
+              rotateControl: false,
+              fullscreenControl: false,
+              styles: [
+                {
+                  featureType: "poi",
+                  elementType: "labels",
+                  stylers: [{ visibility: "off" }],
+                },
+              ],
+            })
+
+            new window.google.maps.Marker({
+              position: results[0].geometry.location,
+              map: map,
+              title: location,
+              icon: {
+                url:
+                  "data:image/svg+xml;charset=UTF-8," +
+                  encodeURIComponent(`
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#ef4444"/>
+                  </svg>
+                `),
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 32),
+              },
+            })
+
+            setMapLoaded(true)
+          } else {
+            console.error("Geocoding failed:", status)
+            setMapError(true)
+          }
+        })
+      } catch (error) {
+        console.error("Error initializing map:", error)
+        setMapError(true)
+      }
+    }
+
+    initializeMaps()
+  }, [location])
+
+  if (mapError) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <div className="text-center text-gray-500">
+          <p className="text-sm">Map unavailable</p>
+          <p className="text-xs mt-1">{location}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <div ref={mapRef} className="w-full h-full rounded-lg" />
+      {!mapLoaded && (
+        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Loading map...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ProposalPagesViewerDialogProps {
   proposal: Proposal | null
@@ -18,7 +123,7 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
 
   if (!proposal) return null
 
-  const totalPages = Math.max(3, Math.ceil(proposal.products.length / 2)) // Dynamic page calculation
+  const totalPages = Math.max(1, proposal.products?.length || 0)
 
   const nextPage = () => {
     if (currentPage < totalPages) {
@@ -36,6 +141,8 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
     setCurrentPage(1)
     onClose()
   }
+
+  const currentProduct = proposal.products?.[currentPage - 1]
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -60,93 +167,108 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center p-12 bg-gray-50 min-h-[600px]">
-          <div className="relative w-full max-w-3xl">
+          <div className="relative w-full max-w-4xl">
             {/* Document Pages Stack */}
             <div className="relative">
               {/* Background pages for subtle stack effect */}
               <div
                 className="absolute inset-0 bg-gray-200 rounded-sm transform translate-x-2 translate-y-2"
-                style={{ height: "420px" }}
+                style={{ height: "500px" }}
               />
               <div
                 className="absolute inset-0 bg-gray-300 rounded-sm transform translate-x-1 translate-y-1"
-                style={{ height: "420px" }}
+                style={{ height: "500px" }}
               />
 
               {/* Main document page */}
-              <div className="relative bg-white rounded-sm shadow-lg border" style={{ height: "420px" }}>
-                {/* Document content area */}
+              <div className="relative bg-white rounded-sm shadow-lg border" style={{ height: "500px" }}>
                 <div className="h-full p-8 flex flex-col relative overflow-hidden">
-                  {currentPage === 1 && (
+                  {currentProduct ? (
                     <>
-                      {/* Header section */}
-                      <div className="mb-8">
-                        <div className="h-4 bg-gray-200 rounded w-full mb-3" />
-                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-6" />
-                      </div>
-
-                      {/* Main content area with image and text layout */}
-                      <div className="flex-1 grid grid-cols-2 gap-8">
-                        <div className="bg-gray-100 rounded aspect-video flex items-center justify-center">
-                          <div className="w-16 h-16 bg-white rounded shadow-sm" />
-                        </div>
-                        <div className="space-y-3">
-                          <div className="h-3 bg-gray-200 rounded w-full" />
-                          <div className="h-3 bg-gray-200 rounded w-5/6" />
-                          <div className="h-3 bg-gray-200 rounded w-4/6" />
-                          <div className="h-3 bg-gray-200 rounded w-full" />
-                          <div className="h-3 bg-gray-200 rounded w-3/4" />
-                        </div>
-                      </div>
-
-                      {/* Footer section */}
-                      <div className="mt-8">
-                        <div className="h-4 bg-gray-200 rounded w-full" />
-                      </div>
-                    </>
-                  )}
-
-                  {currentPage === 2 && (
-                    <>
-                      {/* Header */}
+                      {/* Product header */}
                       <div className="mb-6">
-                        <div className="h-4 bg-gray-200 rounded w-2/3 mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          {currentProduct.name || currentProduct.site_code}
+                        </h3>
+                        <div className="h-px bg-gray-200 w-full" />
                       </div>
 
-                      {/* Content sections */}
-                      <div className="space-y-6 flex-1">
-                        <div className="bg-gray-100 rounded h-32" />
-                        <div className="space-y-2">
-                          <div className="h-3 bg-gray-200 rounded w-full" />
-                          <div className="h-3 bg-gray-200 rounded w-full" />
-                          <div className="h-3 bg-gray-200 rounded w-4/5" />
+                      {/* Product content layout matching main page */}
+                      <div className="flex-1 flex gap-6">
+                        {/* Product image */}
+                        <div className="flex-shrink-0">
+                          <div className="w-48 h-60 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                            {currentProduct.media && currentProduct.media.length > 0 ? (
+                              <img
+                                src={currentProduct.media[0].url || "/placeholder.svg"}
+                                alt={currentProduct.name || "Product image"}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon className="text-gray-400 h-12 w-12" />
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="bg-gray-100 rounded h-24" />
+
+                        {/* Product details */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 mb-3 text-lg">Location Map:</h4>
+
+                          {/* Location map */}
+                          {currentProduct.specs_rental?.location ? (
+                            <GoogleMap
+                              location={currentProduct.specs_rental.location}
+                              className="w-full h-32 rounded-lg mb-4"
+                            />
+                          ) : (
+                            <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                              <p className="text-gray-500 text-sm">Location not specified</p>
+                            </div>
+                          )}
+
+                          {/* Product specifications */}
+                          <div className="space-y-2 text-sm text-gray-800">
+                            {currentProduct.specs_rental?.location && (
+                              <p>
+                                <span className="font-semibold">Location:</span> {currentProduct.specs_rental.location}
+                              </p>
+                            )}
+                            {currentProduct.specs_rental?.traffic_count && (
+                              <p>
+                                <span className="font-semibold">Traffic Count:</span>{" "}
+                                {currentProduct.specs_rental.traffic_count.toLocaleString()} vehicles
+                              </p>
+                            )}
+                            {currentProduct.specs_rental?.elevation !== undefined && (
+                              <p>
+                                <span className="font-semibold">Visibility:</span>{" "}
+                                {currentProduct.specs_rental.elevation} meters
+                              </p>
+                            )}
+                            {currentProduct.specs_rental?.height && currentProduct.specs_rental?.width && (
+                              <p>
+                                <span className="font-semibold">Dimension:</span> {currentProduct.specs_rental.height}ft
+                                x {currentProduct.specs_rental.width}ft
+                              </p>
+                            )}
+                            <p>
+                              <span className="font-semibold">Type:</span> {currentProduct.type || "Advertising Space"}
+                            </p>
+                            {currentProduct.description && (
+                              <p>
+                                <span className="font-semibold">Description:</span> {currentProduct.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </>
-                  )}
-
-                  {currentPage >= 3 && (
-                    <>
-                      {/* Header */}
-                      <div className="mb-6">
-                        <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
-                      </div>
-
-                      {/* Grid content */}
-                      <div className="flex-1">
-                        <div className="grid grid-cols-3 gap-4 mb-6">
-                          <div className="bg-gray-100 rounded aspect-square" />
-                          <div className="bg-gray-100 rounded aspect-square" />
-                          <div className="bg-gray-100 rounded aspect-square" />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="h-3 bg-gray-200 rounded w-full" />
-                          <div className="h-3 bg-gray-200 rounded w-5/6" />
-                          <div className="h-3 bg-gray-200 rounded w-3/4" />
-                        </div>
-                      </div>
-                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <p className="text-gray-500">No product data available</p>
+                    </div>
                   )}
                 </div>
 
