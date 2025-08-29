@@ -72,11 +72,10 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
   pdf.setFont("helvetica", "normal")
   pdf.text(formatDate(new Date()), margin, yPosition)
   pdf.text(`RFQ. No. ${quotation.quotation_number}`, pageWidth - margin, yPosition, { align: "right" })
-  yPosition += 8
+  yPosition += 10
 
   pdf.text(quotation.client_name || "Client Name", margin, yPosition)
   yPosition += 6
-  pdf.setFont("helvetica", "bold")
   pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
   yPosition += 15
 
@@ -89,18 +88,16 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
   pdf.setFontSize(11)
   pdf.setFont("helvetica", "normal")
   pdf.text(
-    `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`,
+    `Good Day! Thank you for considering ${companyData?.name || "AI Xynergy"} for your business needs.`,
     pageWidth / 2,
     yPosition,
-    {
-      align: "center",
-    },
+    { align: "center" },
   )
   yPosition += 6
   pdf.text("We are pleased to submit our quotation for your requirements:", pageWidth / 2, yPosition, {
     align: "center",
   })
-  yPosition += 10
+  yPosition += 15
 
   pdf.setFont("helvetica", "bold")
   pdf.text("Details as follows:", pageWidth / 2, yPosition, { align: "center" })
@@ -111,14 +108,14 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
     pdf.setFont("helvetica", "normal")
 
     const details = [
-      `● Type: ${safeString(item.type) || "Rental"}`,
-      `● Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
-      `● Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
-      `● Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
-      `● Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
-      `● Illumination: 10 units of 1000 watts metal Halide`,
-      `● Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
-      `● Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Type: ${safeString(item.type) || "Rental"}`,
+      `• Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
+      `• Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
+      `• Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
+      `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
+      `• Illumination: 10 units of 1000 watts metal Halide`,
+      `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
     ]
 
     details.forEach((detail) => {
@@ -126,35 +123,30 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
       yPosition += 7
     })
 
-    yPosition += 10
+    yPosition += 15
 
-    pdf.setFillColor(248, 250, 252) // Gray background like the page
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 35, "F")
+    pdf.setFillColor(248, 250, 252)
+    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 40, "F")
     pdf.setDrawColor(229, 231, 235)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 35)
+    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 40)
 
     yPosition += 8
     pdf.setFont("helvetica", "normal")
     pdf.text("Lease rate per month", margin + 5, yPosition)
     pdf.text(`PHP ${(item.price || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, { align: "right" })
-    yPosition += 6
+    yPosition += 7
 
     pdf.text(`x ${formatDuration(quotation.duration_days || 0)}`, margin + 5, yPosition)
     pdf.text(`PHP ${(item.item_total_amount || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 6
+    yPosition += 7
 
     pdf.text("12% VAT", margin + 5, yPosition)
     pdf.text(`PHP ${((item.item_total_amount || 0) * 0.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 8
-
-    // Total line
-    pdf.setDrawColor(0, 0, 0)
-    pdf.line(margin + 5, yPosition, pageWidth - margin - 5, yPosition)
-    yPosition += 6
+    yPosition += 10
 
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(14)
@@ -162,7 +154,7 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
     pdf.text(`PHP ${((item.item_total_amount || 0) * 1.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 15
+    yPosition += 20
 
     const durationMonths = Math.ceil((quotation.duration_days || 0) / 30)
     pdf.setFont("helvetica", "normal")
@@ -182,7 +174,7 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
       "3. To book the site, one (1) month advance and one (2) months security deposit",
       "    payment dated 7 days before the start of rental is required.",
       "4. Final artwork should be approved ten (10) days before the contract period",
-      `5. Print is exclusively for ${companyData?.name || "Company Name"} Only.`,
+      `5. Print is exclusively for ${companyData?.name || "AI Xynergy"} Only.`,
     ]
 
     terms.forEach((term) => {
@@ -190,25 +182,22 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
       yPosition += 6
     })
 
-    yPosition += 15
+    yPosition += 20
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
 
-    // Two column layout like the page
     const leftColX = margin
     const rightColX = pageWidth / 2 + 10
 
     pdf.text("Very truly yours,", leftColX, yPosition)
     pdf.text("Conforme:", rightColX, yPosition)
-    yPosition += 25
+    yPosition += 20
 
-    // Signature lines
     pdf.line(leftColX, yPosition, leftColX + 60, yPosition)
     pdf.line(rightColX, yPosition, rightColX + 60, yPosition)
     yPosition += 8
 
-    // Names and positions
     pdf.text(quotation.signature_name || "AIX Xymbiosis", leftColX, yPosition)
     pdf.text(quotation.client_name || "Client Name", rightColX, yPosition)
     yPosition += 6
@@ -217,14 +206,15 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
     pdf.text(quotation.client_company_name || "COMPANY NAME", rightColX, yPosition)
     yPosition += 10
 
-    // Official document note
     pdf.setFontSize(9)
+    pdf.setFont("helvetica", "italic")
     pdf.text("This signed quotation serves as an", rightColX, yPosition)
     yPosition += 4
     pdf.text("official document for billing purposes", rightColX, yPosition)
     yPosition += 15
 
     pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
     const companyAddress = formatCompanyAddress(companyData)
     if (companyAddress) {
       pdf.text(companyAddress, pageWidth / 2, yPosition, { align: "center" })
@@ -239,7 +229,6 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
     }
   }
 
-  // Save the PDF
   const fileName = `Quotation_${quotation.quotation_number || quotation.id?.slice(-8)}.pdf`
   pdf.save(fileName)
 }
@@ -393,11 +382,10 @@ export const generateQuotationEmailPDF = async (
   pdf.setFont("helvetica", "normal")
   pdf.text(formatDate(new Date()), margin, yPosition)
   pdf.text(`RFQ. No. ${quotation.quotation_number}`, pageWidth - margin, yPosition, { align: "right" })
-  yPosition += 8
+  yPosition += 10
 
   pdf.text(quotation.client_name || "Client Name", margin, yPosition)
   yPosition += 6
-  pdf.setFont("helvetica", "bold")
   pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
   yPosition += 15
 
@@ -410,18 +398,16 @@ export const generateQuotationEmailPDF = async (
   pdf.setFontSize(11)
   pdf.setFont("helvetica", "normal")
   pdf.text(
-    `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`,
+    `Good Day! Thank you for considering ${companyData?.name || "AI Xynergy"} for your business needs.`,
     pageWidth / 2,
     yPosition,
-    {
-      align: "center",
-    },
+    { align: "center" },
   )
   yPosition += 6
   pdf.text("We are pleased to submit our quotation for your requirements:", pageWidth / 2, yPosition, {
     align: "center",
   })
-  yPosition += 10
+  yPosition += 15
 
   pdf.setFont("helvetica", "bold")
   pdf.text("Details as follows:", pageWidth / 2, yPosition, { align: "center" })
@@ -432,14 +418,14 @@ export const generateQuotationEmailPDF = async (
     pdf.setFont("helvetica", "normal")
 
     const details = [
-      `● Type: ${safeString(item.type) || "Rental"}`,
-      `● Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
-      `● Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
-      `● Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
-      `● Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
-      `● Illumination: 10 units of 1000 watts metal Halide`,
-      `● Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
-      `● Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Type: ${safeString(item.type) || "Rental"}`,
+      `• Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
+      `• Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
+      `• Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
+      `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
+      `• Illumination: 10 units of 1000 watts metal Halide`,
+      `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
     ]
 
     details.forEach((detail) => {
@@ -447,35 +433,30 @@ export const generateQuotationEmailPDF = async (
       yPosition += 7
     })
 
-    yPosition += 10
+    yPosition += 15
 
-    pdf.setFillColor(248, 250, 252) // Gray background like the page
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 35, "F")
+    pdf.setFillColor(248, 250, 252)
+    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 40, "F")
     pdf.setDrawColor(229, 231, 235)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 35)
+    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 40)
 
     yPosition += 8
     pdf.setFont("helvetica", "normal")
     pdf.text("Lease rate per month", margin + 5, yPosition)
     pdf.text(`PHP ${(item.price || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, { align: "right" })
-    yPosition += 6
+    yPosition += 7
 
     pdf.text(`x ${formatDuration(quotation.duration_days || 0)}`, margin + 5, yPosition)
     pdf.text(`PHP ${(item.item_total_amount || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 6
+    yPosition += 7
 
     pdf.text("12% VAT", margin + 5, yPosition)
     pdf.text(`PHP ${((item.item_total_amount || 0) * 0.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 8
-
-    // Total line
-    pdf.setDrawColor(0, 0, 0)
-    pdf.line(margin + 5, yPosition, pageWidth - margin - 5, yPosition)
-    yPosition += 6
+    yPosition += 10
 
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(14)
@@ -483,7 +464,7 @@ export const generateQuotationEmailPDF = async (
     pdf.text(`PHP ${((item.item_total_amount || 0) * 1.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
       align: "right",
     })
-    yPosition += 15
+    yPosition += 20
 
     const durationMonths = Math.ceil((quotation.duration_days || 0) / 30)
     pdf.setFont("helvetica", "normal")
@@ -503,7 +484,7 @@ export const generateQuotationEmailPDF = async (
       "3. To book the site, one (1) month advance and one (2) months security deposit",
       "    payment dated 7 days before the start of rental is required.",
       "4. Final artwork should be approved ten (10) days before the contract period",
-      `5. Print is exclusively for ${companyData?.name || "Company Name"} Only.`,
+      `5. Print is exclusively for ${companyData?.name || "AI Xynergy"} Only.`,
     ]
 
     terms.forEach((term) => {
@@ -511,25 +492,22 @@ export const generateQuotationEmailPDF = async (
       yPosition += 6
     })
 
-    yPosition += 15
+    yPosition += 20
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
 
-    // Two column layout like the page
     const leftColX = margin
     const rightColX = pageWidth / 2 + 10
 
     pdf.text("Very truly yours,", leftColX, yPosition)
     pdf.text("Conforme:", rightColX, yPosition)
-    yPosition += 25
+    yPosition += 20
 
-    // Signature lines
     pdf.line(leftColX, yPosition, leftColX + 60, yPosition)
     pdf.line(rightColX, yPosition, rightColX + 60, yPosition)
     yPosition += 8
 
-    // Names and positions
     pdf.text(quotation.signature_name || "AIX Xymbiosis", leftColX, yPosition)
     pdf.text(quotation.client_name || "Client Name", rightColX, yPosition)
     yPosition += 6
@@ -538,14 +516,15 @@ export const generateQuotationEmailPDF = async (
     pdf.text(quotation.client_company_name || "COMPANY NAME", rightColX, yPosition)
     yPosition += 10
 
-    // Official document note
     pdf.setFontSize(9)
+    pdf.setFont("helvetica", "italic")
     pdf.text("This signed quotation serves as an", rightColX, yPosition)
     yPosition += 4
     pdf.text("official document for billing purposes", rightColX, yPosition)
     yPosition += 15
 
     pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
     const companyAddress = formatCompanyAddress(companyData)
     if (companyAddress) {
       pdf.text(companyAddress, pageWidth / 2, yPosition, { align: "center" })
@@ -560,12 +539,10 @@ export const generateQuotationEmailPDF = async (
     }
   }
 
-  // Return base64 string for email attachment
   if (forEmail) {
     return pdf.output("datauristring").split(",")[1]
   }
 
-  // Save the PDF for regular download
   const fileName = `Quotation_${quotation.quotation_number || quotation.id?.slice(-8)}.pdf`
   pdf.save(fileName)
   return fileName
