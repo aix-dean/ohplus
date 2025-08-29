@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, ChevronLeft, ChevronRight, ImageIcon, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, ImageIcon, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import type { Proposal } from "@/lib/types/proposal"
@@ -146,7 +146,7 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] p-0 gap-0 bg-white">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 bg-white">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b bg-white">
           <div className="space-y-1">
@@ -156,48 +156,39 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
             <h2 className="text-2xl font-semibold text-gray-900">{proposal.client?.company || "Client Name"}</h2>
             <div className="text-sm text-gray-500">{format(proposal.createdAt, "MMMM d, yyyy")}</div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="h-8 w-8 p-0 rounded-full hover:bg-gray-100"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-12 bg-gray-50 min-h-[600px]">
-          <div className="relative w-full max-w-4xl">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 min-h-[500px]">
+          <div className="relative w-full max-w-3xl">
             {/* Document Pages Stack */}
             <div className="relative">
               {/* Background pages for subtle stack effect */}
               <div
                 className="absolute inset-0 bg-gray-200 rounded-sm transform translate-x-2 translate-y-2"
-                style={{ height: "500px" }}
+                style={{ height: "450px" }}
               />
               <div
                 className="absolute inset-0 bg-gray-300 rounded-sm transform translate-x-1 translate-y-1"
-                style={{ height: "500px" }}
+                style={{ height: "450px" }}
               />
 
-              {/* Main document page */}
-              <div className="relative bg-white rounded-sm shadow-lg border" style={{ height: "500px" }}>
-                <div className="h-full p-8 flex flex-col relative overflow-hidden">
+              <div className="relative bg-white rounded-sm shadow-lg border" style={{ height: "450px" }}>
+                <div className="h-full p-6 flex flex-col relative overflow-hidden">
                   {currentProduct ? (
                     <>
                       {/* Product header */}
-                      <div className="mb-6">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
                           {currentProduct.name || currentProduct.site_code}
                         </h3>
                         <div className="h-px bg-gray-200 w-full" />
                       </div>
 
                       {/* Product content layout matching main page */}
-                      <div className="flex-1 flex gap-6">
+                      <div className="flex-1 flex gap-4">
                         {/* Product image */}
                         <div className="flex-shrink-0">
-                          <div className="w-48 h-60 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
+                          <div className="w-40 h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100">
                             {currentProduct.media && currentProduct.media.length > 0 ? (
                               <img
                                 src={currentProduct.media[0].url || "/placeholder.svg"}
@@ -206,7 +197,7 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="text-gray-400 h-12 w-12" />
+                                <ImageIcon className="text-gray-400 h-10 w-10" />
                               </div>
                             )}
                           </div>
@@ -214,16 +205,16 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
 
                         {/* Product details */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 mb-3 text-lg">Location Map:</h4>
+                          <h4 className="font-semibold text-gray-900 mb-2">Location Map:</h4>
 
                           {/* Location map */}
                           {currentProduct.specs_rental?.location ? (
                             <GoogleMap
                               location={currentProduct.specs_rental.location}
-                              className="w-full h-32 rounded-lg mb-4"
+                              className="w-full h-28 rounded-lg mb-3"
                             />
                           ) : (
-                            <div className="w-full h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                            <div className="w-full h-28 bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
                               <p className="text-gray-500 text-sm">Location not specified</p>
                             </div>
                           )}
@@ -284,7 +275,7 @@ export function ProposalPagesViewerDialog({ proposal, isOpen, onClose }: Proposa
           </div>
 
           {/* Navigation controls */}
-          <div className="flex items-center gap-6 mt-8">
+          <div className="flex items-center gap-6 mt-6">
             <Button
               variant="outline"
               size="sm"
