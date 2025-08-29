@@ -38,7 +38,7 @@ interface ProposalEmailTemplate extends EmailTemplate {
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -341,8 +341,8 @@ OH PLUS
       }
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
-      if (user?.phoneNumber) {
-        formData.append("currentUserPhoneNumber", user.phoneNumber)
+      if (userData?.phone_number) {
+        formData.append("currentUserPhoneNumber", userData.phone_number)
       }
 
       for (let i = 0; i < attachments.length; i++) {
