@@ -540,7 +540,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{items?.name || "Site Name"}</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{items[0]?.name || "Site Name"}</h1>
         </div>
 
         {/* Greeting */}
@@ -702,7 +702,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                 onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
                 title={isEditing ? "Click to edit lease rate" : ""}
               >
-                {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                {(items[0]?.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
