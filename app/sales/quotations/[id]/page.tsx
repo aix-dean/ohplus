@@ -540,7 +540,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"}</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{items?.name || "Site Name"}</h1>
         </div>
 
         {/* Greeting */}
