@@ -732,24 +732,14 @@ function SalesDashboardContent() {
         return
       }
     } else {
-      // For cost estimates, check selectedProducts
-      if (selectedProducts.length === 0) {
+      if (selectedSites.length === 0) {
         toast({
-          title: "No Products Selected",
-          description: "Please select at least one product to create a cost estimate.",
+          title: "No Sites Selected",
+          description: "Please select at least one site to create a cost estimate.",
           variant: "destructive",
         })
         return
       }
-    }
-
-    if (!selectedClientForProposal) {
-      toast({
-        title: "No Client Selected",
-        description: `Please select a client to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
-        variant: "destructive",
-      })
-      return
     }
 
     if (actionAfterDateSelection === "quotation") {
@@ -824,13 +814,13 @@ function SalesDashboardContent() {
     }
     setIsCreatingCostEstimate(true)
     try {
-      const sitesData = selectedProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
-        location: product.location,
-        price: product.price,
-        type: product.type,
-        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
+      const sitesData = selectedSites.map((site) => ({
+        id: site.id,
+        name: site.name,
+        location: site.specs_rental?.location || site.light?.location || "N/A",
+        price: site.price || 0,
+        type: site.type || "Unknown",
+        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
       }))
 
       const clientData = {
@@ -848,23 +838,23 @@ function SalesDashboardContent() {
         startDate,
         endDate,
         company_id: userData.company_id,
-        page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
       console.log("[v0] handleDatesSelected - options being passed:", options)
 
       let costEstimateIds: string[]
 
-      if (selectedProducts.length > 1) {
-        // Create multiple cost estimates for multiple products
+      if (selectedSites.length > 1) {
+        // Create multiple cost estimates for multiple sites
         costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
 
         toast({
           title: "Cost Estimates Created",
-          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
+          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected sites.`,
         })
       } else {
-        // Create single cost estimate for one product
+        // Create single cost estimate for one site
         const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
         costEstimateIds = [costEstimateId]
 
@@ -1897,9 +1887,10 @@ function ProductCard({
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
                 isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+                isSelected ? "text-white" : "text-gray-500",
               )}
             >
-              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+              {isSelected && <CheckCircle className="h-4 w-4" />}
             </div>
           </div>
         )}
@@ -1908,16 +1899,12 @@ function ProductCard({
       <CardContent className="p-4">
         <div className="flex flex-col">
           {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
-
           <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-
           <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-          >
-            Create Report
-          </Button>
+          <div className="mt-1 text-xs text-gray-500 flex items-center">
+            <MapPin size={12} className="mr-1 flex-shrink-0" />
+            <span className="truncate">{location}</span>
+          </div>
         </div>
       </CardContent>
     </Card>
