@@ -1,5 +1,7 @@
 "use client"
 import { useEffect, useState, useCallback } from "react"
+import type React from "react"
+
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -136,13 +138,13 @@ const formatDuration = (days: number) => {
 }
 
 export default function QuotationPage({ params }: { params: { id: string } }) {
-  const { id: quotationId } = params // Use quotationId instead of costEstimateId
+  const { id: quotationId } = params
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
-  const [quotation, setQuotation] = useState<Quotation | null>(null) // Use quotation state
-  const [editableQuotation, setEditableQuotation] = useState<Quotation | null>(null) // Use quotation state
-  const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([]) // Use quotations array
+  const [quotation, setQuotation] = useState<Quotation | null>(null)
+  const [editableQuotation, setEditableQuotation] = useState<Quotation | null>(null)
+  const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([])
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
@@ -164,12 +166,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
-  const [clientHistory, setClientHistory] = useState<Quotation[]>([]) // Use quotation history
+  const [clientHistory, setClientHistory] = useState<Quotation[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-
-  const [editingField, setEditingField] = useState<string | null>(null)
-  const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const fetchQuotationHistory = useCallback(async () => {
     if (!quotation?.items?.[0]?.id) return
@@ -235,50 +234,23 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const handleFieldEdit = (fieldName: string, currentValue: any) => {
-    setEditingField(fieldName)
-    setTempValues({ ...tempValues, [fieldName]: currentValue })
-    setHasUnsavedChanges(true)
-  }
-  const updateTempValues = (fieldName: string, newValue: any) => {
-    const updatedTempValues = { ...tempValues, [fieldName]: newValue }
-
-    if (fieldName === "duration_days" && quotation?.start_date) {
-      const newEndDate = new Date(quotation.start_date)
-      newEndDate.setDate(newEndDate.getDate() + newValue)
-      updatedTempValues.end_date = newEndDate
-    } else if (fieldName === "start_date" || fieldName === "end_date") {
-      const startDate = fieldName === "start_date" ? newValue : tempValues.start_date || quotation?.start_date
-      const endDate = fieldName === "end_date" ? newValue : tempValues.end_date || quotation?.end_date
-
-      if (startDate && endDate) {
-        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-        const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        updatedTempValues.duration_days = newDurationDays
-      }
-    }
-
-    setTempValues(updatedTempValues)
-    setHasUnsavedChanges(true)
-  }
   useEffect(() => {
     const fetchQuotationData = async () => {
       if (!quotationId) return
 
       setLoading(true)
       try {
-        const q = await getQuotationById(quotationId) // Use quotation service
+        const q = await getQuotationById(quotationId)
         if (q) {
           setQuotation(q)
-          setEditableQuotation(q) // Set editable copy when fetching data
+          setEditableQuotation(q)
 
-          console.log("[v0] Current quotation page_id:", q.page_id) // Log quotation page_id
+          console.log("[v0] Current quotation page_id:", q.page_id)
 
           if (q.page_id) {
-            const relatedQs = await getQuotationsByPageId(q.page_id) // Use quotation service
+            const relatedQs = await getQuotationsByPageId(q.page_id)
             console.log("[v0] Related quotations found:", relatedQs.length, relatedQs)
             setRelatedQuotations(relatedQs)
-            // Find current page index
             const currentIndex = relatedQs.findIndex((rq) => rq.id === q.id)
             console.log("[v0] Current page index:", currentIndex)
             setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
@@ -313,7 +285,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     }
 
     fetchQuotationData()
-  }, [quotationId, router, toast]) // Use quotationId
+  }, [quotationId, router, toast])
 
   useEffect(() => {
     if (user && userData) {
@@ -357,9 +329,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const handleCancelEdit = () => {
     setEditableQuotation(quotation)
     setIsEditing(false)
-    setTempValues({})
-    setHasUnsavedChanges(false)
-    setEditingField(null)
     toast({
       title: "Cancelled",
       description: "Editing cancelled. Changes were not saved.",
@@ -378,9 +347,6 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
       setQuotation(editableQuotation)
       setIsEditing(false)
-      setTempValues({})
-      setHasUnsavedChanges(false)
-      setEditingField(null)
       toast({
         title: "Success",
         description: "Quotation updated successfully!",
@@ -395,6 +361,21 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      [name]: value,
+    }))
+  }
+
+  const handleDateChange = (date: Date | undefined, field: "start_date" | "end_date") => {
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      [field]: date || new Date(),
+    }))
   }
 
   const handleDownloadPDF = async () => {
@@ -479,10 +460,10 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }
 
   const renderQuotationBlock = (siteName: string, items: QuotationLineItem[], pageNumber: number) => {
-    const currentQuotation = editableQuotation || quotation // Use quotation
+    const currentQuotation = editableQuotation || quotation
     if (!currentQuotation) return null
 
-    const item = items[0] // Get the first item for this quotation
+    const item = items[0]
     const monthlyRate = item?.price || 0
     const durationMonths = Math.ceil((Number(item?.duration_days) || 40) / 30)
     const totalLease = monthlyRate * durationMonths
@@ -499,50 +480,28 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           <div className="text-left">
             <p className="text-base font-medium mb-2">{format(new Date(), "MMMM dd, yyyy")}</p>
 
-            {isEditing && editingField === "client_name" ? (
+            {isEditing ? (
               <Input
-                type="text"
-                value={tempValues.client_name || ""}
-                onChange={(e) => updateTempValues("client_name", e.target.value)}
+                name="client_name"
+                value={editableQuotation?.client_name || ""}
+                onChange={handleChange}
                 className="w-64 h-8 text-base font-medium mb-2"
                 placeholder="Enter client name"
               />
             ) : (
-              <p
-                className={`text-base font-medium mb-1 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("client_name", currentQuotation.client_name || "")}
-              >
-                {tempValues.client_name || currentQuotation.client_name || "Client Name"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </p>
+              <p className="text-base font-medium mb-1">{currentQuotation.client_name || "Client Name"}</p>
             )}
 
-            {isEditing && editingField === "client_company_name" ? (
+            {isEditing ? (
               <Input
-                type="text"
-                value={tempValues.client_company_name || ""}
-                onChange={(e) => updateTempValues("client_company_name", e.target.value)}
+                name="client_company_name"
+                value={editableQuotation?.client_company_name || ""}
+                onChange={handleChange}
                 className="w-64 h-8 text-base"
                 placeholder="Enter company name"
               />
             ) : (
-              <p
-                className={`text-base font-medium ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                    : ""
-                }`}
-                onClick={() =>
-                  isEditing && handleFieldEdit("client_company_name", currentQuotation.client_company_name || "")
-                }
-              >
-                {tempValues.client_company_name || currentQuotation.client_company_name || "COMPANY NAME"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </p>
+              <p className="text-base font-medium">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
             )}
           </div>
           <div className="text-right">
@@ -550,52 +509,141 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Company Header */}
         <div className="text-center mb-8">
-          <h2 className="text-xl font-bold mb-4">{items[0]?.name || "SITE NAME"}</h2>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "SITE NAME"} QUOTATION</h1>
+        </div>
+
+        {/* Greeting */}
+        <div className="text-center mb-8">
           <p className="text-base mb-2">
             Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
           </p>
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
         </div>
-        {/* Site Details - Updated for quotation data structure */}
-        <div className="mb-8 space-y-3">
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Type:</span>
-            <span className="font-bold">{items[0]?.type || "Billboard"}</span>
+
+        {/* Details Section with editable fields */}
+        <div className="space-y-3 mb-8">
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Type</span>
+            <span className="text-gray-700">: {item?.type || "Rental"}</span>
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Size:</span>
-            <span className="font-bold">{items[0]?.size || "100ft (H) x 60ft (W)"}</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Size</span>
+            <span className="text-gray-700">: </span>
+            {isEditing ? (
+              <Input
+                name="size"
+                value={editableQuotation?.size || ""}
+                onChange={handleChange}
+                className="w-48 h-6 text-sm ml-1"
+                placeholder="Enter size"
+              />
+            ) : (
+              <span className="text-gray-700">{currentQuotation?.size || "100ft (H) x 60ft (W)"}</span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Contract Duration:</span>
-            <span className="font-bold">{formatDuration(currentQuotation.duration_days || 180)}</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Contract Duration</span>
+            <span className="text-gray-700">: </span>
+            {isEditing ? (
+              <Input
+                name="duration_days"
+                type="number"
+                value={editableQuotation?.duration_days || ""}
+                onChange={handleChange}
+                className="w-24 h-6 text-sm ml-1"
+                placeholder="Days"
+              />
+            ) : (
+              <span className="text-gray-700">{formatDuration(currentQuotation?.duration_days || 0)}</span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Contract Period:</span>
-            <span className="font-bold">
-              {format(new Date(currentQuotation.start_date || new Date()), "MMMM dd, yyyy")} -{" "}
-              {format(new Date(currentQuotation.end_date || new Date()), "MMMM dd, yyyy")}
-            </span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Contract Period</span>
+            <span className="text-gray-700">: </span>
+            {isEditing ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="date"
+                  value={
+                    editableQuotation?.start_date ? format(new Date(editableQuotation.start_date), "yyyy-MM-dd") : ""
+                  }
+                  onChange={(e) => handleDateChange(new Date(e.target.value), "start_date")}
+                  className="w-36 h-6 text-sm"
+                />
+                <span className="text-gray-500">-</span>
+                <Input
+                  type="date"
+                  value={editableQuotation?.end_date ? format(new Date(editableQuotation.end_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => handleDateChange(new Date(e.target.value), "end_date")}
+                  className="w-36 h-6 text-sm"
+                />
+              </div>
+            ) : (
+              <span className="text-gray-700">
+                {currentQuotation?.start_date ? format(new Date(currentQuotation.start_date), "MMMM d, yyyy") : ""}
+                {currentQuotation?.start_date && currentQuotation?.end_date ? " - " : ""}
+                {currentQuotation?.end_date ? format(new Date(currentQuotation.end_date), "MMMM d, yyyy") : ""}
+              </span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Proposal to:</span>
-            <span className="font-bold">{currentQuotation.client_company_name || "CLIENT COMPANY NAME"}</span>
+
+          <div className="flex">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Proposal to</span>
+            <span className="text-gray-700">: {currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Illumination:</span>
-            <span className="font-bold">{items[0]?.illumination || "10 units of 1000 watts metal Halide"}</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Illumination</span>
+            <span className="text-gray-700">: 10 units of 1000 watts metal Halide</span>
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Lease Rate/Month:</span>
-            <span className="font-bold">PHP {(items[0]?.price || 0).toLocaleString()} (Exclusive of VAT)</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
+            <span className="text-gray-700">: PHP </span>
+            {isEditing ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  name="price"
+                  type="number"
+                  value={editableQuotation?.items?.[0]?.price || ""}
+                  onChange={(e) => {
+                    const newPrice = Number.parseFloat(e.target.value) || 0
+                    setEditableQuotation((prev) => ({
+                      ...prev!,
+                      items:
+                        prev!.items?.map((item, index) => (index === 0 ? { ...item, price: newPrice } : item)) || [],
+                    }))
+                  }}
+                  className="w-32 h-6 text-sm"
+                  placeholder="0.00"
+                />
+                <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+              </div>
+            ) : (
+              <span className="text-gray-700">
+                {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+              </span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Total Lease:</span>
-            <span className="font-bold">
-              PHP {(items[0]?.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)
+
+          <div className="flex">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Total Lease</span>
+            <span className="text-gray-700">
+              : PHP {(item?.item_total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of
+              VAT)
             </span>
           </div>
         </div>
@@ -642,122 +690,56 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
         {/* Terms and Conditions */}
         <div className="mb-8">
-          <h3 className="text-lg font-bold mb-4 pb-1 border-b border-gray-200 font-[Calibri]">Terms and Conditions:</h3>
+          <p className="font-semibold mb-4">Terms and Conditions:</p>
           <div className="space-y-2 text-sm">
             <p>1. Quotation validity: 5 working days.</p>
             <p>
               2. Availability of the site is on first-come-first-served-basis only. Only official documents such as
-              P.O's,
+              P.O's, Media Orders, signed quotation, & contracts are accepted in order to booked the site.
             </p>
-            <p className="ml-4">
-              Media Orders, signed quotation, & contracts are accepted in order to booked the site.
+            <p>
+              3. To book the site, one (1) month advance and one (2) months security deposit payment dated 7 days before
+              the start of rental is required.
             </p>
-            <p>3. To book the site, one (1) month advance and one (2) months security deposit</p>
-            <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
             <p>4. Final artwork should be approved ten (10) days before the contract period</p>
             <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
           </div>
         </div>
 
-        {/* Signature Section - Updated for quotation signatures */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            {/* Left side - Company signature */}
-            <div className="w-1/2">
-              <p className="text-base mb-8">Very truly yours,</p>
-              <div className="mb-2">
-                <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-              </div>
-              {/* Editable name */}
-              {isEditing && editingField === "signatureName" ? (
+        {/* Signature Section with editable fields */}
+        <div className="flex justify-between items-start">
+          <div className="text-left">
+            <p className="mb-16">Very truly yours,</p>
+            {isEditing ? (
+              <div className="space-y-2">
                 <Input
-                  type="text"
-                  value={tempValues.signatureName || ""}
-                  onChange={(e) => updateTempValues("signatureName", e.target.value)}
-                  className="w-48 h-8 text-base font-medium mb-1"
+                  name="signature_name"
+                  value={editableQuotation?.signature_name || ""}
+                  onChange={handleChange}
+                  className="w-48 h-6 text-sm"
                   placeholder="Enter name"
                 />
-              ) : (
-                <p
-                  className={`text-base font-medium text-gray-900 ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    isEditing &&
-                    handleFieldEdit(
-                      "signatureName",
-                      `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim(),
-                    )
-                  }
-                >
-                  {tempValues.signatureName ||
-                    `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim() ||
-                    "Mathew Espanto"}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
-              )}
-              {/* Editable position */}
-              {isEditing && editingField === "signaturePosition" ? (
                 <Input
-                  type="text"
-                  value={tempValues.signaturePosition || ""}
-                  onChange={(e) => updateTempValues("signaturePosition", e.target.value)}
-                  className="w-48 h-8 text-base"
+                  name="signature_position"
+                  value={editableQuotation?.signature_position || ""}
+                  onChange={handleChange}
+                  className="w-48 h-6 text-sm"
                   placeholder="Enter position"
                 />
-              ) : (
-                <p
-                  className={`text-base text-gray-600 ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    isEditing && handleFieldEdit("signaturePosition", userData?.position || "Account Management")
-                  }
-                >
-                  {tempValues.signaturePosition || userData?.position || "Account Management"}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
-              )}
-            </div>
-
-            {/* Right side - Client conforme */}
-            <div className="w-1/2 pl-8">
-              <p className="text-base mb-8">C o n f o r m e:</p>
-              <div className="mb-2">
-                <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
               </div>
-              <p className="text-base font-medium text-gray-900 mb-1">
-                {currentQuotation.client?.name || "Client Name"}
-              </p>
-              <p className="text-base text-gray-600">{currentQuotation.client?.company || "Client Company"}</p>
-              <p className="text-sm text-gray-600 mt-4">
-                This signed Quotation serves as an
-                <br />
-                official document for billing purposes
-              </p>
-            </div>
+            ) : (
+              <div>
+                <p className="font-medium">{currentQuotation?.signature_name || "Mathew Espanto"}</p>
+                <p className="text-sm">{currentQuotation?.signature_position || "Account Management"}</p>
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
-          <p>No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53</p>
-          <p>email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
-          {currentQuotation.validUntil && (
-            <p className="mt-2">This quotation is valid until {format(currentQuotation.validUntil, "PPP")}</p>
-          )}
-          <p className="mt-1">
-            © {new Date().getFullYear()} {companyData?.name || "Company Name"}. All rights reserved.
-          </p>
-          {relatedQuotations.length > 1 && (
-            <p className="mt-2 font-medium">
-              Page {pageNumber} of {relatedQuotations.length}
-            </p>
-          )}
+          <div className="text-right">
+            <p className="mb-16">C o n f o r m e:</p>
+            <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
+            <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
+            <p className="text-xs mt-4">This signed Quotation serves as an official document for billing purposes</p>
+          </div>
         </div>
       </div>
     )
