@@ -3,7 +3,9 @@ import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-function createEmailTemplate(body: string): string {
+function createEmailTemplate(body: string, userPhoneNumber?: string): string {
+  const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -163,7 +165,7 @@ function createEmailTemplate(body: string): string {
             
             <div class="contact-info">
                 <strong>OH PLUS</strong><br>
-                📞 +639XXXXXXXXX<br>
+                📞 ${phoneNumber}<br>
                 📧 noreply@ohplus.ph<br>
                 🌐 www.ohplus.ph
             </div>
@@ -192,6 +194,7 @@ export async function POST(request: NextRequest) {
     const ccJson = formData.get("cc") as string
     const subject = formData.get("subject") as string
     const body = formData.get("body") as string
+    const currentUserPhoneNumber = formData.get("currentUserPhoneNumber") as string
 
     // Parse JSON strings
     const to = JSON.parse(toJson)
@@ -222,7 +225,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject,
-      html: createEmailTemplate(body),
+      html: createEmailTemplate(body, currentUserPhoneNumber),
     }
 
     if (cc && cc.length > 0) {

@@ -341,6 +341,9 @@ OH PLUS
       }
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
+      if (user?.phoneNumber) {
+        formData.append("currentUserPhoneNumber", user.phoneNumber)
+      }
 
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
