@@ -851,9 +851,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               </div>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-left">
             <p className="mb-16">Conforme:</p>
-            <div className="border-b border-gray-400 w-48 mb-2 ml-auto"></div>
+            <div className="border-b border-gray-400 w-48 mb-2"></div>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
             <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
             <p className="text-xs mt-4 text-gray-600 italic">
