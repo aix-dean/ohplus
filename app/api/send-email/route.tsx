@@ -6,6 +6,13 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 function createEmailTemplate(body: string, userPhoneNumber?: string): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
+  const processedBody = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => `<p>${line}</p>`)
+    .join("")
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -136,10 +143,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
         </div>
         
         <div class="content">
-            ${body
-              .replace(/\n/g, "</p><p>")
-              .replace(/^<p>/, "<p>")
-              .replace(/<\/p>$/, "</p>")}
+            ${processedBody}
             
             <div class="highlight-box">
                 <p style="margin: 0; font-weight: 500; color: #495057;">
@@ -196,6 +200,20 @@ export async function POST(request: NextRequest) {
     const body = formData.get("body") as string
     const currentUserPhoneNumber = formData.get("currentUserPhoneNumber") as string
 
+    console.log("[v0] Email sending - Subject:", subject)
+    console.log("[v0] Email sending - Body length:", body?.length)
+    console.log("[v0] Email sending - Body preview:", body?.substring(0, 100))
+
+    if (!body || body.trim().length === 0) {
+      console.error("[v0] Email sending failed - Empty body")
+      return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
+    }
+
+    if (!subject || subject.trim().length === 0) {
+      console.error("[v0] Email sending failed - Empty subject")
+      return NextResponse.json({ error: "Email subject cannot be empty" }, { status: 400 })
+    }
+
     // Parse JSON strings
     const to = JSON.parse(toJson)
     const cc = ccJson ? JSON.parse(ccJson) : undefined
@@ -220,12 +238,14 @@ export async function POST(request: NextRequest) {
       attachmentIndex++
     }
 
+    console.log("[v0] Email sending - Attachments count:", attachments.length)
+
     // Send email using Resend
     const emailData: any = {
       from,
       to,
-      subject,
-      html: createEmailTemplate(body, currentUserPhoneNumber),
+      subject: subject.trim(),
+      html: createEmailTemplate(body.trim(), currentUserPhoneNumber),
     }
 
     if (cc && cc.length > 0) {
@@ -236,16 +256,18 @@ export async function POST(request: NextRequest) {
       emailData.attachments = attachments
     }
 
+    console.log("[v0] Email sending - Sending to Resend API")
     const { data, error } = await resend.emails.send(emailData)
 
     if (error) {
-      console.error("Resend error:", error)
+      console.error("[v0] Resend error:", error)
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    console.log("[v0] Email sent successfully:", data?.id)
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("Send email error:", error)
+    console.error("[v0] Send email error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to send email" },
       { status: 500 },
