@@ -48,6 +48,7 @@ import { generateQuotationPDF } from "@/lib/quotation-pdf-service" // Use quotat
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Use quotation success dialog
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
+import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
 
 interface CompanyData {
   id: string
@@ -446,11 +447,54 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     setDownloadingPDF(true)
     try {
-      await generateQuotationPDF(quotation)
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
+      // Check if there are multiple related quotations (same page_id)
+      if (relatedQuotations.length > 1) {
+        console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
+
+        // Download all related quotations as separate PDFs
+        for (let i = 0; i < relatedQuotations.length; i++) {
+          const relatedQuotation = relatedQuotations[i]
+
+          // Create unique quotation number with suffix
+          const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
+          const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+          // Create modified quotation with unique number
+          const modifiedQuotation = {
+            ...relatedQuotation,
+            quotation_number: uniqueQuotationNumber,
+          }
+
+          await generateQuotationPDF(modifiedQuotation, companyData)
+
+          // Add small delay between downloads to ensure proper file naming
+          if (i < relatedQuotations.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+
+        toast({
+          title: "PDFs Generated",
+          description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
+        })
+      } else {
+        // Single quotation - check if it has multiple items
+        if (quotation.items && quotation.items.length > 1) {
+          console.log("[v0] Downloading separate PDFs for multiple items:", quotation.items.length)
+          await generateSeparateQuotationPDFs(quotation, companyData)
+          toast({
+            title: "PDFs Generated",
+            description: `${quotation.items.length} separate PDF files have been downloaded for each item.`,
+          })
+        } else {
+          // Single quotation with single item
+          await generateQuotationPDF(quotation, companyData)
+          toast({
+            title: "Success",
+            description: "PDF downloaded successfully",
+          })
+        }
+      }
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
