@@ -29,10 +29,11 @@ export async function POST(request: NextRequest) {
       customSubject: body.subject,
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
+      currentUserPhoneNumber: body.currentUserPhoneNumber,
       ccEmail: body.ccEmail, // Now a string that might contain multiple emails
     })
 
-    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, ccEmail } = body
+    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, currentUserPhoneNumber, ccEmail } = body
 
     if (!proposal || !clientEmail) {
       console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
@@ -273,7 +274,7 @@ export async function POST(request: NextRequest) {
             <div class="contact-info">
               <strong>Ready to get started?</strong><br>
               📧 Email: sales@ohplus.com<br>
-              📞 Phone: +63 123 456 7890
+              📞 Phone: ${currentUserPhoneNumber || "+639XXXXXXXXX"}
             </div>
 
             <p>Thank you for considering OH Plus as your advertising partner. We look forward to creating something amazing together!</p>

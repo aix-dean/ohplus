@@ -53,7 +53,6 @@
     "date-fns": "latest",
     "embla-carousel-react": "latest",
     "firebase": "latest",
-    "firebase-admin": "latest",
     "https": "latest",
     "input-otp": "latest",
     "jspdf": "latest",
