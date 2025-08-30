@@ -1824,6 +1824,9 @@ export async function generateReportPDF(
     const contentWidth = pageWidth - margin * 2
     let yPosition = 0
 
+    const moduleDisplayName = module === "sales" ? "Sales" : "Logistics"
+    const moduleDepartmentName = module === "sales" ? "SALES" : "LOGISTICS"
+
     // Helper function to format date exactly like the preview page
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -1937,14 +1940,11 @@ export async function generateReportPDF(
       "F",
     )
 
-    const departmentName = module.charAt(0).toUpperCase() + module.slice(1)
-    const departmentNameUpper = module.toUpperCase()
-
-    // Add "Sales" or "Logistics" text in header based on module
+    // Add module text in header
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text(departmentName, margin, yPosition + 10) // Use dynamic department name
+    pdf.text(moduleDisplayName, margin, yPosition + 10) // Use dynamic module name instead of hardcoded "Logistics"
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
@@ -2385,7 +2385,7 @@ export async function generateReportPDF(
     pdf.text(preparedByName, margin, footerY)
     footerY += 4
 
-    pdf.text(departmentNameUpper, margin, footerY) // Use dynamic department name in footer
+    pdf.text(moduleDepartmentName, margin, footerY) // Use dynamic department name instead of hardcoded "LOGISTICS"
     footerY += 4
 
     pdf.text(formatDate(report.date), margin, footerY)
