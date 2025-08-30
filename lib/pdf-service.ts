@@ -1604,10 +1604,7 @@ export async function generateCostEstimatePDF(
 
       pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
-        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}\`\`\`javascript
-yPosition + 6)
-      pdf.text(
-        \`PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
         yPosition + 6,
         { align: "right" },
@@ -1817,6 +1814,7 @@ export async function generateReportPDF(
   userData?: any,
   projectData?: any,
   returnBase64 = false,
+  department = "logistics", // Added department parameter with default value
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -1825,6 +1823,8 @@ export async function generateReportPDF(
     const margin = 15
     const contentWidth = pageWidth - margin * 2
     let yPosition = 0
+
+    const departmentText = department.charAt(0).toUpperCase() + department.slice(1)
 
     // Helper function to format date exactly like the preview page
     const formatDate = (dateString: string) => {
@@ -1939,11 +1939,11 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add "Logistics" text in header
+    // Add department text in header with proper capitalization
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text("Logistics", margin, yPosition + 10)
+    pdf.text(departmentText, margin, yPosition + 10)
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
@@ -2332,6 +2332,7 @@ export async function generateReportPDF(
         // Location
         pdf.setFont("helvetica", "bold")
         pdf.text("Location:", metaX, metaY)
+
         pdf.setFont("helvetica", "normal")
 
         // Handle long location text with wrapping
@@ -2384,7 +2385,7 @@ export async function generateReportPDF(
     pdf.text(preparedByName, margin, footerY)
     footerY += 4
 
-    pdf.text("LOGISTICS", margin, footerY)
+    pdf.text(departmentText.toUpperCase(), margin, footerY)
     footerY += 4
 
     pdf.text(formatDate(report.date), margin, footerY)

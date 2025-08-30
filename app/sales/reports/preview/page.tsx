@@ -340,7 +340,7 @@ export default function SalesReportPreviewPage() {
         },
       }
 
-      await generateReportPDF(reportWithSafeDates, product, false)
+      await generateReportPDF(reportWithSafeDates, product, false, undefined, false, "sales")
     } catch (error) {
       console.error("Error generating report PDF:", error)
       toast({
