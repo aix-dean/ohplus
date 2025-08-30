@@ -1824,8 +1824,6 @@ export async function generateReportPDF(
     const contentWidth = pageWidth - margin * 2
     let yPosition = 0
 
-    const departmentText = department.charAt(0).toUpperCase() + department.slice(1)
-
     // Helper function to format date exactly like the preview page
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -1939,11 +1937,11 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add department text in header with proper capitalization
+    // Add department text in header
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text(departmentText, margin, yPosition + 10)
+    pdf.text(department.charAt(0).toUpperCase() + department.slice(1), margin, yPosition + 10)
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
@@ -2332,7 +2330,6 @@ export async function generateReportPDF(
         // Location
         pdf.setFont("helvetica", "bold")
         pdf.text("Location:", metaX, metaY)
-
         pdf.setFont("helvetica", "normal")
 
         // Handle long location text with wrapping
@@ -2385,7 +2382,7 @@ export async function generateReportPDF(
     pdf.text(preparedByName, margin, footerY)
     footerY += 4
 
-    pdf.text(departmentText.toUpperCase(), margin, footerY)
+    pdf.text(department.toUpperCase(), margin, footerY)
     footerY += 4
 
     pdf.text(formatDate(report.date), margin, footerY)
