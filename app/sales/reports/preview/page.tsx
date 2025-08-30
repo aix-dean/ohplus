@@ -26,6 +26,7 @@ import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { CongratulationsDialog } from "@/components/congratulations-dialog"
 
 export default function SalesReportPreviewPage() {
   const router = useRouter()
@@ -42,6 +43,11 @@ export default function SalesReportPreviewPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
+  const [showCongratulations, setShowCongratulations] = useState(false)
+
+  const handleCongratulationsClose = () => {
+    setShowCongratulations(false)
+  }
 
   useEffect(() => {
     loadPreviewData()
@@ -181,6 +187,7 @@ export default function SalesReportPreviewPage() {
           start: new Date().toISOString().split("T")[0],
           end: new Date().toISOString().split("T")[0],
         },
+        breakdate: report.breakdate || report.date || new Date().toISOString().split("T")[0],
         status: "posted",
         category: "sales",
         id: undefined,
@@ -209,12 +216,7 @@ export default function SalesReportPreviewPage() {
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      toast({
-        title: "Success",
-        description: "Report posted successfully!",
-      })
-
-      router.push("/sales/service-reports")
+      setShowCongratulations(true)
     } catch (error) {
       console.error("Error posting report:", error)
       toast({
@@ -854,6 +856,8 @@ export default function SalesReportPreviewPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CongratulationsDialog isOpen={showCongratulations} onClose={handleCongratulationsClose} />
     </div>
   )
 }
