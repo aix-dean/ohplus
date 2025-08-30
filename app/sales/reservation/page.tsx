@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
 import { Search, MoreHorizontal } from "lucide-react"
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 interface Booking {
   id: string
+  product_id?: string
   product_owner?: string
   client_name?: string
   start_date?: any
@@ -23,11 +24,40 @@ interface Booking {
   created?: any
 }
 
+interface Product {
+  id?: string
+  site_code?: string
+  specs_rental?: {
+    site_code?: string
+  }
+  light?: {
+    site_code?: string
+  }
+  siteCode?: string
+  [key: string]: any
+}
+
+// Function to get site code from product - following the pattern from sales dashboard
+const getSiteCode = (product: Product | null) => {
+  if (!product) return null
+
+  // Try different possible locations for site_code
+  if (product.site_code) return product.site_code
+  if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
+  if (product.light && "site_code" in product.light) return product.light.site_code
+
+  // Check for camelCase variant
+  if ("siteCode" in product) return product.siteCode
+
+  return null
+}
+
 export default function ReservationPage() {
   const { user, userData } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState<{ [key: string]: Product }>({})
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -46,6 +76,26 @@ export default function ReservationPage() {
         })
 
         setBookings(fetchedBookings)
+
+        const productIds = fetchedBookings
+          .map((booking) => booking.product_id)
+          .filter((id): id is string => Boolean(id))
+
+        const uniqueProductIds = [...new Set(productIds)]
+        const productData: { [key: string]: Product } = {}
+
+        for (const productId of uniqueProductIds) {
+          try {
+            const productDoc = await getDoc(doc(db, "products", productId))
+            if (productDoc.exists()) {
+              productData[productId] = { id: productDoc.id, ...productDoc.data() }
+            }
+          } catch (error) {
+            console.error(`Error fetching product ${productId}:`, error)
+          }
+        }
+
+        setProducts(productData)
       } catch (error) {
         console.error("Error fetching bookings:", error)
       } finally {
@@ -85,15 +135,16 @@ export default function ReservationPage() {
     }
   }
 
-  const filteredReservations = bookings.filter(
-    (booking) =>
-      booking.product_owner?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      false ||
+  const filteredReservations = bookings.filter((booking) => {
+    const product = booking.product_id ? products[booking.product_id] : null
+    const siteCode = getSiteCode(product)
+
+    return (
+      siteCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      false ||
-      booking.status?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      false,
-  )
+      booking.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -178,41 +229,46 @@ export default function ReservationPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredReservations.map((booking) => (
-                  <TableRow key={booking.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{booking.product_owner || "-"}</TableCell>
-                    <TableCell>{booking.client_name || "N/A"}</TableCell>
-                    <TableCell>{formatDate(booking.start_date)}</TableCell>
-                    <TableCell>{formatDate(booking.end_date)}</TableCell>
-                    <TableCell>{calculateDuration(booking.start_date, booking.end_date)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={booking.status?.toLowerCase() === "confirmed" ? "default" : "secondary"}
-                        className={
-                          booking.status?.toLowerCase() === "confirmed"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                        }
-                      >
-                        {booking.status?.toUpperCase() || "PENDING"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredReservations.map((booking) => {
+                  const product = booking.product_id ? products[booking.product_id] : null
+                  const siteCode = getSiteCode(product)
+
+                  return (
+                    <TableRow key={booking.id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">{siteCode || booking.product_owner || "-"}</TableCell>
+                      <TableCell>{booking.client_name || "N/A"}</TableCell>
+                      <TableCell>{formatDate(booking.start_date)}</TableCell>
+                      <TableCell>{formatDate(booking.end_date)}</TableCell>
+                      <TableCell>{calculateDuration(booking.start_date, booking.end_date)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={booking.status?.toLowerCase() === "confirmed" ? "default" : "secondary"}
+                          className={
+                            booking.status?.toLowerCase() === "confirmed"
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                          }
+                        >
+                          {booking.status?.toUpperCase() || "PENDING"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>View Details</DropdownMenuItem>
+                            <DropdownMenuItem>Edit</DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
