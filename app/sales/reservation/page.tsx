@@ -24,19 +24,19 @@ interface Booking {
 }
 
 export default function ReservationPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchBookings = async () => {
-      if (!user?.uid) return
+      if (!user?.uid || !userData?.company_id) return
 
       try {
         setLoading(true)
         const bookingsRef = collection(db, "booking")
-        const q = query(bookingsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"))
+        const q = query(bookingsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
 
         const querySnapshot = await getDocs(q)
         const fetchedBookings: Booking[] = []
@@ -54,7 +54,7 @@ export default function ReservationPage() {
     }
 
     fetchBookings()
-  }, [user])
+  }, [user, userData])
 
   const formatDate = (date: any) => {
     if (!date) return "N/A"
