@@ -1824,6 +1824,7 @@ function SalesDashboardContent() {
           open={createReportDialogOpen}
           onOpenChange={setCreateReportDialogOpen}
           siteId={selectedProductForReport}
+          module="sales"
         />
       </div>
     </div>
