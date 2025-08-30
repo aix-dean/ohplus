@@ -28,6 +28,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 import {
   getPaginatedUserProducts,
   getUserProductsCount,
@@ -88,6 +89,9 @@ function SalesDashboardContent() {
   const [loadingBookings, setLoadingBookings] = useState(false)
   const { isMobile, isTablet } = useResponsive()
 
+  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
+  const [selectedSiteForReport, setSelectedSiteForReport] = useState<string>("")
+
   // Search state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -136,6 +140,13 @@ function SalesDashboardContent() {
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  const handleCreateReport = (productId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedSiteForReport(productId)
+    setCreateReportDialogOpen(true)
+  }
 
   const handleCopySitesFromProposal = (sites: Product[]) => {
     // Switch to CE/Quote mode and select the copied sites
@@ -983,6 +994,77 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
   }
 
+  const handleViewProduct = (product: Product) => {
+    router.push(`/sales/products/${product.id}`)
+  }
+
+  const handleEditProduct = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/sales/products/edit/${product.id}`)
+  }
+
+  const handleDeleteProduct = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setProductToDelete(product)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!productToDelete) return
+
+    try {
+      await softDeleteProduct(productToDelete.id)
+
+      // Update the UI by removing the deleted product
+      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
+
+      // Update total count
+      setTotalItems((prev) => prev - 1)
+
+      // Recalculate total pages
+      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
+
+      // Clear cache to force refresh
+      setPageCache(new Map())
+
+      toast({
+        title: "Product deleted",
+        description: `${productToDelete.name} has been successfully deleted.`,
+      })
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete the product. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeleteDialogOpen(false)
+    }
+  }
+
+  const handleProductSelection = (product: Product) => {
+    setSelectedProducts((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
+      }
+    })
+  }
+
+  const handleSiteSelection = (product: Product) => {
+    setSelectedSites((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
+      }
+    })
+  }
+
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {proposalCreationMode && (
@@ -1461,6 +1543,7 @@ function SalesDashboardContent() {
                               proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
                             }
                             selectionMode={proposalCreationMode || ceQuoteMode}
+                            onCreateReport={handleCreateReport}
                           />
                         ))}
                       </ResponsiveCardGrid>
@@ -1807,6 +1890,13 @@ function SalesDashboardContent() {
             })
           }}
         />
+
+        {/* Create Report Dialog */}
+        <CreateReportDialog
+          isOpen={createReportDialogOpen}
+          onClose={() => setCreateReportDialogOpen(false)}
+          productId={selectedSiteForReport}
+        />
       </div>
     </div>
   )
@@ -1837,6 +1927,7 @@ function ProductCard({
   isSelected = false,
   onSelect,
   selectionMode = false,
+  onCreateReport, // Added onCreateReport prop
 }: {
   product: Product
   hasOngoingBooking: boolean
@@ -1846,6 +1937,7 @@ function ProductCard({
   isSelected?: boolean
   onSelect?: () => void
   selectionMode?: boolean
+  onCreateReport?: (productId: string, e: React.MouseEvent) => void // Added onCreateReport prop type
 }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -1915,6 +2007,7 @@ function ProductCard({
           <Button
             variant="outline"
             className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={(e) => onCreateReport?.(product.id, e)} // Added onClick handler for Create Report
           >
             Create Report
           </Button>
