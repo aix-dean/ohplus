@@ -176,6 +176,11 @@ export default function SalesReportPreviewPage() {
 
       const finalReportData: ReportData = {
         ...report,
+        // Ensure bookingDates exists with default values if undefined
+        bookingDates: report.bookingDates || {
+          start: new Date().toISOString().split("T")[0],
+          end: new Date().toISOString().split("T")[0],
+        },
         status: "posted",
         category: "sales",
         id: undefined,
