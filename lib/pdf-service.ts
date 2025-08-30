@@ -1814,7 +1814,7 @@ export async function generateReportPDF(
   userData?: any,
   projectData?: any,
   returnBase64 = false,
-  department = "Logistics", // Default to Logistics for backward compatibility
+  module = "logistics", // Added module parameter with default value
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -1937,11 +1937,12 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add department text in header
+    // Add module text in header
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text(department, margin, yPosition + 10)
+    const moduleText = module.charAt(0).toUpperCase() + module.slice(1)
+    pdf.text(moduleText, margin, yPosition + 10)
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
@@ -2330,6 +2331,7 @@ export async function generateReportPDF(
         // Location
         pdf.setFont("helvetica", "bold")
         pdf.text("Location:", metaX, metaY)
+
         pdf.setFont("helvetica", "normal")
 
         // Handle long location text with wrapping
@@ -2382,9 +2384,7 @@ export async function generateReportPDF(
     pdf.text(preparedByName, margin, footerY)
     footerY += 4
 
-    footerY += 4
-
-    pdf.text(department.toUpperCase(), margin, footerY)
+    pdf.text(moduleText.toUpperCase(), margin, footerY)
     footerY += 4
 
     pdf.text(formatDate(report.date), margin, footerY)
