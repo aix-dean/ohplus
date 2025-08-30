@@ -260,8 +260,8 @@ export default function ReservationPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
+                            <DropdownMenuItem>Create JO</DropdownMenuItem>
+                            <DropdownMenuItem>Create Report</DropdownMenuItem>
                             <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
