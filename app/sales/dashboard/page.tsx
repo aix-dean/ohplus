@@ -28,7 +28,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import { CreateReportDialog } from "@/components/create-report-dialog"
 import {
   getPaginatedUserProducts,
   getUserProductsCount,
@@ -60,6 +59,7 @@ import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
+import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -88,9 +88,6 @@ function SalesDashboardContent() {
   const [productsWithBookings, setProductsWithBookings] = useState<Record<string, boolean>>({})
   const [loadingBookings, setLoadingBookings] = useState(false)
   const { isMobile, isTablet } = useResponsive()
-
-  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
-  const [selectedSiteForReport, setSelectedSiteForReport] = useState<string>("")
 
   // Search state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -141,11 +138,15 @@ function SalesDashboardContent() {
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
-  const handleCreateReport = (productId: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setSelectedSiteForReport(productId)
-    setCreateReportDialogOpen(true)
+  const [jobOrdersDialogOpen, setJobOrdersDialogOpen] = useState(false)
+  const [selectedSiteForJO, setSelectedSiteForJO] = useState<{
+    id: string
+    name: string
+  }>({ id: "", name: "" })
+
+  const handleCreateReportClick = (productId: string, productName: string) => {
+    setSelectedSiteForJO({ id: productId, name: productName })
+    setJobOrdersDialogOpen(true)
   }
 
   const handleCopySitesFromProposal = (sites: Product[]) => {
@@ -994,77 +995,6 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
   }
 
-  const handleViewProduct = (product: Product) => {
-    router.push(`/sales/products/${product.id}`)
-  }
-
-  const handleEditProduct = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/sales/products/edit/${product.id}`)
-  }
-
-  const handleDeleteProduct = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setProductToDelete(product)
-    setDeleteDialogOpen(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!productToDelete) return
-
-    try {
-      await softDeleteProduct(productToDelete.id)
-
-      // Update the UI by removing the deleted product
-      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
-
-      // Update total count
-      setTotalItems((prev) => prev - 1)
-
-      // Recalculate total pages
-      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
-
-      // Clear cache to force refresh
-      setPageCache(new Map())
-
-      toast({
-        title: "Product deleted",
-        description: `${productToDelete.name} has been successfully deleted.`,
-      })
-    } catch (error) {
-      console.error("Error deleting product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete the product. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setDeleteDialogOpen(false)
-    }
-  }
-
-  const handleProductSelection = (product: Product) => {
-    setSelectedProducts((prev) => {
-      const isSelected = prev.some((p) => p.id === product.id)
-      if (isSelected) {
-        return prev.filter((p) => p.id !== product.id)
-      } else {
-        return [...prev, product]
-      }
-    })
-  }
-
-  const handleSiteSelection = (product: Product) => {
-    setSelectedSites((prev) => {
-      const isSelected = prev.some((p) => p.id === product.id)
-      if (isSelected) {
-        return prev.filter((p) => p.id !== product.id)
-      } else {
-        return [...prev, product]
-      }
-    })
-  }
-
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {proposalCreationMode && (
@@ -1543,7 +1473,7 @@ function SalesDashboardContent() {
                               proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
                             }
                             selectionMode={proposalCreationMode || ceQuoteMode}
-                            onCreateReport={handleCreateReport}
+                            onCreateReport={handleCreateReportClick} // Added onCreateReport prop to ProductCard
                           />
                         ))}
                       </ResponsiveCardGrid>
@@ -1890,28 +1820,84 @@ function SalesDashboardContent() {
             })
           }}
         />
-
-        {/* Create Report Dialog */}
-        <CreateReportDialog
-          isOpen={createReportDialogOpen}
-          onClose={() => setCreateReportDialogOpen(false)}
-          productId={selectedSiteForReport}
-        />
       </div>
+      <JobOrdersListDialog
+        open={jobOrdersDialogOpen}
+        onOpenChange={setJobOrdersDialogOpen}
+        siteId={selectedSiteForJO.id}
+        siteName={selectedSiteForJO.name}
+        companyId={userData?.company_id || ""}
+      />
     </div>
   )
 }
 
 export default function SalesDashboardPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
+
+  // const [jobOrdersDialogOpen, setJobOrdersDialogOpen] = useState(false)
+  // const [selectedSiteForJO, setSelectedSiteForJO] = useState<{
+  //   id: string
+  //   name: string
+  // }>({ id: "", name: "" })
+  // const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
+
+  // const fetchJobOrderCountsDirectly = useCallback(async () => {
+  //   if (!userData?.company_id) {
+  //     console.log("No company_id available for job orders")
+  //     return
+  //   }
+
+  //   try {
+  //     // Query job orders collection directly
+  //     const jobOrdersRef = collection(db, "job_orders")
+  //     const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+
+  //     const querySnapshot = await getDocs(q)
+
+  //     const counts: Record<string, number> = {}
+
+  //     querySnapshot.forEach((doc) => {
+  //       const jobOrder = { id: doc.id, ...doc.data() }
+
+  //       if (jobOrder.product_id) {
+  //         counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
+  //       }
+  //     })
+
+  //     setJobOrderCounts(counts)
+  //   } catch (error) {
+  //     console.error("Error fetching job orders directly:", error)
+  //     setJobOrderCounts({})
+  //   }
+  // }, [userData?.company_id])
+
+  // useEffect(() => {
+  //   if (userData?.company_id) {
+  //     fetchJobOrderCountsDirectly()
+  //   }
+  // }, [userData?.company_id, fetchJobOrderCountsDirectly])
+
+  // const handleCreateReportClick = (productId: string, productName: string) => {
+  //   setSelectedSiteForJO({ id: productId, name: productName })
+  //   setJobOrdersDialogOpen(true)
+  // }
 
   return (
     <RouteProtection requiredRoles="sales">
-      <div className="h-screen overflow-hidden">
+      <div className="flex flex-col h-screen bg-gray-50">
         <SalesDashboardContent />
 
         {/* Render SalesChatWidget without the floating button */}
         <SalesChatWidget />
+
+        {/* <JobOrdersListDialog
+          open={jobOrdersDialogOpen}
+          onOpenChange={setJobOrdersDialogOpen}
+          siteId={selectedSiteForJO.id}
+          siteName={selectedSiteForJO.name}
+          companyId={userData?.company_id || ""}
+        /> */}
       </div>
     </RouteProtection>
   )
@@ -1937,7 +1923,7 @@ function ProductCard({
   isSelected?: boolean
   onSelect?: () => void
   selectionMode?: boolean
-  onCreateReport?: (productId: string, e: React.MouseEvent) => void // Added onCreateReport prop type
+  onCreateReport?: (productId: string, productName: string) => void // Added onCreateReport prop type
 }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -1957,6 +1943,14 @@ function ProductCard({
       onSelect()
     } else {
       onView()
+    }
+  }
+
+  const handleCreateReportClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (onCreateReport && product.id) {
+      onCreateReport(product.id, product.name || `Site ${product.id.substring(0, 8)}`)
     }
   }
 
@@ -2007,7 +2001,7 @@ function ProductCard({
           <Button
             variant="outline"
             className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={(e) => onCreateReport?.(product.id, e)} // Added onClick handler for Create Report
+            onClick={handleCreateReportClick} // Added click handler to open job orders dialog
           >
             Create Report
           </Button>
