@@ -1814,7 +1814,7 @@ export async function generateReportPDF(
   userData?: any,
   projectData?: any,
   returnBase64 = false,
-  department = "logistics", // Added department parameter with default value
+  department = "Logistics", // Default to Logistics for backward compatibility
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -1937,11 +1937,11 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add department text in header
+    // Add "Logistics" text in header
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text(department.charAt(0).toUpperCase() + department.slice(1), margin, yPosition + 10)
+    pdf.text(department, margin, yPosition + 10)
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
