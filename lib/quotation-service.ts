@@ -816,13 +816,13 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation) // Changed products to items
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
     })
 
-    return quotations
+    return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   } catch (error) {
     console.error("Error fetching quotations by created_by ID:", error)
-    return []
+    throw error
   }
 }
 
@@ -934,7 +934,8 @@ export async function createDirectQuotation(
       const start = new Date(options.startDate)
       const end = new Date(options.endDate)
       durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      totalAmount = (site.price || 0) * durationDays
+      const dailyRate = (site.price || 0) / 30
+      totalAmount = dailyRate * durationDays
     }
 
     const pageId = options.page_id || `PAGE-${Date.now()}`
@@ -1022,7 +1023,8 @@ export async function createMultipleQuotations(
     for (let i = 0; i < sitesData.length; i++) {
       const site = sitesData[i]
       const quotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
-      const totalAmount = (site.price || 0) * durationDays
+      const dailyRate = (site.price || 0) / 30
+      const totalAmount = dailyRate * durationDays
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
@@ -1109,31 +1111,6 @@ export async function getQuotationsByProductId(productId: string): Promise<Quota
   }
 }
 
-// Get quotations by page ID (for pagination between related documents)
-export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]> {
-  try {
-    if (!db) {
-      throw new Error("Firestore not initialized")
-    }
-
-    const quotationsRef = collection(db, "quotations")
-    const q = query(quotationsRef, where("page_id", "==", pageId), orderBy("page_number", "asc"))
-
-    const querySnapshot = await getDocs(q)
-    const quotations: Quotation[] = []
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
-    })
-
-    return quotations
-  } catch (error) {
-    console.error("Error fetching quotations by page ID:", error)
-    return []
-  }
-}
-
 // Get quotations by client ID
 export async function getQuotationsByClientId(clientId: string): Promise<Quotation[]> {
   try {
@@ -1161,3 +1138,86 @@ export async function getQuotationsByClientId(clientId: string): Promise<Quotati
     throw error
   }
 }
+
+// Get quotations by client name
+export async function getQuotationsByClientName(clientName: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("client_name", "==", clientName), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by client name:", error)
+    return []
+  }
+}
+
+// Get quotations by page ID
+export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("page_id", "==", pageId), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by page ID:", error)
+    return []
+  }
+}
+
+export async function getQuotationsByProductIdAndCompanyId(productId: string, companyId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
+
+      const hasMatchingProduct = quotation.items.some((item) => item.id === productId)
+      const hasMatchingCompany = quotation.company_id === companyId
+
+      if (hasMatchingProduct && hasMatchingCompany) {
+        quotations.push(quotation)
+      }
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by product ID and company ID:", error)
+    return []
+  }
+}
+
+export { getQuotationById as getQuotation }
