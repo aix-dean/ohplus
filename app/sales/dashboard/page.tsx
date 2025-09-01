@@ -59,6 +59,7 @@ import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -87,6 +88,9 @@ function SalesDashboardContent() {
   const [productsWithBookings, setProductsWithBookings] = useState<Record<string, boolean>>({})
   const [loadingBookings, setLoadingBookings] = useState(false)
   const { isMobile, isTablet } = useResponsive()
+
+  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
+  const [selectedProductForReport, setSelectedProductForReport] = useState<string>("")
 
   // Search state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -136,6 +140,13 @@ function SalesDashboardContent() {
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  const handleCreateReport = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedProductForReport(product.id)
+    setCreateReportDialogOpen(true)
+  }
 
   const handleCopySitesFromProposal = (sites: Product[]) => {
     // Switch to CE/Quote mode and select the copied sites
@@ -1452,6 +1463,7 @@ function SalesDashboardContent() {
                             onView={() => handleViewDetails(product.id)}
                             onEdit={(e) => handleEditClick(product, e)}
                             onDelete={(e) => handleDeleteClick(product, e)}
+                            onCreateReport={(e) => handleCreateReport(product, e)}
                             isSelected={
                               proposalCreationMode
                                 ? selectedProducts.some((p) => p.id === product.id)
@@ -1807,6 +1819,13 @@ function SalesDashboardContent() {
             })
           }}
         />
+
+        <CreateReportDialog
+          open={createReportDialogOpen}
+          onOpenChange={setCreateReportDialogOpen}
+          siteId={selectedProductForReport}
+          module="sales"
+        />
       </div>
     </div>
   )
@@ -1834,6 +1853,7 @@ function ProductCard({
   onView,
   onEdit,
   onDelete,
+  onCreateReport,
   isSelected = false,
   onSelect,
   selectionMode = false,
@@ -1843,6 +1863,7 @@ function ProductCard({
   onView: () => void
   onEdit: (e: React.MouseEvent) => void
   onDelete: (e: React.MouseEvent) => void
+  onCreateReport: (e: React.MouseEvent) => void
   isSelected?: boolean
   onSelect?: () => void
   selectionMode?: boolean
@@ -1915,6 +1936,7 @@ function ProductCard({
           <Button
             variant="outline"
             className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={onCreateReport}
           >
             Create Report
           </Button>
