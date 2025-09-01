@@ -1205,10 +1205,10 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
       const data = doc.data()
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
-      // Check if any item in this quotation matches the product ID and company ID
-      const hasMatchingProduct = quotation.items.some((item) => item.id === productId && item.company_id === companyId)
+      const hasMatchingProduct = quotation.items.some((item) => item.id === productId)
+      const hasMatchingCompany = quotation.company_id === companyId
 
-      if (hasMatchingProduct) {
+      if (hasMatchingProduct && hasMatchingCompany) {
         quotations.push(quotation)
       }
     })
