@@ -1189,4 +1189,35 @@ export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]
   }
 }
 
+export async function getQuotationsByProductIdAndCompanyId(productId: string, companyId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
+
+      // Check if any item in this quotation matches the product ID and company ID
+      const hasMatchingProduct = quotation.items.some((item) => item.id === productId && item.company_id === companyId)
+
+      if (hasMatchingProduct) {
+        quotations.push(quotation)
+      }
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by product ID and company ID:", error)
+    return []
+  }
+}
+
 export { getQuotationById as getQuotation }

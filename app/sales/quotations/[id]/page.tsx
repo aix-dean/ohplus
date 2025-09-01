@@ -10,7 +10,7 @@ import {
   getQuotationsByPageId,
   updateQuotationStatus,
   updateQuotation,
-  getQuotationsByProductId,
+  getQuotationsByProductIdAndCompanyId,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -281,12 +281,13 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }
 
   const fetchQuotationHistory = useCallback(async () => {
-    if (!quotation?.items?.[0]?.id) return
+    if (!quotation?.items?.[0]?.id || !quotation?.items?.[0]?.company_id) return
 
     setLoadingHistory(true)
     try {
       const productId = quotation.items[0].id
-      const history = await getQuotationsByProductId(productId)
+      const companyId = quotation.items[0].company_id
+      const history = await getQuotationsByProductIdAndCompanyId(productId, companyId)
       // Filter out current quotation from history
       const filteredHistory = history.filter((q) => q.id !== quotation.id)
       setClientHistory(filteredHistory)
@@ -295,7 +296,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     } finally {
       setLoadingHistory(false)
     }
-  }, [quotation?.items?.[0]?.id, quotation?.id])
+  }, [quotation?.items?.[0]?.id, quotation?.items?.[0]?.company_id, quotation?.id])
 
   const fetchCompanyData = useCallback(async () => {
     if (!user || !userData) return
