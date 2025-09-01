@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { getProductsByCompany, type Product } from "@/lib/firebase-service"
@@ -58,11 +57,36 @@ export default function ProjectMonitoringPage() {
     router.back()
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(price)
+  const formatActivityDate = (date: any) => {
+    if (!date) return new Date().toLocaleDateString()
+    const d = date.toDate ? date.toDate() : new Date(date)
+    return d.toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "2-digit",
+    })
+  }
+
+  const formatActivityTime = (date: any) => {
+    if (!date) return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+    const d = date.toDate ? date.toDate() : new Date(date)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  }
+
+  const generateJobOrderNumber = (productId: string) => {
+    return `JO-${productId.slice(0, 8).toUpperCase()}`
+  }
+
+  const getHeaderColor = (index: number) => {
+    const colors = [
+      "bg-cyan-500", // Cyan like in the reference
+      "bg-pink-500", // Pink variant
+      "bg-slate-800", // Dark variant
+      "bg-blue-500", // Blue variant
+      "bg-purple-500", // Purple variant
+      "bg-green-500", // Green variant
+    ]
+    return colors[index % colors.length]
   }
 
   return (
@@ -81,7 +105,7 @@ export default function ProjectMonitoringPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-10 bg-gray-50 border-gray-200 focus:bg-white"
@@ -114,14 +138,18 @@ export default function ProjectMonitoringPage() {
 
       <div className="p-4">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
               <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-gray-200 animate-pulse" />
-                <CardContent className="p-4">
+                <div className="h-4 bg-gray-200 animate-pulse m-4 mb-2" />
+                <div className="h-12 bg-gray-200 animate-pulse mx-4 mb-4 rounded" />
+                <CardContent className="p-4 pt-0">
                   <div className="h-4 bg-gray-200 rounded animate-pulse mb-2" />
-                  <div className="h-3 bg-gray-200 rounded animate-pulse mb-2" />
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
+                  <div className="space-y-2">
+                    <div className="h-3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 bg-gray-200 rounded animate-pulse" />
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -129,80 +157,68 @@ export default function ProjectMonitoringPage() {
         ) : error ? (
           <div className="text-center py-12">
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">Error loading products</p>
+            <p className="text-gray-500 mb-2">Error loading projects</p>
             <p className="text-sm text-gray-400">{error}</p>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">{searchQuery ? "No products found" : "No products available"}</p>
+            <p className="text-gray-500 mb-2">{searchQuery ? "No projects found" : "No projects available"}</p>
             <p className="text-sm text-gray-400">
-              {searchQuery ? "Try adjusting your search terms" : "Products will appear here when added"}
+              {searchQuery ? "Try adjusting your search terms" : "Projects will appear here when added"}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredProducts.map((product, index) => (
               <Card
                 key={product.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer bg-white border border-gray-200"
               >
-                <div className="aspect-square relative bg-gray-100">
-                  {(() => {
-                    const imageUrl =
-                      product.imageUrl && product.imageUrl.trim() !== ""
-                        ? product.imageUrl
-                        : product.media &&
-                            product.media.length > 0 &&
-                            product.media[0]?.url &&
-                            product.media[0].url.trim() !== ""
-                          ? product.media[0].url
-                          : null
+                <CardContent className="p-0">
+                  {/* Job Order Number */}
+                  <div className="px-4 pt-3 pb-2">
+                    <p className="text-xs text-blue-600 font-medium">{generateJobOrderNumber(product.id)}</p>
+                  </div>
 
-                    return imageUrl ? (
-                      <img
-                        src={imageUrl || "/placeholder.svg"}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.style.display = "none"
-                          target.nextElementSibling?.classList.remove("hidden")
-                        }}
-                      />
-                    ) : null
-                  })()}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center ${
-                      (product.imageUrl && product.imageUrl.trim() !== "") ||
-                      (
-                        product.media &&
-                          product.media.length > 0 &&
-                          product.media[0]?.url &&
-                          product.media[0].url.trim() !== ""
-                      )
-                        ? "hidden"
-                        : ""
-                    }`}
-                  >
-                    <Package className="h-12 w-12 text-gray-400" />
+                  {/* Project Header */}
+                  <div className={`${getHeaderColor(index)} px-4 py-3 mx-4 rounded-md mb-4`}>
+                    <h3 className="text-white font-bold text-lg leading-tight">{product.name}</h3>
                   </div>
-                  {product.active && (
-                    <Badge className="absolute top-2 right-2 bg-green-500 hover:bg-green-600">Active</Badge>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">{product.name}</h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-blue-600">{formatPrice(product.price)}</span>
-                    {product.categories && product.categories.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {product.categories[0]}
-                      </Badge>
-                    )}
+
+                  {/* Project Location/Description */}
+                  <div className="px-4 pb-2">
+                    <p className="text-gray-900 font-medium text-sm">
+                      {product.seller_name || product.categories?.[0] || "Project Location"}
+                    </p>
                   </div>
-                  {product.seller_name && <p className="text-xs text-gray-500 mt-2">by {product.seller_name}</p>}
+
+                  {/* Last Activity Section */}
+                  <div className="px-4 pb-4">
+                    <p className="text-gray-700 font-medium text-sm mb-2">Last Activity</p>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <div className="flex">
+                        <span className="text-gray-500">
+                          -{formatActivityDate(product.created_at)}- {formatActivityTime(product.created_at)}-
+                        </span>
+                        <span className="ml-1">Project initiated</span>
+                      </div>
+                      {product.updated_at && (
+                        <div className="flex">
+                          <span className="text-gray-500">
+                            -{formatActivityDate(product.updated_at)}- {formatActivityTime(product.updated_at)}-
+                          </span>
+                          <span className="ml-1">Status updated</span>
+                        </div>
+                      )}
+                      <div className="flex">
+                        <span className="text-gray-500">
+                          -{formatActivityDate(new Date())}- {formatActivityTime(new Date())}-
+                        </span>
+                        <span className="ml-1">Ready for monitoring</span>
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             ))}
