@@ -17,6 +17,7 @@ import {
   Mail,
   Eye,
   AlertCircle,
+  Briefcase,
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -934,7 +935,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </Card>
             </TabsContent>
 
-            {/* ... existing CE, Quote, and Job Order tabs ... */}
+            {/* CE Tab */}
             <TabsContent value="ce" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
                 <CardContent className="p-0">
@@ -1003,7 +1004,202 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </Card>
             </TabsContent>
 
-            {/* ... existing Quote and Job Order tabs ... */}
+            {/* Quote Tab */}
+            <TabsContent value="quote" className="space-y-4">
+              <div className="rounded-lg border bg-white">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Quotations</h3>
+                  <p className="text-sm text-gray-600">
+                    {quotationsLoading ? "Loading..." : `${quotations.length} quotation(s) found`}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  {quotationsLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading quotations...</p>
+                    </div>
+                  ) : quotations.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No quotations found for this product</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quotation #
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {quotations.map((quotation) => {
+                          const statusConfig = getQuotationStatusConfig(quotation.status)
+                          const totalAmount =
+                            quotation.products?.reduce((sum, product) => sum + (product.total || 0), 0) || 0
+
+                          return (
+                            <tr key={quotation.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {quotation.quotationNumber || quotation.id}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{quotation.client?.name || "N/A"}</div>
+                                <div className="text-sm text-gray-500">{quotation.client?.company || ""}</div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">₱{totalAmount.toLocaleString()}</div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
+                                >
+                                  {statusConfig.icon}
+                                  {statusConfig.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {quotation.createdAt ? formatDate(quotation.createdAt) : "N/A"}
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => window.open(`/quotations/${quotation.id}`, "_blank")}
+                                  className="text-blue-600 hover:text-blue-900"
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Job Order Tab */}
+            <TabsContent value="job-order" className="space-y-4">
+              <div className="rounded-lg border bg-white">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Job Orders</h3>
+                  <p className="text-sm text-gray-600">
+                    {jobOrdersLoading ? "Loading..." : `${jobOrders.length} job order(s) found`}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  {jobOrdersLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading job orders...</p>
+                    </div>
+                  ) : jobOrders.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No job orders found for this product</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Job Order #
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Title
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Priority
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {jobOrders.map((jobOrder) => {
+                          const statusConfig = getJobOrderStatusConfig(jobOrder.status)
+                          const priorityConfig = getJobOrderPriorityConfig(jobOrder.priority)
+
+                          return (
+                            <tr key={jobOrder.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {jobOrder.jobOrderNumber || jobOrder.id}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="text-sm text-gray-900 max-w-xs truncate">
+                                  {jobOrder.title || "Untitled Job Order"}
+                                </div>
+                                <div className="text-sm text-gray-500">{jobOrder.siteName || ""}</div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{jobOrder.clientName || "N/A"}</div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
+                                >
+                                  {statusConfig.icon}
+                                  {statusConfig.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${priorityConfig.color}`}
+                                >
+                                  {priorityConfig.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {jobOrder.createdAt ? formatDate(jobOrder.createdAt) : "N/A"}
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => window.open(`/job-orders/${jobOrder.id}`, "_blank")}
+                                  className="text-blue-600 hover:text-blue-900"
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
         </section>
       </main>
