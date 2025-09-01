@@ -302,6 +302,11 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     if (!user || !userData) return
 
     try {
+      if (!userData.companyId) {
+        console.warn("No companyId found in userData:", userData)
+        return
+      }
+
       const companyDoc = await getDoc(doc(db, "companies", userData.companyId))
       if (companyDoc.exists()) {
         const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
