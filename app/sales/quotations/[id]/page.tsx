@@ -593,29 +593,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           <div className="text-left">
             <p className="text-base font-medium mb-2">{format(new Date(), "MMMM dd, yyyy")}</p>
 
-            {isEditing ? (
-              <Input
-                name="client_name"
-                value={editableQuotation?.client_name || ""}
-                onChange={handleChange}
-                className="w-64 h-8 text-base font-medium mb-2"
-                placeholder="Enter client name"
-              />
-            ) : (
-              <p className="text-base font-medium mb-1">{currentQuotation.client_name || "Client Name"}</p>
-            )}
+            <p className="text-base font-medium mb-1">{currentQuotation.client_name || "Client Name"}</p>
 
-            {isEditing ? (
-              <Input
-                name="client_company_name"
-                value={editableQuotation?.client_company_name || ""}
-                onChange={handleChange}
-                className="w-64 h-8 text-base"
-                placeholder="Enter company name"
-              />
-            ) : (
-              <p className="text-base font-medium">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
-            )}
+            <p className="text-base font-medium">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
           </div>
           <div className="text-right">
             <p className="text-base font-medium">RFQ. No. {currentQuotation.quotation_number}</p>
