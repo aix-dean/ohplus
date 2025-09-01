@@ -8,11 +8,42 @@ import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
 
+interface JobOrderCount {
+  [productId: string]: number
+}
+
 export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
+
+  const fetchJobOrderCounts = async (productIds: string[]) => {
+    if (!userData?.company_id || productIds.length === 0) return
+
+    try {
+      const counts: JobOrderCount = {}
+
+      // Fetch job orders for all products at once
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+      const querySnapshot = await getDocs(q)
+
+      // Count job orders for each product
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const productId = data.product_id
+        if (productId && productIds.includes(productId)) {
+          counts[productId] = (counts[productId] || 0) + 1
+        }
+      })
+
+      setJobOrderCounts(counts)
+    } catch (error) {
+      console.error("Error fetching job order counts:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -32,6 +63,11 @@ export default function ProjectMonitoringPage() {
         })
 
         setProducts(fetchedProducts)
+
+        if (fetchedProducts.length > 0) {
+          const productIds = fetchedProducts.map((p) => p.id)
+          await fetchJobOrderCounts(productIds)
+        }
       } catch (error) {
         console.error("Error fetching products:", error)
       } finally {
@@ -90,8 +126,9 @@ export default function ProjectMonitoringPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {products.map((product) => (
               <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
-                {/* Project ID */}
-                <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
+                <button className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors">
+                  Job Orders: {jobOrderCounts[product.id] || 0}
+                </button>
 
                 {/* Project Title Banner */}
                 <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
