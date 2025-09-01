@@ -306,22 +306,22 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     try {
       console.log("[v0] fetchCompanyData: userData:", userData)
-      console.log("[v0] fetchCompanyData: userData.companyId:", userData.companyId)
+      console.log("[v0] fetchCompanyData: userData.company_id:", userData.company_id)
 
-      if (!userData.companyId) {
-        console.warn("[v0] No companyId found in userData:", userData)
+      if (!userData.company_id) {
+        console.warn("[v0] No company_id found in userData:", userData)
         return
       }
 
-      console.log("[v0] Fetching company data for companyId:", userData.companyId)
-      const companyDoc = await getDoc(doc(db, "companies", userData.companyId))
+      console.log("[v0] Fetching company data for company_id:", userData.company_id)
+      const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
 
       if (companyDoc.exists()) {
         const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
         console.log("[v0] Company data fetched successfully:", companyData)
         setCompanyData(companyData)
       } else {
-        console.warn("[v0] No company data found for companyId:", userData.companyId)
+        console.warn("[v0] No company data found for company_id:", userData.company_id)
       }
     } catch (error) {
       console.error("[v0] Error fetching company data:", error)
