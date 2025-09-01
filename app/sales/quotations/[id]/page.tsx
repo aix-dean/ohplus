@@ -392,7 +392,14 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     if (isSendEmailDialogOpen && quotation) {
       setEmailSubject(`Quotation: ${quotation.title || "Custom Quotation"} - OH Plus`) // Updated subject
       setEmailBody(
-        `Dear ${quotation.client?.contactPerson || quotation.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed quotation for your advertising campaign. Please find the full quotation attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`, // Updated email body
+        `Dear ${quotation.client?.contactPerson || quotation.client?.company || "Valued Client"},
+
+We are pleased to provide you with a detailed quotation for your advertising campaign. Please find the full quotation attached and accessible via the link below.
+
+Thank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!
+
+Best regards,
+The OH Plus Team`,
       )
       if (user?.email) {
         setCcEmail(user.email)

@@ -6,7 +6,7 @@ const weatherCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes in milliseconds
 
 async function getWeatherByCoordinates(lat: number, lng: number, address: string) {
-  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY
+  const apiKey = process.env.OPENWEATHER_API_KEY
   if (!apiKey) {
     throw new Error("OpenWeatherMap API key not configured")
   }
