@@ -125,11 +125,6 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
 
     yPosition += 8
 
-    pdf.setFillColor(248, 250, 252)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 30, "F")
-    pdf.setDrawColor(229, 231, 235)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 30)
-
     yPosition += 6
     pdf.setFont("helvetica", "normal")
     pdf.text("Lease rate per month", margin + 5, yPosition)
@@ -434,11 +429,6 @@ export const generateQuotationEmailPDF = async (
     })
 
     yPosition += 8
-
-    pdf.setFillColor(248, 250, 252)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 30, "F")
-    pdf.setDrawColor(229, 231, 235)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 30)
 
     yPosition += 6
     pdf.setFont("helvetica", "normal")
