@@ -87,9 +87,9 @@ export default function ProjectMonitoringPage() {
         {loading ? (
           <div className="text-center py-8">Loading...</div>
         ) : products.length > 0 ? (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4 max-w-md">
+              <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
                 {/* Project ID */}
                 <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
 
