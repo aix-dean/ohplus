@@ -993,7 +993,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                               </Badge>
                             </div>
                             <div className="text-red-600 font-medium">
-                              ₱{estimate.totalAmount?.toLocaleString() || "0"}/month
+                              ₱{estimate.totalAmount?.toLocaleString()}/month
                             </div>
                           </div>
                         ))}
