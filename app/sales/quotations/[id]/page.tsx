@@ -12,7 +12,7 @@ import {
   updateQuotation,
   getQuotationsByProductIdAndCompanyId,
 } from "@/lib/quotation-service"
-import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
+import type { Quotation, QuotationLineItem } from "@/lib/types/quotation"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -1008,6 +1008,16 @@ The OH Plus Team`,
   const currentQuotation = isEditing ? editableQuotation : quotation
   const hasMultipleSites = currentQuotation?.items && currentQuotation.items.length > 1
 
+  const handleSendClick = () => {
+    setIsSendOptionsDialogOpen(true)
+  }
+
+  const handleEmailClick = () => {
+    setIsSendOptionsDialogOpen(false)
+    // Navigate to compose email page like the current implementation
+    router.push(`/sales/quotations/${params.id}/compose-email`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Word-style Toolbar */}
@@ -1273,7 +1283,7 @@ The OH Plus Team`,
 
             {currentPageIndex === relatedQuotations.length - 1 ? (
               <Button
-                onClick={() => router.push(`/sales/quotations/${params.id}/compose-email`)}
+                onClick={handleSendClick}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
                 Send
@@ -1294,7 +1304,7 @@ The OH Plus Team`,
       ) : (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
-            onClick={() => router.push(`/sales/quotations/${params.id}/compose-email`)}
+            onClick={handleSendClick}
             className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
           >
             Send
@@ -1313,19 +1323,14 @@ The OH Plus Team`,
         </DialogContent>
       </Dialog>
 
-      {/* Send Quotation Options Dialog */}
-      <SendQuotationOptionsDialog
-        open={isSendOptionsDialogOpen}
-        onOpenChange={setIsSendOptionsDialogOpen}
-        onConfirm={() => {
-          setIsSendOptionsDialogOpen(false)
-          setIsSendEmailDialogOpen(true)
-        }}
-        onUpdateStatus={async (newStatus: QuotationStatus) => {
-          setIsSendOptionsDialogOpen(false)
-          await handleStatusUpdate(newStatus)
-        }}
-      />
+      {quotation && (
+        <SendQuotationOptionsDialog
+          isOpen={isSendOptionsDialogOpen}
+          onOpenChange={setIsSendOptionsDialogOpen}
+          quotation={quotation}
+          onEmailClick={handleEmailClick}
+        />
+      )}
 
       {/* Email Dialog */}
       <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
