@@ -48,9 +48,8 @@ export default function ProjectMonitoringPage() {
 
   const filteredProducts = products.filter(
     (product) =>
-      product.product_id === product.id &&
-      ((product.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-        (product.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())),
+      (product.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (product.description?.toLowerCase() || "").includes(searchQuery.toLowerCase()),
   )
 
   const handleClearSearch = () => {
@@ -122,7 +121,7 @@ export default function ProjectMonitoringPage() {
   const getJOsForSelectedSite = () => {
     if (!selectedSiteForDialog) return []
     const siteGroups = getProductsBySite()
-    return siteGroups[selectedSiteForDialog] || []
+    return (siteGroups[selectedSiteForDialog] || []).filter((product) => product.product_id === product.id)
   }
 
   return (
