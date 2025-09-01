@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
-import { getProducts, type Product } from "@/lib/firebase-service"
+import { useAuth } from "@/contexts/auth-context"
+import { getProductsByCompany, type Product } from "@/lib/firebase-service"
 
 export default function ProjectMonitoringPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -17,12 +18,18 @@ export default function ProjectMonitoringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { userData } = useAuth()
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true)
-        const fetchedProducts = await getProducts()
+        if (!userData?.company_id) {
+          setError("No company associated with your account")
+          setProducts([])
+          return
+        }
+        const fetchedProducts = await getProductsByCompany(userData.company_id)
         setProducts(fetchedProducts)
       } catch (err) {
         console.error("Error fetching products:", err)
@@ -32,8 +39,10 @@ export default function ProjectMonitoringPage() {
       }
     }
 
-    fetchProducts()
-  }, [])
+    if (userData !== null) {
+      fetchProducts()
+    }
+  }, [userData])
 
   const filteredProducts = products.filter(
     (product) =>
