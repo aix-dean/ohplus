@@ -17,9 +17,8 @@ export default function ProjectMonitoringPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedSiteJOs, setSelectedSiteJOs] = useState<Product[]>([])
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [currentSite, setCurrentSite] = useState("")
+  const [selectedSiteForDialog, setSelectedSiteForDialog] = useState<string | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const router = useRouter()
   const { userData } = useAuth()
 
@@ -77,16 +76,8 @@ export default function ProjectMonitoringPage() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
   }
 
-  const generateJobOrderNumber = (index: number) => {
-    return `JO: ${(index + 1).toString().padStart(3, "0")}`
-  }
-
-  const handleJOClick = (product: Product, index: number) => {
-    const site = product.seller_name || product.categories?.[0] || "Unknown Site"
-    const siteProducts = products.filter((p) => (p.seller_name || p.categories?.[0] || "Unknown Site") === site)
-    setSelectedSiteJOs(siteProducts)
-    setCurrentSite(site)
-    setDialogOpen(true)
+  const generateJobOrderNumber = (productId: string) => {
+    return `JO-${productId.slice(0, 8).toUpperCase()}`
   }
 
   const getHeaderColor = (index: number) => {
@@ -99,6 +90,38 @@ export default function ProjectMonitoringPage() {
       "bg-green-500", // Green variant
     ]
     return colors[index % colors.length]
+  }
+
+  const getProductsBySite = () => {
+    const siteGroups: { [key: string]: Product[] } = {}
+
+    filteredProducts.forEach((product) => {
+      const site = product.seller_name || product.categories?.[0] || "Unknown Site"
+      if (!siteGroups[site]) {
+        siteGroups[site] = []
+      }
+      siteGroups[site].push(product)
+    })
+
+    return siteGroups
+  }
+
+  const getJOCountForSite = (product: Product) => {
+    const site = product.seller_name || product.categories?.[0] || "Unknown Site"
+    const siteGroups = getProductsBySite()
+    return siteGroups[site]?.length || 1
+  }
+
+  const handleJOClick = (product: Product) => {
+    const site = product.seller_name || product.categories?.[0] || "Unknown Site"
+    setSelectedSiteForDialog(site)
+    setIsDialogOpen(true)
+  }
+
+  const getJOsForSelectedSite = () => {
+    if (!selectedSiteForDialog) return []
+    const siteGroups = getProductsBySite()
+    return siteGroups[selectedSiteForDialog] || []
   }
 
   return (
@@ -188,29 +211,25 @@ export default function ProjectMonitoringPage() {
                 className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer bg-white border border-gray-200"
               >
                 <CardContent className="p-0">
-                  {/* Job Order Number */}
                   <div className="px-4 pt-3 pb-2">
                     <button
-                      onClick={() => handleJOClick(product, index)}
+                      onClick={() => handleJOClick(product)}
                       className="text-xs text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors"
                     >
-                      {generateJobOrderNumber(index)}
+                      JO: {getJOCountForSite(product)}
                     </button>
                   </div>
 
-                  {/* Project Header */}
                   <div className={`${getHeaderColor(index)} px-4 py-3 mx-4 rounded-md mb-4`}>
                     <h3 className="text-white font-bold text-lg leading-tight">{product.name}</h3>
                   </div>
 
-                  {/* Project Location/Description */}
                   <div className="px-4 pb-2">
                     <p className="text-gray-900 font-medium text-sm">
                       {product.seller_name || product.categories?.[0] || "Project Location"}
                     </p>
                   </div>
 
-                  {/* Last Activity Section */}
                   <div className="px-4 pb-4">
                     <p className="text-gray-700 font-medium text-sm mb-2">Last Activity</p>
                     <div className="space-y-1 text-xs text-gray-600">
@@ -243,31 +262,50 @@ export default function ProjectMonitoringPage() {
         )}
       </div>
 
-      {/* Dialog for showing all JOs for a site */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Job Orders for {currentSite}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Job Orders for {selectedSiteForDialog}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            {selectedSiteJOs.map((jo, index) => (
-              <Card key={jo.id} className="border border-gray-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-600">
-                      {generateJobOrderNumber(products.findIndex((p) => p.id === jo.id))}
+          <div className="mt-4">
+            <div className="space-y-3">
+              {getJOsForSelectedSite().map((product, index) => (
+                <div
+                  key={product.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-medium text-gray-900">{generateJobOrderNumber(product.id)}</p>
+                      <p className="text-sm text-gray-600">{product.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Created: {formatActivityDate(product.created_at)}</p>
+                      {product.price && (
+                        <p className="text-sm font-medium text-green-600">₱{product.price.toLocaleString()}</p>
+                      )}
+                    </div>
+                  </div>
+                  {product.description && <p className="text-xs text-gray-500 line-clamp-2">{product.description}</p>}
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Active
                     </span>
-                    <span className="text-xs text-gray-500">{formatActivityDate(jo.created_at)}</span>
+                    {product.categories?.[0] && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {product.categories[0]}
+                      </span>
+                    )}
                   </div>
-                  <h4 className="font-semibold text-gray-900 mb-1">{jo.name}</h4>
-                  <p className="text-sm text-gray-600 mb-2">{jo.description || "No description available"}</p>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Status: Active</span>
-                    {jo.price && <span>₱{jo.price.toLocaleString()}</span>}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              ))}
+            </div>
+            {getJOsForSelectedSite().length === 0 && (
+              <div className="text-center py-8">
+                <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">No job orders found for this site</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
