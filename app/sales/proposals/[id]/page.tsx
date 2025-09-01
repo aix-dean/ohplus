@@ -20,8 +20,6 @@ import {
   Upload,
   Check,
   XIcon,
-  Minus,
-  Send,
 } from "lucide-react"
 import { getProposalById, updateProposal } from "@/lib/proposal-service"
 import {
@@ -36,7 +34,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -231,8 +228,6 @@ export default function ProposalDetailsPage() {
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState<number>(1)
-  const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -330,19 +325,6 @@ export default function ProposalDetailsPage() {
       console.log("[v0] Updating proposal with data:", updateData)
 
       await updateProposal(proposal.id, updateData, userData.uid, userData.displayName || "User")
-
-      setProposal((prev) =>
-        prev
-          ? {
-              ...prev,
-              templateSize: selectedSize,
-              templateOrientation: selectedOrientation,
-              templateLayout: selectedLayout,
-              templateBackground:
-                selectedTemplateBackground !== "" ? selectedTemplateBackground : prev.templateBackground,
-            }
-          : null,
-      )
 
       toast({
         title: "Template Applied",
@@ -580,57 +562,11 @@ export default function ProposalDetailsPage() {
     // Don't set currentEditingPage here - let individual pages handle their own editing
   }
 
-  const handleDownload = async () => {
-    if (!proposal) {
-      toast({
-        title: "Error",
-        description: "No proposal data available",
-        variant: "destructive",
-      })
-      return
-    }
-
+  const handleDownload = () => {
     toast({
       title: "Download",
-      description: "Generating PDF...",
+      description: "Downloading proposal...",
     })
-
-    try {
-      const response = await fetch("/api/proposals/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ proposal }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF")
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.style.display = "none"
-      a.href = url
-      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
-    } catch (error) {
-      console.error("Error downloading PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to download PDF. Please try again.",
-        variant: "destructive",
-      })
-    }
   }
 
   const handleTemplateSelect = async (template: any) => {
@@ -750,9 +686,9 @@ export default function ProposalDetailsPage() {
       case 1:
         return "grid-cols-1"
       case 2:
-        return "grid-cols-1 lg:grid-cols-2"
+        return "grid-cols-1 md:grid-cols-2"
       case 4:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
+        return "grid-cols-2"
       default:
         return "grid-cols-1"
     }
@@ -783,6 +719,7 @@ export default function ProposalDetailsPage() {
       toast({
         title: "Error",
         description: "Failed to save template settings",
+        variant: "destructive",
       })
     }
   }
@@ -807,41 +744,6 @@ export default function ProposalDetailsPage() {
     }
 
     return `${siteCodes[0]} & ${siteCodes.length - 1} more sites`
-  }
-
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.1, 2)) // Max zoom 200%
-  }
-
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3)) // Min zoom 30%
-  }
-
-  const handleResetZoom = () => {
-    setZoomLevel(1)
-  }
-
-  // Added handler functions for Save as Draft and Send
-  const handleUpdatePublicStatus = async (status: string) => {
-    if (!proposal || !userData) return
-
-    try {
-      await updateProposal(proposal.id, { status }, userData.uid, userData.displayName || "User")
-
-      setProposal((prev) => (prev ? { ...prev, status } : null))
-
-      toast({
-        title: "Success",
-        description: `Proposal ${status === "draft" ? "saved as draft" : "status updated"}`,
-      })
-    } catch (error) {
-      console.error("Error updating proposal status:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update proposal status",
-        variant: "destructive",
-      })
-    }
   }
 
   if (loading) {
@@ -873,55 +775,6 @@ export default function ProposalDetailsPage() {
     )
   }
 
-  const getPageContainerClass = () => {
-    const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
-
-    // Size-based dimensions with orientation support
-    let sizeStyles = ""
-    switch (selectedSize) {
-      case "A4":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
-        } else {
-          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
-        }
-        break
-      case "Letter size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
-        }
-        break
-      case "Legal size":
-        if (selectedOrientation === "Landscape") {
-          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
-        } else {
-          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
-        }
-        break
-      default:
-        sizeStyles = "w-full max-w-4xl min-h-[600px]"
-    }
-
-    // Square orientation for any paper size
-    if (selectedOrientation === "Square") {
-      switch (selectedSize) {
-        case "A4":
-          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
-          break
-        case "Letter size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
-          break
-        case "Legal size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
-          break
-      }
-    }
-
-    return `${baseStyles} ${sizeStyles}`
-  }
-
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col">
       <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
@@ -935,40 +788,9 @@ export default function ProposalDetailsPage() {
         </Button>
         <span className="text-black font-medium">Finalize Proposal</span>
         <span className="text-black italic ml-2">{proposal?.proposalNumber || params.id}</span>
-
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel <= 0.3}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleResetZoom}
-              className="h-7 px-2 text-xs font-medium hover:bg-gray-200 min-w-[50px]"
-            >
-              {Math.round(zoomLevel * 100)}%
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel >= 2}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+      <div className="flex-1 flex items-center justify-center p-4">
         {showTemplatesPanel && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -1199,39 +1021,18 @@ export default function ProposalDetailsPage() {
                       <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          {
-                            name: "1 per page",
-                            value: "1",
-                            layout: "grid-cols-1",
-                            description: "Single site per page",
-                          },
-                          {
-                            name: "2 per page",
-                            value: "2",
-                            layout: "grid-cols-2",
-                            description: "Two sites side by side",
-                          },
-                          {
-                            name: "4 per page",
-                            value: "4",
-                            layout: "grid-cols-2",
-                            description: "Four sites in grid layout",
-                          },
+                          { name: "1 per page", value: "1", layout: "grid-cols-1" },
+                          { name: "2 per page", value: "2", layout: "grid-cols-2" },
+                          { name: "4 per page", value: "4", layout: "grid-cols-2" },
                         ].map((layout) => (
                           <div
                             key={layout.value}
-                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
+                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
                               selectedLayout === layout.value
-                                ? "border-blue-500 bg-blue-50 shadow-md scale-105"
-                                : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-gray-200 hover:border-gray-300"
                             }`}
-                            onClick={() => {
-                              setSelectedLayout(layout.value)
-                              toast({
-                                title: "Layout Updated",
-                                description: `Switched to ${layout.name} layout`,
-                              })
-                            }}
+                            onClick={() => setSelectedLayout(layout.value)}
                           >
                             <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
                               <div className={`grid ${layout.layout} gap-0.5 h-full`}>
@@ -1240,15 +1041,7 @@ export default function ProposalDetailsPage() {
                                 ))}
                               </div>
                             </div>
-                            <div className="space-y-1">
-                              <span className="text-xs font-medium text-gray-700 block">{layout.name}</span>
-                              <span className="text-xs text-gray-500 block">{layout.description}</span>
-                            </div>
-                            {selectedLayout === layout.value && (
-                              <div className="absolute top-2 right-2">
-                                <Check className="h-4 w-4 text-blue-500" />
-                              </div>
-                            )}
+                            <span className="text-xs font-medium text-gray-700">{layout.name}</span>
                           </div>
                         ))}
                       </div>
@@ -1322,16 +1115,14 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
 
-        <div
-          className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
-          style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
-        >
+        <div className="flex flex-col gap-8">
           {Array.from({ length: getTotalPages() }, (_, index) => {
             const pageNumber = index + 1
             const pageContent = getPageContent(pageNumber)
 
             return (
-              <div key={pageNumber} className={getPageContainerClass()}>
+              <div key={pageNumber} className={getContainerDimensions()}>
+                {/* Background template */}
                 {selectedTemplateBackground && (
                   <div
                     className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
@@ -1400,19 +1191,15 @@ export default function ProposalDetailsPage() {
                   </div>
 
                   {/* Product content grid */}
-                  <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
+                  <div className={`grid gap-4 ${getLayoutGridClass()}`}>
                     {pageContent.map((product, productIndex) => (
-                      <div key={product.id} className="space-y-4 transition-all duration-300">
+                      <div key={product.id} className="space-y-4">
                         {/* Rest of product content */}
                         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                           <div className="flex-shrink-0">
                             <div
-                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
-                                getSitesPerPage() === 1
-                                  ? "w-48 h-60 md:w-64 md:h-80"
-                                  : getSitesPerPage() === 2
-                                    ? "w-40 h-48 md:w-48 md:h-60"
-                                    : "w-32 h-40 md:w-36 md:h-44"
+                              className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 ${
+                                getSitesPerPage() === 1 ? "w-48 h-60 md:w-64 md:h-80" : "w-32 h-40 md:w-40 md:h-48"
                               }`}
                             >
                               {product.media && product.media.length > 0 ? (
@@ -1492,33 +1279,6 @@ export default function ProposalDetailsPage() {
           })}
         </div>
       </div>
-
-      {proposal?.status === "draft" && (
-        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 flex space-x-4 z-50">
-          <Button
-            onClick={() => handleUpdatePublicStatus("draft")}
-            variant="outline"
-            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-          >
-            <FileText className="h-5 w-5 mr-2" />
-            Save as Draft
-          </Button>
-          <Button
-            onClick={() => setIsSendOptionsDialogOpen(true)}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-          >
-            <Send className="h-5 w-5 mr-2" />
-            Send
-          </Button>
-        </div>
-      )}
-
-      {/* Send Options Dialog */}
-      <SendProposalShareDialog
-        isOpen={isSendOptionsDialogOpen}
-        onClose={() => setIsSendOptionsDialogOpen(false)}
-        proposal={proposal}
-      />
     </div>
   )
 }

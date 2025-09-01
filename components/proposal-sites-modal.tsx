@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Copy } from "lucide-react"
+import { X, Copy, Check } from "lucide-react"
 import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
@@ -102,46 +102,33 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="pb-6">
-          <DialogTitle className="text-xl font-semibold">{proposal.proposalNumber || proposal.title}</DialogTitle>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 text-sm">
-            <div>
-              <div className="font-medium text-gray-700 mb-2">Prepared for:</div>
-              <div className="space-y-1 text-gray-600">
-                <div className="font-medium">{proposal.client?.contactPerson || "N/A"}</div>
-                <div>{proposal.client?.designation || "N/A"}</div>
-                <div>{proposal.client?.company || "N/A"}</div>
-                <div>{proposal.client?.address || "N/A"}</div>
-              </div>
-            </div>
-
-            <div>
-              <div className="font-medium text-gray-700 mb-2">Date Sent:</div>
-              <div className="text-gray-600">{format(proposal.createdAt, "MMMM d, yyyy")}</div>
-            </div>
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <DialogTitle className="text-xl font-semibold">{proposal.proposalNumber || proposal.title}</DialogTitle>
+            <p className="text-sm text-gray-500 mt-1">Sent on {format(proposal.createdAt, "MMM d, yyyy")}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
+            >
+              {selectedSites.length === proposal.products.length ? "Deselect All" : "Select All"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </DialogHeader>
 
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-medium text-gray-900">Sites ({proposal.products.length})</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSelectAll}
-            className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
-          >
-            {selectedSites.length === proposal.products.length ? "Deselect All" : "Select All"}
-          </Button>
-        </div>
-
         <ScrollArea className="flex-1 pr-4">
-          <div className="flex gap-4 pb-4" style={{ minWidth: "max-content" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {proposal.products.map((product) => (
               <div
                 key={product.id}
-                className={`relative border rounded-lg p-3 cursor-pointer transition-all w-48 flex-shrink-0 ${
+                className={`relative border rounded-lg p-3 cursor-pointer transition-all ${
                   selectedSites.includes(product.id)
                     ? "border-green-500 bg-green-50"
                     : "border-gray-200 hover:border-gray-300"
@@ -176,10 +163,22 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
                 <div className="space-y-1">
                   <div className="text-xs text-gray-500 font-medium">{product.site_code || product.id}</div>
                   <div className="font-medium text-sm line-clamp-2">{product.name}</div>
-                  {product.specs_rental?.audience_type === "vacant" && (
-                    <Badge className="text-xs bg-blue-600 text-white">VACANT</Badge>
+                  <div className="text-xs text-gray-600 line-clamp-1">{product.location}</div>
+                  {product.specs_rental?.audience_type && (
+                    <Badge variant="secondary" className="text-xs">
+                      {product.specs_rental.audience_type}
+                    </Badge>
                   )}
                 </div>
+
+                {/* Selection Indicator */}
+                {selectedSites.includes(product.id) && (
+                  <div className="absolute top-2 right-2">
+                    <div className="bg-green-600 rounded-full p-1">
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -192,10 +191,10 @@ export function ProposalSitesModal({ proposal, isOpen, onClose, onCopySites }: P
           <Button
             onClick={handleCopySites}
             disabled={selectedSites.length === 0}
-            className="bg-green-500 hover:bg-green-600 text-white"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             <Copy className="h-4 w-4 mr-2" />
-            Copy Sites
+            {copied ? "Copied!" : "Copy Sites"}
           </Button>
         </div>
       </DialogContent>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +33,6 @@ import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -41,12 +40,10 @@ function ProposalsPageContent() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const { user } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
-  const [activeTab, setActiveTab] = useState("proposals")
+  const [activeTab, setActiveTab] = useState("proposals") // State to manage active tab
 
   useEffect(() => {
     if (user?.uid) {
@@ -57,16 +54,6 @@ function ProposalsPageContent() {
   useEffect(() => {
     filterProposals()
   }, [proposals, searchTerm, statusFilter])
-
-  useEffect(() => {
-    const success = searchParams.get("success")
-    if (success === "email-sent") {
-      setShowSuccessDialog(true)
-      const url = new URL(window.location.href)
-      url.searchParams.delete("success")
-      window.history.replaceState({}, "", url.toString())
-    }
-  }, [searchParams])
 
   const loadProposals = async () => {
     if (!user?.uid) return
@@ -85,6 +72,7 @@ function ProposalsPageContent() {
   const filterProposals = () => {
     let filtered = proposals
 
+    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(
         (proposal) =>
@@ -93,6 +81,7 @@ function ProposalsPageContent() {
       )
     }
 
+    // Filter by status
     if (statusFilter !== "all") {
       filtered = filtered.filter((proposal) => proposal.status === statusFilter)
     }
@@ -146,17 +135,20 @@ function ProposalsPageContent() {
   }
 
   const handleDownloadPDF = (proposal: Proposal) => {
+    // TODO: Implement PDF download
     console.log("Download PDF for proposal:", proposal.id)
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+        {/* Header Section */}
         <div className="mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
             <div></div>
           </div>
 
+          {/* Filters */}
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-5">
               <div className="flex flex-col sm:flex-row gap-4">
@@ -190,8 +182,11 @@ function ProposalsPageContent() {
           </Card>
         </div>
 
+        {/* Tabs for Proposals and Cost Estimates */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
+            {" "}
+            {/* Adjusted grid-cols-2 for two tabs */}
             <TabsTrigger value="proposals">Proposals</TabsTrigger>
             <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
           </TabsList>
@@ -272,6 +267,7 @@ function ProposalsPageContent() {
                 </CardContent>
               </Card>
             ) : (
+              // Desktop Table View
               <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
                 <Table>
                   <TableHeader>
@@ -382,20 +378,6 @@ function ProposalsPageContent() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
-          <div className="py-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Congratulations!</h2>
-              <div className="flex justify-center mb-4">
-                <div className="text-6xl">🎉</div>
-              </div>
-              <p className="text-gray-600">You have successfully sent a proposal!</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

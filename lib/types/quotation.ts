@@ -71,6 +71,7 @@ export interface Quotation {
   client_name?: string
   client_email?: string
   client_id?: string
+  client_company_name?: string
   client_designation?: string // Added client designation
   client_address?: string // Added client address
   client_phone?: string // Added client phone
