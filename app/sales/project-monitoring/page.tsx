@@ -3,23 +3,35 @@
 import { ArrowLeft, Search, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
 import { useEffect, useState } from "react"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import type { Product } from "@/lib/firebase-service"
 
 export default function ProjectMonitoringPage() {
   const router = useRouter()
-  const { userData, loading: authLoading } = useAuth()
+  const { userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!userData?.company_id || authLoading) return
+      if (!userData?.company_id) {
+        setLoading(false)
+        return
+      }
 
       try {
-        setLoading(true)
-        const result = await getPaginatedUserProducts(userData.company_id, 1, null, { active: true })
-        setProducts(result.items)
+        const productsRef = collection(db, "products")
+        const q = query(productsRef, where("company_id", "==", userData.company_id), where("deleted", "==", false))
+        const querySnapshot = await getDocs(q)
+
+        const fetchedProducts: Product[] = []
+        querySnapshot.forEach((doc) => {
+          fetchedProducts.push({ id: doc.id, ...doc.data() } as Product)
+        })
+
+        setProducts(fetchedProducts)
       } catch (error) {
         console.error("Error fetching products:", error)
       } finally {
@@ -28,9 +40,7 @@ export default function ProjectMonitoringPage() {
     }
 
     fetchProducts()
-  }, [userData?.company_id, authLoading])
-
-  const firstProduct = products[0]
+  }, [userData?.company_id])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,34 +84,40 @@ export default function ProjectMonitoringPage() {
       </div>
 
       <div className="p-4">
-        <div className="bg-white rounded-lg border border-gray-300 p-4 max-w-md">
-          {/* Project ID */}
-          <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
+        {loading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : products.length > 0 ? (
+          <div className="space-y-4">
+            {products.map((product) => (
+              <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4 max-w-md">
+                {/* Project ID */}
+                <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
 
-          {/* Project Title Banner */}
-          <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
-            <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
-          </div>
+                {/* Project Title Banner */}
+                <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
+                  <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+                </div>
 
-          {/* Project Location */}
-          <div className="text-gray-900 font-medium mb-3">
-            {loading
-              ? "Loading..."
-              : firstProduct?.specs_rental?.location
-                ? firstProduct.specs_rental.location
-                : "No location available"}
-          </div>
+                {/* Project Location */}
+                <div className="text-gray-900 font-medium mb-3">
+                  {product.specs_rental?.location || product.name || "No site code available"}
+                </div>
 
-          {/* Last Activity Section */}
-          <div>
-            <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
-            <div className="space-y-1 text-sm text-gray-600">
-              <div>5/6/25- 5:00AM- Arrival of FA to site</div>
-              <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
-              <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
-            </div>
+                {/* Last Activity Section */}
+                <div>
+                  <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div>5/6/25- 5:00AM- Arrival of FA to site</div>
+                    <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
+                    <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">No products found</div>
+        )}
       </div>
     </div>
   )
