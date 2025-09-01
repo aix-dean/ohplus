@@ -2,9 +2,35 @@
 
 import { ArrowLeft, Search, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
+import { useEffect, useState } from "react"
 
 export default function ProjectMonitoringPage() {
   const router = useRouter()
+  const { userData, loading: authLoading } = useAuth()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!userData?.company_id || authLoading) return
+
+      try {
+        setLoading(true)
+        const result = await getPaginatedUserProducts(userData.company_id, 1, null, { active: true })
+        setProducts(result.items)
+      } catch (error) {
+        console.error("Error fetching products:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [userData?.company_id, authLoading])
+
+  const firstProduct = products[0]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +84,13 @@ export default function ProjectMonitoringPage() {
           </div>
 
           {/* Project Location */}
-          <div className="text-gray-900 font-medium mb-3">Petplans Southbound</div>
+          <div className="text-gray-900 font-medium mb-3">
+            {loading
+              ? "Loading..."
+              : firstProduct?.specs_rental?.location
+                ? firstProduct.specs_rental.location
+                : "No location available"}
+          </div>
 
           {/* Last Activity Section */}
           <div>
