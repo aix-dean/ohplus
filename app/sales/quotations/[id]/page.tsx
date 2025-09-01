@@ -9,6 +9,7 @@ import {
   getQuotationById,
   getQuotationsByPageId,
   updateQuotationStatus,
+  updateQuotation,
   getQuotationsByClientName,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
@@ -413,7 +414,14 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     setIsSaving(true)
     try {
       console.log("[v0] Saving changes:", editableQuotation)
-      // Save logic here
+
+      await updateQuotation(
+        editableQuotation.id,
+        editableQuotation,
+        editableQuotation.created_by || "system",
+        `${editableQuotation.created_by_first_name || "User"} ${editableQuotation.created_by_last_name || ""}`,
+      )
+
       setQuotation(editableQuotation)
       setIsEditing(false)
       setHasUnsavedChanges(false)
@@ -1196,7 +1204,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           >
             {isSaving ? (
               <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving...
               </>
             ) : (
               <>
