@@ -201,9 +201,15 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     // Update the editable quotation with the new value
     if (editableQuotation) {
       if (fieldName === "price" && editableQuotation.items?.[0]) {
+        const durationDays = editableQuotation.items[0].duration_days || 32
+        const dailyRate = newValue / 30 // Convert monthly price to daily rate
+        const newTotalAmount = dailyRate * durationDays
+
         setEditableQuotation({
           ...editableQuotation,
-          items: editableQuotation.items.map((item, index) => (index === 0 ? { ...item, price: newValue } : item)),
+          items: editableQuotation.items.map((item, index) =>
+            index === 0 ? { ...item, price: newValue, item_total_amount: newTotalAmount } : item,
+          ),
         })
       } else {
         setEditableQuotation({
@@ -789,7 +795,13 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Total Lease</span>
             <span className="text-gray-700">
-              : PHP {safeFormatNumber(item?.item_total_amount || 0)} (Exclusive of VAT)
+              : PHP{" "}
+              {safeFormatNumber(
+                isEditing && editableQuotation?.items?.[0]?.item_total_amount
+                  ? editableQuotation.items[0].item_total_amount
+                  : item?.item_total_amount || 0,
+              )}{" "}
+              (Exclusive of VAT)
             </span>
           </div>
         </div>
