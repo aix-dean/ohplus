@@ -11,6 +11,7 @@ import {
   updateQuotationStatus,
   updateQuotation,
   getQuotationsByClientName,
+  getQuotationsByProductId,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -286,10 +287,10 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     setLoadingHistory(true)
     try {
       const productId = quotation.items[0].id
-      const history = await getQuotationsByPageId(productId) // Changed to filter by page_id instead of product_id
+      const history = await getQuotationsByProductId(productId)
       // Filter out current quotation from history
       const filteredHistory = history.filter((q) => q.id !== quotation.id)
-      setClientHistory(filteredHistory) // Changed from setQuotation to setClientHistory
+      setClientHistory(filteredHistory)
     } catch (error) {
       console.error("Error fetching quotation history:", error)
     } finally {
@@ -1165,9 +1166,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           {/* Right Sidebar - Updated for quotation history */}
           <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3> {/* Updated title */}
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {quotation?.client?.company || quotation?.client?.name || "Client"}
+                {quotation?.items?.[0]?.name || "Product"}
               </div>
             </div>
 
