@@ -46,6 +46,31 @@ export default function ProjectMonitoringPage() {
           </div>
         </div>
       </div>
+
+      <div className="p-4">
+        <div className="bg-white rounded-lg border border-gray-300 p-4 max-w-md">
+          {/* Project ID */}
+          <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
+
+          {/* Project Title Banner */}
+          <div className="bg-blue-500 text-white px-4 py-2 rounded mb-3">
+            <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+          </div>
+
+          {/* Project Location */}
+          <div className="text-gray-900 font-medium mb-3">Petplans Southbound</div>
+
+          {/* Last Activity Section */}
+          <div>
+            <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
+            <div className="space-y-1 text-sm text-gray-600">
+              <div>5/6/25- 5:00AM- Arrival of FA to site</div>
+              <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
+              <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
