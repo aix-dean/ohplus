@@ -299,23 +299,32 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }, [quotation?.items?.[0]?.id, quotation?.items?.[0]?.company_id, quotation?.id])
 
   const fetchCompanyData = useCallback(async () => {
-    if (!user || !userData) return
+    if (!user || !userData) {
+      console.log("[v0] fetchCompanyData: Missing user or userData", { user: !!user, userData: !!userData })
+      return
+    }
 
     try {
+      console.log("[v0] fetchCompanyData: userData:", userData)
+      console.log("[v0] fetchCompanyData: userData.companyId:", userData.companyId)
+
       if (!userData.companyId) {
-        console.warn("No companyId found in userData:", userData)
+        console.warn("[v0] No companyId found in userData:", userData)
         return
       }
 
+      console.log("[v0] Fetching company data for companyId:", userData.companyId)
       const companyDoc = await getDoc(doc(db, "companies", userData.companyId))
+
       if (companyDoc.exists()) {
         const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
+        console.log("[v0] Company data fetched successfully:", companyData)
         setCompanyData(companyData)
       } else {
-        console.warn("No company data found for companyId:", userData.companyId)
+        console.warn("[v0] No company data found for companyId:", userData.companyId)
       }
     } catch (error) {
-      console.error("Error fetching company data:", error)
+      console.error("[v0] Error fetching company data:", error)
     }
   }, [user, userData])
 
@@ -377,7 +386,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }, [quotationId, router, toast])
 
   useEffect(() => {
+    console.log("[v0] useEffect triggered - user:", !!user, "userData:", !!userData)
     if (user && userData) {
+      console.log("[v0] Calling fetchCompanyData")
       fetchCompanyData()
     }
   }, [user, userData, fetchCompanyData])

@@ -141,9 +141,9 @@ export default function PublicQuotationPage({ params }: { params: { id: string }
           setQuotation(quotationData)
 
           // Fetch company data if available
-          if (quotationData.company_id) {
+          if (quotationData.items?.[0]?.company_id) {
             try {
-              const companyDoc = await getDoc(doc(db, "companies", quotationData.company_id))
+              const companyDoc = await getDoc(doc(db, "companies", quotationData.items[0].company_id))
               if (companyDoc.exists()) {
                 setCompanyData({ id: companyDoc.id, ...companyDoc.data() } as CompanyData)
               }
@@ -410,29 +410,16 @@ export default function PublicQuotationPage({ params }: { params: { id: string }
               {companyData?.photo_url ? (
                 <img
                   src={companyData.photo_url || "/placeholder.svg"}
-                  alt={`${companyData.name || "Company"} Logo`}
-                  className="h-16 w-auto max-w-32 object-contain"
-                  onError={(e) => {
-                    // Fallback to building icon if image fails to load
-                    const target = e.target as HTMLImageElement
-                    target.style.display = "none"
-                    target.nextElementSibling?.classList.remove("hidden")
-                  }}
+                  alt="Company Logo"
+                  className="h-16 w-auto object-contain"
                 />
-              ) : null}
-              {!companyData?.photo_url && (
+              ) : (
                 <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Building className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
-              {companyData?.photo_url && (
-                <div className="hidden h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
                   <Building className="h-8 w-8 text-gray-400" />
                 </div>
               )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
-            {companyData?.address && <p className="text-sm text-gray-600">{formatCompanyAddress(companyData)}</p>}
           </div>
 
           {/* Render quotation content */}
