@@ -300,6 +300,21 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
   }
 }
 
+export async function getAllJobOrders(): Promise<JobOrder[]> {
+  try {
+    const q = query(collection(db, JOB_ORDERS_COLLECTION), orderBy("createdAt", "desc"))
+    const querySnapshot = await getDocs(q)
+    const jobOrders: JobOrder[] = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as JobOrder[]
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching all job orders:", error)
+    throw error
+  }
+}
+
 export function generateJONumber(): string {
   const timestamp = Date.now()
   const randomSuffix = Math.floor(Math.random() * 1000)
