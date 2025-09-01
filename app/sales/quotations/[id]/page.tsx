@@ -201,7 +201,66 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
     // Update the editable quotation with the new value
     if (editableQuotation) {
-      if (fieldName === "price" && editableQuotation.items?.[0]) {
+      if (fieldName === "duration_days") {
+        // When duration changes, update contract period and pricing
+        const durationDays = newValue
+        const startDate = editableQuotation.start_date ? new Date(editableQuotation.start_date) : new Date()
+        const endDate = new Date(startDate)
+        endDate.setDate(startDate.getDate() + durationDays - 1)
+
+        // Update pricing based on new duration
+        const price = editableQuotation.items?.[0]?.price || 0
+        const dailyRate = price / 30
+        const newTotalAmount = dailyRate * durationDays
+
+        setEditableQuotation({
+          ...editableQuotation,
+          duration_days: durationDays,
+          end_date: endDate.toISOString(),
+          items:
+            editableQuotation.items?.map((item, index) =>
+              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
+            ) || [],
+        })
+
+        // Update temp values for contract period
+        setTempValues((prev) => ({
+          ...prev,
+          duration_days: durationDays,
+          end_date: endDate,
+        }))
+      } else if (fieldName === "start_date" || fieldName === "end_date") {
+        // When contract period changes, update duration and pricing
+        const startDate =
+          fieldName === "start_date" ? new Date(newValue) : new Date(editableQuotation.start_date || new Date())
+        const endDate =
+          fieldName === "end_date" ? new Date(newValue) : new Date(editableQuotation.end_date || new Date())
+
+        const timeDiff = endDate.getTime() - startDate.getTime()
+        const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
+
+        // Update pricing based on new duration
+        const price = editableQuotation.items?.[0]?.price || 0
+        const dailyRate = price / 30
+        const newTotalAmount = dailyRate * durationDays
+
+        setEditableQuotation({
+          ...editableQuotation,
+          [fieldName]: newValue.toISOString(),
+          duration_days: durationDays,
+          items:
+            editableQuotation.items?.map((item, index) =>
+              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
+            ) || [],
+        })
+
+        // Update temp values for duration
+        setTempValues((prev) => ({
+          ...prev,
+          [fieldName]: newValue,
+          duration_days: durationDays,
+        }))
+      } else if (fieldName === "price" && editableQuotation.items?.[0]) {
         const durationDays = editableQuotation.items[0].duration_days || 32
         const dailyRate = newValue / 30 // Convert monthly price to daily rate
         const newTotalAmount = dailyRate * durationDays
