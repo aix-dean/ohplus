@@ -642,7 +642,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   value={tempValues.size || ""}
                   onChange={(e) => updateTempValues("size", e.target.value)}
                   className="w-48 h-6 text-sm"
-                  placeholder="Enter size"
+                  placeholder={currentQuotation?.size || "100ft (H) x 60ft (W)"}
                 />
               </div>
             ) : (
@@ -672,7 +672,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   value={tempValues.duration_days || ""}
                   onChange={(e) => updateTempValues("duration_days", Number.parseInt(e.target.value) || 0)}
                   className="w-24 h-6 text-sm"
-                  placeholder="Days"
+                  placeholder={currentQuotation?.duration_days?.toString() || "0"}
                 />
                 <span className="text-sm text-gray-600">days</span>
               </div>
@@ -759,7 +759,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   value={tempValues.price || ""}
                   onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
                   className="w-32 h-6 text-sm"
-                  placeholder="0.00"
+                  placeholder={items[0]?.price?.toString() || "0.00"}
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>
@@ -853,21 +853,25 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   value={tempValues.signature_first_name || ""}
                   onChange={(e) => updateTempValues("signature_first_name", e.target.value)}
                   className="w-48 h-6 text-sm"
-                  placeholder="Enter first name"
+                  placeholder={
+                    currentQuotation?.signature_first_name || currentQuotation?.created_by_first_name || "AIX"
+                  }
                 />
                 <Input
                   type="text"
                   value={tempValues.signature_last_name || ""}
                   onChange={(e) => updateTempValues("signature_last_name", e.target.value)}
                   className="w-48 h-6 text-sm"
-                  placeholder="Enter last name"
+                  placeholder={
+                    currentQuotation?.signature_last_name || currentQuotation?.created_by_last_name || "Xymbiosis"
+                  }
                 />
                 <Input
                   type="text"
                   value={tempValues.signature_position || ""}
                   onChange={(e) => updateTempValues("signature_position", e.target.value)}
                   className="w-48 h-6 text-sm"
-                  placeholder="Enter position"
+                  placeholder={currentQuotation?.signature_position || currentQuotation?.position || "Position"}
                 />
               </div>
             ) : (
