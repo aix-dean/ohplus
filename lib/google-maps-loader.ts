@@ -43,42 +43,33 @@ export function loadGoogleMaps(): Promise<void> {
   }
 
   // Create new loading promise
-  loadPromise = new Promise(async (resolve, reject) => {
-    try {
-      const response = await fetch("/api/maps-config")
-      const config = await response.json()
+  loadPromise = new Promise((resolve, reject) => {
+    if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+      reject(new Error("Google Maps API key not configured"))
+      return
+    }
 
-      if (!config.apiKey) {
-        reject(new Error("Google Maps API key not configured"))
-        return
-      }
+    isLoading = true
 
-      isLoading = true
+    const script = document.createElement("script")
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGoogleMapsGlobal`
+    script.async = true
+    script.defer = true
 
-      const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places&callback=initGoogleMapsGlobal`
-      script.async = true
-      script.defer = true
+    window.initGoogleMapsGlobal = () => {
+      isLoaded = true
+      isLoading = false
+      resolve()
+      delete window.initGoogleMapsGlobal
+    }
 
-      window.initGoogleMapsGlobal = () => {
-        isLoaded = true
-        isLoading = false
-        resolve()
-        delete window.initGoogleMapsGlobal
-      }
-
-      script.onerror = () => {
-        isLoading = false
-        loadPromise = null
-        reject(new Error("Failed to load Google Maps script"))
-      }
-
-      document.head.appendChild(script)
-    } catch (error) {
+    script.onerror = () => {
       isLoading = false
       loadPromise = null
-      reject(new Error("Failed to fetch Google Maps configuration"))
+      reject(new Error("Failed to load Google Maps script"))
     }
+
+    document.head.appendChild(script)
   })
 
   return loadPromise

@@ -24,11 +24,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Proposal data is required" }, { status: 400 })
     }
 
-    console.log("[v0] PDF Generation - Proposal ID:", proposal.id)
-    console.log("[v0] PDF Generation - Proposal Title:", proposal.title)
-    console.log("[v0] PDF Generation - Products Count:", proposal.products?.length || 0)
-    console.log("[v0] PDF Generation - Products Data:", JSON.stringify(proposal.products, null, 2))
-
     // Create PDF
     const pdf = new jsPDF()
     const pageWidth = pdf.internal.pageSize.getWidth()
@@ -100,11 +95,7 @@ export async function POST(request: NextRequest) {
     pdf.text("Products & Services", margin, yPosition)
     yPosition += 15
 
-    console.log("[v0] PDF Generation - About to process", proposal.products.length, "products")
-
     proposal.products.forEach((product, index) => {
-      console.log(`[v0] PDF Generation - Processing product ${index + 1}:`, product.name)
-
       // Check if we need a new page
       if (yPosition > pageHeight - 60) {
         pdf.addPage()
@@ -193,9 +184,6 @@ export async function POST(request: NextRequest) {
         yPosition += 10
       }
     }
-
-    console.log("[v0] PDF Generation - Final product count in summary:", proposal.products.length)
-    console.log("[v0] PDF Generation - Total amount:", proposal.totalAmount)
 
     // Footer
     pdf.setFontSize(10)

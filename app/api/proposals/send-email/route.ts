@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { generateProposalPDF } from "@/lib/pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Quotation email API route called")
+    console.log("Proposal email API route called")
 
     // Check if API key exists
     if (!process.env.RESEND_API_KEY) {
@@ -22,32 +23,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Request body received:", {
-      hasQuotation: !!body.quotation,
+      hasProposal: !!body.proposal,
       hasClientEmail: !!body.clientEmail,
-      quotationId: body.quotation?.id,
+      proposalId: body.proposal?.id,
       customSubject: body.subject,
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
-      ccEmail: body.ccEmail,
-      preGeneratedPDFsCount: body.preGeneratedPDFs?.length || 0,
-      hasUploadedFiles: !!body.uploadedFiles,
-      uploadedFilesCount: body.uploadedFiles?.length || 0,
+      ccEmail: body.ccEmail, // Now a string that might contain multiple emails
     })
 
-    const {
-      quotation,
-      clientEmail,
-      subject,
-      body: customBody,
-      currentUserEmail,
-      ccEmail,
-      preGeneratedPDFs,
-      uploadedFiles,
-    } = body
+    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, ccEmail } = body
 
-    if (!quotation || !clientEmail) {
-      console.error("Missing required fields:", { quotation: !!quotation, clientEmail: !!clientEmail })
-      return NextResponse.json({ error: "Missing quotation or client email address" }, { status: 400 })
+    if (!proposal || !clientEmail) {
+      console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
+      return NextResponse.json({ error: "Missing proposal or client email address" }, { status: 400 })
     }
 
     // Validate email format for 'To'
@@ -72,31 +61,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const quotationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sales/quotations/${quotation.id}`
+    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
 
-    console.log(`Using ${preGeneratedPDFs?.length || 0} pre-generated PDFs for email attachments`)
-    console.log("Generated quotation URL:", quotationUrl)
+    // Generate PDF as base64 for attachment
+    let pdfBase64 = null
+    try {
+      console.log("Generating PDF for email attachment...")
+      pdfBase64 = await generateProposalPDF(proposal, true) // true for base64 return
+      console.log("PDF generated successfully for email attachment")
+    } catch (pdfError) {
+      console.error("Error generating PDF:", pdfError)
+      // Continue without PDF attachment if generation fails
+    }
+
+    console.log("Generated proposal URL:", proposalUrl)
 
     // Use custom subject and body if provided, otherwise fall back to default
-    const finalSubject =
-      subject || `Quotation: ${quotation.items?.[0]?.name || "Custom Advertising Solution"} - OH Plus`
-
-    // Format custom body as HTML if provided
-    const formattedCustomBody = customBody
-      ? customBody
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line)
-          .map((line) => `<p>${line}</p>`)
-          .join("")
-      : `<p>We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.</p>`
-
-    const finalBody = `
+    const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - OH Plus`
+    const finalBody =
+      customBody ||
+      `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Quotation from OH Plus</title>
+        <title>Proposal from OH Plus</title>
         <style>
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -137,7 +126,7 @@ export async function POST(request: NextRequest) {
             margin-bottom: 20px;
             color: #1f2937;
           }
-          .quotation-summary {
+          .proposal-summary {
             background: #f3f4f6;
             border-radius: 8px;
             padding: 20px;
@@ -218,10 +207,6 @@ export async function POST(request: NextRequest) {
             color: #92400e;
             text-align: center;
           }
-          .custom-message {
-            margin: 20px 0;
-            line-height: 1.6;
-          }
         </style>
       </head>
       <body>
@@ -233,54 +218,61 @@ export async function POST(request: NextRequest) {
 
           <div class="content">
             <div class="greeting">
-              Dear ${quotation.client_name || "Valued Client"},
+              Dear ${proposal.client?.contactPerson || proposal.client?.company || "Valued Client"},
             </div>
 
-            <div class="custom-message">
-              ${formattedCustomBody}
-            </div>
+            <p>We are excited to present you with a customized advertising proposal tailored to your specific needs. Our team has carefully crafted this proposal to help you achieve your marketing objectives.</p>
 
-            <div class="quotation-summary">
-              <h3 style="margin-top: 0; color: #1f2937;">Quotation Summary</h3>
+            <div class="proposal-summary">
+              <h3 style="margin-top: 0; color: #1f2937;">Proposal Summary</h3>
               <div class="summary-item">
-                <span class="summary-label">Site Location:</span>
-                <span class="summary-value">${quotation.items?.[0]?.location || "Custom Location"}</span>
+                <span class="summary-label">Proposal Title:</span>
+                <span class="summary-value">${proposal.title || "Custom Advertising Proposal"}</span>
               </div>
               <div class="summary-item">
-                <span class="summary-label">Billboard Type:</span>
-                <span class="summary-value">${quotation.items?.[0]?.type || "Billboard"}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Contract Duration:</span>
-                <span class="summary-value">${quotation.duration_days || 0} days</span>
+                <span class="summary-label">Number of Products:</span>
+                <span class="summary-value">${proposal.products?.length || 0} advertising solutions</span>
               </div>
               <div class="summary-item">
                 <span class="summary-label">Valid Until:</span>
-                <span class="summary-value">${quotation.valid_until ? new Date(quotation.valid_until).toLocaleDateString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>
+                <span class="summary-value">${proposal.validUntil ? new Date(proposal.validUntil).toLocaleDateString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>
               </div>
             </div>
 
             <div class="total-amount">
-              Total Amount: ₱${(quotation.total_amount || 0).toLocaleString()}
+              Total Investment: ₱${(proposal.totalAmount || 0).toLocaleString()}
             </div>
 
             ${
-              preGeneratedPDFs && preGeneratedPDFs.length > 0
+              proposal.customMessage
+                ? `
+            <div class="message">
+              <strong>Personal Message:</strong><br>
+              ${proposal.customMessage}
+            </div>
+            `
+                : ""
+            }
+
+            ${
+              pdfBase64
                 ? `
             <div class="attachment-note">
-              📎 <strong>PDF${preGeneratedPDFs.length > 1 ? "s" : ""} Attached:</strong> You'll find the complete quotation document${preGeneratedPDFs.length > 1 ? "s" : ""} attached to this email for your convenience.
+              📎 <strong>PDF Attached:</strong> You'll find the complete proposal document attached to this email for your convenience.
             </div>
             `
                 : ""
             }
 
             <div class="action-button">
-              <a href="${quotationUrl}" class="btn">View Full Quotation Online</a>
+              <a href="${proposalUrl}" class="btn">View Full Proposal Online</a>
             </div>
+
+            <p>We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>
 
             <div class="contact-info">
               <strong>Ready to get started?</strong><br>
-              📧 Email: sales@ohplus.ph<br>
+              📧 Email: sales@ohplus.com<br>
               📞 Phone: +63 123 456 7890
             </div>
 
@@ -293,7 +285,7 @@ export async function POST(request: NextRequest) {
           </div>
 
           <div class="footer">
-            <p>This quotation is confidential and intended solely for ${quotation.client_company_name || "your company"}.</p>
+            <p>This proposal is confidential and intended solely for ${proposal.client?.company || "your company"}.</p>
             <p>© ${new Date().getFullYear()} OH Plus. All rights reserved.</p>
           </div>
         </div>
@@ -303,50 +295,26 @@ export async function POST(request: NextRequest) {
 
     console.log("Attempting to send email to:", clientEmail)
 
-    const attachments = []
-
-    if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
-      preGeneratedPDFs.forEach((pdf, index) => {
-        if (pdf.filename && pdf.content) {
-          attachments.push({
-            filename: pdf.filename,
-            content: pdf.content,
-            type: "application/pdf",
-          })
-          console.log(`Pre-generated PDF attachment ${index + 1} added:`, pdf.filename)
-        }
-      })
-    }
-
-    // Add uploaded file attachments if available
-    if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-      uploadedFiles.forEach((file, index) => {
-        if (file.filename && file.content && file.type) {
-          attachments.push({
-            filename: file.filename,
-            content: file.content,
-            type: file.type,
-          })
-          console.log(`Uploaded file attachment ${index + 1} added:`, file.filename)
-        }
-      })
-    }
-
-    console.log(`Total attachments prepared: ${attachments.length}`)
-
-    // Prepare email data with all attachments
+    // Prepare email data with optional PDF attachment
     const emailData: any = {
       from: "OH Plus <noreply@ohplus.ph>",
       to: [clientEmail],
-      subject: finalSubject,
-      html: finalBody,
-      reply_to: currentUserEmail ? [currentUserEmail] : undefined,
-      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
+      subject: finalSubject, // Use the final subject
+      html: finalBody, // Use the final body
+      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
+      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
     }
 
-    if (attachments.length > 0) {
-      emailData.attachments = attachments
-      console.log(`${attachments.length} attachment(s) added to email`)
+    // Add PDF attachment if generated successfully
+    if (pdfBase64) {
+      emailData.attachments = [
+        {
+          filename: `${(proposal.title || "Proposal").replace(/[^a-z0-9]/gi, "_")}_${proposal.id}.pdf`,
+          content: pdfBase64,
+          type: "application/pdf",
+        },
+      ]
+      console.log("PDF attachment added to email")
     }
 
     const { data, error } = await resend.emails.send(emailData)
@@ -367,10 +335,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data,
-      message:
-        attachments.length > 0
-          ? `Email sent successfully with ${attachments.length} attachment(s)`
-          : "Email sent successfully",
+      message: pdfBase64
+        ? "Email sent successfully with PDF attachment and access code"
+        : "Email sent successfully with access code",
     })
   } catch (error) {
     console.error("Email sending error:", error)

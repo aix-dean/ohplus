@@ -184,7 +184,7 @@ importers:
         version: 3.1.2(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react-is@18.3.1)(react@19.0.0)(redux@5.0.1)
       resend:
         specifier: latest
-        version: 6.0.1(@react-email/render@1.2.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
+        version: 6.0.2(@react-email/render@1.2.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -226,7 +226,7 @@ importers:
         specifier: ^8.5
         version: 8.5.0
       tailwindcss:
-        specifier: ^3.4.17
+        specifier: ^3.4.1
         version: 3.4.17
       typescript:
         specifier: ^5
@@ -1698,6 +1698,7 @@ packages:
 
   '@types/node@22.18.0':
     resolution: {integrity: sha512-m5ObIqwsUp6BZzyiy4RdZpzWGub9bqLJMvZDD0QMXhxjqMHMENlj+SqF5QxoUwaQNFe+8kz8XM8ZQhqkQPTgMQ==}
+
   '@types/pako@2.0.4':
     resolution: {integrity: sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw==}
 
@@ -3510,8 +3511,8 @@ packages:
   reselect@5.1.1:
     resolution: {integrity: sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w==}
 
-  resend@6.0.1:
-    resolution: {integrity: sha512-xNZ0gKAOqQcH83lXsqNOwBbpKROnsZpQr9mXRdG6hrHTF9G9Il2pkoTRtq7rJzXMvCZX+I79oahsbSeaYOWRFA==}
+  resend@6.0.2:
+    resolution: {integrity: sha512-um08qWpSVvEVqAePEy/bsa7pqtnJK+qTCZ0Et7YE7xuqM46J0C9gnSbIJKR3LIcRVMgO9jUeot8rH0UI84eqMQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@react-email/render': ^1.1.0
@@ -4053,6 +4054,7 @@ packages:
     resolution: {integrity: sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg==}
     peerDependencies:
       zod: ^3.24.1
+
   zod@4.1.5:
     resolution: {integrity: sha512-rcUUZqlLJgBC33IT3PNMgsCq6TzLQEG/Ei/KTCU0PedSWRMAXoOUN+4t/0H+Q8bdnLPdqUYnvboJT0bn/229qg==}
 
@@ -4072,7 +4074,6 @@ snapshots:
       nanoid: 3.3.6
       secure-json-parse: 2.7.0
     optionalDependencies:
-
       zod: 4.1.5
 
   '@ai-sdk/provider-utils@1.0.22(zod@4.1.5)':
@@ -4082,7 +4083,6 @@ snapshots:
       nanoid: 3.3.11
       secure-json-parse: 2.7.0
     optionalDependencies:
-
       zod: 4.1.5
 
   '@ai-sdk/provider@0.0.24':
@@ -4101,7 +4101,6 @@ snapshots:
       throttleit: 2.1.0
     optionalDependencies:
       react: 19.0.0
-
       zod: 4.1.5
 
   '@ai-sdk/solid@0.0.54(zod@4.1.5)':
@@ -5941,14 +5940,11 @@ snapshots:
       json-schema: 0.4.0
       jsondiffpatch: 0.6.0
       secure-json-parse: 2.7.0
-
       zod-to-json-schema: 3.24.6(zod@4.1.5)
-
     optionalDependencies:
       react: 19.0.0
       sswr: 2.2.0(svelte@5.37.1)
       svelte: 5.37.1
-
       zod: 4.1.5
     transitivePeerDependencies:
       - solid-js
@@ -7713,7 +7709,7 @@ snapshots:
 
   reselect@5.1.1: {}
 
-  resend@6.0.1(@react-email/render@1.2.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)):
+  resend@6.0.2(@react-email/render@1.2.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)):
     optionalDependencies:
       '@react-email/render': 1.2.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
 

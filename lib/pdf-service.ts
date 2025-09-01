@@ -1604,7 +1604,10 @@ export async function generateCostEstimatePDF(
 
       pdf.text("Lease rate per month", margin + 5, yPosition + 6)
       pdf.text(
-        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}\`\`\`javascript
+yPosition + 6)
+      pdf.text(
+        \`PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
         pageWidth - margin - 5,
         yPosition + 6,
         { align: "right" },
@@ -1814,7 +1817,6 @@ export async function generateReportPDF(
   userData?: any,
   projectData?: any,
   returnBase64 = false,
-  module = "logistics", // Added module parameter with default value
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -1823,9 +1825,6 @@ export async function generateReportPDF(
     const margin = 15
     const contentWidth = pageWidth - margin * 2
     let yPosition = 0
-
-    const moduleDisplayName = module === "sales" ? "Sales" : "Logistics"
-    const moduleDepartmentName = module === "sales" ? "SALES" : "LOGISTICS"
 
     // Helper function to format date exactly like the preview page
     const formatDate = (dateString: string) => {
@@ -1940,11 +1939,11 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add module text in header
+    // Add "Logistics" text in header
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
-    pdf.text(moduleDisplayName, margin, yPosition + 10) // Use dynamic module name instead of hardcoded "Logistics"
+    pdf.text("Logistics", margin, yPosition + 10)
 
     yPosition += headerHeight + 8
     pdf.setTextColor(0, 0, 0)
@@ -2385,7 +2384,7 @@ export async function generateReportPDF(
     pdf.text(preparedByName, margin, footerY)
     footerY += 4
 
-    pdf.text(moduleDepartmentName, margin, footerY) // Use dynamic department name instead of hardcoded "LOGISTICS"
+    pdf.text("LOGISTICS", margin, footerY)
     footerY += 4
 
     pdf.text(formatDate(report.date), margin, footerY)
