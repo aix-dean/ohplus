@@ -10,7 +10,6 @@ import {
   getQuotationsByPageId,
   updateQuotationStatus,
   updateQuotation,
-  getQuotationsByClientName,
   getQuotationsByProductId,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
@@ -298,53 +297,21 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     }
   }, [quotation?.items?.[0]?.id, quotation?.id])
 
-  const fetchClientHistory = useCallback(async () => {
-    if (!quotation?.client_name) return
+  const fetchCompanyData = useCallback(async () => {
+    if (!user || !userData) return
 
-    setLoadingHistory(true)
     try {
-      const history = (await getQuotationsByClientName?.(quotation.client_name)) || []
-      // Filter out current quotation from history
-      const filteredHistory = history.filter((q) => q.id !== quotation.id)
-      setClientHistory(filteredHistory)
-    } catch (error) {
-      console.error("Error fetching client history:", error)
-      setClientHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }, [quotation?.client_name, quotation?.id])
-
-  const fetchCompanyData = async () => {
-    try {
-      if (userData?.company_id) {
-        // Fetch company data logic here
-        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
-        if (companyDoc.exists()) {
-          const companyInfo = companyDoc.data() as CompanyData
-          setCompanyData({
-            ...companyInfo,
-            id: userData.company_id,
-          })
-        } else {
-          // Fallback if company not found
-          setCompanyData({
-            name: "Company Name",
-            photo_url: "/oh-plus-logo.png",
-            id: userData?.company_id,
-          })
-        }
+      const companyDoc = await getDoc(doc(db, "companies", userData.companyId))
+      if (companyDoc.exists()) {
+        const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
+        setCompanyData(companyData)
+      } else {
+        console.warn("No company data found for companyId:", userData.companyId)
       }
     } catch (error) {
       console.error("Error fetching company data:", error)
-      // Set fallback data on error
-      setCompanyData({
-        name: "Company Name",
-        photo_url: "/oh-plus-logo.png",
-        id: userData?.company_id,
-      })
     }
-  }
+  }, [user, userData])
 
   useEffect(() => {
     const fetchQuotationData = async () => {
@@ -407,19 +374,13 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     if (user && userData) {
       fetchCompanyData()
     }
-  }, [user, userData])
+  }, [user, userData, fetchCompanyData])
 
   useEffect(() => {
     if (quotation?.items?.[0]?.id) {
       fetchQuotationHistory()
     }
   }, [fetchQuotationHistory])
-
-  useEffect(() => {
-    if (quotation?.client_name) {
-      fetchClientHistory()
-    }
-  }, [fetchClientHistory])
 
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {
