@@ -21,6 +21,7 @@ interface CreateReportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   siteId: string
+  module?: "logistics" | "sales"
 }
 
 interface Team {
@@ -40,7 +41,6 @@ interface AttachmentData {
   fileType?: string
 }
 
-
 interface JobOrder {
   id: string
   joNumber: string
@@ -52,7 +52,7 @@ interface JobOrder {
   product_id: string
 }
 
-export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
+export function CreateReportDialog({ open, onOpenChange, siteId, module = "logistics" }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
@@ -423,15 +423,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
       return
     }
-    // Remove this block:
-    // if (!selectedJO) {
-    //   toast({
-    //     title: "Error",
-    //     description: "Please select a Job Order",
-    //     variant: "destructive",
-    //   })
-    //   return
-    // }
 
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
@@ -485,7 +476,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
-        category: "logistics",
+        category: module,
         subcategory: product.content_type || "general",
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
@@ -551,8 +542,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the report preview page with preview flag
-      router.push(`/logistics/reports/preview`)
+      const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
+      router.push(previewPath)
     } catch (error) {
       console.error("Error generating report preview:", error)
       toast({

@@ -8,7 +8,7 @@ import { getCostEstimatesByProposalId, getCostEstimatesByCreatedBy } from "@/lib
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton component
+import { Skeleton } from "@/components/ui/skeleton"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 
@@ -111,7 +111,7 @@ export function CostEstimatesList({ proposalId, userId }: CostEstimatesListProps
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-6">
       {loading ? (
         <Card className="border-gray-200 shadow-sm rounded-xl">
           <Table>
@@ -126,7 +126,7 @@ export function CostEstimatesList({ proposalId, userId }: CostEstimatesListProps
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array(5) // Display 5 skeleton rows
+              {Array(5)
                 .fill(0)
                 .map((_, i) => (
                   <TableRow key={i} className="border-b border-gray-100">
