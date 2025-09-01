@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { getProductsByCompany, type Product } from "@/lib/firebase-service"
@@ -16,6 +17,9 @@ export default function ProjectMonitoringPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedSiteJOs, setSelectedSiteJOs] = useState<Product[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [currentSite, setCurrentSite] = useState("")
   const router = useRouter()
   const { userData } = useAuth()
 
@@ -73,8 +77,16 @@ export default function ProjectMonitoringPage() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
   }
 
-  const generateJobOrderNumber = (productId: string) => {
-    return `JO-${productId.slice(0, 8).toUpperCase()}`
+  const generateJobOrderNumber = (index: number) => {
+    return `JO: ${(index + 1).toString().padStart(3, "0")}`
+  }
+
+  const handleJOClick = (product: Product, index: number) => {
+    const site = product.seller_name || product.categories?.[0] || "Unknown Site"
+    const siteProducts = products.filter((p) => (p.seller_name || p.categories?.[0] || "Unknown Site") === site)
+    setSelectedSiteJOs(siteProducts)
+    setCurrentSite(site)
+    setDialogOpen(true)
   }
 
   const getHeaderColor = (index: number) => {
@@ -178,7 +190,12 @@ export default function ProjectMonitoringPage() {
                 <CardContent className="p-0">
                   {/* Job Order Number */}
                   <div className="px-4 pt-3 pb-2">
-                    <p className="text-xs text-blue-600 font-medium">{generateJobOrderNumber(product.id)}</p>
+                    <button
+                      onClick={() => handleJOClick(product, index)}
+                      className="text-xs text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors"
+                    >
+                      {generateJobOrderNumber(index)}
+                    </button>
                   </div>
 
                   {/* Project Header */}
@@ -225,6 +242,35 @@ export default function ProjectMonitoringPage() {
           </div>
         )}
       </div>
+
+      {/* Dialog for showing all JOs for a site */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Job Orders for {currentSite}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {selectedSiteJOs.map((jo, index) => (
+              <Card key={jo.id} className="border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-600">
+                      {generateJobOrderNumber(products.findIndex((p) => p.id === jo.id))}
+                    </span>
+                    <span className="text-xs text-gray-500">{formatActivityDate(jo.created_at)}</span>
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-1">{jo.name}</h4>
+                  <p className="text-sm text-gray-600 mb-2">{jo.description || "No description available"}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Status: Active</span>
+                    {jo.price && <span>₱{jo.price.toLocaleString()}</span>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
