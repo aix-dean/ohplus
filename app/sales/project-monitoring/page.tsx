@@ -53,7 +53,7 @@ export default function ProjectMonitoringPage() {
           <div className="text-blue-600 font-medium text-sm mb-3">JO-SU-LS-0014-060525</div>
 
           {/* Project Title Banner */}
-          <div className="text-white px-4 py-2 rounded mb-3" style={{ backgroundColor: "#00aeef" }}>
+          <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
             <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
           </div>
 
