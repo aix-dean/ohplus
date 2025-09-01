@@ -23,7 +23,7 @@ export default function ProjectMonitoringPage() {
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="flex items-center gap-4">
           {/* Search Bar */}
-          <div className="flex-1 relative">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
@@ -33,14 +33,16 @@ export default function ProjectMonitoringPage() {
           </div>
 
           {/* Dropdown Filter */}
-          <div className="relative">
-            <select className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700">
-              <option value="">Select Site</option>
-              <option value="site1">Site 1</option>
-              <option value="site2">Site 2</option>
-              <option value="site3">Site 3</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+          <div className="flex-1 flex justify-end">
+            <div className="relative">
+              <select className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700">
+                <option value="">Select Site</option>
+                <option value="site1">Site 1</option>
+                <option value="site2">Site 2</option>
+                <option value="site3">Site 3</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
