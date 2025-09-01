@@ -1220,4 +1220,20 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
   }
 }
 
+// Fetch all quotations
+export async function getAllQuotations(): Promise<Quotation[]> {
+  try {
+    const q = query(collection(db, "quotations"), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Quotation[]
+    return quotations
+  } catch (error) {
+    console.error("Error fetching all quotations:", error)
+    throw error
+  }
+}
+
 export { getQuotationById as getQuotation }
