@@ -842,10 +842,17 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
               <div className="space-y-2">
                 <Input
                   type="text"
-                  value={tempValues.signature_name || ""}
-                  onChange={(e) => updateTempValues("signature_name", e.target.value)}
+                  value={tempValues.signature_first_name || ""}
+                  onChange={(e) => updateTempValues("signature_first_name", e.target.value)}
                   className="w-48 h-6 text-sm"
-                  placeholder="Enter name"
+                  placeholder="Enter first name"
+                />
+                <Input
+                  type="text"
+                  value={tempValues.signature_last_name || ""}
+                  onChange={(e) => updateTempValues("signature_last_name", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder="Enter last name"
                 />
                 <Input
                   type="text"
@@ -867,8 +874,10 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
                   title={isEditing ? "Click to edit name" : ""}
                 >
-                  {currentQuotation?.signature_name ||
-                    `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
+                  {currentQuotation?.signature_first_name && currentQuotation?.signature_last_name
+                    ? `${currentQuotation.signature_first_name} ${currentQuotation.signature_last_name}`
+                    : currentQuotation?.signature_name ||
+                      `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
                 <p
