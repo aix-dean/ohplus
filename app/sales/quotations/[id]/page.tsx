@@ -867,7 +867,8 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
                   title={isEditing ? "Click to edit name" : ""}
                 >
-                  {currentQuotation?.signature_name || "AIX Xymbiosis"}
+                  {currentQuotation?.signature_name ||
+                    `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
                 <p
@@ -881,7 +882,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
                   }
                   title={isEditing ? "Click to edit position" : ""}
                 >
-                  {currentQuotation?.signature_position || "Account Manager"}
+                  {currentQuotation?.signature_position || currentQuotation?.position || "Position"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
               </div>
