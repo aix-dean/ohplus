@@ -139,20 +139,42 @@ export default function ProjectMonitoringPage() {
                 className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
               >
                 <div className="aspect-square relative bg-gray-100">
-                  {product.imageUrl || (product.media && product.media.length > 0) ? (
-                    <img
-                      src={product.imageUrl || product.media?.[0]?.url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = "none"
-                        target.nextElementSibling?.classList.remove("hidden")
-                      }}
-                    />
-                  ) : null}
+                  {(() => {
+                    const imageUrl =
+                      product.imageUrl && product.imageUrl.trim() !== ""
+                        ? product.imageUrl
+                        : product.media &&
+                            product.media.length > 0 &&
+                            product.media[0]?.url &&
+                            product.media[0].url.trim() !== ""
+                          ? product.media[0].url
+                          : null
+
+                    return imageUrl ? (
+                      <img
+                        src={imageUrl || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = "none"
+                          target.nextElementSibling?.classList.remove("hidden")
+                        }}
+                      />
+                    ) : null
+                  })()}
                   <div
-                    className={`absolute inset-0 flex items-center justify-center ${product.imageUrl || (product.media && product.media.length > 0) ? "hidden" : ""}`}
+                    className={`absolute inset-0 flex items-center justify-center ${
+                      (product.imageUrl && product.imageUrl.trim() !== "") ||
+                      (
+                        product.media &&
+                          product.media.length > 0 &&
+                          product.media[0]?.url &&
+                          product.media[0].url.trim() !== ""
+                      )
+                        ? "hidden"
+                        : ""
+                    }`}
                   >
                     <Package className="h-12 w-12 text-gray-400" />
                   </div>
