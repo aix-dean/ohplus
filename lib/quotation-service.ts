@@ -791,7 +791,14 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation) // Changed products to items
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
+
+      // Check if any item in this quotation matches the product ID
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === campaignId)
+
+      if (hasMatchingProduct) {
+        quotations.push(quotation)
+      }
     })
 
     return quotations
@@ -1097,7 +1104,7 @@ export async function getQuotationsByProductId(productId: string): Promise<Quota
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       // Check if any item in this quotation matches the product ID
-      const hasMatchingProduct = quotation.items.some((item) => item.id === productId)
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
 
       if (hasMatchingProduct) {
         quotations.push(quotation)
@@ -1205,7 +1212,7 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
       const data = doc.data()
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
-      const hasMatchingProduct = quotation.items.some((item) => item.id === productId)
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
       const hasMatchingCompany = quotation.company_id === companyId
 
       if (hasMatchingProduct && hasMatchingCompany) {
