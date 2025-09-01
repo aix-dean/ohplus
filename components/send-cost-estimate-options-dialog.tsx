@@ -50,10 +50,10 @@ export function SendCostEstimateOptionsDialog({
         <div className="grid gap-4 py-4">
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-              {costEstimate.lineItems?.[0]?.image ? (
+              {costEstimate.client?.companyLogoUrl ? (
                 <Image
-                  src={costEstimate.lineItems[0].image || "/placeholder.svg"}
-                  alt="Cost Estimate Image"
+                  src={costEstimate.client.companyLogoUrl || "/placeholder.svg"}
+                  alt="Client Logo"
                   width={80}
                   height={80}
                   objectFit="contain"

@@ -19,10 +19,9 @@ interface ProposalHistoryProps {
     contactPerson: string
   } | null
   onCopySites?: (sites: Product[]) => void
-  useProposalViewer?: boolean
 }
 
-export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false }: ProposalHistoryProps) {
+export function ProposalHistory({ selectedClient, onCopySites }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
@@ -124,7 +123,6 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onCopySites={onCopySites}
-        useProposalViewer={useProposalViewer}
       />
     </>
   )

@@ -37,8 +37,6 @@ export interface EmailTemplate {
   subject: string
   body: string
   userId: string
-  company_id?: string
-  deleted?: boolean
   created?: Timestamp
 }
 
@@ -130,12 +128,11 @@ class EmailService {
     }
   }
 
-  async getEmailTemplates(companyId: string): Promise<EmailTemplate[]> {
+  async getEmailTemplates(userId: string): Promise<EmailTemplate[]> {
     try {
       const q = query(
         collection(db, this.templatesCollection),
-        where("company_id", "==", companyId),
-        where("deleted", "==", false),
+        where("userId", "==", userId),
         orderBy("created", "desc"),
       )
       const querySnapshot = await getDocs(q)
@@ -149,16 +146,9 @@ class EmailService {
     }
   }
 
-  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate> {
+  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
     try {
       await updateDoc(doc(db, this.templatesCollection, templateId), updates)
-
-      // Return the updated template
-      const updatedDoc = await getDoc(doc(db, this.templatesCollection, templateId))
-      if (updatedDoc.exists()) {
-        return { id: updatedDoc.id, ...updatedDoc.data() } as EmailTemplate
-      }
-      throw new Error("Template not found after update")
     } catch (error) {
       console.error("Error updating email template:", error)
       throw new Error("Failed to update email template")
@@ -167,94 +157,77 @@ class EmailService {
 
   async deleteEmailTemplate(templateId: string): Promise<void> {
     try {
-      await updateDoc(doc(db, this.templatesCollection, templateId), { deleted: true })
+      await deleteDoc(doc(db, this.templatesCollection, templateId))
     } catch (error) {
       console.error("Error deleting email template:", error)
       throw new Error("Failed to delete email template")
     }
   }
 
-  async softDeleteEmailTemplate(templateId: string): Promise<void> {
-    try {
-      await updateDoc(doc(db, this.templatesCollection, templateId), { deleted: true })
-    } catch (error) {
-      console.error("Error soft deleting email template:", error)
-      throw new Error("Failed to soft delete email template")
-    }
-  }
-
-  async createDefaultTemplates(companyId: string): Promise<void> {
+  async createDefaultTemplates(userId: string): Promise<void> {
     const defaultTemplates = [
       {
-        name: "Cost Estimate Template 1",
-        subject: "Cost Estimate: {title} - OH Plus",
-        body: `Hi {clientName},
+        name: "Report Delivery",
+        subject: "Report Ready for Review",
+        body: `Hi [Customer's Name],
 
-I hope you're doing well!
+I hope you're doing well.
 
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
+Attached is the report you requested. We've prepared a comprehensive analysis based on your requirements and current project status.
 
-If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
+Please feel free to review and let me know if you have any questions or would like to explore additional options. I'm happy to assist.
+
+Looking forward to your feedback!
 
 Best regards,
-{userName}
-Sales Executive
-{companyName}
-{userContact}
-{userEmail}`,
-        company_id: companyId,
-        deleted: false,
+[Your Full Name]
+[Your Position]
+[Company Name]
+[Contact Info]`,
+        userId,
       },
       {
-        name: "Cost Estimate Template 2",
-        subject: "Your Advertising Campaign Quote - {title}",
-        body: `Dear {clientName},
+        name: "Project Update",
+        subject: "Project Status Update",
+        body: `Dear [Customer's Name],
 
-Thank you for your interest in our advertising services. We are pleased to provide you with a detailed cost estimate for your campaign.
+I wanted to provide you with an update on your project progress.
 
-Please review the attached quotation and let us know if you have any questions or require any modifications.
+Current Status: [Project Status]
+Completion: [Percentage]%
+Next Steps: [Next Steps]
 
-We look forward to working with you!
+Attached you'll find the detailed progress report with all relevant information and documentation.
+
+If you have any questions or concerns, please don't hesitate to reach out.
 
 Best regards,
-{userName}
-{companyName}`,
-        company_id: companyId,
-        deleted: false,
+[Your Full Name]
+[Your Position]
+[Company Name]`,
+        userId,
       },
       {
-        name: "Cost Estimate Template 3",
-        subject: "Billboard Campaign Proposal - {title}",
-        body: `Hello {clientName},
+        name: "Completion Report",
+        subject: "Project Completion Report",
+        body: `Dear [Customer's Name],
 
-We've prepared a comprehensive cost estimate for your billboard advertising campaign. The attached document includes all the details we discussed.
+I'm pleased to inform you that your project has been completed successfully!
 
-Please take your time to review it and don't hesitate to contact us with any questions.
+Project Details:
+- Start Date: [Start Date]
+- Completion Date: [Completion Date]
+- Final Status: Completed
 
-Thank you for considering OH Plus for your advertising needs.
+Please find the final completion report attached for your records. This document contains all the details about the work performed and final deliverables.
 
-Best regards,
-{userName}`,
-        company_id: companyId,
-        deleted: false,
-      },
-      {
-        name: "Cost Estimate Template 4",
-        subject: "Cost Estimate Ready for Review - {title}",
-        body: `Dear {clientName},
-
-Your cost estimate is ready! We've carefully prepared a detailed proposal that aligns with your requirements and budget considerations.
-
-The attached document contains all the information you need to make an informed decision about your advertising campaign.
-
-We're excited about the possibility of working together!
+Thank you for choosing our services. We look forward to working with you again in the future.
 
 Best regards,
-{userName}
-Sales Executive
-{companyName}`,
-        company_id: companyId,
-        deleted: false,
+[Your Full Name]
+[Your Position]
+[Company Name]`,
+        userId,
       },
     ]
 

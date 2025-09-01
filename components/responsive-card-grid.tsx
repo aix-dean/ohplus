@@ -26,9 +26,9 @@ export function ResponsiveCardGrid({
 
   const gapClasses = {
     none: "gap-0",
-    sm: "gap-1",
-    md: "gap-2",
-    lg: "gap-4",
+    sm: "gap-2",
+    md: "gap-4",
+    lg: "gap-6",
   }
 
   const getGridCols = () => {

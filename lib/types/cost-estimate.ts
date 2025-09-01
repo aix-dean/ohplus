@@ -12,7 +12,6 @@ export interface CostEstimateLineItem {
   total: number
   category: string // e.g., "Billboard Rental", "Production", "Installation", "Maintenance"
   notes?: string
-  image?: string // Added optional image field for product images
 }
 
 export interface CostEstimate {
@@ -29,9 +28,6 @@ export interface CostEstimate {
   createdAt: Date
   updatedAt: Date
   createdBy: string // User ID of who created it
-  company_id?: string // Company ID from user data
-  page_id?: string // Page ID for grouping multiple cost estimates
-  page_number?: number // Page number for multiple products (1, 2, 3, etc.)
   startDate?: Date | null // New field
   endDate?: Date | null // New field
   durationDays?: number | null // New field for duration in days
