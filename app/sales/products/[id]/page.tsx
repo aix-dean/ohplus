@@ -1040,7 +1040,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                             onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                           >
-                            <div className="text-gray-600">{formatDate(quotation.createdAt)}</div>
+                            <div className="text-gray-600">{formatDate(quotation.created)}</div>
                             <div className="text-gray-900 font-medium">
                               {quotation.quotationNumber || quotation.id.slice(-8)}
                             </div>
