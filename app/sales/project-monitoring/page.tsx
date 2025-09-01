@@ -48,8 +48,9 @@ export default function ProjectMonitoringPage() {
 
   const filteredProducts = products.filter(
     (product) =>
-      (product.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-      (product.description?.toLowerCase() || "").includes(searchQuery.toLowerCase()),
+      product.product_id === product.id &&
+      ((product.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+        (product.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())),
   )
 
   const handleClearSearch = () => {
