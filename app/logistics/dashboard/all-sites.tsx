@@ -72,41 +72,37 @@ export default function AllSitesTab({
     }
 
     try {
+      const counts: Record<string, number> = {}
 
+      // Get all product IDs from current products
+      const productIds = products.map((p) => p.id).filter(Boolean)
+
+      if (productIds.length === 0) {
+        console.log("No products available to fetch job orders for")
+        setJobOrderCounts({})
+        return
+      }
 
       // Query job orders collection directly
       const jobOrdersRef = collection(db, "job_orders")
       const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
-
-
       const querySnapshot = await getDocs(q)
 
- 
-
-      const counts: Record<string, number> = {}
-      const allJobOrders: any[] = []
-
+      // Count job orders for each product, but only for existing products
       querySnapshot.forEach((doc) => {
-        const jobOrder = { id: doc.id, ...doc.data() }
-        allJobOrders.push(jobOrder)
-
-
-        if (jobOrder.product_id) {
-          counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
-         
-        } else {
-          console.log("Job order missing product_id:", jobOrder)
+        const data = doc.data()
+        const productId = data.product_id
+        if (productId && productIds.includes(productId)) {
+          counts[productId] = (counts[productId] || 0) + 1
         }
       })
-
-
 
       setJobOrderCounts(counts)
     } catch (error) {
       console.error("Error fetching job orders directly:", error)
       setJobOrderCounts({})
     }
-  }, [userData?.company_id])
+  }, [userData?.company_id, products])
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -154,8 +150,6 @@ export default function AllSitesTab({
           active: true,
           searchTerm: searchQuery,
         })
-
-
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -323,8 +317,6 @@ export default function AllSitesTab({
 
     // Get JO count for this site using the product ID
     const joCount = jobOrderCounts[product.id || ""] || 0
-
-
 
     return {
       id: product.id,

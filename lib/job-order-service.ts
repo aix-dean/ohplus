@@ -300,6 +300,54 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
   }
 }
 
+export async function getJobOrdersByProductId(productId: string): Promise<JobOrder[]> {
+  try {
+    console.log("Fetching job orders for product ID:", productId)
+
+    if (!productId) {
+      console.log("No productId provided")
+      return []
+    }
+
+    const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
+    const q = query(jobOrdersRef, where("product_id", "==", productId), orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const jobOrders: JobOrder[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotationId || "",
+        product_id: data.product_id || "",
+      } as JobOrder)
+    })
+
+    console.log(`Found ${jobOrders.length} job orders for product ${productId}`)
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching job orders by product ID:", error)
+    throw error
+  }
+}
+
 export async function getAllJobOrders(): Promise<JobOrder[]> {
   try {
     const q = query(collection(db, JOB_ORDERS_COLLECTION), orderBy("createdAt", "desc"))
@@ -321,4 +369,37 @@ export function generateJONumber(): string {
     .toString()
     .padStart(3, "0")
   return `JO-${timestamp}-${randomSuffix}`
+}
+
+export async function generatePersonalizedJONumber(userData: any): Promise<string> {
+  try {
+    // Extract initials from user's name
+    const names = [userData.first_name, userData.middle_name, userData.last_name].filter(Boolean) // Remove empty/null values
+
+    const initials = names
+      .map((name) => name.charAt(0).toUpperCase())
+      .join("")
+      .substring(0, 4) // Limit to 4 characters max
+
+    // If no initials available, use default
+    if (!initials) {
+      return generateJONumber() // Fallback to original method
+    }
+
+    // Count existing job orders for this user to get sequential number
+    const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
+    const q = query(jobOrdersRef, where("createdBy", "==", userData.uid), orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const nextSequence = querySnapshot.size + 1
+
+    // Format as INITIALS-XXXX (e.g., JPDM-0001)
+    const sequenceNumber = nextSequence.toString().padStart(4, "0")
+
+    return `${initials}-${sequenceNumber}`
+  } catch (error) {
+    console.error("Error generating personalized JO number:", error)
+    // Fallback to original method if there's an error
+    return generateJONumber()
+  }
 }
