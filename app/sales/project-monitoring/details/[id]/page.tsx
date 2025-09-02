@@ -26,12 +26,21 @@ interface JobOrder {
   // Add other fields as needed
 }
 
+interface Seller {
+  id: string
+  first_name?: string
+  last_name?: string
+  uid: string
+  // Add other fields as needed
+}
+
 interface Product {
   id: string
   name?: string
   location?: string
   site_owner?: string
   seller_name?: string
+  seller_id?: string // Added seller_id field
   price?: number
   status?: string
   specs_rental?: {
@@ -63,6 +72,7 @@ export default function JobOrderDetailsPage() {
   const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [booking, setBooking] = useState<Booking | null>(null)
+  const [seller, setSeller] = useState<Seller | null>(null) // Added seller state
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -86,10 +96,24 @@ export default function JobOrderDetailsPage() {
             const productSnap = await getDoc(productRef)
 
             if (productSnap.exists()) {
-              setProduct({
+              const productData = {
                 id: productSnap.id,
                 ...productSnap.data(),
-              } as Product)
+              } as Product
+
+              setProduct(productData)
+
+              if (productData.seller_id) {
+                const sellerRef = doc(db, "iboard_users", productData.seller_id)
+                const sellerSnap = await getDoc(sellerRef)
+
+                if (sellerSnap.exists()) {
+                  setSeller({
+                    id: sellerSnap.id,
+                    ...sellerSnap.data(),
+                  } as Seller)
+                }
+              }
             }
 
             const bookingQuery = query(collection(db, "booking"), where("product_id", "==", jobOrderData.product_id))
@@ -105,7 +129,7 @@ export default function JobOrderDetailsPage() {
           }
         }
       } catch (error) {
-        console.error("Error fetching job order, product, or booking:", error)
+        console.error("Error fetching job order, product, booking, or seller:", error)
       } finally {
         setLoading(false)
       }
@@ -139,6 +163,7 @@ export default function JobOrderDetailsPage() {
           booking?.start_date && booking?.end_date
             ? `${formatDate(booking.start_date)} to ${formatDate(booking.end_date)}`
             : "Not specified",
+        seller: seller?.first_name && seller?.last_name ? `${seller.first_name} ${seller.last_name}` : "Not specified",
       }
     }
 
@@ -146,6 +171,7 @@ export default function JobOrderDetailsPage() {
       site: "Not specified",
       client: "Not specified",
       bookingDates: "Not specified",
+      seller: "Not specified", // Added seller fallback
     }
   }
 
@@ -193,6 +219,11 @@ export default function JobOrderDetailsPage() {
             <div>
               <span className="font-medium text-gray-900">Booking Dates: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Seller: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.seller}</span>
             </div>
           </div>
         </div>
