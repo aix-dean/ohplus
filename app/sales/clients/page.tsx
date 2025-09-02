@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ClientDialog } from "@/components/client-dialog"
 import { Search, MoreHorizontal, Users, Shield } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -14,6 +13,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, getDocs, query, where, deleteDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useRouter } from "next/navigation" // Added useRouter import
 
 interface Company {
   id: string
@@ -29,6 +29,7 @@ interface Company {
 
 export default function ClientsPage() {
   const { userData } = useAuth()
+  const router = useRouter() // Added router instance
 
   // State for companies data
   const [companies, setCompanies] = useState<Company[]>([])
@@ -38,9 +39,6 @@ export default function ClientsPage() {
   const [operatorSearch, setOperatorSearch] = useState("")
   const [agencySearch, setAgencySearch] = useState("")
   const [brandSearch, setBrandSearch] = useState("")
-
-  // State for dialog
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   // Load companies on initial render
   useEffect(() => {
@@ -286,22 +284,12 @@ export default function ClientsPage() {
       {/* Add Client Button */}
       <div className="fixed bottom-6 right-6">
         <Button
-          onClick={() => setIsDialogOpen(true)}
+          onClick={() => router.push("/sales/clients/add")} // Changed to navigate to add client page instead of opening dialog
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg"
         >
           + Add Client
         </Button>
       </div>
-
-      {/* Client Dialog */}
-      <ClientDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSuccess={() => {
-          setIsDialogOpen(false)
-          loadCompanies()
-        }}
-      />
     </div>
   )
 }
