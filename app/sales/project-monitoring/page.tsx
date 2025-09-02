@@ -155,7 +155,7 @@ export default function ProjectMonitoringPage() {
       <div className="bg-white border-b border-gray-200">
         <div className="flex items-center px-4 py-3">
           <button
-            onClick={() => router.push("/sales/project-bulletins")}
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
