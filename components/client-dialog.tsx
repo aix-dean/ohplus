@@ -12,7 +12,7 @@ import { toast } from "sonner"
 import { Plus } from "lucide-react"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
 import { useAuth } from "@/contexts/auth-context" // Import useAuth
-import { collection, getDocs, addDoc } from "firebase/firestore"
+import { collection, getDocs, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface ClientDialogProps {
@@ -113,7 +113,11 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const handleCompanySelect = (value: string) => {
     if (value === "add_new") {
       setShowNewCompanyInput(true)
-      setFormData((prev) => ({ ...prev, company: "", company_id: "" }))
+      setFormData((prev) => ({
+        ...prev,
+        company: "",
+        company_id: "",
+      }))
     } else {
       const selectedCompany = companies.find((c) => c.id === value)
       if (selectedCompany) {
@@ -132,6 +136,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       const companiesRef = collection(db, "client_company")
       const docRef = await addDoc(companiesRef, {
         name: companyName,
+        address: formData.address,
+        industry: formData.industry,
+        clientType: formData.clientType,
+        companyLogoUrl: "", // Will be updated after logo upload if needed
         created: new Date(),
       })
       return docRef.id
@@ -165,15 +173,21 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       let finalCompanyId = formData.company_id
       let finalCompanyName = formData.company
 
-      if (showNewCompanyInput && newCompanyName.trim()) {
-        finalCompanyId = await createNewCompany(newCompanyName.trim())
-        finalCompanyName = newCompanyName.trim()
+      if (logoFile) {
+        const uploadPath = `company_logos/${client?.id || "new_client"}/`
+        finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
       }
 
-      if (logoFile) {
-        // Only upload if a new file is selected
-        const uploadPath = `company_logos/${client?.id || "new_client"}/` // Use client ID if editing, or 'new_client'
-        finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
+      if (showNewCompanyInput && newCompanyName.trim()) {
+        setFormData((prev) => ({ ...prev, companyLogoUrl: finalCompanyLogoUrl }))
+        finalCompanyId = await createNewCompany(newCompanyName.trim())
+        finalCompanyName = newCompanyName.trim()
+
+        if (finalCompanyLogoUrl && finalCompanyLogoUrl !== formData.companyLogoUrl) {
+          await updateDoc(doc(db, "client_company", finalCompanyId), {
+            companyLogoUrl: finalCompanyLogoUrl,
+          })
+        }
       }
 
       const clientDataToSave = {
