@@ -170,11 +170,11 @@ export default function SelectQuotationPage() {
       </Card>
 
       <Button
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg"
-        size="icon"
+        className="fixed bottom-6 right-6 h-14 px-6 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center gap-2"
         onClick={() => router.push("/sales/quotations/create")}
       >
-        <Plus className="h-6 w-6" />
+        <Plus className="h-5 w-5" />
+        <span className="text-sm font-medium">Add New Quotation</span>
       </Button>
     </div>
   )
