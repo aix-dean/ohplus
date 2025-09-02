@@ -11,13 +11,18 @@ import { doc, getDoc } from "firebase/firestore"
 interface JobOrder {
   id: string
   joNumber: string
+  clientCompany: string
+  clientName: string
+  siteName: string
+  siteCode: string
+  contractPeriodStart: string
+  contractPeriodEnd: string
+  leaseRatePerMonth: number
+  totalAmount: number
+  status: string
+  joType: string
+  assignTo: string
   product_id?: string
-  site?: string
-  client?: string
-  bookingStartDate?: any
-  bookingEndDate?: any
-  breakDate?: any
-  sales?: string
   // Add other fields as needed
 }
 
@@ -102,29 +107,33 @@ export default function JobOrderDetailsPage() {
   }
 
   const getSiteData = () => {
-    if (product) {
+    if (jobOrder) {
       return {
-        site: product.specs_rental?.location || product.location || "Not specified",
-        client: product.site_owner || product.seller_name || "Not specified",
-        productName: product.name || "Not specified",
-        status: product.status || "Not specified",
-        caretaker: product.specs_rental?.caretaker || "Not specified",
-        price: product.price ? `₱${product.price.toLocaleString()}` : "Not specified",
-        landOwner: product.specs_rental?.land_owner || "Not specified",
-        structureCondition: product.specs_rental?.structure_condition || "Not specified",
+        site: jobOrder.siteName || jobOrder.siteCode || "Not specified",
+        client: `${jobOrder.clientCompany || ""} ${jobOrder.clientName || ""}`.trim() || "Not specified",
+        contractPeriod:
+          jobOrder.contractPeriodStart && jobOrder.contractPeriodEnd
+            ? `${formatDate(jobOrder.contractPeriodStart)} to ${formatDate(jobOrder.contractPeriodEnd)}`
+            : "Not specified",
+        leaseRate: jobOrder.leaseRatePerMonth
+          ? `₱${jobOrder.leaseRatePerMonth.toLocaleString()}/month`
+          : "Not specified",
+        totalAmount: jobOrder.totalAmount ? `₱${jobOrder.totalAmount.toLocaleString()}` : "Not specified",
+        status: jobOrder.status || "Not specified",
+        jobType: jobOrder.joType || "Not specified",
+        assignedTo: jobOrder.assignTo || "Not specified",
       }
     }
 
-    // Fallback to job order data if product not available
     return {
-      site: jobOrder?.site || "Not specified",
-      client: jobOrder?.client || "Not specified",
-      productName: "Not specified",
+      site: "Not specified",
+      client: "Not specified",
+      contractPeriod: "Not specified",
+      leaseRate: "Not specified",
+      totalAmount: "Not specified",
       status: "Not specified",
-      caretaker: "Not specified",
-      price: "Not specified",
-      landOwner: "Not specified",
-      structureCondition: "Not specified",
+      jobType: "Not specified",
+      assignedTo: "Not specified",
     }
   }
 
@@ -170,8 +179,18 @@ export default function JobOrderDetailsPage() {
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Product: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.productName}</span>
+              <span className="font-medium text-gray-900">Contract Period: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.contractPeriod}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Lease Rate: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.leaseRate}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Total Amount: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.totalAmount}</span>
             </div>
 
             <div>
@@ -180,13 +199,13 @@ export default function JobOrderDetailsPage() {
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Caretaker: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.caretaker}</span>
+              <span className="font-medium text-gray-900">Job Type: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.jobType}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Price: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.price}</span>
+              <span className="font-medium text-gray-900">Assigned To: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.assignedTo}</span>
             </div>
           </div>
         </div>
