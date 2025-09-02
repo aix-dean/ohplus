@@ -4,29 +4,15 @@ import type React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import {
-  ArrowLeft,
-  CalendarIcon,
-  Plus,
-  Loader2,
-  AlertCircle,
-  FileText,
-  ImageIcon,
-  XCircle,
-  Package,
-  Check,
-} from "lucide-react"
+import { ArrowLeft, CalendarIcon, Loader2, AlertCircle, XCircle, Package, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -37,8 +23,6 @@ import type { Quotation } from "@/lib/types/quotation"
 import type { Product } from "@/lib/firebase-service"
 import type { Client } from "@/lib/client-service"
 import { cn } from "@/lib/utils"
-import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
@@ -73,6 +57,7 @@ export default function CreateJobOrderPage() {
   } | null>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
 
   // Shared compliance states
   const projectCompliance = quotationData?.quotation?.projectCompliance || {}
@@ -319,14 +304,16 @@ export default function CreateJobOrderPage() {
     return !hasError
   }, [jobOrderForms, handleFormUpdate])
 
-  const handleCreateJobOrders = useCallback(
+  const handleCreateJobOrder = useCallback(
     async (status: JobOrderStatus) => {
+      setIsCreating(true)
       if (!quotationData || !user?.uid) {
         toast({
           title: "Missing Information",
           description: "Cannot create Job Orders due to missing data or user authentication.",
           variant: "destructive",
         })
+        setIsCreating(false)
         return
       }
 
@@ -336,6 +323,7 @@ export default function CreateJobOrderPage() {
           description: "Please fill in all required fields for all Job Orders.",
           variant: "destructive",
         })
+        setIsCreating(false)
         return
       }
 
@@ -471,6 +459,7 @@ export default function CreateJobOrderPage() {
         })
       } finally {
         setIsSubmitting(false)
+        setIsCreating(false)
       }
     },
     [
@@ -830,432 +819,195 @@ export default function CreateJobOrderPage() {
             </Alert>
           ) : null}
 
-          <h2 className="text-lg font-bold text-gray-900">
-            Job Order{isMultiProduct ? "s" : ""} ({hasItems ? quotationItems.length : 1})
-          </h2>
+          <div className="bg-white">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Job Order</h2>
 
-          {isMultiProduct ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {quotationItems.map((item: any, index: number) => (
-                  <TabsTrigger
-                    key={index}
-                    value={index.toString()}
-                    className="text-xs max-w-[150px] truncate overflow-hidden whitespace-nowrap"
-                  >
-                    {item.site_code || `Site ${index + 1}`}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              {quotationItems.map((item: any, index: number) => {
-                const form = jobOrderForms[index]
-                const product = products[index] || {}
-
-                if (!form) return null
-
-                return (
-                  <TabsContent key={index} value={index.toString()}>
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Image
-                            src={product.media?.[0]?.url || "/placeholder.svg?height=24&width=24&query=billboard"}
-                            alt={item.product_name || "Site image"}
-                            width={24}
-                            height={24}
-                            className="rounded object-cover"
-                          />
-                          <span className="truncate">{item.product_name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {item.site_code || `Site ${index + 1}`}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {/* Job Order Form Fields */}
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">JO #</Label>
-                          <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Date Requested</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                  !form.dateRequested && "text-gray-500",
-                                  form.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
-                                )}
-                                onClick={() => handleFormUpdate(index, "dateRequestedError", false)}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                                {form.dateRequested ? format(form.dateRequested, "PPP") : <span>Date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={form.dateRequested}
-                                onSelect={(date) => {
-                                  handleFormUpdate(index, "dateRequested", date)
-                                  handleFormUpdate(index, "dateRequestedError", false)
-                                }}
-                                // Removed initialFocus to ensure it opens to the selected date
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">JO Type</Label>
-                          <Select
-                            onValueChange={(value: JobOrderType) => {
-                              handleFormUpdate(index, "joType", value)
-                              handleFormUpdate(index, "joTypeError", false)
-                            }}
-                            value={form.joType}
-                          >
-                            <SelectTrigger
-                              className={cn(
-                                "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                form.joTypeError && "border-red-500 focus-visible:ring-red-500",
-                              )}
-                            >
-                              <SelectValue placeholder="Choose JO Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {joTypes.map((type) => (
-                                <SelectItem key={type} value={type} className="text-sm">
-                                  {type}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Deadline</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                  !form.deadline && "text-gray-500",
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                                {form.deadline ? format(form.deadline, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={form.deadline}
-                                onSelect={(date) => handleFormUpdate(index, "deadline", date)}
-                                disabled={{ before: new Date() }} // Disable past dates
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Requested By</Label>
-                          <Input
-                            value={userData?.first_name || "(Auto-Generated)"}
-                            disabled
-                            className="bg-gray-100 text-gray-600 text-sm h-9"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Remarks</Label>
-                          <Textarea
-                            placeholder="Remarks..."
-                            value={form.remarks}
-                            onChange={(e) => handleFormUpdate(index, "remarks", e.target.value)}
-                            className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
-                          />
-                        </div>
-
-                        {/* Attachments */}
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Attachments</Label>
-                          <input
-                            type="file"
-                            id={`attachment-upload-${index}`}
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) => {
-                              if (event.target.files && event.target.files[0]) {
-                                handleProductAttachmentUpload(index, event.target.files[0])
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                            onClick={() => document.getElementById(`attachment-upload-${index}`)?.click()}
-                            disabled={form.uploadingAttachment}
-                          >
-                            {form.uploadingAttachment ? (
-                              <Loader2 className="h-6 w-6 animate-spin" />
-                            ) : (
-                              <Plus className="h-6 w-6" />
-                            )}
-                            <span className="text-xs mt-1">{form.uploadingAttachment ? "Uploading..." : "Upload"}</span>
-                          </Button>
-                          {form.attachmentFile && !form.uploadingAttachment && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <ImageIcon className="h-4 w-4" />
-                              <span>{form.attachmentFile.name}</span>
-                            </div>
-                          )}
-                          {form.attachmentError && <p className="text-xs text-red-500 mt-1">{form.attachmentError}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Assign to</Label>
-                          <Select
-                            onValueChange={(value) => handleFormUpdate(index, "assignTo", value)}
-                            value={form.assignTo}
-                          >
-                            <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                              <SelectValue placeholder="Choose Assignee" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={userData?.first_name || ""} className="text-sm">
-                                {userData?.first_name}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )
-              })}
-            </Tabs>
-          ) : (
-            // Single product form
             <div className="space-y-4">
-              <Card>
-                <CardContent className="space-y-4 pt-6">
-                  {/* Same form fields as in the tabs, but without the card header */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">JO #</Label>
-                    <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
-                  </div>
+              {/* JO # */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">JO #:</Label>
+                <div className="col-span-2">
+                  <span className="text-sm text-gray-500">(Auto-Generated)</span>
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Date Requested</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                            !jobOrderForms[0]?.dateRequested && "text-gray-500",
-                            jobOrderForms[0]?.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
-                          )}
-                          onClick={() => handleFormUpdate(0, "dateRequestedError", false)}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                          {jobOrderForms[0]?.dateRequested ? (
-                            format(jobOrderForms[0].dateRequested, "PPP")
-                          ) : (
-                            <span>Date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={jobOrderForms[0]?.dateRequested}
-                          onSelect={(date) => {
-                            handleFormUpdate(0, "dateRequested", date)
-                            handleFormUpdate(0, "dateRequestedError", false)
-                          }}
-                          // Removed initialFocus to ensure it opens to the selected date
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+              {/* Campaign Name */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">Campaign Name:</Label>
+                <div className="col-span-2">
+                  <Input
+                    placeholder="Fantastic 4"
+                    className="w-full"
+                    value={jobOrderForms[0]?.remarks || ""}
+                    onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                  />
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">JO Type</Label>
-                    <Select
-                      onValueChange={(value: JobOrderType) => {
-                        handleFormUpdate(0, "joType", value)
-                        handleFormUpdate(0, "joTypeError", false)
-                      }}
-                      value={jobOrderForms[0]?.joType}
-                    >
-                      <SelectTrigger
+              {/* Date Requested */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">Date Requested:</Label>
+                <div className="col-span-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
                         className={cn(
-                          "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                          jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
+                          "w-full justify-start text-left font-normal",
+                          !jobOrderForms[0]?.dateRequested && "text-muted-foreground",
                         )}
                       >
-                        <SelectValue placeholder="Choose JO Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {joTypes.map((type) => (
-                          <SelectItem key={type} value={type} className="text-sm">
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {jobOrderForms[0]?.dateRequested ? (
+                          format(jobOrderForms[0].dateRequested, "PPP")
+                        ) : (
+                          <span>Date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={jobOrderForms[0]?.dateRequested}
+                        onSelect={(date) => handleFormUpdate(0, "dateRequested", date)}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Deadline</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                            !jobOrderForms[0]?.deadline && "text-gray-500",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                          {jobOrderForms[0]?.deadline ? (
-                            format(jobOrderForms[0].deadline, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={jobOrderForms[0]?.deadline}
-                          onSelect={(date) => handleFormUpdate(0, "deadline", date)}
-                          disabled={{ before: new Date() }} // Disable past dates
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Requested By</Label>
-                    <Input
-                      value={userData?.first_name || "(Auto-Generated)"}
-                      disabled
-                      className="bg-gray-100 text-gray-600 text-sm h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Remarks</Label>
-                    <Textarea
-                      placeholder="Remarks..."
-                      value={jobOrderForms[0]?.remarks || ""}
-                      onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
-                      className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
-                    />
-                  </div>
-
-                  {/* Attachments */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Attachments</Label>
-                    <input
-                      type="file"
-                      id="attachment-upload-0"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => {
-                        if (event.target.files && event.target.files[0]) {
-                          handleProductAttachmentUpload(0, event.target.files[0])
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                      onClick={() => document.getElementById("attachment-upload-0")?.click()}
-                      disabled={jobOrderForms[0]?.uploadingAttachment}
-                    >
-                      {jobOrderForms[0]?.uploadingAttachment ? (
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      ) : (
-                        <Plus className="h-6 w-6" />
-                      )}
-                      <span className="text-xs mt-1">
-                        {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : "Upload"}
-                      </span>
-                    </Button>
-                    {jobOrderForms[0]?.attachmentFile && !jobOrderForms[0]?.uploadingAttachment && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <ImageIcon className="h-4 w-4" />
-                        <span>{jobOrderForms[0].attachmentFile.name}</span>
-                      </div>
-                    )}
-                    {jobOrderForms[0]?.attachmentError && (
-                      <p className="text-xs text-red-500 mt-1">{jobOrderForms[0].attachmentError}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Assign to</Label>
-                    <Select
-                      onValueChange={(value) => handleFormUpdate(0, "assignTo", value)}
-                      value={jobOrderForms[0]?.assignTo}
-                    >
-                      <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                        <SelectValue placeholder="Choose Assignee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={userData?.uid || ""} className="text-sm">
-                          {userData?.first_name}
+              {/* JO Type */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">JO Type:</Label>
+                <div className="col-span-2">
+                  <Select
+                    onValueChange={(value: JobOrderType) => handleFormUpdate(0, "joType", value)}
+                    value={jobOrderForms[0]?.joType}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="-Choose JO Type-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {joTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
                         </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => handleCreateJobOrders("draft")}
-              disabled={isSubmitting}
-              className="flex-1 bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Save as Draft
-            </Button>
-            <Button
-              onClick={() => handleCreateJobOrders("pending")}
-              disabled={isSubmitting}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Create Job Order{isMultiProduct ? "s" : ""}
-            </Button>
+              {/* Deadline */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">Deadline:</Label>
+                <div className="col-span-2 flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !jobOrderForms[0]?.deadline && "text-muted-foreground",
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {jobOrderForms[0]?.deadline ? (
+                          format(jobOrderForms[0].deadline, "PPP")
+                        ) : (
+                          <span>Select Date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={jobOrderForms[0]?.deadline}
+                        onSelect={(date) => handleFormUpdate(0, "deadline", date)}
+                        disabled={{ before: new Date() }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="outline" size="sm">
+                    Timeline
+                  </Button>
+                </div>
+              </div>
+
+              {/* Requested By */}
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <Label className="text-sm font-medium text-gray-700">Requested By:</Label>
+                <div className="col-span-2">
+                  <span className="text-sm text-gray-500">(Auto-Generated)</span>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="grid grid-cols-3 gap-4 items-start">
+                <Label className="text-sm font-medium text-gray-700 pt-2">Remarks:</Label>
+                <div className="col-span-2">
+                  <Input
+                    placeholder="Remarks..."
+                    className="w-full"
+                    value={jobOrderForms[0]?.remarks || ""}
+                    onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Material Preview */}
+              <div className="mt-8">
+                <Label className="text-sm font-medium text-gray-700 mb-3 block">Material Preview:</Label>
+                <div className="w-24 h-24 bg-gray-100 rounded border flex items-center justify-center overflow-hidden">
+                  {products[0]?.media?.[0]?.url ? (
+                    <Image
+                      src={products[0].media[0].url || "/placeholder.svg"}
+                      alt="Material preview"
+                      width={96}
+                      height={96}
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <Image
+                      src="/material-preview.png"
+                      alt="Material preview"
+                      width={96}
+                      height={96}
+                      className="object-cover w-full h-full"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Info Text */}
+              <div className="mt-6">
+                <p className="text-sm text-gray-500 italic">This Job Order will be forwarded to your Logistics Team.</p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t">
+                <Button variant="outline" onClick={() => router.push("/sales/job-orders")} className="px-6">
+                  Save as Draft
+                </Button>
+                <Button
+                  onClick={() => handleCreateJobOrder("active")}
+                  disabled={isCreating}
+                  className="px-6 bg-blue-600 hover:bg-blue-700"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create JO"
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Success Dialog */}
-      <JobOrderCreatedSuccessDialog
-        isOpen={showJobOrderSuccessDialog}
-        onClose={handleDismissAndNavigate}
-        joIds={createdJoIds}
-        isMultiple={isMultiProduct}
-      />
-
-      {/* Coming Soon Dialog */}
-      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} />
     </div>
   )
 }
