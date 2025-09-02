@@ -12,12 +12,20 @@ import { toast } from "sonner"
 import { Plus } from "lucide-react"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
 import { useAuth } from "@/contexts/auth-context" // Import useAuth
+import { collection, getDocs, addDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface ClientDialogProps {
   client?: Client
   onSuccess?: (client: Client) => void
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+interface Company {
+  id: string
+  name: string
+  created: Date
 }
 
 export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
@@ -27,7 +35,15 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null) // Ref for hidden file input
 
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [loadingCompanies, setLoadingCompanies] = useState(false)
+  const [showNewCompanyInput, setShowNewCompanyInput] = useState(false)
+  const [newCompanyName, setNewCompanyName] = useState("")
+
   const [formData, setFormData] = useState({
+    clientType: client?.clientType || "",
+    partnerType: client?.partnerType || "",
+    company_id: client?.company_id || "",
     company: client?.company || "",
     industry: client?.industry || "",
     name: client?.name || "", // Contact Person Name
@@ -38,10 +54,32 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     companyLogoUrl: client?.companyLogoUrl || "", // Existing logo URL
   })
 
+  const fetchCompanies = async () => {
+    setLoadingCompanies(true)
+    try {
+      const companiesRef = collection(db, "client_company")
+      const snapshot = await getDocs(companiesRef)
+      const companiesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+        created: doc.data().created?.toDate() || new Date(),
+      }))
+      setCompanies(companiesData)
+    } catch (error) {
+      console.error("Error fetching companies:", error)
+      toast.error("Failed to load companies")
+    } finally {
+      setLoadingCompanies(false)
+    }
+  }
+
   // Reset form data and logo states when dialog opens for a new client or when client prop changes
   useEffect(() => {
     if (open) {
       setFormData({
+        clientType: client?.clientType || "",
+        partnerType: client?.partnerType || "",
+        company_id: client?.company_id || "",
         company: client?.company || "",
         industry: client?.industry || "",
         name: client?.name || "",
@@ -53,6 +91,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       })
       setLogoFile(null) // Clear selected file
       setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
+      setShowNewCompanyInput(false)
+      setNewCompanyName("")
+      fetchCompanies()
     }
   }, [open, client])
 
@@ -63,6 +104,41 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+
+    if (name === "clientType" && value === "brand") {
+      setFormData((prev) => ({ ...prev, partnerType: "" }))
+    }
+  }
+
+  const handleCompanySelect = (value: string) => {
+    if (value === "add_new") {
+      setShowNewCompanyInput(true)
+      setFormData((prev) => ({ ...prev, company: "", company_id: "" }))
+    } else {
+      const selectedCompany = companies.find((c) => c.id === value)
+      if (selectedCompany) {
+        setFormData((prev) => ({
+          ...prev,
+          company: selectedCompany.name,
+          company_id: selectedCompany.id,
+        }))
+        setShowNewCompanyInput(false)
+      }
+    }
+  }
+
+  const createNewCompany = async (companyName: string) => {
+    try {
+      const companiesRef = collection(db, "client_company")
+      const docRef = await addDoc(companiesRef, {
+        name: companyName,
+        created: new Date(),
+      })
+      return docRef.id
+    } catch (error) {
+      console.error("Error creating company:", error)
+      throw error
+    }
   }
 
   const handleLogoClick = () => {
@@ -86,6 +162,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
     try {
       let finalCompanyLogoUrl = formData.companyLogoUrl
+      let finalCompanyId = formData.company_id
+      let finalCompanyName = formData.company
+
+      if (showNewCompanyInput && newCompanyName.trim()) {
+        finalCompanyId = await createNewCompany(newCompanyName.trim())
+        finalCompanyName = newCompanyName.trim()
+      }
 
       if (logoFile) {
         // Only upload if a new file is selected
@@ -95,12 +178,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
       const clientDataToSave = {
         ...formData,
+        company_id: finalCompanyId,
+        company: finalCompanyName,
         companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
         // Ensure required fields are not undefined if they come from optional props
         name: formData.name || "",
         email: formData.email || "",
         phone: formData.phone || "",
-        company: formData.company || "",
         industry: formData.industry || "",
         address: formData.address || "",
         designation: formData.designation || "",
@@ -146,17 +230,73 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Company Name */}
             <div className="space-y-2">
+              <Label htmlFor="clientType">Client Type:</Label>
+              <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="partner">Partner</SelectItem>
+                  <SelectItem value="brand">Brand</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.clientType === "partner" && (
+              <div className="space-y-2">
+                <Label htmlFor="partnerType">Partner Type:</Label>
+                <Select
+                  value={formData.partnerType}
+                  onValueChange={(value) => handleSelectChange("partnerType", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select partner type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="agency">Agency</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="company">Company Name:</Label>
-              <Input
-                id="company"
-                name="company"
-                value={formData.company}
-                onChange={handleChange}
-                placeholder="XYZ Company"
-                required
-              />
+              {!showNewCompanyInput ? (
+                <Select value={formData.company_id} onValueChange={handleCompanySelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Select or add company"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="add_new">+ Add New Company</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                    placeholder="Enter new company name"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowNewCompanyInput(false)
+                      setNewCompanyName("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Industry */}
