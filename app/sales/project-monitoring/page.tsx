@@ -21,7 +21,7 @@ export default function ProjectMonitoringPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(6) // 6 items per page for 2x3 grid on desktop
+  const [itemsPerPage] = useState(9) // 9 items per page for 3x3 grid on desktop
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -156,7 +156,7 @@ export default function ProjectMonitoringPage() {
         ) : products.length > 0 ? (
           <>
             <div className="overflow-auto max-h-[calc(100vh-300px)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[400px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[600px]">
                 {currentProducts.map((product) => (
                   <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
                     <button
