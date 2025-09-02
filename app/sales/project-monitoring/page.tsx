@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Search, ChevronDown } from "lucide-react"
+import { ArrowLeft, Search, ChevronDown, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState } from "react"
@@ -18,6 +18,7 @@ export default function ProjectMonitoringPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -128,7 +129,10 @@ export default function ProjectMonitoringPage() {
               .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
               .map((product) => (
                 <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
-                  <button className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors">
+                  <button
+                    onClick={() => setIsDialogOpen(true)}
+                    className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
+                  >
                     Job Orders: {jobOrderCounts[product.id] || 0}
                   </button>
 
@@ -158,6 +162,20 @@ export default function ProjectMonitoringPage() {
           <div className="text-center py-8 text-gray-500">No products found</div>
         )}
       </div>
+
+      {isDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] relative">
+            <button
+              onClick={() => setIsDialogOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="text-center py-8 text-gray-500">Job Orders Dialog</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
