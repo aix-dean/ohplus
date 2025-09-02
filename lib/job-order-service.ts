@@ -369,7 +369,10 @@ export async function generateJONumber(userData?: {
   last_name?: string
   uid: string
 }): Promise<string> {
+  console.log("[v0] generateJONumber called with userData:", userData)
+
   if (!userData) {
+    console.log("[v0] No userData provided, using fallback format")
     // Fallback to old format if no user data provided
     const timestamp = Date.now()
     const randomSuffix = Math.floor(Math.random() * 1000)
@@ -384,11 +387,14 @@ export async function generateJONumber(userData?: {
     const middleName = userData.middle_name || ""
     const lastName = userData.last_name || ""
 
+    console.log("[v0] User names:", { firstName, middleName, lastName })
+
     const firstInitial = firstName.charAt(0).toUpperCase()
     const middleInitial = middleName.charAt(0).toUpperCase()
     const lastInitial = lastName.charAt(0).toUpperCase()
 
     const initials = `${firstInitial}${middleInitial}${lastInitial}`.padEnd(3, "X") // Pad with X if missing initials
+    console.log("[v0] Generated initials:", initials)
 
     // Count existing job orders created by this user
     const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
@@ -396,10 +402,14 @@ export async function generateJONumber(userData?: {
     const querySnapshot = await getDocs(q)
 
     const nextNumber = (querySnapshot.size + 1).toString().padStart(4, "0")
+    console.log("[v0] Existing job orders count:", querySnapshot.size, "Next number:", nextNumber)
 
-    return `${initials}-${nextNumber}`
+    const finalJONumber = `${initials}-${nextNumber}`
+    console.log("[v0] Final JO Number:", finalJONumber)
+
+    return finalJONumber
   } catch (error) {
-    console.error("Error generating JO number:", error)
+    console.error("[v0] Error generating JO number:", error)
     // Fallback to timestamp format if there's an error
     const timestamp = Date.now()
     const randomSuffix = Math.floor(Math.random() * 1000)
