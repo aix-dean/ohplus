@@ -310,7 +310,8 @@ export default function ProjectMonitoringPage() {
                   {jobOrders.map((jobOrder) => (
                     <div
                       key={jobOrder.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      onClick={() => router.push(`/sales/project-monitoring/details/${jobOrder.id}`)}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-gray-900">
