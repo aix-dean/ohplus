@@ -137,42 +137,40 @@ export default function ProjectMonitoringPage() {
           <div className="text-center py-8">Loading...</div>
         ) : products.length > 0 ? (
           <div className="space-y-4">
-            <div className="h-[800px] overflow-y-auto bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products
-                  .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
-                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                  .map((product) => (
-                    <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
-                      <button
-                        onClick={handleOpenDialog}
-                        className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
-                      >
-                        Job Orders: {jobOrderCounts[product.id] || 0}
-                      </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {products
+                .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .map((product) => (
+                  <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
+                    <button
+                      onClick={handleOpenDialog}
+                      className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
+                    >
+                      Job Orders: {jobOrderCounts[product.id] || 0}
+                    </button>
 
-                      {/* Project Title Banner */}
-                      <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
-                        <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
-                      </div>
+                    {/* Project Title Banner */}
+                    <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
+                      <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+                    </div>
 
-                      {/* Project Location */}
-                      <div className="text-gray-900 font-medium mb-3">
-                        {product.specs_rental?.location || product.name || "No site code available"}
-                      </div>
+                    {/* Project Location */}
+                    <div className="text-gray-900 font-medium mb-3">
+                      {product.specs_rental?.location || product.name || "No site code available"}
+                    </div>
 
-                      {/* Last Activity Section */}
-                      <div>
-                        <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <div>5/6/25- 5:00AM- Arrival of FA to site</div>
-                          <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
-                          <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
-                        </div>
+                    {/* Last Activity Section */}
+                    <div>
+                      <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>5/6/25- 5:00AM- Arrival of FA to site</div>
+                        <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
+                        <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
                       </div>
                     </div>
-                  ))}
-              </div>
+                  </div>
+                ))}
             </div>
 
             {(() => {
