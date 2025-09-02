@@ -285,16 +285,22 @@ export default function AddClientPage() {
         finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
       }
 
-      if (showNewCompanyInput && newCompanyName.trim()) {
+      if (!formData.company_id && formData.company.trim()) {
+        // Create new company since no existing company was selected
         setFormData((prev) => ({ ...prev, companyLogoUrl: finalCompanyLogoUrl }))
-        finalCompanyId = await createNewCompany(newCompanyName.trim())
-        finalCompanyName = newCompanyName.trim()
+        finalCompanyId = await createNewCompany(formData.company.trim())
+        finalCompanyName = formData.company.trim()
 
         if (finalCompanyLogoUrl && finalCompanyLogoUrl !== formData.companyLogoUrl) {
           await updateDoc(doc(db, "client_company", finalCompanyId), {
             companyLogoUrl: finalCompanyLogoUrl,
           })
         }
+      } else if (formData.company_id && logoFile) {
+        // Update existing company logo if new logo was uploaded
+        await updateDoc(doc(db, "client_company", formData.company_id), {
+          companyLogoUrl: finalCompanyLogoUrl,
+        })
       }
 
       // Create multiple client documents for each contact person
