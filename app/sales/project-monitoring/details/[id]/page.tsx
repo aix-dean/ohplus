@@ -11,6 +11,12 @@ import { doc, getDoc } from "firebase/firestore"
 interface JobOrder {
   id: string
   joNumber: string
+  site?: string
+  client?: string
+  bookingStartDate?: any
+  bookingEndDate?: any
+  breakDate?: any
+  sales?: string
   // Add other fields as needed
 }
 
@@ -44,6 +50,22 @@ export default function JobOrderDetailsPage() {
     fetchJobOrder()
   }, [params.id])
 
+  const formatDate = (dateField: any) => {
+    if (!dateField) return "Not specified"
+
+    try {
+      if (dateField?.toDate) {
+        return dateField.toDate().toLocaleDateString()
+      } else if (dateField) {
+        const date = new Date(dateField)
+        return isNaN(date.getTime()) ? "Invalid Date" : date.toLocaleDateString()
+      }
+      return "Not specified"
+    } catch (error) {
+      return "Invalid Date"
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 py-2">
@@ -58,6 +80,47 @@ export default function JobOrderDetailsPage() {
         <span className="text-lg font-medium text-gray-900">
           {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
         </span>
+      </div>
+
+      <div className="flex justify-start">
+        <div className="flex items-start gap-4 max-w-md">
+          {/* Product image placeholder */}
+          <div className="flex-shrink-0">
+            <img src="/lilo-and-stitch-product-box.png" alt="Product" className="w-20 h-20 object-cover rounded-md border" />
+          </div>
+
+          {/* Site information */}
+          <div className="flex-1 space-y-1 text-sm">
+            <div>
+              <span className="font-medium text-gray-900">Site: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : jobOrder?.site || "Not specified"}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Client: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : jobOrder?.client || "Not specified"}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Booking Dates: </span>
+              <span className="text-gray-700">
+                {loading
+                  ? "Loading..."
+                  : `${formatDate(jobOrder?.bookingStartDate)} to ${formatDate(jobOrder?.bookingEndDate)}`}
+              </span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Breakdate: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : formatDate(jobOrder?.breakDate)}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Sales: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : jobOrder?.sales || "Not specified"}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
