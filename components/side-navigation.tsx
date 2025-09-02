@@ -1210,7 +1210,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
                   { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Project Monitoring", href: "/sales/project-bulletins", icon: Monitor },
+                  { title: "Project Bulletins", href: "/sales/project-monitoring", icon: Monitor },
                   { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
