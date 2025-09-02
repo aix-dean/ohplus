@@ -470,7 +470,8 @@ export default function SalesReportPreviewPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">{getSiteName(report)}</div>
+          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">Lilo & Stitch</div>
+          {report.joNumber && <span className="text-lg font-medium text-gray-900">{report.joNumber}</span>}
         </div>
 
         <div className="ml-auto"></div>
