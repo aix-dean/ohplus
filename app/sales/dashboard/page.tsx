@@ -1215,42 +1215,44 @@ function SalesDashboardContent() {
                   </div>
                   {/* Results dropdown */}
                   {isClientDropdownOpen && (
-                    <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
-                      <div className="p-2">
-                        {/* Always show "Add New Client" option at the top */}
-                        <div
-                          className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                          onClick={() => setIsNewClientDialogOpen(true)}
-                        >
-                          <PlusCircle className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium text-blue-700">Add New Client</span>
-                        </div>
+                    <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
+                      <div className="max-h-[200px] overflow-y-auto">
+                        <div className="p-2">
+                          {/* Always show "Add New Client" option at the top */}
+                          <div
+                            className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                            onClick={() => setIsNewClientDialogOpen(true)}
+                          >
+                            <PlusCircle className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium text-blue-700">Add New Client</span>
+                          </div>
 
-                        {dashboardClientSearchResults.length > 0 ? (
-                          dashboardClientSearchResults.map((result) => (
-                            <div
-                              key={result.id}
-                              className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                              onClick={() => handleClientSelectOnDashboard(result)}
-                            >
-                              <div>
-                                <p className="font-medium">
-                                  {result.name} ({result.company})
-                                </p>
-                                <p className="text-xs text-gray-500">{result.email}</p>
+                          {dashboardClientSearchResults.length > 0 ? (
+                            dashboardClientSearchResults.map((result) => (
+                              <div
+                                key={result.id}
+                                className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                                onClick={() => handleClientSelectOnDashboard(result)}
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    {result.name} ({result.company})
+                                  </p>
+                                  <p className="text-xs text-gray-500">{result.email}</p>
+                                </div>
+                                {selectedClientForProposal?.id === result.id && (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                )}
                               </div>
-                              {selectedClientForProposal?.id === result.id && (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500 text-center py-2">
-                            {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                              ? `No clients found for "${dashboardClientSearchTerm}".`
-                              : "Start typing to search for clients."}
-                          </p>
-                        )}
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500 text-center py-2">
+                              {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                                ? `No clients found for "${dashboardClientSearchTerm}".`
+                                : "Start typing to search for clients."}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </Card>
                   )}
