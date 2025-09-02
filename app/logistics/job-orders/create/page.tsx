@@ -173,7 +173,16 @@ export default function CreateJobOrderPage() {
 
     try {
       const jobOrderData = {
-        joNumber: generateJONumber(),
+        joNumber: await generateJONumber(
+          userData
+            ? {
+                first_name: userData.first_name,
+                middle_name: userData.middle_name,
+                last_name: userData.last_name,
+                uid: userData.uid,
+              }
+            : undefined,
+        ),
         dateRequested: jobOrderForm.dateRequested!.toISOString(),
         joType: jobOrderForm.joType as JobOrderType,
         deadline: jobOrderForm.deadline!.toISOString(),
@@ -347,7 +356,15 @@ export default function CreateJobOrderPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm text-gray-800">JO #</Label>
-                <Input value={generateJONumber()} disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
+                <Input
+                  value={
+                    userData
+                      ? `${userData.first_name?.charAt(0) || "X"}${userData.middle_name?.charAt(0) || "X"}${userData.last_name?.charAt(0) || "X"}-XXXX`
+                      : "JO-PREVIEW"
+                  }
+                  disabled
+                  className="bg-gray-100 text-gray-600 text-sm h-9"
+                />
               </div>
 
               <div className="space-y-2">
