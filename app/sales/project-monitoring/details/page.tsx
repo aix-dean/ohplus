@@ -3,7 +3,7 @@
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-export default function JobOrderDetailsPage() {
+export default function ProjectMonitoringDetailsPage() {
   const router = useRouter()
 
   return (
@@ -21,9 +21,9 @@ export default function JobOrderDetailsPage() {
       </div>
 
       <div className="p-4">
-        {/* This page is intentionally left blank as requested */}
-        <div className="bg-white rounded-lg border border-gray-300 p-8 text-center">
-          <p className="text-gray-500">Job Order Details Page</p>
+        {/* Blank content area - ready for future implementation */}
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+          <p className="text-gray-500">Job order details will be displayed here</p>
         </div>
       </div>
     </div>
