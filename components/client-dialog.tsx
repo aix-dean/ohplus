@@ -163,6 +163,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         clientType: formData.clientType,
         companyLogoUrl: "", // Will be updated after logo upload if needed
         created: new Date(),
+        user_company_id: user?.company_id || "", // Added user_company_id to track which company the user belongs to
       })
       return docRef.id
     } catch (error) {
