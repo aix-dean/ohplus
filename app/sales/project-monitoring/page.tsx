@@ -12,16 +12,102 @@ interface JobOrderCount {
   [productId: string]: number
 }
 
+interface JobOrder {
+  id: string
+  joNumber: string
+  product_id: string
+  company_id: string
+  status: string
+  createdAt: any
+  updatedAt: any
+  [key: string]: any
+}
+
+interface Report {
+  id: string
+  joNumber: string
+  date: any
+  category: string
+  status: string
+  description: string
+  attachments?: string[]
+  [key: string]: any
+}
+
+interface ProductReports {
+  [productId: string]: Report[]
+}
+
 export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
+  const [productReports, setProductReports] = useState<ProductReports>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 9
+
+  const fetchProductReports = async (productIds: string[]) => {
+    if (!userData?.company_id || productIds.length === 0) return
+
+    try {
+      // First, get all job orders for the products
+      const jobOrdersRef = collection(db, "job_orders")
+      const jobOrdersQuery = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+      const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
+
+      // Create a map of joNumber to product_id
+      const joNumberToProductId: { [joNumber: string]: string } = {}
+      jobOrdersSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.joNumber && data.product_id && productIds.includes(data.product_id)) {
+          joNumberToProductId[data.joNumber] = data.product_id
+        }
+      })
+
+      // Get all joNumbers for the products
+      const joNumbers = Object.keys(joNumberToProductId)
+
+      if (joNumbers.length === 0) return
+
+      // Fetch reports for these joNumbers
+      const reportsRef = collection(db, "reports")
+      const reportsQuery = query(reportsRef, where("joNumber", "in", joNumbers))
+      const reportsSnapshot = await getDocs(reportsQuery)
+
+      // Group reports by product_id
+      const reportsByProduct: ProductReports = {}
+      reportsSnapshot.forEach((doc) => {
+        const reportData = { id: doc.id, ...doc.data() } as Report
+        const productId = joNumberToProductId[reportData.joNumber]
+
+        if (productId) {
+          if (!reportsByProduct[productId]) {
+            reportsByProduct[productId] = []
+          }
+          reportsByProduct[productId].push(reportData)
+        }
+      })
+
+      // Sort reports by date (newest first) for each product
+      Object.keys(reportsByProduct).forEach((productId) => {
+        reportsByProduct[productId].sort((a, b) => {
+          const aTime = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0)
+          const bTime = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0)
+          return bTime.getTime() - aTime.getTime()
+        })
+      })
+
+      setProductReports(reportsByProduct)
+    } catch (error) {
+      console.error("Error fetching product reports:", error)
+    }
+  }
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -49,13 +135,59 @@ export default function ProjectMonitoringPage() {
     }
   }
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = async (product: Product) => {
+    setSelectedProduct(product)
     setIsDialogOpen(true)
     setIsDialogLoading(true)
-    // Simulate loading time
-    setTimeout(() => {
+
+    try {
+      if (!userData?.company_id) return
+
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(
+        jobOrdersRef,
+        where("company_id", "==", userData.company_id),
+        where("product_id", "==", product.id),
+      )
+      const querySnapshot = await getDocs(q)
+
+      const fetchedJobOrders: JobOrder[] = []
+      querySnapshot.forEach((doc) => {
+        fetchedJobOrders.push({ id: doc.id, ...doc.data() } as JobOrder)
+      })
+
+      fetchedJobOrders.sort((a, b) => {
+        let aTime: Date
+        let bTime: Date
+
+        // Handle Firestore Timestamp objects
+        if (a.createdAt?.toDate) {
+          aTime = a.createdAt.toDate()
+        } else if (a.createdAt) {
+          aTime = new Date(a.createdAt)
+        } else {
+          aTime = new Date(0) // Default to epoch if no date
+        }
+
+        if (b.createdAt?.toDate) {
+          bTime = b.createdAt.toDate()
+        } else if (b.createdAt) {
+          bTime = new Date(b.createdAt)
+        } else {
+          bTime = new Date(0) // Default to epoch if no date
+        }
+
+        // Sort descending (newest first)
+        return bTime.getTime() - aTime.getTime()
+      })
+
+      setJobOrders(fetchedJobOrders)
+    } catch (error) {
+      console.error("Error fetching job orders:", error)
+      setJobOrders([])
+    } finally {
       setIsDialogLoading(false)
-    }, 1000)
+    }
   }
 
   useEffect(() => {
@@ -80,6 +212,7 @@ export default function ProjectMonitoringPage() {
         if (fetchedProducts.length > 0) {
           const productIds = fetchedProducts.map((p) => p.id)
           await fetchJobOrderCounts(productIds)
+          await fetchProductReports(productIds)
         }
       } catch (error) {
         console.error("Error fetching products:", error)
@@ -144,7 +277,7 @@ export default function ProjectMonitoringPage() {
                 .map((product) => (
                   <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
                     <button
-                      onClick={handleOpenDialog}
+                      onClick={() => handleOpenDialog(product)}
                       className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
                     >
                       Job Orders: {jobOrderCounts[product.id] || 0}
@@ -164,9 +297,29 @@ export default function ProjectMonitoringPage() {
                     <div>
                       <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <div>5/6/25- 5:00AM- Arrival of FA to site</div>
-                        <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
-                        <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+                        {productReports[product.id] && productReports[product.id].length > 0 ? (
+                          productReports[product.id].slice(0, 3).map((report, index) => {
+                            const reportDate = report.date?.toDate ? report.date.toDate() : new Date(report.date || 0)
+                            const formattedDate = reportDate.toLocaleDateString("en-US", {
+                              month: "numeric",
+                              day: "numeric",
+                              year: "2-digit",
+                            })
+                            const formattedTime = reportDate.toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })
+
+                            return (
+                              <div key={report.id}>
+                                {formattedDate}- {formattedTime}- {report.description || "No description available"}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className="text-gray-500 italic">No recent activity</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -223,20 +376,75 @@ export default function ProjectMonitoringPage() {
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] relative animate-in zoom-in-95 duration-300">
+          <div className="bg-white rounded-lg p-6 w-[600px] max-w-[90vw] max-h-[80vh] relative animate-in zoom-in-95 duration-300">
             <button
               onClick={() => setIsDialogOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
+
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Job Orders</h2>
+              {selectedProduct && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedProduct.specs_rental?.location || selectedProduct.name || "Unknown Site"}
+                </p>
+              )}
+            </div>
+
             {isDialogLoading ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-500">Loading job orders...</p>
               </div>
+            ) : jobOrders.length > 0 ? (
+              <div className="max-h-96 overflow-y-auto">
+                <div className="space-y-3">
+                  {jobOrders.map((jobOrder) => (
+                    <div
+                      key={jobOrder.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/sales/project-monitoring/details/${jobOrder.id}`)}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-gray-900">
+                          Job Order #: {jobOrder.joNumber || jobOrder.id.slice(-6)}
+                        </h3>
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            jobOrder.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : jobOrder.status === "in_progress"
+                                ? "bg-blue-100 text-blue-800"
+                                : jobOrder.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {jobOrder.status || "Unknown"}
+                        </span>
+                      </div>
+
+                      {jobOrder.description && <p className="text-sm text-gray-600 mb-2">{jobOrder.description}</p>}
+
+                      <div className="text-xs text-gray-500">
+                        Created: {(() => {
+                          if (jobOrder.createdAt?.toDate) {
+                            return jobOrder.createdAt.toDate().toLocaleDateString()
+                          } else if (jobOrder.createdAt) {
+                            const date = new Date(jobOrder.createdAt)
+                            return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
+                          }
+                          return "Unknown"
+                        })()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">Job Orders Dialog</div>
+              <div className="text-center py-8 text-gray-500">No job orders found for this site</div>
             )}
           </div>
         </div>

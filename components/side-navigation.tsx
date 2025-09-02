@@ -798,6 +798,22 @@ export function SideNavigation() {
                   <div className="w-8 h-8 bg-white/30 rounded-full"></div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
+                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  </div>
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
                   </div>
                   <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -1194,7 +1210,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
                   { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Project Monitoring", href: "/sales/project-monitoring", icon: Monitor },
+                  { title: "Project Bulletins", href: "/sales/project-monitoring", icon: Monitor },
                   { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon

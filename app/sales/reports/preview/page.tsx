@@ -569,7 +569,9 @@ export default function SalesReportPreviewPage() {
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
-                      <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "7733"}</span>
+                      <span className="text-gray-900">
+                        {report.joNumber || report.id?.slice(-4).toUpperCase() || "N/A"}
+                      </span>
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
