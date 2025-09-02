@@ -626,7 +626,7 @@ export default function CreateJobOrderPage() {
             </div>
             <div className="space-y-0.5">
               <p className="text-sm">
-                <span className="font-semibold">Client Name:</span> {client?.company || client?.name || "N/A"}
+                <span className="font-semibold">Client Name:</span> {quotation.client_name || "N/A"}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
