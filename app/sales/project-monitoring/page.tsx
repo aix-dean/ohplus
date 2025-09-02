@@ -23,18 +23,91 @@ interface JobOrder {
   [key: string]: any
 }
 
+interface Report {
+  id: string
+  joNumber: string
+  date: any
+  category: string
+  status: string
+  description: string
+  attachments?: string[]
+  [key: string]: any
+}
+
+interface ProductReports {
+  [productId: string]: Report[]
+}
+
 export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
+  const [productReports, setProductReports] = useState<ProductReports>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 9
+
+  const fetchProductReports = async (productIds: string[]) => {
+    if (!userData?.company_id || productIds.length === 0) return
+
+    try {
+      // First, get all job orders for the products
+      const jobOrdersRef = collection(db, "job_orders")
+      const jobOrdersQuery = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+      const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
+
+      // Create a map of joNumber to product_id
+      const joNumberToProductId: { [joNumber: string]: string } = {}
+      jobOrdersSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.joNumber && data.product_id && productIds.includes(data.product_id)) {
+          joNumberToProductId[data.joNumber] = data.product_id
+        }
+      })
+
+      // Get all joNumbers for the products
+      const joNumbers = Object.keys(joNumberToProductId)
+
+      if (joNumbers.length === 0) return
+
+      // Fetch reports for these joNumbers
+      const reportsRef = collection(db, "reports")
+      const reportsQuery = query(reportsRef, where("joNumber", "in", joNumbers))
+      const reportsSnapshot = await getDocs(reportsQuery)
+
+      // Group reports by product_id
+      const reportsByProduct: ProductReports = {}
+      reportsSnapshot.forEach((doc) => {
+        const reportData = { id: doc.id, ...doc.data() } as Report
+        const productId = joNumberToProductId[reportData.joNumber]
+
+        if (productId) {
+          if (!reportsByProduct[productId]) {
+            reportsByProduct[productId] = []
+          }
+          reportsByProduct[productId].push(reportData)
+        }
+      })
+
+      // Sort reports by date (newest first) for each product
+      Object.keys(reportsByProduct).forEach((productId) => {
+        reportsByProduct[productId].sort((a, b) => {
+          const aTime = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0)
+          const bTime = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0)
+          return bTime.getTime() - aTime.getTime()
+        })
+      })
+
+      setProductReports(reportsByProduct)
+    } catch (error) {
+      console.error("Error fetching product reports:", error)
+    }
+  }
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -139,6 +212,7 @@ export default function ProjectMonitoringPage() {
         if (fetchedProducts.length > 0) {
           const productIds = fetchedProducts.map((p) => p.id)
           await fetchJobOrderCounts(productIds)
+          await fetchProductReports(productIds)
         }
       } catch (error) {
         console.error("Error fetching products:", error)
@@ -223,9 +297,29 @@ export default function ProjectMonitoringPage() {
                     <div>
                       <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <div>5/6/25- 5:00AM- Arrival of FA to site</div>
-                        <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
-                        <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+                        {productReports[product.id] && productReports[product.id].length > 0 ? (
+                          productReports[product.id].slice(0, 3).map((report, index) => {
+                            const reportDate = report.date?.toDate ? report.date.toDate() : new Date(report.date || 0)
+                            const formattedDate = reportDate.toLocaleDateString("en-US", {
+                              month: "numeric",
+                              day: "numeric",
+                              year: "2-digit",
+                            })
+                            const formattedTime = reportDate.toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })
+
+                            return (
+                              <div key={report.id}>
+                                {formattedDate}- {formattedTime}- {report.description || "No description available"}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className="text-gray-500 italic">No recent activity</div>
+                        )}
                       </div>
                     </div>
                   </div>
