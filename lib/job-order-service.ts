@@ -300,6 +300,54 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
   }
 }
 
+export async function getJobOrdersByProductId(productId: string): Promise<JobOrder[]> {
+  try {
+    console.log("Fetching job orders for product ID:", productId)
+
+    if (!productId) {
+      console.log("No productId provided")
+      return []
+    }
+
+    const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
+    const q = query(jobOrdersRef, where("product_id", "==", productId), orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const jobOrders: JobOrder[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotationId || "",
+        product_id: data.product_id || "",
+      } as JobOrder)
+    })
+
+    console.log(`Found ${jobOrders.length} job orders for product ${productId}`)
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching job orders by product ID:", error)
+    throw error
+  }
+}
+
 export async function getAllJobOrders(): Promise<JobOrder[]> {
   try {
     const q = query(collection(db, JOB_ORDERS_COLLECTION), orderBy("createdAt", "desc"))
