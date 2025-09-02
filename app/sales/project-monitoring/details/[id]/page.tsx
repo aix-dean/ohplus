@@ -234,6 +234,101 @@ export default function JobOrderDetailsPage() {
           </div>
         </div>
       </div>
+
+      <div className="mt-8">
+        <div className="bg-gradient-to-r from-blue-600 to-teal-400 text-white px-4 py-3 rounded-t-lg">
+          <h2 className="text-lg font-semibold">Project Monitoring</h2>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-b-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Time</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Team</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Update</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Attachments</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white">Installer</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Finished installation of new material</td>
+                <td className="px-4 py-3">
+                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
+                </td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-purple-500 hover:bg-purple-600 text-white">Delivery</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Arrived at site</td>
+                <td className="px-4 py-3 text-sm text-gray-500">N/A</td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white">Installer</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Arrived at site</td>
+                <td className="px-4 py-3">
+                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
+                </td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 4, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Logistics</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Reported Bad Weather as cause of delay</td>
+                <td className="px-4 py-3">
+                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
+                </td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 3, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Logistics</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Contacted Team C for installation</td>
+                <td className="px-4 py-3 text-sm text-gray-500">N/A</td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">May 2, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Sales</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Created an Installation JO for Petplans Site</td>
+                <td className="px-4 py-3">
+                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
+                </td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm text-gray-900">April 20, 2025</td>
+                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
+                <td className="px-4 py-3">
+                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Sales</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">Received signed contract. Project approved.</td>
+                <td className="px-4 py-3">
+                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
