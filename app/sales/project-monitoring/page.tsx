@@ -12,6 +12,17 @@ interface JobOrderCount {
   [productId: string]: number
 }
 
+interface JobOrder {
+  id: string
+  job_order_number: string
+  product_id: string
+  company_id: string
+  status: string
+  created_at: any
+  updated_at: any
+  [key: string]: any
+}
+
 export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { userData } = useAuth()
@@ -20,6 +31,8 @@ export default function ProjectMonitoringPage() {
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 9
 
@@ -49,13 +62,41 @@ export default function ProjectMonitoringPage() {
     }
   }
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = async (product: Product) => {
+    setSelectedProduct(product)
     setIsDialogOpen(true)
     setIsDialogLoading(true)
-    // Simulate loading time
-    setTimeout(() => {
+
+    try {
+      if (!userData?.company_id) return
+
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(
+        jobOrdersRef,
+        where("company_id", "==", userData.company_id),
+        where("product_id", "==", product.id),
+      )
+      const querySnapshot = await getDocs(q)
+
+      const fetchedJobOrders: JobOrder[] = []
+      querySnapshot.forEach((doc) => {
+        fetchedJobOrders.push({ id: doc.id, ...doc.data() } as JobOrder)
+      })
+
+      // Sort by created_at descending (newest first)
+      fetchedJobOrders.sort((a, b) => {
+        const aTime = a.created_at?.toDate?.() || new Date(a.created_at)
+        const bTime = b.created_at?.toDate?.() || new Date(b.created_at)
+        return bTime.getTime() - aTime.getTime()
+      })
+
+      setJobOrders(fetchedJobOrders)
+    } catch (error) {
+      console.error("Error fetching job orders:", error)
+      setJobOrders([])
+    } finally {
       setIsDialogLoading(false)
-    }, 1000)
+    }
   }
 
   useEffect(() => {
@@ -144,7 +185,7 @@ export default function ProjectMonitoringPage() {
                 .map((product) => (
                   <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
                     <button
-                      onClick={handleOpenDialog}
+                      onClick={() => handleOpenDialog(product)}
                       className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
                     >
                       Job Orders: {jobOrderCounts[product.id] || 0}
@@ -223,20 +264,77 @@ export default function ProjectMonitoringPage() {
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] relative animate-in zoom-in-95 duration-300">
+          <div className="bg-white rounded-lg p-6 w-[600px] max-w-[90vw] max-h-[80vh] relative animate-in zoom-in-95 duration-300">
             <button
               onClick={() => setIsDialogOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
+
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Job Orders</h2>
+              {selectedProduct && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedProduct.specs_rental?.location || selectedProduct.name || "Unknown Site"}
+                </p>
+              )}
+            </div>
+
             {isDialogLoading ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-500">Loading job orders...</p>
               </div>
+            ) : jobOrders.length > 0 ? (
+              <div className="max-h-96 overflow-y-auto">
+                <div className="space-y-3">
+                  {jobOrders.map((jobOrder) => (
+                    <div
+                      key={jobOrder.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-gray-900">
+                          JO #{jobOrder.job_order_number || jobOrder.id.slice(-6)}
+                        </h3>
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            jobOrder.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : jobOrder.status === "in_progress"
+                                ? "bg-blue-100 text-blue-800"
+                                : jobOrder.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {jobOrder.status || "Unknown"}
+                        </span>
+                      </div>
+
+                      {jobOrder.description && <p className="text-sm text-gray-600 mb-2">{jobOrder.description}</p>}
+
+                      <div className="text-xs text-gray-500">
+                        Created:{" "}
+                        {jobOrder.created_at?.toDate?.()?.toLocaleDateString() ||
+                          new Date(jobOrder.created_at).toLocaleDateString() ||
+                          "Unknown"}
+                      </div>
+
+                      {jobOrder.updated_at && (
+                        <div className="text-xs text-gray-500">
+                          Updated:{" "}
+                          {jobOrder.updated_at?.toDate?.()?.toLocaleDateString() ||
+                            new Date(jobOrder.updated_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">Job Orders Dialog</div>
+              <div className="text-center py-8 text-gray-500">No job orders found for this site</div>
             )}
           </div>
         </div>
