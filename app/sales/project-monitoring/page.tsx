@@ -19,6 +19,7 @@ export default function ProjectMonitoringPage() {
   const [loading, setLoading] = useState(true)
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogLoading, setIsDialogLoading] = useState(false)
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -44,6 +45,15 @@ export default function ProjectMonitoringPage() {
     } catch (error) {
       console.error("Error fetching job order counts:", error)
     }
+  }
+
+  const handleOpenDialog = () => {
+    setIsDialogOpen(true)
+    setIsDialogLoading(true)
+    // Simulate loading time
+    setTimeout(() => {
+      setIsDialogLoading(false)
+    }, 1000)
   }
 
   useEffect(() => {
@@ -130,7 +140,7 @@ export default function ProjectMonitoringPage() {
               .map((product) => (
                 <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
                   <button
-                    onClick={() => setIsDialogOpen(true)}
+                    onClick={handleOpenDialog}
                     className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
                   >
                     Job Orders: {jobOrderCounts[product.id] || 0}
@@ -164,15 +174,22 @@ export default function ProjectMonitoringPage() {
       </div>
 
       {isDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] relative animate-in zoom-in-95 duration-300">
             <button
               onClick={() => setIsDialogOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="text-center py-8 text-gray-500">Job Orders Dialog</div>
+            {isDialogLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p className="mt-2 text-gray-500">Loading job orders...</p>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">Job Orders Dialog</div>
+            )}
           </div>
         </div>
       )}
