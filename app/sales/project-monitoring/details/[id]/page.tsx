@@ -115,13 +115,7 @@ export default function JobOrderDetailsPage() {
           jobOrder.contractPeriodStart && jobOrder.contractPeriodEnd
             ? `${formatDate(jobOrder.contractPeriodStart)} to ${formatDate(jobOrder.contractPeriodEnd)}`
             : "Not specified",
-        leaseRate: jobOrder.leaseRatePerMonth
-          ? `₱${jobOrder.leaseRatePerMonth.toLocaleString()}/month`
-          : "Not specified",
-        totalAmount: jobOrder.totalAmount ? `₱${jobOrder.totalAmount.toLocaleString()}` : "Not specified",
-        status: jobOrder.status || "Not specified",
         jobType: jobOrder.joType || "Not specified",
-        assignedTo: jobOrder.assignTo || "Not specified",
       }
     }
 
@@ -129,11 +123,7 @@ export default function JobOrderDetailsPage() {
       site: "Not specified",
       client: "Not specified",
       contractPeriod: "Not specified",
-      leaseRate: "Not specified",
-      totalAmount: "Not specified",
-      status: "Not specified",
       jobType: "Not specified",
-      assignedTo: "Not specified",
     }
   }
 
@@ -184,28 +174,8 @@ export default function JobOrderDetailsPage() {
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Lease Rate: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.leaseRate}</span>
-            </div>
-
-            <div>
-              <span className="font-medium text-gray-900">Total Amount: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.totalAmount}</span>
-            </div>
-
-            <div>
-              <span className="font-medium text-gray-900">Status: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.status}</span>
-            </div>
-
-            <div>
               <span className="font-medium text-gray-900">Job Type: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.jobType}</span>
-            </div>
-
-            <div>
-              <span className="font-medium text-gray-900">Assigned To: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.assignedTo}</span>
             </div>
           </div>
         </div>
