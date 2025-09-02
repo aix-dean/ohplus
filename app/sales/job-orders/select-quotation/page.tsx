@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Search, FileText, CheckCircle, ArrowLeft, Package } from "lucide-react"
+import { Loader2, Search, ArrowLeft, Package } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationsForSelection } from "@/lib/job-order-service"
@@ -73,7 +73,7 @@ export default function SelectQuotationPage() {
   )
 
   const handleSelect = (quotation: Quotation) => {
-    setSelectedQuotation(quotation)
+    router.push(`/sales/job-orders/create?quotationId=${quotation.id}`)
   }
 
   const getProductCount = (quotation: Quotation): number => {
@@ -88,18 +88,6 @@ export default function SelectQuotationPage() {
       return quotation.items.map((item: any) => item.name).join(", ")
     }
     return quotation.product_name || "N/A"
-  }
-
-  const handleConfirm = () => {
-    if (selectedQuotation) {
-      router.push(`/sales/job-orders/create?quotationId=${selectedQuotation.id}`)
-    } else {
-      toast({
-        title: "No Quotation Selected",
-        description: "Please select a quotation to proceed.",
-        variant: "destructive",
-      })
-    }
   }
 
   return (
@@ -143,10 +131,7 @@ export default function SelectQuotationPage() {
                   <Card
                     key={quotation.id}
                     className={cn(
-                      "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors",
-                      selectedQuotation?.id === quotation.id
-                        ? "border-blue-500 bg-blue-50 shadow-md"
-                        : "hover:bg-gray-50",
+                      "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 hover:border-blue-300",
                     )}
                     onClick={() => handleSelect(quotation)}
                   >
@@ -159,7 +144,6 @@ export default function SelectQuotationPage() {
                             {productCount} Products
                           </Badge>
                         )}
-                        {selectedQuotation?.id === quotation.id && <CheckCircle className="h-5 w-5 text-blue-600" />}
                       </div>
                     </div>
                     <p className="text-sm text-gray-700 mb-1">Client: {quotation.client_name}</p>
@@ -186,12 +170,6 @@ export default function SelectQuotationPage() {
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => router.back()}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirm} disabled={!selectedQuotation}>
-            <FileText className="mr-2 h-4 w-4" />
-            {selectedQuotation && getProductCount(selectedQuotation) > 1
-              ? `Create ${getProductCount(selectedQuotation)} Job Orders`
-              : "Create Job Order"}
           </Button>
         </div>
       </Card>
