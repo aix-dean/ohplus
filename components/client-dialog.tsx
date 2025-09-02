@@ -25,6 +25,10 @@ interface ClientDialogProps {
 interface Company {
   id: string
   name: string
+  address?: string
+  industry?: string
+  clientType?: string
+  companyLogoUrl?: string
   created: Date
 }
 
@@ -62,6 +66,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       const companiesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         name: doc.data().name,
+        address: doc.data().address || "",
+        industry: doc.data().industry || "",
+        clientType: doc.data().clientType || "",
+        companyLogoUrl: doc.data().companyLogoUrl || "",
         created: doc.data().created?.toDate() || new Date(),
       }))
       setCompanies(companiesData)
@@ -110,14 +118,19 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
   }
 
-  const handleCompanySelect = (value: string) => {
+  const handleCompanySelect = async (value: string) => {
     if (value === "add_new") {
       setShowNewCompanyInput(true)
       setFormData((prev) => ({
         ...prev,
         company: "",
         company_id: "",
+        address: "",
+        industry: "",
+        clientType: "",
+        companyLogoUrl: "",
       }))
+      setLogoPreviewUrl(null)
     } else {
       const selectedCompany = companies.find((c) => c.id === value)
       if (selectedCompany) {
@@ -125,7 +138,16 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           ...prev,
           company: selectedCompany.name,
           company_id: selectedCompany.id,
+          address: selectedCompany.address || "",
+          industry: selectedCompany.industry || "",
+          clientType: selectedCompany.clientType || "",
+          companyLogoUrl: selectedCompany.companyLogoUrl || "",
+          name: "",
+          designation: "",
+          phone: "",
+          email: "",
         }))
+        setLogoPreviewUrl(selectedCompany.companyLogoUrl || null)
         setShowNewCompanyInput(false)
       }
     }
@@ -195,20 +217,17 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company_id: finalCompanyId,
         company: finalCompanyName,
         companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
-        // Ensure required fields are not undefined if they come from optional props
         name: formData.name || "",
         email: formData.email || "",
         phone: formData.phone || "",
         industry: formData.industry || "",
         address: formData.address || "",
         designation: formData.designation || "",
-        // Default status and empty notes/city/state/zipCode if not explicitly handled by new UI
         status: client?.status || "lead",
         notes: client?.notes || "",
         city: client?.city || "",
         state: client?.state || "",
         zipCode: client?.zipCode || "",
-        // Add uploadedBy and uploadedByName for new clients
         uploadedBy: client?.uploadedBy || user?.uid || "",
         uploadedByName: client?.uploadedByName || user?.displayName || user?.email || "",
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
@@ -244,37 +263,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="clientType">Client Type:</Label>
-              <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select client type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="partner">Partner</SelectItem>
-                  <SelectItem value="brand">Brand</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.clientType === "partner" && (
-              <div className="space-y-2">
-                <Label htmlFor="partnerType">Partner Type:</Label>
-                <Select
-                  value={formData.partnerType}
-                  onValueChange={(value) => handleSelectChange("partnerType", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select partner type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="operator">Operator</SelectItem>
-                    <SelectItem value="agency">Agency</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="company">Company Name:</Label>
               {!showNewCompanyInput ? (
@@ -313,7 +301,37 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
               )}
             </div>
 
-            {/* Industry */}
+            <div className="space-y-2">
+              <Label htmlFor="clientType">Client Type:</Label>
+              <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="partner">Partner</SelectItem>
+                  <SelectItem value="brand">Brand</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.clientType === "partner" && (
+              <div className="space-y-2">
+                <Label htmlFor="partnerType">Partner Type:</Label>
+                <Select
+                  value={formData.partnerType}
+                  onValueChange={(value) => handleSelectChange("partnerType", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select partner type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="agency">Agency</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="industry">Industry:</Label>
               <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
@@ -331,42 +349,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
               </Select>
             </div>
 
-            {/* Contact Person */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="name">Contact Person:</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
-              <Input
-                id="designation"
-                name="designation"
-                value={formData.designation}
-                onChange={handleChange}
-                placeholder="Designation"
-              />
-            </div>
-
-            {/* Contact Details */}
-            <div className="space-y-2 md:col-span-2">
-              <Label>Contact Details:</Label>
-              <Input
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Phone Number"
-                required
-              />
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Email Address"
-                required
-              />
-            </div>
-
-            {/* Address */}
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="address">Address:</Label>
               <Input
@@ -378,7 +360,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
               />
             </div>
 
-            {/* Company Logo */}
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="companyLogo">
                 Company Logo: <span className="text-green-600">(Optional)</span>
@@ -403,6 +384,39 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                 onChange={handleFileChange}
                 className="hidden"
                 accept="image/*" // Only accept image files
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="name">Contact Person:</Label>
+              <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
+              <Input
+                id="designation"
+                name="designation"
+                value={formData.designation}
+                onChange={handleChange}
+                placeholder="Designation"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Contact Details:</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Phone Number"
+                required
+              />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Email Address"
+                required
               />
             </div>
           </div>
