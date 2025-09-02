@@ -49,10 +49,20 @@ export default function AddClientPage() {
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const dtiFileInputRef = useRef<HTMLInputElement>(null)
+  const gisFileInputRef = useRef<HTMLInputElement>(null)
+  const idFileInputRef = useRef<HTMLInputElement>(null)
+
   const [companies, setCompanies] = useState<Company[]>([])
   const [loadingCompanies, setLoadingCompanies] = useState(false)
   const [showNewCompanyInput, setShowNewCompanyInput] = useState(false)
   const [newCompanyName, setNewCompanyName] = useState("")
+
+  const [complianceFiles, setComplianceFiles] = useState({
+    dti: null as File | null,
+    gis: null as File | null,
+    id: null as File | null,
+  })
 
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([])
   const [showAddContact, setShowAddContact] = useState(false)
@@ -193,6 +203,23 @@ export default function AddClientPage() {
     }
   }
 
+  const handleComplianceFileChange = (type: "dti" | "gis" | "id") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setComplianceFiles((prev) => ({ ...prev, [type]: file }))
+      toast.success(`${type.toUpperCase()} document selected`)
+    }
+  }
+
+  const handleComplianceUpload = (type: "dti" | "gis" | "id") => {
+    const fileInputRefs = {
+      dti: dtiFileInputRef,
+      gis: gisFileInputRef,
+      id: idFileInputRef,
+    }
+    fileInputRefs[type].current?.click()
+  }
+
   const handleAddContact = () => {
     if (newContact.name && newContact.email && newContact.phone) {
       const contact: ContactPerson = {
@@ -331,41 +358,14 @@ export default function AddClientPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Company Name:</Label>
-                  {!showNewCompanyInput ? (
-                    <Select value={formData.company_id} onValueChange={handleCompanySelect}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Company Name" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="add_new">+ Add New Company</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Input
-                        value={newCompanyName}
-                        onChange={(e) => setNewCompanyName(e.target.value)}
-                        placeholder="Enter new company name"
-                        className="h-10"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowNewCompanyInput(false)
-                          setNewCompanyName("")
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
+                  <Input
+                    name="company"
+                    value={formData.company}
+                    onChange={handleChange}
+                    placeholder="Company Name"
+                    className="h-10"
+                    required
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -530,20 +530,38 @@ export default function AddClientPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-700">DTI/BIR 2303</span>
-                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
-                    Upload Document
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs bg-transparent"
+                    onClick={() => handleComplianceUpload("dti")}
+                  >
+                    {complianceFiles.dti ? "Document Selected" : "Upload Document"}
                   </Button>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-700">G.I.S.</span>
-                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
-                    Upload Document
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs bg-transparent"
+                    onClick={() => handleComplianceUpload("gis")}
+                  >
+                    {complianceFiles.gis ? "Document Selected" : "Upload Document"}
                   </Button>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-700">ID with signature</span>
-                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
-                    Upload Document
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs bg-transparent"
+                    onClick={() => handleComplianceUpload("id")}
+                  >
+                    {complianceFiles.id ? "Document Selected" : "Upload Document"}
                   </Button>
                 </div>
                 <div className="pt-2">
@@ -674,6 +692,28 @@ export default function AddClientPage() {
           </Button>
         </div>
       </form>
+
+      <input
+        type="file"
+        ref={dtiFileInputRef}
+        onChange={handleComplianceFileChange("dti")}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      />
+      <input
+        type="file"
+        ref={gisFileInputRef}
+        onChange={handleComplianceFileChange("gis")}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      />
+      <input
+        type="file"
+        ref={idFileInputRef}
+        onChange={handleComplianceFileChange("id")}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      />
     </div>
   )
 }
