@@ -72,6 +72,24 @@ interface Booking {
   // Add other fields as needed
 }
 
+interface Report {
+  id: string
+  joNumber: string
+  date: string
+  created: any
+  category: string
+  subcategory: string
+  status: string
+  reportType: string
+  attachments?: Array<{
+    fileName: string
+    fileType: string
+    fileUrl: string
+    note?: string
+  }>
+  // Add other fields as needed
+}
+
 export default function JobOrderDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -79,6 +97,7 @@ export default function JobOrderDetailsPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [booking, setBooking] = useState<Booking | null>(null)
   const [seller, setSeller] = useState<Seller | null>(null) // Added seller state
+  const [reports, setReports] = useState<Report[]>([]) // Added reports state
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -96,6 +115,25 @@ export default function JobOrderDetailsPage() {
           } as JobOrder
 
           setJobOrder(jobOrderData)
+
+          if (jobOrderData.joNumber) {
+            const reportsQuery = query(collection(db, "reports"), where("joNumber", "==", jobOrderData.joNumber))
+            const reportsSnapshot = await getDocs(reportsQuery)
+
+            const reportsData = reportsSnapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as Report[]
+
+            // Sort reports by date (newest first)
+            reportsData.sort((a, b) => {
+              const dateA = a.created?.toDate?.() || new Date(a.date || a.created)
+              const dateB = b.created?.toDate?.() || new Date(b.date || b.created)
+              return dateB.getTime() - dateA.getTime()
+            })
+
+            setReports(reportsData)
+          }
 
           if (jobOrderData.product_id) {
             const productRef = doc(db, "products", jobOrderData.product_id)
@@ -135,7 +173,7 @@ export default function JobOrderDetailsPage() {
           }
         }
       } catch (error) {
-        console.error("Error fetching job order, product, booking, or seller:", error)
+        console.error("Error fetching job order, product, booking, seller, or reports:", error)
       } finally {
         setLoading(false)
       }
@@ -158,6 +196,45 @@ export default function JobOrderDetailsPage() {
     } catch (error) {
       return "Invalid Date"
     }
+  }
+
+  const formatTime = (dateField: any) => {
+    if (!dateField) return "N/A"
+
+    try {
+      if (dateField?.toDate) {
+        return dateField.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      } else if (dateField) {
+        const date = new Date(dateField)
+        return isNaN(date.getTime()) ? "N/A" : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      }
+      return "N/A"
+    } catch (error) {
+      return "N/A"
+    }
+  }
+
+  const getTeamBadge = (category: string) => {
+    switch (category.toLowerCase()) {
+      case "sales":
+        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Sales</Badge>
+      case "logistics":
+        return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Logistics</Badge>
+      case "installer":
+      case "installation":
+        return <Badge className="bg-green-500 hover:bg-green-600 text-white">Installer</Badge>
+      case "delivery":
+        return <Badge className="bg-purple-500 hover:bg-purple-600 text-white">Delivery</Badge>
+      default:
+        return <Badge className="bg-gray-500 hover:bg-gray-600 text-white">{category}</Badge>
+    }
+  }
+
+  const getUpdateText = (report: Report) => {
+    if (report.reportType === "completion-report") {
+      return `Completion report submitted - ${report.subcategory || "general"}`
+    }
+    return report.subcategory || report.reportType || "Report submitted"
   }
 
   const getSiteData = () => {
@@ -252,79 +329,40 @@ export default function JobOrderDetailsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-green-500 hover:bg-green-600 text-white">Installer</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Finished installation of new material</td>
-                <td className="px-4 py-3">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
-                </td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-purple-500 hover:bg-purple-600 text-white">Delivery</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Arrived at site</td>
-                <td className="px-4 py-3 text-sm text-gray-500">N/A</td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 6, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-green-500 hover:bg-green-600 text-white">Installer</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Arrived at site</td>
-                <td className="px-4 py-3">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
-                </td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 4, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Logistics</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Reported Bad Weather as cause of delay</td>
-                <td className="px-4 py-3">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
-                </td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 3, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Logistics</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Contacted Team C for installation</td>
-                <td className="px-4 py-3 text-sm text-gray-500">N/A</td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">May 2, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Sales</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Created an Installation JO for Petplans Site</td>
-                <td className="px-4 py-3">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
-                </td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">April 20, 2025</td>
-                <td className="px-4 py-3 text-sm text-gray-900">10:24 am</td>
-                <td className="px-4 py-3">
-                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Sales</Badge>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">Received signed contract. Project approved.</td>
-                <td className="px-4 py-3">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">See Attachment</button>
-                </td>
-              </tr>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    Loading project monitoring data...
+                  </td>
+                </tr>
+              ) : reports.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    No project monitoring data available for this job order.
+                  </td>
+                </tr>
+              ) : (
+                reports.map((report) => (
+                  <tr key={report.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatDate(report.created || report.date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatTime(report.created)}</td>
+                    <td className="px-4 py-3">{getTeamBadge(report.category)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{getUpdateText(report)}</td>
+                    <td className="px-4 py-3">
+                      {report.attachments && report.attachments.length > 0 ? (
+                        <button
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          onClick={() => window.open(report.attachments![0].fileUrl, "_blank")}
+                        >
+                          See Attachment
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-500">N/A</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
