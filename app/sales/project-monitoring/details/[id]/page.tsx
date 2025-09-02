@@ -139,7 +139,6 @@ export default function JobOrderDetailsPage() {
           booking?.start_date && booking?.end_date
             ? `${formatDate(booking.start_date)} to ${formatDate(booking.end_date)}`
             : "Not specified",
-        jobType: jobOrder.joType || "Not specified",
       }
     }
 
@@ -147,7 +146,6 @@ export default function JobOrderDetailsPage() {
       site: "Not specified",
       client: "Not specified",
       bookingDates: "Not specified",
-      jobType: "Not specified",
     }
   }
 
@@ -195,11 +193,6 @@ export default function JobOrderDetailsPage() {
             <div>
               <span className="font-medium text-gray-900">Booking Dates: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
-            </div>
-
-            <div>
-              <span className="font-medium text-gray-900">Job Type: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.jobType}</span>
             </div>
           </div>
         </div>
