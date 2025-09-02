@@ -43,6 +43,12 @@ interface Product {
   seller_id?: string // Added seller_id field
   price?: number
   status?: string
+  media?: Array<{
+    distance: string
+    isVideo: boolean
+    type: string
+    url: string
+  }>
   specs_rental?: {
     location?: string
     caretaker?: string
@@ -198,7 +204,7 @@ export default function JobOrderDetailsPage() {
           {/* Product image placeholder */}
           <div className="flex-shrink-0">
             <img
-              src="/lilo-and-stitch-product-box.png"
+              src={product?.media?.[0]?.url || "/lilo-and-stitch-product-box.png"}
               alt="Product"
               className="w-20 h-20 object-cover rounded-md border"
             />
