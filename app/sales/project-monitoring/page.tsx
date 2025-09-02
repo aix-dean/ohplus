@@ -311,14 +311,7 @@ export default function ProjectMonitoringPage() {
                     <div
                       key={jobOrder.id}
                       className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        const params = new URLSearchParams({
-                          id: jobOrder.id,
-                          number: jobOrder.joNumber || jobOrder.id.slice(-6),
-                          site: selectedProduct?.specs_rental?.location || selectedProduct?.name || "Unknown Site",
-                        })
-                        router.push(`/sales/project-monitoring/details?${params.toString()}`)
-                      }}
+                      onClick={() => router.push(`/sales/project-monitoring/details/${jobOrder.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-gray-900">
