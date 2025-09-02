@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/lib/firebase"
@@ -261,7 +261,7 @@ export default function JobOrderDetailsPage() {
   const siteData = getSiteData()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex items-center gap-3 py-2">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-1 h-8 w-8">
           <ArrowLeft className="h-4 w-4" />
@@ -366,6 +366,19 @@ export default function JobOrderDetailsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-lg px-4 py-2 flex items-center gap-2"
+          onClick={() => {
+            // TODO: Open create report dialog or navigate to create report page
+            console.log("Create Report clicked for job order:", jobOrder?.joNumber)
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          Create Report
+        </Button>
       </div>
     </div>
   )
