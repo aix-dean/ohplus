@@ -110,7 +110,7 @@ export default function JobOrderDetailsPage() {
     if (jobOrder) {
       return {
         site: jobOrder.siteName || jobOrder.siteCode || "Not specified",
-        client: `${jobOrder.clientCompany || ""} ${jobOrder.clientName || ""}`.trim() || "Not specified",
+        client: jobOrder.clientName || "Not specified",
         contractPeriod:
           jobOrder.contractPeriodStart && jobOrder.contractPeriodEnd
             ? `${formatDate(jobOrder.contractPeriodStart)} to ${formatDate(jobOrder.contractPeriodEnd)}`
