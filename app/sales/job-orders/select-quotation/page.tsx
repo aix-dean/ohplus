@@ -85,9 +85,9 @@ export default function SelectQuotationPage() {
 
   const getProductNames = (quotation: Quotation): string => {
     if (quotation.items && Array.isArray(quotation.items)) {
-      return quotation.items.map((item: any) => item.site_code).join(", ")
+      return quotation.items.map((item: any) => item.name).join(", ")
     }
-    return quotation.site_code || "N/A"
+    return quotation.product_name || "N/A"
   }
 
   const handleConfirm = () => {
