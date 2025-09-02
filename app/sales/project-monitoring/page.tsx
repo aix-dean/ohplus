@@ -18,8 +18,8 @@ interface JobOrder {
   product_id: string
   company_id: string
   status: string
-  created_at: any
-  updated_at: any
+  createdAt: any
+  updatedAt: any
   [key: string]: any
 }
 
@@ -88,18 +88,18 @@ export default function ProjectMonitoringPage() {
         let bTime: Date
 
         // Handle Firestore Timestamp objects
-        if (a.created_at?.toDate) {
-          aTime = a.created_at.toDate()
-        } else if (a.created_at) {
-          aTime = new Date(a.created_at)
+        if (a.createdAt?.toDate) {
+          aTime = a.createdAt.toDate()
+        } else if (a.createdAt) {
+          aTime = new Date(a.createdAt)
         } else {
           aTime = new Date(0) // Default to epoch if no date
         }
 
-        if (b.created_at?.toDate) {
-          bTime = b.created_at.toDate()
-        } else if (b.created_at) {
-          bTime = new Date(b.created_at)
+        if (b.createdAt?.toDate) {
+          bTime = b.createdAt.toDate()
+        } else if (b.createdAt) {
+          bTime = new Date(b.createdAt)
         } else {
           bTime = new Date(0) // Default to epoch if no date
         }
@@ -333,23 +333,23 @@ export default function ProjectMonitoringPage() {
 
                       <div className="text-xs text-gray-500">
                         Created: {(() => {
-                          if (jobOrder.created_at?.toDate) {
-                            return jobOrder.created_at.toDate().toLocaleDateString()
-                          } else if (jobOrder.created_at) {
-                            const date = new Date(jobOrder.created_at)
+                          if (jobOrder.createdAt?.toDate) {
+                            return jobOrder.createdAt.toDate().toLocaleDateString()
+                          } else if (jobOrder.createdAt) {
+                            const date = new Date(jobOrder.createdAt)
                             return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
                           }
                           return "Unknown"
                         })()}
                       </div>
 
-                      {jobOrder.updated_at && (
+                      {jobOrder.updatedAt && (
                         <div className="text-xs text-gray-500">
                           Updated: {(() => {
-                            if (jobOrder.updated_at?.toDate) {
-                              return jobOrder.updated_at.toDate().toLocaleDateString()
-                            } else if (jobOrder.updated_at) {
-                              const date = new Date(jobOrder.updated_at)
+                            if (jobOrder.updatedAt?.toDate) {
+                              return jobOrder.updatedAt.toDate().toLocaleDateString()
+                            } else if (jobOrder.updatedAt) {
+                              const date = new Date(jobOrder.updatedAt)
                               return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
                             }
                             return "Unknown"
