@@ -83,10 +83,28 @@ export default function ProjectMonitoringPage() {
         fetchedJobOrders.push({ id: doc.id, ...doc.data() } as JobOrder)
       })
 
-      // Sort by created_at descending (newest first)
       fetchedJobOrders.sort((a, b) => {
-        const aTime = a.created_at?.toDate?.() || new Date(a.created_at)
-        const bTime = b.created_at?.toDate?.() || new Date(b.created_at)
+        let aTime: Date
+        let bTime: Date
+
+        // Handle Firestore Timestamp objects
+        if (a.created_at?.toDate) {
+          aTime = a.created_at.toDate()
+        } else if (a.created_at) {
+          aTime = new Date(a.created_at)
+        } else {
+          aTime = new Date(0) // Default to epoch if no date
+        }
+
+        if (b.created_at?.toDate) {
+          bTime = b.created_at.toDate()
+        } else if (b.created_at) {
+          bTime = new Date(b.created_at)
+        } else {
+          bTime = new Date(0) // Default to epoch if no date
+        }
+
+        // Sort descending (newest first)
         return bTime.getTime() - aTime.getTime()
       })
 
@@ -314,17 +332,28 @@ export default function ProjectMonitoringPage() {
                       {jobOrder.description && <p className="text-sm text-gray-600 mb-2">{jobOrder.description}</p>}
 
                       <div className="text-xs text-gray-500">
-                        Created:{" "}
-                        {jobOrder.created_at?.toDate?.()?.toLocaleDateString() ||
-                          new Date(jobOrder.created_at).toLocaleDateString() ||
-                          "Unknown"}
+                        Created: {(() => {
+                          if (jobOrder.created_at?.toDate) {
+                            return jobOrder.created_at.toDate().toLocaleDateString()
+                          } else if (jobOrder.created_at) {
+                            const date = new Date(jobOrder.created_at)
+                            return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
+                          }
+                          return "Unknown"
+                        })()}
                       </div>
 
                       {jobOrder.updated_at && (
                         <div className="text-xs text-gray-500">
-                          Updated:{" "}
-                          {jobOrder.updated_at?.toDate?.()?.toLocaleDateString() ||
-                            new Date(jobOrder.updated_at).toLocaleDateString()}
+                          Updated: {(() => {
+                            if (jobOrder.updated_at?.toDate) {
+                              return jobOrder.updated_at.toDate().toLocaleDateString()
+                            } else if (jobOrder.updated_at) {
+                              const date = new Date(jobOrder.updated_at)
+                              return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
+                            }
+                            return "Unknown"
+                          })()}
                         </div>
                       )}
                     </div>
