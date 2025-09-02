@@ -28,6 +28,7 @@ interface Company {
   address?: string
   industry?: string
   clientType?: string
+  partnerType?: string
   companyLogoUrl?: string
   created: Date
 }
@@ -69,6 +70,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         address: doc.data().address || "",
         industry: doc.data().industry || "",
         clientType: doc.data().clientType || "",
+        partnerType: doc.data().partnerType || "", // Include partner type in fetched data
         companyLogoUrl: doc.data().companyLogoUrl || "",
         created: doc.data().created?.toDate() || new Date(),
       }))
@@ -141,6 +143,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           address: selectedCompany.address || "",
           industry: selectedCompany.industry || "",
           clientType: selectedCompany.clientType || "",
+          partnerType: selectedCompany.partnerType || "", // Include partner type in form data
           companyLogoUrl: selectedCompany.companyLogoUrl || "",
           name: "",
           designation: "",
@@ -161,6 +164,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         address: formData.address,
         industry: formData.industry,
         clientType: formData.clientType,
+        partnerType: formData.partnerType || "", // Include partner type when creating company
         companyLogoUrl: "", // Will be updated after logo upload if needed
         created: new Date(),
         user_company_id: userData?.company_id || "", // Added user_company_id to track which company the user belongs to
