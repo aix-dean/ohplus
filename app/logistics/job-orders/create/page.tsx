@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { createJobOrder, generateJONumber } from "@/lib/job-order-service"
+import { createJobOrder, generatePersonalizedJONumber } from "@/lib/job-order-service"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType } from "@/lib/types/job-order"
 import { cn } from "@/lib/utils"
@@ -173,16 +173,7 @@ export default function CreateJobOrderPage() {
 
     try {
       const jobOrderData = {
-        joNumber: await generateJONumber(
-          userData
-            ? {
-                first_name: userData.first_name,
-                middle_name: userData.middle_name,
-                last_name: userData.last_name,
-                uid: userData.uid,
-              }
-            : undefined,
-        ),
+        joNumber: await generatePersonalizedJONumber(userData), // Replace generateJONumber() with personalized number generation
         dateRequested: jobOrderForm.dateRequested!.toISOString(),
         joType: jobOrderForm.joType as JobOrderType,
         deadline: jobOrderForm.deadline!.toISOString(),
@@ -356,15 +347,8 @@ export default function CreateJobOrderPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm text-gray-800">JO #</Label>
-                <Input
-                  value={
-                    userData
-                      ? `${userData.first_name?.charAt(0) || "X"}${userData.middle_name?.charAt(0) || "X"}${userData.last_name?.charAt(0) || "X"}-XXXX`
-                      : "JO-PREVIEW"
-                  }
-                  disabled
-                  className="bg-gray-100 text-gray-600 text-sm h-9"
-                />
+                <Input value="Will be auto-generated" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />{" "}
+                {/* Updated placeholder text since number is now generated dynamically */}
               </div>
 
               <div className="space-y-2">

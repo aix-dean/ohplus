@@ -30,10 +30,10 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
-  getQuotationDetailsForJobOrder,
   createMultipleJobOrders,
+  getQuotationDetailsForJobOrder,
+  generatePersonalizedJONumber,
   type QuotationItem,
-  generateJONumber,
 } from "@/lib/job-order-service"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
@@ -365,68 +365,61 @@ export default function CreateJobOrderPage() {
         let jobOrdersData = []
 
         if (hasItems) {
-          jobOrdersData = quotationItems.map(async (item: any, index: number) => {
-            const form = jobOrderForms[index]
-            const product = products[index] || {}
+          jobOrdersData = await Promise.all(
+            quotationItems.map(async (item: any, index: number) => {
+              const form = jobOrderForms[index]
+              const product = products[index] || {}
 
-            const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
+              const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-            const subtotal = item.item_total_amount || 0 // Use item_total_amount
-            const productVat = subtotal * 0.12 // Recalculate VAT
-            const productTotal = subtotal + productVat // Recalculate total
+              const subtotal = item.item_total_amount || 0 // Use item_total_amount
+              const productVat = subtotal * 0.12 // Recalculate VAT
+              const productTotal = subtotal + productVat // Recalculate total
 
-            return {
-              quotationId: quotation.id,
-              joNumber: await generateJONumber(
-                userData
-                  ? {
-                      first_name: userData.first_name,
-                      middle_name: userData.middle_name,
-                      last_name: userData.last_name,
-                      uid: userData.uid,
-                    }
-                  : undefined,
-              ),
-              dateRequested: form.dateRequested!.toISOString(),
-              joType: form.joType as JobOrderType,
-              deadline: form.deadline!.toISOString(),
-              requestedBy: userData?.first_name || "Auto-Generated",
-              remarks: form.remarks,
-              assignTo: form.assignTo,
-              attachments: form.attachmentUrl
-                ? [
-                    {
-                      url: form.attachmentUrl,
-                      name: form.attachmentFile?.name || "Attachment",
-                      type: form.attachmentFile?.type || "image",
-                    },
-                  ]
-                : [],
-              signedQuotationUrl: signedQuotationUrl,
-              poMoUrl: poMoUrl,
-              projectFaUrl: projectFaUrl,
-              quotationNumber: quotation.quotation_number,
-              clientName: client?.name || "N/A",
-              clientCompany: client?.company || "N/A",
-              contractDuration: contractDuration, // Use new contractDuration
-              contractPeriodStart: quotation.start_date || "",
-              contractPeriodEnd: quotation.end_date || "",
-              siteName: item.product_name || product.name || "",
-              siteCode: item.site_code || product.site_code || "N/A",
-              siteType: item.type || product.type || "N/A",
-              siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-              siteIllumination: product.light?.illumination || "N/A",
-              leaseRatePerMonth: item.price || 0, // Keep monthlyRate for display if needed
-              totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
-              totalLease: subtotal, // totalLease is now the subtotal
-              vatAmount: productVat, // Use recalculated VAT
-              totalAmount: productTotal, // Use recalculated total
-              siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-              missingCompliance: missingCompliance,
-              product_id: item.product_id || product.id || "",
-              company_id: userData?.company_id || "",
-            }
-          })
+              return {
+                quotationId: quotation.id,
+                joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
+                dateRequested: form.dateRequested!.toISOString(),
+                joType: form.joType as JobOrderType,
+                deadline: form.deadline!.toISOString(),
+                requestedBy: userData?.first_name || "Auto-Generated",
+                remarks: form.remarks,
+                assignTo: form.assignTo,
+                attachments: form.attachmentUrl
+                  ? [
+                      {
+                        url: form.attachmentUrl,
+                        name: form.attachmentFile?.name || "Attachment",
+                        type: form.attachmentFile?.type || "image",
+                      },
+                    ]
+                  : [],
+                signedQuotationUrl: signedQuotationUrl,
+                poMoUrl: poMoUrl,
+                projectFaUrl: projectFaUrl,
+                quotationNumber: quotation.quotation_number,
+                clientName: client?.name || "N/A",
+                clientCompany: client?.company || "N/A",
+                contractDuration: contractDuration, // Use new contractDuration
+                contractPeriodStart: quotation.start_date || "",
+                contractPeriodEnd: quotation.end_date || "",
+                siteName: item.product_name || product.name || "",
+                siteCode: item.site_code || product.site_code || "N/A",
+                siteType: item.type || product.type || "N/A",
+                siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+                siteIllumination: product.light?.illumination || "N/A",
+                leaseRatePerMonth: item.price || 0, // Keep monthlyRate for display if needed
+                totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+                totalLease: subtotal, // totalLease is now the subtotal
+                vatAmount: productVat, // Use recalculated VAT
+                totalAmount: productTotal, // Use recalculated total
+                siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+                missingCompliance: missingCompliance,
+                product_id: item.product_id || product.id || "",
+                company_id: userData?.company_id || "",
+              }
+            }),
+          )
         } else {
           // Single product from quotation object
           const form = jobOrderForms[0]
@@ -441,16 +434,7 @@ export default function CreateJobOrderPage() {
           jobOrdersData = [
             {
               quotationId: quotation.id,
-              joNumber: await generateJONumber(
-                userData
-                  ? {
-                      first_name: userData.first_name,
-                      middle_name: userData.middle_name,
-                      last_name: userData.last_name,
-                      uid: userData.uid,
-                    }
-                  : undefined,
-              ),
+              joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
               dateRequested: form.dateRequested!.toISOString(),
               joType: form.joType as JobOrderType,
               deadline: form.deadline!.toISOString(),
@@ -493,10 +477,7 @@ export default function CreateJobOrderPage() {
           ]
         }
 
-        // Wait for all promises to resolve
-        const jobOrdersDataResolved = await Promise.all(jobOrdersData)
-
-        const joIds = await createMultipleJobOrders(jobOrdersDataResolved, user.uid, status)
+        const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
         setCreatedJoIds(joIds)
         setShowJobOrderSuccessDialog(true)
       } catch (error: any) {

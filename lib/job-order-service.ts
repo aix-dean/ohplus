@@ -363,58 +363,43 @@ export async function getAllJobOrders(): Promise<JobOrder[]> {
   }
 }
 
-export async function generateJONumber(userData?: {
-  first_name?: string
-  middle_name?: string
-  last_name?: string
-  uid: string
-}): Promise<string> {
-  console.log("[v0] generateJONumber called with userData:", userData)
+export function generateJONumber(): string {
+  const timestamp = Date.now()
+  const randomSuffix = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0")
+  return `JO-${timestamp}-${randomSuffix}`
+}
 
-  if (!userData) {
-    console.log("[v0] No userData provided, using fallback format")
-    // Fallback to old format if no user data provided
-    const timestamp = Date.now()
-    const randomSuffix = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")
-    return `JO-${timestamp}-${randomSuffix}`
-  }
-
+export async function generatePersonalizedJONumber(userData: any): Promise<string> {
   try {
-    // Generate initials from user's name
-    const firstName = userData.first_name || ""
-    const middleName = userData.middle_name || ""
-    const lastName = userData.last_name || ""
+    // Extract initials from user's name
+    const names = [userData.first_name, userData.middle_name, userData.last_name].filter(Boolean) // Remove empty/null values
 
-    console.log("[v0] User names:", { firstName, middleName, lastName })
+    const initials = names
+      .map((name) => name.charAt(0).toUpperCase())
+      .join("")
+      .substring(0, 4) // Limit to 4 characters max
 
-    const firstInitial = firstName.charAt(0).toUpperCase()
-    const middleInitial = middleName.charAt(0).toUpperCase()
-    const lastInitial = lastName.charAt(0).toUpperCase()
+    // If no initials available, use default
+    if (!initials) {
+      return generateJONumber() // Fallback to original method
+    }
 
-    const initials = `${firstInitial}${middleInitial}${lastInitial}`.padEnd(3, "X") // Pad with X if missing initials
-    console.log("[v0] Generated initials:", initials)
-
-    // Count existing job orders created by this user
+    // Count existing job orders for this user to get sequential number
     const jobOrdersRef = collection(db, JOB_ORDERS_COLLECTION)
-    const q = query(jobOrdersRef, where("createdBy", "==", userData.uid))
+    const q = query(jobOrdersRef, where("createdBy", "==", userData.uid), orderBy("createdAt", "desc"))
+
     const querySnapshot = await getDocs(q)
+    const nextSequence = querySnapshot.size + 1
 
-    const nextNumber = (querySnapshot.size + 1).toString().padStart(4, "0")
-    console.log("[v0] Existing job orders count:", querySnapshot.size, "Next number:", nextNumber)
+    // Format as INITIALS-XXXX (e.g., JPDM-0001)
+    const sequenceNumber = nextSequence.toString().padStart(4, "0")
 
-    const finalJONumber = `${initials}-${nextNumber}`
-    console.log("[v0] Final JO Number:", finalJONumber)
-
-    return finalJONumber
+    return `${initials}-${sequenceNumber}`
   } catch (error) {
-    console.error("[v0] Error generating JO number:", error)
-    // Fallback to timestamp format if there's an error
-    const timestamp = Date.now()
-    const randomSuffix = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")
-    return `JO-${timestamp}-${randomSuffix}`
+    console.error("Error generating personalized JO number:", error)
+    // Fallback to original method if there's an error
+    return generateJONumber()
   }
 }
