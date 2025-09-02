@@ -29,7 +29,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getQuotationDetailsForJobOrder, createMultipleJobOrders, type QuotationItem } from "@/lib/job-order-service"
+import {
+  createMultipleJobOrders,
+  getQuotationDetailsForJobOrder,
+  generateJONumberByUser,
+} from "@/lib/job-order-service"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation } from "@/lib/types/quotation"
@@ -38,6 +42,7 @@ import type { Client } from "@/lib/client-service"
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
+import type { QuotationItem } from "@/lib/types/quotation"
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
@@ -360,7 +365,7 @@ export default function CreateJobOrderPage() {
         let jobOrdersData = []
 
         if (hasItems) {
-          jobOrdersData = quotationItems.map((item: any, index: number) => {
+          jobOrdersData = quotationItems.map(async (item: any, index: number) => {
             const form = jobOrderForms[index]
             const product = products[index] || {}
 
@@ -372,7 +377,12 @@ export default function CreateJobOrderPage() {
 
             return {
               quotationId: quotation.id,
-              joNumber: "JO-AUTO-GEN",
+              joNumber: await generateJONumberByUser(
+                user.uid,
+                userData?.first_name || "",
+                userData?.middle_name,
+                userData?.last_name,
+              ),
               dateRequested: form.dateRequested!.toISOString(),
               joType: form.joType as JobOrderType,
               deadline: form.deadline!.toISOString(),
@@ -427,7 +437,12 @@ export default function CreateJobOrderPage() {
           jobOrdersData = [
             {
               quotationId: quotation.id,
-              joNumber: "JO-AUTO-GEN",
+              joNumber: await generateJONumberByUser(
+                user.uid,
+                userData?.first_name || "",
+                userData?.middle_name,
+                userData?.last_name,
+              ),
               dateRequested: form.dateRequested!.toISOString(),
               joType: form.joType as JobOrderType,
               deadline: form.deadline!.toISOString(),
@@ -470,7 +485,7 @@ export default function CreateJobOrderPage() {
           ]
         }
 
-        const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
+        const joIds = await createMultipleJobOrders(await Promise.all(jobOrdersData), user.uid, status)
         setCreatedJoIds(joIds)
         setShowJobOrderSuccessDialog(true)
       } catch (error: any) {

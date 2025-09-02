@@ -370,3 +370,39 @@ export function generateJONumber(): string {
     .padStart(3, "0")
   return `JO-${timestamp}-${randomSuffix}`
 }
+
+export async function generateJONumberByUser(
+  userId: string,
+  firstName: string,
+  middleName?: string,
+  lastName?: string,
+): Promise<string> {
+  try {
+    // Extract initials from names
+    const firstInitial = firstName?.charAt(0)?.toUpperCase() || ""
+    const middleInitial = middleName?.charAt(0)?.toUpperCase() || ""
+    const lastInitial = lastName?.charAt(0)?.toUpperCase() || ""
+
+    // Combine initials (minimum 2 characters, use first name twice if needed)
+    let initials = firstInitial + middleInitial + lastInitial
+    if (initials.length < 2) {
+      initials = firstInitial + firstInitial
+    }
+    if (initials.length < 2) {
+      initials = "JO" // Fallback if no name data
+    }
+
+    // Count existing job orders by this user
+    const q = query(collection(db, JOB_ORDERS_COLLECTION), where("createdBy", "==", userId))
+    const querySnapshot = await getDocs(q)
+    const count = querySnapshot.size + 1 // Next number in sequence
+
+    // Format as INITIALS-XXXX (4-digit padded)
+    const paddedCount = count.toString().padStart(4, "0")
+    return `${initials}-${paddedCount}`
+  } catch (error) {
+    console.error("Error generating JO number by user:", error)
+    // Fallback to timestamp-based generation
+    return generateJONumber()
+  }
+}
