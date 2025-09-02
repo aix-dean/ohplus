@@ -187,11 +187,33 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
   }
 
+  const fetchUserCompanyId = async (): Promise<string> => {
+    try {
+      if (!user?.uid) return ""
+
+      const companiesRef = collection(db, "client_company")
+      const snapshot = await getDocs(companiesRef)
+
+      // Find the company that belongs to the current user
+      const userCompany = snapshot.docs.find((doc) => {
+        const data = doc.data()
+        return data.user_company_id === user.uid || data.created_by === user.uid
+      })
+
+      return userCompany?.id || user?.company_id || ""
+    } catch (error) {
+      console.error("Error fetching user company ID:", error)
+      return user?.company_id || ""
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      const userCompanyId = await fetchUserCompanyId()
+
       let finalCompanyLogoUrl = formData.companyLogoUrl
       let finalCompanyId = formData.company_id
       let finalCompanyName = formData.company
@@ -231,7 +253,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         zipCode: client?.zipCode || "",
         uploadedBy: client?.uploadedBy || user?.uid || "",
         uploadedByName: client?.uploadedByName || user?.displayName || user?.email || "",
-        user_company_id: user?.company_id || "", // Added user_company_id field to track which company the user belongs to
+        user_company_id: userCompanyId, // Use fetched company_id instead of auth context
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
 
       let savedClient: Client
