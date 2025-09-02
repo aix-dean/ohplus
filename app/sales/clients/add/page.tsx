@@ -461,29 +461,24 @@ export default function AddClientPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Company Address:</Label>
-                  <Select value={formData.address} onValueChange={(value) => handleSelectChange("address", value)}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Company Address" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manila">Manila</SelectItem>
-                      <SelectItem value="quezon-city">Quezon City</SelectItem>
-                      <SelectItem value="makati">Makati</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Company Address"
+                    className="h-10"
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Company Website:</Label>
-                  <Select value={formData.website} onValueChange={(value) => handleSelectChange("website", value)}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Company Website" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="custom">Enter Custom URL</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    name="website"
+                    value={formData.website}
+                    onChange={handleChange}
+                    placeholder="Company Website"
+                    className="h-10"
+                  />
                 </div>
               </div>
 
@@ -491,14 +486,13 @@ export default function AddClientPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Company Phone #:</Label>
-                  <Select value={formData.phone} onValueChange={(value) => handleSelectChange("phone", value)}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Company Phone #" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="custom">Enter Phone Number</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="Company Phone #"
+                    className="h-10"
+                  />
                 </div>
 
                 <div className="space-y-2">
