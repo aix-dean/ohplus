@@ -14,6 +14,7 @@ import {
   ImageIcon,
   XCircle,
   Package,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -74,22 +75,18 @@ export default function CreateJobOrderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Shared compliance states
-  const [signedQuotationFile, setSignedQuotationFile] = useState<File | null>(null)
-  const [signedQuotationUrl, setSignedQuotationUrl] = useState<string | null>(null)
-  const [uploadingSignedQuotation, setUploadingSignedQuotation] = useState(false)
-  const [signedQuotationError, setSignedQuotationError] = useState<string | null>(null)
+  const projectCompliance = quotationData?.quotation?.projectCompliance || {}
 
-  const [poMoFile, setPoMoFile] = useState<File | null>(null)
-  const [poMoUrl, setPoMoUrl] = useState<string | null>(null)
-  const [uploadingPoMo, setUploadingPoMo] = useState(false)
-  const [poMoError, setPoMoError] = useState<string | null>(null)
+  const missingCompliance = useMemo(() => {
+    return {
+      signedQuotation: !projectCompliance.signedQuotation?.completed,
+      poMo: !projectCompliance.poMo?.completed,
+      projectFa: !projectCompliance.finalArtwork?.completed,
+      signedContract: !projectCompliance.signedContract?.completed,
+      paymentAsDeposit: !projectCompliance.paymentAsDeposit?.completed,
+    }
+  }, [projectCompliance])
 
-  const [projectFaFile, setProjectFaFile] = useState<File | null>(null)
-  const [projectFaUrl, setProjectFaUrl] = useState<string | null>(null)
-  const [uploadingProjectFa, setUploadingProjectFa] = useState(false)
-  const [projectFaError, setProjectFaError] = useState<string | null>(null)
-
-  // Form data for each product
   const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
 
   // Success dialog states
@@ -114,14 +111,6 @@ export default function CreateJobOrderPage() {
   const hasItems = useMemo(() => {
     return quotationItems.length > 0
   }, [quotationItems])
-
-  const missingCompliance = useMemo(() => {
-    return {
-      signedQuotation: !signedQuotationUrl,
-      poMo: !poMoUrl,
-      projectFa: !projectFaUrl,
-    }
-  }, [signedQuotationUrl, poMoUrl, projectFaUrl])
 
   // Calculate duration in months
   const totalDays = useMemo(() => {
@@ -388,9 +377,9 @@ export default function CreateJobOrderPage() {
                     },
                   ]
                 : [],
-              signedQuotationUrl: signedQuotationUrl,
-              poMoUrl: poMoUrl,
-              projectFaUrl: projectFaUrl,
+              signedQuotationUrl: quotation?.projectCompliance?.signedQuotation?.fileUrl,
+              poMoUrl: quotation?.projectCompliance?.poMo?.fileUrl,
+              projectFaUrl: quotation?.projectCompliance?.finalArtwork?.fileUrl,
               quotationNumber: quotation.quotation_number,
               clientName: client?.name || "N/A",
               clientCompany: client?.company || "N/A",
@@ -443,9 +432,9 @@ export default function CreateJobOrderPage() {
                     },
                   ]
                 : [],
-              signedQuotationUrl: signedQuotationUrl,
-              poMoUrl: poMoUrl,
-              projectFaUrl: projectFaUrl,
+              signedQuotationUrl: quotation?.projectCompliance?.signedQuotation?.fileUrl,
+              poMoUrl: quotation?.projectCompliance?.poMo?.fileUrl,
+              projectFaUrl: quotation?.projectCompliance?.finalArtwork?.fileUrl,
               quotationNumber: quotation.quotation_number,
               clientName: client?.name || "N/A",
               clientCompany: client?.company || "N/A",
@@ -492,9 +481,6 @@ export default function CreateJobOrderPage() {
       quotationItems,
       jobOrderForms,
       totalDays,
-      signedQuotationUrl,
-      poMoUrl,
-      projectFaUrl,
       missingCompliance,
       userData,
       toast,
@@ -701,140 +687,120 @@ export default function CreateJobOrderPage() {
               )}
             </div>
 
-            {/* Shared Compliance Documents */}
-            <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
-              <p className="text-sm font-semibold mb-2">Project Compliance (Shared for all Job Orders):</p>
-
-              {/* Signed Quotation Upload */}
-              <div className="flex items-center gap-2">
-                <Label htmlFor="signed-quotation-upload" className="text-sm w-36">
-                  <span className="font-semibold">Signed Quotation:</span>
-                </Label>
-                <input
-                  type="file"
-                  id="signed-quotation-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setSignedQuotationFile,
-                        setSignedQuotationUrl,
-                        setUploadingSignedQuotation,
-                        setSignedQuotationError,
-                        "documents/signed-quotations/",
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("signed-quotation-upload")?.click()}
-                  disabled={uploadingSignedQuotation}
-                >
-                  {uploadingSignedQuotation ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
-                  )}
-                  {uploadingSignedQuotation ? "Uploading..." : "Upload Document"}
-                </Button>
-                {signedQuotationFile && !uploadingSignedQuotation && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{signedQuotationFile.name}</span>
-                )}
-                {signedQuotationError && <span className="text-xs text-red-500 ml-2">{signedQuotationError}</span>}
+            {/* Client Compliance */}
+            <div className="space-y-3 pt-4 border-t border-gray-200 mt-6">
+              <p className="text-sm font-semibold mb-3">Client Compliance</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm">DTI/BIR 2303</span>
+                  <span className="text-xs text-blue-600 ml-auto">JMCL MediaShot.pdf</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm">GIS</span>
+                  <span className="text-xs text-blue-600 ml-auto">JMCL GIS.pdf</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm">ID with Signature</span>
+                  <span className="text-xs text-blue-600 ml-auto">Jking Castro FBC.pdf</span>
+                </div>
               </div>
+            </div>
 
-              {/* PO/MO Upload */}
-              <div className="flex items-center gap-2">
-                <Label htmlFor="po-mo-upload" className="text-sm w-36">
-                  <span className="font-semibold">PO/MO:</span>
-                </Label>
-                <input
-                  type="file"
-                  id="po-mo-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setPoMoFile,
-                        setPoMoUrl,
-                        setUploadingPoMo,
-                        setPoMoError,
-                        "documents/po-mo/",
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("po-mo-upload")?.click()}
-                  disabled={uploadingPoMo}
-                >
-                  {uploadingPoMo ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
+            {/* Project Compliance */}
+            <div className="space-y-3 pt-4 border-t border-gray-200 mt-4">
+              <p className="text-sm font-semibold mb-3">Project Compliance</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                      projectCompliance.signedQuotation?.completed ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    {projectCompliance.signedQuotation?.completed && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className="text-sm">Signed Quotation</span>
+                  {projectCompliance.signedQuotation?.fileName && (
+                    <span className="text-xs text-blue-600 ml-auto">{projectCompliance.signedQuotation.fileName}</span>
                   )}
-                  {uploadingPoMo ? "Uploading..." : "Upload Document"}
-                </Button>
-                {poMoFile && !uploadingPoMo && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{poMoFile.name}</span>
-                )}
-                {poMoError && <span className="text-xs text-red-500 ml-2">{poMoError}</span>}
-              </div>
+                  {!projectCompliance.signedQuotation?.completed && (
+                    <span className="text-xs text-gray-500 ml-auto">Upload</span>
+                  )}
+                </div>
 
-              {/* Project FA Upload */}
-              <div className="flex items-center gap-2">
-                <Label htmlFor="project-fa-upload" className="text-sm w-36">
-                  <span className="font-semibold">Project FA:</span>
-                </Label>
-                <input
-                  type="file"
-                  id="project-fa-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setProjectFaFile,
-                        setProjectFaUrl,
-                        setUploadingProjectFa,
-                        setProjectFaError,
-                        "documents/project-fa/",
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("project-fa-upload")?.click()}
-                  disabled={uploadingProjectFa}
-                >
-                  {uploadingProjectFa ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                      projectCompliance.signedContract?.completed ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    {projectCompliance.signedContract?.completed && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className="text-sm">Signed Contract</span>
+                  {projectCompliance.signedContract?.fileName && (
+                    <span className="text-xs text-blue-600 ml-auto">{projectCompliance.signedContract.fileName}</span>
                   )}
-                  {uploadingProjectFa ? "Uploading..." : "Upload Document"}
-                </Button>
-                {projectFaFile && !uploadingProjectFa && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{projectFaFile.name}</span>
-                )}
-                {projectFaError && <span className="text-xs text-red-500 ml-2">{projectFaError}</span>}
+                  {!projectCompliance.signedContract?.completed && (
+                    <span className="text-xs text-gray-500 ml-auto">Upload</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                      projectCompliance.poMo?.completed ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    {projectCompliance.poMo?.completed && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className="text-sm">PO/MO</span>
+                  {projectCompliance.poMo?.fileName && (
+                    <span className="text-xs text-blue-600 ml-auto">{projectCompliance.poMo.fileName}</span>
+                  )}
+                  {!projectCompliance.poMo?.completed && <span className="text-xs text-gray-500 ml-auto">Upload</span>}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                      projectCompliance.finalArtwork?.completed ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    {projectCompliance.finalArtwork?.completed && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className="text-sm">Final Artwork</span>
+                  {projectCompliance.finalArtwork?.fileName && (
+                    <span className="text-xs text-blue-600 ml-auto">{projectCompliance.finalArtwork.fileName}</span>
+                  )}
+                  {!projectCompliance.finalArtwork?.completed && (
+                    <span className="text-xs text-gray-500 ml-auto">Upload</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                      projectCompliance.paymentAsDeposit?.completed ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    {projectCompliance.paymentAsDeposit?.completed && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className="text-sm">Payment as Deposit/Advance</span>
+                  {projectCompliance.paymentAsDeposit?.fileName && (
+                    <span className="text-xs text-blue-600 ml-auto">{projectCompliance.paymentAsDeposit.fileName}</span>
+                  )}
+                  {!projectCompliance.paymentAsDeposit?.completed && (
+                    <span className="text-xs text-gray-500 ml-auto">For Treasury's confirmation</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -842,7 +808,11 @@ export default function CreateJobOrderPage() {
 
         {/* Right Column: Job Order Forms */}
         <div className="space-y-6">
-          {missingCompliance.signedQuotation || missingCompliance.poMo || missingCompliance.projectFa ? (
+          {missingCompliance.signedQuotation ||
+          missingCompliance.poMo ||
+          missingCompliance.projectFa ||
+          missingCompliance.signedContract ||
+          missingCompliance.paymentAsDeposit ? (
             <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <AlertTitle className="text-red-700 text-sm">
@@ -850,9 +820,11 @@ export default function CreateJobOrderPage() {
               </AlertTitle>
               <AlertDescription className="text-red-700 text-xs">
                 <ul className="list-disc list-inside ml-2">
-                  {missingCompliance.signedQuotation && <li>- Signed Quotation</li>}
-                  {missingCompliance.poMo && <li>- PO/MO</li>}
-                  {missingCompliance.projectFa && <li>- Project FA</li>}
+                  {missingCompliance.signedQuotation && <li>-Signed Quotation</li>}
+                  {missingCompliance.poMo && <li>-PO/MO</li>}
+                  {missingCompliance.projectFa && <li>-Project FA</li>}
+                  {missingCompliance.signedContract && <li>-Signed Contract</li>}
+                  {missingCompliance.paymentAsDeposit && <li>-Payment as Deposit</li>}
                 </ul>
               </AlertDescription>
             </Alert>
