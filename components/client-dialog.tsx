@@ -230,6 +230,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         zipCode: client?.zipCode || "",
         uploadedBy: client?.uploadedBy || user?.uid || "",
         uploadedByName: client?.uploadedByName || user?.displayName || user?.email || "",
+        user_company_id: user?.company_id || "", // Added user_company_id field to track which company the user belongs to
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
 
       let savedClient: Client
