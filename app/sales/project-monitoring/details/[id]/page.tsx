@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/lib/firebase"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 
 interface JobOrder {
   id: string
@@ -45,11 +45,24 @@ interface Product {
   updated?: any
 }
 
+interface Booking {
+  id: string
+  start_date: any
+  end_date: any
+  product_id: string
+  status: string
+  cost: number
+  total_cost: number
+  type: string
+  // Add other fields as needed
+}
+
 export default function JobOrderDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
+  const [booking, setBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -78,10 +91,21 @@ export default function JobOrderDetailsPage() {
                 ...productSnap.data(),
               } as Product)
             }
+
+            const bookingQuery = query(collection(db, "booking"), where("product_id", "==", jobOrderData.product_id))
+            const bookingSnapshot = await getDocs(bookingQuery)
+
+            if (!bookingSnapshot.empty) {
+              const bookingDoc = bookingSnapshot.docs[0]
+              setBooking({
+                id: bookingDoc.id,
+                ...bookingDoc.data(),
+              } as Booking)
+            }
           }
         }
       } catch (error) {
-        console.error("Error fetching job order or product:", error)
+        console.error("Error fetching job order, product, or booking:", error)
       } finally {
         setLoading(false)
       }
@@ -111,9 +135,9 @@ export default function JobOrderDetailsPage() {
       return {
         site: jobOrder.siteName || jobOrder.siteCode || "Not specified",
         client: jobOrder.clientName || "Not specified",
-        contractPeriod:
-          jobOrder.contractPeriodStart && jobOrder.contractPeriodEnd
-            ? `${formatDate(jobOrder.contractPeriodStart)} to ${formatDate(jobOrder.contractPeriodEnd)}`
+        bookingDates:
+          booking?.start_date && booking?.end_date
+            ? `${formatDate(booking.start_date)} to ${formatDate(booking.end_date)}`
             : "Not specified",
         jobType: jobOrder.joType || "Not specified",
       }
@@ -122,7 +146,7 @@ export default function JobOrderDetailsPage() {
     return {
       site: "Not specified",
       client: "Not specified",
-      contractPeriod: "Not specified",
+      bookingDates: "Not specified",
       jobType: "Not specified",
     }
   }
@@ -169,8 +193,8 @@ export default function JobOrderDetailsPage() {
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Contract Period: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.contractPeriod}</span>
+              <span className="font-medium text-gray-900">Booking Dates: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
             </div>
 
             <div>
