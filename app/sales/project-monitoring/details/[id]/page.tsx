@@ -23,13 +23,21 @@ interface JobOrder {
 
 interface Product {
   id: string
-  site?: string
-  client?: string
-  bookingStartDate?: any
-  bookingEndDate?: any
-  breakDate?: any
-  sales?: string
-  // Add other product fields as needed
+  name?: string
+  location?: string
+  site_owner?: string
+  seller_name?: string
+  price?: number
+  status?: string
+  specs_rental?: {
+    location?: string
+    caretaker?: string
+    land_owner?: string
+    site_orientation?: string
+    structure_condition?: string
+  }
+  created?: any
+  updated?: any
 }
 
 export default function JobOrderDetailsPage() {
@@ -94,7 +102,30 @@ export default function JobOrderDetailsPage() {
   }
 
   const getSiteData = () => {
-    return product || jobOrder
+    if (product) {
+      return {
+        site: product.specs_rental?.location || product.location || "Not specified",
+        client: product.site_owner || product.seller_name || "Not specified",
+        productName: product.name || "Not specified",
+        status: product.status || "Not specified",
+        caretaker: product.specs_rental?.caretaker || "Not specified",
+        price: product.price ? `₱${product.price.toLocaleString()}` : "Not specified",
+        landOwner: product.specs_rental?.land_owner || "Not specified",
+        structureCondition: product.specs_rental?.structure_condition || "Not specified",
+      }
+    }
+
+    // Fallback to job order data if product not available
+    return {
+      site: jobOrder?.site || "Not specified",
+      client: jobOrder?.client || "Not specified",
+      productName: "Not specified",
+      status: "Not specified",
+      caretaker: "Not specified",
+      price: "Not specified",
+      landOwner: "Not specified",
+      structureCondition: "Not specified",
+    }
   }
 
   const siteData = getSiteData()
@@ -130,31 +161,32 @@ export default function JobOrderDetailsPage() {
           <div className="flex-1 space-y-1 text-sm">
             <div>
               <span className="font-medium text-gray-900">Site: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData?.site || "Not specified"}</span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.site}</span>
             </div>
 
             <div>
               <span className="font-medium text-gray-900">Client: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData?.client || "Not specified"}</span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.client}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Booking Dates: </span>
-              <span className="text-gray-700">
-                {loading
-                  ? "Loading..."
-                  : `${formatDate(siteData?.bookingStartDate)} to ${formatDate(siteData?.bookingEndDate)}`}
-              </span>
+              <span className="font-medium text-gray-900">Product: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.productName}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Breakdate: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : formatDate(siteData?.breakDate)}</span>
+              <span className="font-medium text-gray-900">Status: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.status}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Sales: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData?.sales || "Not specified"}</span>
+              <span className="font-medium text-gray-900">Caretaker: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.caretaker}</span>
+            </div>
+
+            <div>
+              <span className="font-medium text-gray-900">Price: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.price}</span>
             </div>
           </div>
         </div>
