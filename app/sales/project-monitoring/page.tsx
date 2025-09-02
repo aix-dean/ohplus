@@ -295,7 +295,7 @@ export default function ProjectMonitoringPage() {
                       className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">JO #{jobOrder.joNumber || jobOrder.id.slice(-6)}</h3>
+                        <h3 className="font-medium text-gray-900">#{jobOrder.joNumber || jobOrder.id.slice(-6)}</h3>
                         <span
                           className={`px-2 py-1 text-xs rounded-full ${
                             jobOrder.status === "completed"
