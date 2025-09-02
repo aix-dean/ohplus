@@ -330,32 +330,6 @@ export default function ProjectMonitoringPage() {
                       </div>
 
                       {jobOrder.description && <p className="text-sm text-gray-600 mb-2">{jobOrder.description}</p>}
-
-                      <div className="text-xs text-gray-500">
-                        Created: {(() => {
-                          if (jobOrder.createdAt?.toDate) {
-                            return jobOrder.createdAt.toDate().toLocaleDateString()
-                          } else if (jobOrder.createdAt) {
-                            const date = new Date(jobOrder.createdAt)
-                            return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
-                          }
-                          return "Unknown"
-                        })()}
-                      </div>
-
-                      {jobOrder.updatedAt && (
-                        <div className="text-xs text-gray-500">
-                          Updated: {(() => {
-                            if (jobOrder.updatedAt?.toDate) {
-                              return jobOrder.updatedAt.toDate().toLocaleDateString()
-                            } else if (jobOrder.updatedAt) {
-                              const date = new Date(jobOrder.updatedAt)
-                              return isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString()
-                            }
-                            return "Unknown"
-                          })()}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
