@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Search, ArrowLeft, Package } from "lucide-react"
+import { Loader2, Search, ArrowLeft, Package, Plus } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationsForSelection } from "@/lib/job-order-service"
@@ -167,12 +167,15 @@ export default function SelectQuotationPage() {
             </div>
           </ScrollArea>
         )}
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            Cancel
-          </Button>
-        </div>
       </Card>
+
+      <Button
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg"
+        size="icon"
+        onClick={() => router.push("/sales/quotations/create")}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
     </div>
   )
 }
