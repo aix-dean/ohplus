@@ -949,6 +949,7 @@ export async function createDirectQuotation(
 
     const quotationData: Omit<Quotation, "id"> = {
       quotation_number: quotationNumber,
+      client_id: clientData.id,
       client_name: clientData.name,
       client_email: clientData.email,
       client_company_name: clientData.company,
@@ -1035,6 +1036,7 @@ export async function createMultipleQuotations(
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
+        client_id: clientData.id,
         client_name: clientData.name,
         client_email: clientData.email,
         client_company_name: clientData.company,
