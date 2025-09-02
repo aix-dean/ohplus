@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ArrowLeft, Upload, Plus, MoreHorizontal, Trash2 } from "lucide-react"
@@ -130,6 +129,7 @@ export default function AddClientPage() {
         address: "",
         industry: "",
         clientType: "",
+        partnerType: "",
         website: "",
         phone: "",
         companyLogoUrl: "",
@@ -308,304 +308,339 @@ export default function AddClientPage() {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-white">
       <Toaster />
 
-      {/* Header */}
-      <header className="flex items-center gap-4 pb-6 mb-6 border-b border-gray-200">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-2xl font-bold text-gray-900">Add Client</h1>
-      </header>
+      <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold text-gray-900">Add Client</h1>
+        </div>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Company Information */}
+      <form onSubmit={handleSubmit} className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Company Information - Left Column */}
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Company Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company Name:</Label>
-                    {!showNewCompanyInput ? (
-                      <Select value={formData.company_id} onValueChange={handleCompanySelect}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Company Name"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {companies.map((company) => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="add_new">+ Add New Company</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          value={newCompanyName}
-                          onChange={(e) => setNewCompanyName(e.target.value)}
-                          placeholder="Enter new company name"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setShowNewCompanyInput(false)
-                            setNewCompanyName("")
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+            <h2 className="text-lg font-medium text-gray-900 mb-6">Company Information</h2>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry:</Label>
-                    <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="-Choose an Industry-" />
+            <div className="space-y-6">
+              {/* Company Name */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Company Name:</Label>
+                  {!showNewCompanyInput ? (
+                    <Select value={formData.company_id} onValueChange={handleCompanySelect}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Company Name" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="technology">Technology</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="healthcare">Healthcare</SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="add_new">+ Add New Company</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={newCompanyName}
+                        onChange={(e) => setNewCompanyName(e.target.value)}
+                        placeholder="Enter new company name"
+                        className="h-10"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowNewCompanyInput(false)
+                          setNewCompanyName("")
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Client Type:</Label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Industry:</Label>
+                  <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="-Choose an Industry-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                      <SelectItem value="healthcare">Healthcare</SelectItem>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Client Type */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Client Type:</Label>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="relative">
                         <input
                           type="radio"
                           name="clientType"
                           value="partner"
                           checked={formData.clientType === "partner"}
                           onChange={(e) => handleSelectChange("clientType", e.target.value)}
-                          className="w-4 h-4 text-green-600"
+                          className="sr-only"
                         />
-                        <span className="text-green-600">Partner</span>
-                      </label>
-                      <label className="flex items-center gap-2">
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 ${formData.clientType === "partner" ? "border-green-500 bg-green-500" : "border-gray-300"} flex items-center justify-center`}
+                        >
+                          {formData.clientType === "partner" && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-sm ${formData.clientType === "partner" ? "text-green-600 font-medium" : "text-gray-700"}`}
+                      >
+                        Partner
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="relative">
                         <input
                           type="radio"
                           name="clientType"
                           value="brand"
                           checked={formData.clientType === "brand"}
                           onChange={(e) => handleSelectChange("clientType", e.target.value)}
-                          className="w-4 h-4"
+                          className="sr-only"
                         />
-                        <span>Brand</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {formData.clientType === "partner" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="partnerType">Partner Type:</Label>
-                      <Select
-                        value={formData.partnerType}
-                        onValueChange={(value) => handleSelectChange("partnerType", value)}
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 ${formData.clientType === "brand" ? "border-green-500 bg-green-500" : "border-gray-300"} flex items-center justify-center`}
+                        >
+                          {formData.clientType === "brand" && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-sm ${formData.clientType === "brand" ? "text-green-600 font-medium" : "text-gray-700"}`}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="-Select Type-" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="operator">Operator</SelectItem>
-                          <SelectItem value="agency">Agency</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Company Address:</Label>
-                    <Select value={formData.address} onValueChange={(value) => handleSelectChange("address", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Company Address" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manila">Manila</SelectItem>
-                        <SelectItem value="quezon-city">Quezon City</SelectItem>
-                        <SelectItem value="makati">Makati</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Company Website:</Label>
-                    <Select value={formData.website} onValueChange={(value) => handleSelectChange("website", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Company Website" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="custom">Enter Custom URL</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Company Phone #:</Label>
-                    <Select value={formData.phone} onValueChange={(value) => handleSelectChange("phone", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Company Phone #" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="custom">Enter Phone Number</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Company Logo:</Label>
-                    <div
-                      className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
-                      onClick={handleLogoClick}
-                    >
-                      {logoPreviewUrl ? (
-                        <img
-                          src={logoPreviewUrl || "/placeholder.svg"}
-                          alt="Company Logo Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Upload className="h-8 w-8 text-gray-400" />
-                      )}
-                    </div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      className="hidden"
-                      accept="image/*"
-                    />
+                        Brand
+                      </span>
+                    </label>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+
+                {formData.clientType === "partner" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Partner Type:</Label>
+                    <Select
+                      value={formData.partnerType}
+                      onValueChange={(value) => handleSelectChange("partnerType", value)}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="-Select Type-" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="operator">Operator</SelectItem>
+                        <SelectItem value="agency">Agency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Address and Website */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Company Address:</Label>
+                  <Select value={formData.address} onValueChange={(value) => handleSelectChange("address", value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Company Address" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manila">Manila</SelectItem>
+                      <SelectItem value="quezon-city">Quezon City</SelectItem>
+                      <SelectItem value="makati">Makati</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Company Website:</Label>
+                  <Select value={formData.website} onValueChange={(value) => handleSelectChange("website", value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Company Website" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Enter Custom URL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Phone and Logo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Company Phone #:</Label>
+                  <Select value={formData.phone} onValueChange={(value) => handleSelectChange("phone", value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Company Phone #" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Enter Phone Number</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Company Logo:</Label>
+                  <div
+                    className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
+                    onClick={handleLogoClick}
+                  >
+                    {logoPreviewUrl ? (
+                      <img
+                        src={logoPreviewUrl || "/placeholder.svg"}
+                        alt="Company Logo Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Upload className="h-6 w-6 text-gray-400" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Compliance */}
           <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Compliance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-6">Compliance</h3>
+
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span>DTI/BIR 2303</span>
-                  <Button variant="outline" size="sm">
+                  <span className="text-sm text-gray-700">DTI/BIR 2303</span>
+                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
                     Upload Document
                   </Button>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>G.I.S.</span>
-                  <Button variant="outline" size="sm">
+                  <span className="text-sm text-gray-700">G.I.S.</span>
+                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
                     Upload Document
                   </Button>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>ID with signature</span>
-                  <Button variant="outline" size="sm">
+                  <span className="text-sm text-gray-700">ID with signature</span>
+                  <Button variant="outline" size="sm" className="text-xs bg-transparent">
                     Upload Document
                   </Button>
                 </div>
-                <Button variant="link" className="p-0 h-auto text-blue-600">
-                  Add Compliance
-                </Button>
-              </CardContent>
-            </Card>
+                <div className="pt-2">
+                  <Button variant="link" className="p-0 h-auto text-blue-600 text-sm">
+                    Add Compliance
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Contact Person */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Contact Person</CardTitle>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500">Total: ({contactPersons.length})</span>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowAddContact(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Contact
+        {/* Redesigned Contact Person section to match image */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-medium text-gray-900">Contact Person</h2>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500">Total: ({contactPersons.length})</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowAddContact(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Contact
+              </Button>
+            </div>
+          </div>
+
+          {showAddContact && (
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                <Input
+                  placeholder="Name"
+                  value={newContact.name}
+                  onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                  className="h-10"
+                />
+                <Input
+                  placeholder="Designation"
+                  value={newContact.designation}
+                  onChange={(e) => setNewContact({ ...newContact, designation: e.target.value })}
+                  className="h-10"
+                />
+                <Input
+                  placeholder="Contact #"
+                  value={newContact.phone}
+                  onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                  className="h-10"
+                />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={newContact.email}
+                  onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                  className="h-10"
+                />
+                <Input
+                  placeholder="Remarks"
+                  value={newContact.remarks}
+                  onChange={(e) => setNewContact({ ...newContact, remarks: e.target.value })}
+                  className="h-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" onClick={handleAddContact} size="sm">
+                  Add
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowAddContact(false)} size="sm">
+                  Cancel
                 </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            {showAddContact && (
-              <div className="mb-4 p-4 border rounded-lg bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-                  <Input
-                    placeholder="Name"
-                    value={newContact.name}
-                    onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Designation"
-                    value={newContact.designation}
-                    onChange={(e) => setNewContact({ ...newContact, designation: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Contact #"
-                    value={newContact.phone}
-                    onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Email"
-                    type="email"
-                    value={newContact.email}
-                    onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Remarks"
-                    value={newContact.remarks}
-                    onChange={(e) => setNewContact({ ...newContact, remarks: e.target.value })}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" onClick={handleAddContact} size="sm">
-                    Add
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowAddContact(false)} size="sm">
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
+          )}
 
+          <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Designation</TableHead>
-                  <TableHead>Contact #</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Remarks</TableHead>
-                  <TableHead>Action</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="font-medium text-gray-700">Name</TableHead>
+                  <TableHead className="font-medium text-gray-700">Designation</TableHead>
+                  <TableHead className="font-medium text-gray-700">Contact #</TableHead>
+                  <TableHead className="font-medium text-gray-700">Email</TableHead>
+                  <TableHead className="font-medium text-gray-700">Remarks</TableHead>
+                  <TableHead className="font-medium text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {contactPersons.map((contact) => (
                   <TableRow key={contact.id}>
-                    <TableCell>{contact.name}</TableCell>
-                    <TableCell>{contact.designation}</TableCell>
-                    <TableCell>{contact.phone}</TableCell>
-                    <TableCell>{contact.email}</TableCell>
-                    <TableCell>{contact.remarks}</TableCell>
+                    <TableCell className="text-sm">{contact.name}</TableCell>
+                    <TableCell className="text-sm">{contact.designation}</TableCell>
+                    <TableCell className="text-sm">{contact.phone}</TableCell>
+                    <TableCell className="text-sm text-blue-600">{contact.email}</TableCell>
+                    <TableCell className="text-sm">{contact.remarks}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -632,15 +667,15 @@ export default function AddClientPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+        {/* Redesigned Action buttons to match image - right aligned */}
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={() => router.back()} className="px-6">
             Cancel
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading} className="px-6 bg-blue-600 hover:bg-blue-700">
             {loading ? "Saving..." : "Save"}
           </Button>
         </div>
