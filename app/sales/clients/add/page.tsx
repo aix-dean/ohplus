@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { ArrowLeft, Upload, Plus, MoreHorizontal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Toaster } from "sonner"
@@ -52,6 +53,7 @@ export default function AddClientPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -405,8 +407,7 @@ export default function AddClientPage() {
         await createClient(clientDataToSave)
       }
 
-      toast.success(`Successfully added ${contactPersons.length} client contact(s)`)
-      router.push("/sales/clients")
+      setShowSuccessModal(true)
     } catch (error) {
       console.error("Error saving client:", error)
       toast.error("Failed to save client")
@@ -415,9 +416,29 @@ export default function AddClientPage() {
     }
   }
 
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    router.push("/sales/clients")
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Toaster />
+
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <div className="mb-4">
+              <div className="text-6xl">🎉</div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Congratulations!</h2>
+            <p className="text-gray-600 mb-6">You have successfully added a new client</p>
+            <Button onClick={handleSuccessModalClose} className="bg-blue-600 hover:bg-blue-700">
+              Continue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="border-b border-gray-200 px-6 py-4">
         <div className="flex items-center gap-3">
