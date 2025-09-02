@@ -30,6 +30,13 @@ interface Company {
   website?: string
   phone?: string
   created: Date
+  compliance?: {
+    dti: string
+    gis: string
+    id: string
+    uploadedAt: Date
+    uploadedBy: string
+  }
 }
 
 interface ContactPerson {
@@ -102,6 +109,13 @@ export default function AddClientPage() {
         website: doc.data().website || "",
         phone: doc.data().phone || "",
         created: doc.data().created?.toDate() || new Date(),
+        compliance: doc.data().compliance || {
+          dti: "",
+          gis: "",
+          id: "",
+          uploadedAt: new Date(),
+          uploadedBy: "",
+        },
       }))
       setCompanies(companiesData)
     } catch (error) {
@@ -280,6 +294,28 @@ export default function AddClientPage() {
       let finalCompanyId = formData.company_id
       let finalCompanyName = formData.company
 
+      const complianceUrls = {
+        dti: "",
+        gis: "",
+        id: "",
+      }
+
+      // Upload compliance files if they exist
+      if (complianceFiles.dti) {
+        const uploadPath = `compliance_documents/${userData?.uid || "unknown"}/dti/`
+        complianceUrls.dti = await uploadFileToFirebaseStorage(complianceFiles.dti, uploadPath)
+      }
+
+      if (complianceFiles.gis) {
+        const uploadPath = `compliance_documents/${userData?.uid || "unknown"}/gis/`
+        complianceUrls.gis = await uploadFileToFirebaseStorage(complianceFiles.gis, uploadPath)
+      }
+
+      if (complianceFiles.id) {
+        const uploadPath = `compliance_documents/${userData?.uid || "unknown"}/id/`
+        complianceUrls.id = await uploadFileToFirebaseStorage(complianceFiles.id, uploadPath)
+      }
+
       if (logoFile) {
         const uploadPath = `company_logos/new_client/`
         finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
@@ -296,10 +332,44 @@ export default function AddClientPage() {
             companyLogoUrl: finalCompanyLogoUrl,
           })
         }
+
+        if (complianceUrls.dti || complianceUrls.gis || complianceUrls.id) {
+          await updateDoc(doc(db, "client_company", finalCompanyId), {
+            compliance: {
+              dti: complianceUrls.dti,
+              gis: complianceUrls.gis,
+              id: complianceUrls.id,
+              uploadedAt: new Date(),
+              uploadedBy: userData?.uid || "",
+            },
+          })
+        }
       } else if (formData.company_id && logoFile) {
         // Update existing company logo if new logo was uploaded
         await updateDoc(doc(db, "client_company", formData.company_id), {
           companyLogoUrl: finalCompanyLogoUrl,
+        })
+
+        if (complianceUrls.dti || complianceUrls.gis || complianceUrls.id) {
+          await updateDoc(doc(db, "client_company", formData.company_id), {
+            compliance: {
+              dti: complianceUrls.dti,
+              gis: complianceUrls.gis,
+              id: complianceUrls.id,
+              uploadedAt: new Date(),
+              uploadedBy: userData?.uid || "",
+            },
+          })
+        }
+      } else if (formData.company_id && (complianceUrls.dti || complianceUrls.gis || complianceUrls.id)) {
+        await updateDoc(doc(db, "client_company", formData.company_id), {
+          compliance: {
+            dti: complianceUrls.dti,
+            gis: complianceUrls.gis,
+            id: complianceUrls.id,
+            uploadedAt: new Date(),
+            uploadedBy: userData?.uid || "",
+          },
         })
       }
 
@@ -325,6 +395,11 @@ export default function AddClientPage() {
           uploadedBy: userData?.uid || "",
           uploadedByName: userData?.displayName || userData?.email || "",
           user_company_id: userCompanyId,
+          compliance: {
+            dti: complianceUrls.dti,
+            gis: complianceUrls.gis,
+            id: complianceUrls.id,
+          },
         }
 
         await createClient(clientDataToSave)
