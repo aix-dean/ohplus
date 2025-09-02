@@ -200,35 +200,35 @@ export default function JobOrderDetailsPage() {
       </div>
 
       <div className="flex justify-start">
-        <div className="flex items-start gap-4 max-w-md">
+        <div className="flex items-start gap-6 max-w-2xl">
           {/* Product image placeholder */}
           <div className="flex-shrink-0">
             <img
               src={product?.media?.[0]?.url || "/lilo-and-stitch-product-box.png"}
               alt="Product"
-              className="w-20 h-20 object-cover rounded-md border"
+              className="w-32 h-32 object-cover rounded-md border"
             />
           </div>
 
           {/* Site information */}
-          <div className="flex-1 space-y-1 text-sm">
+          <div className="flex-1 space-y-3 text-base">
             <div>
-              <span className="font-medium text-gray-900">Site: </span>
+              <span className="font-semibold text-gray-900">Site: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.site}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Client: </span>
+              <span className="font-semibold text-gray-900">Client: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.client}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Booking Dates: </span>
+              <span className="font-semibold text-gray-900">Booking Dates: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
             </div>
 
             <div>
-              <span className="font-medium text-gray-900">Seller: </span>
+              <span className="font-semibold text-gray-900">Seller: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.seller}</span>
             </div>
           </div>
