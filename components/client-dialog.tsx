@@ -33,7 +33,7 @@ interface Company {
 }
 
 export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
-  const { user } = useAuth() // Get current user from auth context
+  const { userData } = useAuth() // Get current user from auth context
   const [loading, setLoading] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
@@ -163,7 +163,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         clientType: formData.clientType,
         companyLogoUrl: "", // Will be updated after logo upload if needed
         created: new Date(),
-        user_company_id: user?.company_id || "", // Added user_company_id to track which company the user belongs to
+        user_company_id: userData?.company_id || "", // Added user_company_id to track which company the user belongs to
       })
       return docRef.id
     } catch (error) {
@@ -189,7 +189,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
   const fetchUserCompanyId = async (): Promise<string> => {
     try {
-      if (!user?.uid) return ""
+      if (!userData?.uid) return ""
 
       const companiesRef = collection(db, "client_company")
       const snapshot = await getDocs(companiesRef)
@@ -197,13 +197,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       // Find the company that belongs to the current user
       const userCompany = snapshot.docs.find((doc) => {
         const data = doc.data()
-        return data.user_company_id === user.uid || data.created_by === user.uid
+        return data.user_company_id === userData.uid || data.created_by === userData.uid
       })
 
-      return userCompany?.id || user?.company_id || ""
+      return userCompany?.id || userData?.company_id || ""
     } catch (error) {
       console.error("Error fetching user company ID:", error)
-      return user?.company_id || ""
+      return userData?.company_id || ""
     }
   }
 
@@ -251,8 +251,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         city: client?.city || "",
         state: client?.state || "",
         zipCode: client?.zipCode || "",
-        uploadedBy: client?.uploadedBy || user?.uid || "",
-        uploadedByName: client?.uploadedByName || user?.displayName || user?.email || "",
+        uploadedBy: client?.uploadedBy || userData?.uid || "",
+        uploadedByName: client?.uploadedByName || userData?.displayName || userData?.email || "",
         user_company_id: userCompanyId, // Use fetched company_id instead of auth context
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
 
