@@ -21,7 +21,7 @@ export default function ProjectMonitoringPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(9) // 9 items per page for 3x3 grid on desktop
+  const itemsPerPage = 9
 
   const fetchJobOrderCounts = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -91,24 +91,6 @@ export default function ProjectMonitoringPage() {
     fetchProducts()
   }, [userData?.company_id])
 
-  const filteredProducts = products.filter((product) => (jobOrderCounts[product.id] || 0) > 0)
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentProducts = filteredProducts.slice(startIndex, endIndex)
-
-  const goToPage = (page: number) => {
-    setCurrentPage(page)
-  }
-
-  const goToPrevious = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1))
-  }
-
-  const goToNext = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
@@ -154,78 +136,88 @@ export default function ProjectMonitoringPage() {
         {loading ? (
           <div className="text-center py-8">Loading...</div>
         ) : products.length > 0 ? (
-          <>
-            <div className="overflow-auto max-h-[calc(100vh-300px)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[600px]">
-                {currentProducts.map((product) => (
-                  <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
-                    <button
-                      onClick={handleOpenDialog}
-                      className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
-                    >
-                      Job Orders: {jobOrderCounts[product.id] || 0}
-                    </button>
+          <div className="space-y-4">
+            <div className="h-[800px] overflow-y-auto bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {products
+                  .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
+                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                  .map((product) => (
+                    <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
+                      <button
+                        onClick={handleOpenDialog}
+                        className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
+                      >
+                        Job Orders: {jobOrderCounts[product.id] || 0}
+                      </button>
 
-                    {/* Project Title Banner */}
-                    <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
-                      <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
-                    </div>
+                      {/* Project Title Banner */}
+                      <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
+                        <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+                      </div>
 
-                    {/* Project Location */}
-                    <div className="text-gray-900 font-medium mb-3">
-                      {product.specs_rental?.location || product.name || "No site code available"}
-                    </div>
+                      {/* Project Location */}
+                      <div className="text-gray-900 font-medium mb-3">
+                        {product.specs_rental?.location || product.name || "No site code available"}
+                      </div>
 
-                    {/* Last Activity Section */}
-                    <div>
-                      <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <div>5/6/25- 5:00AM- Arrival of FA to site</div>
-                        <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
-                        <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+                      {/* Last Activity Section */}
+                      <div>
+                        <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
+                        <div className="space-y-1 text-sm text-gray-600">
+                          <div>5/6/25- 5:00AM- Arrival of FA to site</div>
+                          <div>5/4/25- 3:00PM- Reported Bad Weather as cause...</div>
+                          <div>5/3/25- 1:30PM- Contacted Team C for installation</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <button
-                  onClick={goToPrevious}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
+            {(() => {
+              const filteredProducts = products.filter((product) => (jobOrderCounts[product.id] || 0) > 0)
+              const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
 
-                <div className="flex gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md ${
-                        currentPage === page
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+              if (totalPages <= 1) return null
+
+              return (
+                <div className="flex justify-center items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-2 border rounded-md ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
                 </div>
-
-                <button
-                  onClick={goToNext}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
+              )
+            })()}
+          </div>
         ) : (
           <div className="text-center py-8 text-gray-500">No products found</div>
         )}
