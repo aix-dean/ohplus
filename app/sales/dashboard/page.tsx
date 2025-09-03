@@ -1864,6 +1864,32 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
+  if (!product) {
+    return (
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[4/3]">
+        <div className="relative h-40 bg-gray-100 p-3">
+          <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
+            <div className="text-gray-400 text-sm">No data available</div>
+          </div>
+        </div>
+        <CardContent className="p-4 flex-1 flex flex-col">
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="text-base font-bold text-gray-400">N/A</div>
+            <h3 className="text-sm text-gray-400">Record not available</h3>
+            <div className="text-sm font-semibold text-gray-400 mt-1">Price not available</div>
+            <Button
+              variant="outline"
+              className="mt-auto w-full h-9 text-sm bg-gray-100 border border-gray-300 text-gray-400 rounded-lg font-medium cursor-not-allowed"
+              disabled
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   // Get the first media item for the thumbnail
   const thumbnailUrl =
     product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
@@ -1960,10 +1986,10 @@ function ProductCard({
       <CardContent className="p-4 flex-1 flex flex-col">
         <div className="flex flex-col gap-2 flex-1">
           {/* Site Code - More prominent */}
-          {siteCode && <div className="text-base font-bold text-gray-900 tracking-wide">{siteCode}</div>}
+          <div className="text-base font-bold text-gray-900 tracking-wide">{siteCode || "N/A"}</div>
 
           {/* Product Name/Location */}
-          <h3 className="text-sm text-gray-600 line-clamp-2">{product.name}</h3>
+          <h3 className="text-sm text-gray-600 line-clamp-2">{product.name || "No name available"}</h3>
 
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
