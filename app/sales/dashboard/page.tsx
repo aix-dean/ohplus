@@ -1937,7 +1937,7 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4] flex flex-col",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
@@ -1984,7 +1984,7 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-4 flex-1 flex flex-col">
+      <CardContent className="p-4 flex-1 flex flex-col h-full">
         <div className="flex flex-col gap-2 flex-1">
           {/* Location/Site Name - Top text with gray color and smaller font */}
           <div
