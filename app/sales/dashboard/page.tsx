@@ -1866,14 +1866,14 @@ function ProductCard({
 }) {
   if (!product) {
     return (
-      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
-        <div className="relative h-56 bg-gray-100 p-3">
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[4/5]">
+        <div className="relative h-40 bg-gray-100 p-2">
           <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
             <div className="text-gray-400 text-sm">No data available</div>
           </div>
         </div>
-        <CardContent className="p-4 flex-1 flex flex-col">
-          <div className="flex flex-col gap-2 flex-1">
+        <CardContent className="p-3 flex-1 flex flex-col">
+          <div className="flex flex-col gap-1 flex-1">
             <div className="text-base font-bold text-gray-400">N/A</div>
             <h3 className="text-sm text-gray-400">Record not available</h3>
             <div className="text-sm font-semibold text-gray-400 mt-1">Price not available</div>
@@ -1936,13 +1936,13 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[4/5]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-56 p-3">
+      <div className="relative h-40 p-2">
         <div className="relative h-full w-full rounded-xl overflow-hidden">
           <Image
             src={thumbnailUrl || "/placeholder.svg"}
@@ -1983,8 +1983,8 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-4 flex-1 flex flex-col">
-        <div className="flex flex-col gap-2 flex-1">
+      <CardContent className="p-3 flex-1 flex flex-col">
+        <div className="flex flex-col gap-1 flex-1">
           {/* Location/Site Name - Top text with gray color and smaller font */}
           <div
             className="font-medium truncate"
