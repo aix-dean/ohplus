@@ -1867,7 +1867,7 @@ function ProductCard({
 }) {
   if (!product) {
     return (
-      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50">
         <div className="relative h-48 bg-gray-100 p-3">
           <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
             <div className="text-gray-400 text-sm">No data available</div>
@@ -1937,7 +1937,7 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4] flex flex-col",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white flex flex-col",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
