@@ -1910,38 +1910,40 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-xl transition-all hover:shadow-md bg-white",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-          }}
-        />
+      <div className="relative h-56 bg-gray-200 p-3">
+        <div className="relative h-full w-full rounded-xl overflow-hidden">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "Product image"}
+            fill
+            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/abstract-geometric-sculpture.png"
+              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+            }}
+          />
 
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-3 left-3">
-          <div
-            className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
-            style={{ backgroundColor: statusInfo.color }}
-          >
-            {statusInfo.label}
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-3 left-3">
+            <div
+              className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
+              style={{ backgroundColor: statusInfo.color }}
+            >
+              {statusInfo.label}
+            </div>
           </div>
         </div>
 
         {/* Selection indicator */}
         {selectionMode && (
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-5 right-5 z-10">
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
@@ -1955,21 +1957,21 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-2">
+      <CardContent className="p-4 flex-1 flex flex-col">
+        <div className="flex flex-col gap-2 flex-1">
           {/* Site Code - More prominent */}
-          {siteCode && <div className="text-sm font-bold text-gray-900 tracking-wide">{siteCode}</div>}
+          {siteCode && <div className="text-base font-bold text-gray-900 tracking-wide">{siteCode}</div>}
 
           {/* Product Name/Location */}
-          <h3 className="text-sm text-gray-700 line-clamp-1">{product.name}</h3>
+          <h3 className="text-sm text-gray-600 line-clamp-2">{product.name}</h3>
 
           {/* Price - More prominent */}
-          <div className="text-sm font-bold text-gray-900">{formattedPrice}</div>
+          <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
 
-          {/* Create Report Button - Updated styling to match reference */}
+          {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
-            className="mt-2 w-full h-9 text-sm bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+            className="mt-auto w-full h-9 text-sm bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
             onClick={handleCreateReport}
           >
             Create Report
