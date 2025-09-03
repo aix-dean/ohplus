@@ -939,6 +939,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
+          client_company_id: selectedClientForProposal.id, // Added client_company_id to skip dates options
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 
