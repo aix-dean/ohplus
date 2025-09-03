@@ -732,8 +732,8 @@ export default function SalesReportPreviewPage() {
         <Button
           onClick={handlePostReport}
           disabled={posting}
-          className="text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
-          style={{ backgroundColor: "#00bf63" }}
+          className="text-white px-8 py-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
+          style={{ backgroundColor: "#00bf63", minWidth: "120px", minHeight: "56px" }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#00a855")}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#00bf63")}
         >
