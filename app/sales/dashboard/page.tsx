@@ -1910,7 +1910,7 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[2/3]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[1/2]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
