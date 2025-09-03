@@ -28,6 +28,7 @@ interface CreateCostEstimateOptions {
   customLineItems?: CostEstimateLineItem[] // Allow passing custom line items
   company_id?: string
   page_id?: string
+  client_company_id?: string // Added client_company_id field
 }
 
 interface CostEstimateClientData {
@@ -210,6 +211,7 @@ export async function createDirectCostEstimate(
         address: clientData.address || "",
         designation: clientData.designation || "",
         industry: clientData.industry || "",
+        company_id: options?.client_company_id || "", // Added client_company_id to client object
       },
       lineItems,
       totalAmount,
@@ -595,6 +597,7 @@ export async function createMultipleCostEstimates(
           address: clientData.address || "",
           designation: clientData.designation || "",
           industry: clientData.industry || "",
+          company_id: options?.client_company_id || "", // Added client_company_id to client object
         },
         lineItems,
         totalAmount,

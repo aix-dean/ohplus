@@ -30,130 +30,136 @@ const formatDate = (date: any) => {
   }
 }
 
-export const generateQuotationPDF = async (quotation: Quotation) => {
+const formatDuration = (days: number): string => {
+  if (days <= 0) return "0 days"
+
+  const months = Math.floor(days / 30)
+  const remainingDays = days % 30
+
+  if (months === 0) {
+    return `${days} day${days !== 1 ? "s" : ""}`
+  } else if (remainingDays === 0) {
+    return `${months} month${months !== 1 ? "s" : ""}`
+  } else {
+    return `${months} month${months !== 1 ? "s" : ""} and ${remainingDays} day${remainingDays !== 1 ? "s" : ""}`
+  }
+}
+
+const formatCompanyAddress = (companyData: any): string => {
+  if (!companyData) return ""
+  const parts = []
+  if (companyData.address) parts.push(companyData.address)
+  if (companyData.city) parts.push(companyData.city)
+  if (companyData.state) parts.push(companyData.state)
+  if (companyData.zip) parts.push(companyData.zip)
+  return parts.join(", ")
+}
+
+export const generateQuotationPDF = async (quotation: Quotation, companyData?: any) => {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
-  const margin = 20
-
-  // Helper function to add text with word wrapping
-  const addWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
-    pdf.setFontSize(fontSize)
-    const lines = pdf.splitTextToSize(text, maxWidth)
-    pdf.text(lines, x, y)
-    return y + lines.length * fontSize * 0.35
-  }
+  const margin = 15
 
   let yPosition = margin
 
-  // Company Header
-  pdf.setFontSize(24)
+  pdf.setFontSize(20)
   pdf.setFont("helvetica", "bold")
-  pdf.text("Golden Touch Imaging Specialist", pageWidth / 2, yPosition, { align: "center" })
-  yPosition += 20
+  pdf.text(companyData?.name || "AI Xynergy", pageWidth / 2, yPosition, { align: "center" })
+  yPosition += 12
 
-  // Client and RFQ Info
-  pdf.setFontSize(12)
+  pdf.setFontSize(10)
   pdf.setFont("helvetica", "normal")
-  pdf.text(quotation.client_name || "Client Name", margin, yPosition)
+  pdf.text(formatDate(new Date()), margin, yPosition)
   pdf.text(`RFQ. No. ${quotation.quotation_number}`, pageWidth - margin, yPosition, { align: "right" })
   yPosition += 8
 
-  pdf.setFont("helvetica", "bold")
+  pdf.text(quotation.client_name || "Client Name", margin, yPosition)
+  yPosition += 5
   pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
-  yPosition += 15
+  yPosition += 10
 
-  // Company Header Section
-  pdf.setFontSize(18)
+  const item = quotation.items?.[0]
+  pdf.setFontSize(14)
   pdf.setFont("helvetica", "bold")
-  pdf.text("GOLDEN TOUCH IMAGING SPECIALIST", pageWidth / 2, yPosition, { align: "center" })
-  yPosition += 15
+  pdf.text(item?.name || "Site Name", pageWidth / 2, yPosition, { align: "center" })
+  yPosition += 10
 
-  pdf.setFontSize(11)
+  pdf.setFontSize(10)
   pdf.setFont("helvetica", "normal")
-  pdf.text("Good Day! Thank you for considering Golden Touch for your business needs.", pageWidth / 2, yPosition, {
-    align: "center",
-  })
-  yPosition += 6
+  pdf.text(
+    `Good Day! Thank you for considering ${companyData?.name || "AI Xynergy"} for your business needs.`,
+    pageWidth / 2,
+    yPosition,
+    { align: "center" },
+  )
+  yPosition += 4
   pdf.text("We are pleased to submit our quotation for your requirements:", pageWidth / 2, yPosition, {
     align: "center",
   })
-  yPosition += 10
+  yPosition += 8
 
   pdf.setFont("helvetica", "bold")
   pdf.text("Details as follows:", pageWidth / 2, yPosition, { align: "center" })
-  yPosition += 15
+  yPosition += 8
 
-  // Site Details
-  const item = quotation.items?.[0]
   if (item) {
-    const durationMonths = Math.ceil((Number(item.duration_days) || 40) / 30)
-    const monthlyRate = item.price || 0
-    const totalLease = monthlyRate * durationMonths
-    const vatAmount = totalLease * 0.12
-    const totalWithVat = totalLease + vatAmount
-
-    pdf.setFontSize(11)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
     const details = [
-      `● Site Location: ${safeString(item.location)}`,
-      `● Type: ${safeString(item.type)}`,
-      `● Size: ${safeString(item.dimensions) || "100ft (H) x 60ft (W)"}`,
-      `● Contract Duration: ${durationMonths} MONTHS`,
-      `● Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
-      `● Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
-      `● Illumination: ${item.illumination || "10 units of 1000 watts metal Halide"}`,
-      `● Lease Rate/Month: (Exclusive of VAT)`,
-      `● Total Lease: (Exclusive of VAT)`,
+      `• Type: ${safeString(item.type) || "Rental"}`,
+      `• Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
+      `• Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
+      `• Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
+      `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
+      `• Illumination: 10 units of 1000 watts metal Halide`,
+      `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
     ]
 
     details.forEach((detail) => {
       pdf.text(detail, margin, yPosition)
-      yPosition += 7
+      yPosition += 5
     })
 
+    yPosition += 8
+
+    yPosition += 6
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Lease rate per month", margin + 5, yPosition)
+    pdf.text(`PHP ${(item.price || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, { align: "right" })
+    yPosition += 5
+
+    pdf.text(`x ${formatDuration(quotation.duration_days || 0)}`, margin + 5, yPosition)
+    pdf.text(`PHP ${(item.item_total_amount || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
+    yPosition += 5
+
+    pdf.text("12% VAT", margin + 5, yPosition)
+    pdf.text(`PHP ${((item.item_total_amount || 0) * 0.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
+    yPosition += 6
+
+    pdf.setFont("helvetica", "bold")
+    pdf.setFontSize(12)
+    pdf.text("TOTAL", margin + 5, yPosition)
+    pdf.text(`PHP ${((item.item_total_amount || 0) * 1.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
     yPosition += 10
 
-    // Pricing Table
-    pdf.setFont("helvetica", "bold")
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 8)
-    pdf.setFillColor(240, 240, 240)
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 8, "F")
-
-    const colWidth = (pageWidth - 2 * margin) / 3
-    pdf.text("Lease rate per month", margin + colWidth / 2, yPosition + 5, { align: "center" })
-    pdf.text("12% VAT", margin + colWidth + colWidth / 2, yPosition + 5, { align: "center" })
-    pdf.text("TOTAL", margin + 2 * colWidth + colWidth / 2, yPosition + 5, { align: "center" })
-
-    yPosition += 8
-    pdf.rect(margin, yPosition, pageWidth - 2 * margin, 8)
-    pdf.text(`PHP ${monthlyRate.toLocaleString()}`, margin + colWidth / 2, yPosition + 5, { align: "center" })
-    pdf.text(`PHP ${vatAmount.toLocaleString()}`, margin + colWidth + colWidth / 2, yPosition + 5, { align: "center" })
-    pdf.text(`PHP ${totalWithVat.toLocaleString()}`, margin + 2 * colWidth + colWidth / 2, yPosition + 5, {
-      align: "center",
-    })
-
-    yPosition += 15
-
-    // Totals
-    pdf.text(`x ${durationMonths} months`, margin, yPosition)
-    pdf.text(`PHP ${totalLease.toLocaleString()}`, pageWidth - margin, yPosition, { align: "right" })
-    yPosition += 6
-    pdf.text(`PHP ${vatAmount.toLocaleString()}`, pageWidth - margin, yPosition, { align: "right" })
-    yPosition += 6
-    pdf.text(`PHP ${totalWithVat.toLocaleString()}`, pageWidth - margin, yPosition, { align: "right" })
-    yPosition += 15
-
-    // Note
+    const durationMonths = Math.ceil((quotation.duration_days || 0) / 30)
     pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(9)
     pdf.text(`Note: free two (2) change material for ${durationMonths} month rental`, margin, yPosition)
-    yPosition += 15
+    yPosition += 8
 
-    // Terms and Conditions
     pdf.setFont("helvetica", "bold")
     pdf.text("Terms and Conditions:", margin, yPosition)
-    yPosition += 8
+    yPosition += 5
 
     pdf.setFont("helvetica", "normal")
     const terms = [
@@ -163,88 +169,371 @@ export const generateQuotationPDF = async (quotation: Quotation) => {
       "3. To book the site, one (1) month advance and one (2) months security deposit",
       "    payment dated 7 days before the start of rental is required.",
       "4. Final artwork should be approved ten (10) days before the contract period",
-      "5. Print is exclusively for Golden Touch Imaging Specialist Only.",
+      `5. Print is exclusively for ${companyData?.name || "AI Xynergy"} Only.`,
     ]
 
     terms.forEach((term) => {
       pdf.text(term, margin, yPosition)
-      yPosition += 6
+      yPosition += 4
     })
 
     yPosition += 10
 
-    // Date
-    pdf.text(formatDate(new Date()), pageWidth - margin, yPosition, { align: "right" })
-    yPosition += 15
-
-    // Site Location Header
-    pdf.setFont("helvetica", "bold")
-    pdf.setFontSize(14)
-    pdf.text(`${item.location} QUOTATION`, pageWidth / 2, yPosition, { align: "center" })
-    yPosition += 20
-
-    // Signature Section
-    pdf.setFontSize(11)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Left side - Company signature
-    pdf.text("Very truly yours,", margin, yPosition)
-    pdf.text("C o n f o r m e:", pageWidth / 2 + 20, yPosition)
-    yPosition += 25
+    const leftColX = margin
+    const rightColX = pageWidth / 2 + 10
 
-    // Signature lines
-    pdf.line(margin, yPosition, margin + 60, yPosition)
-    pdf.line(pageWidth / 2 + 20, yPosition, pageWidth / 2 + 80, yPosition)
-    yPosition += 8
+    pdf.text("Very truly yours,", leftColX, yPosition)
+    pdf.text("Conforme:", rightColX, yPosition)
+    yPosition += 12
 
-    // Names and positions
-    pdf.text("Mathew Espanto", margin, yPosition)
-    pdf.text(quotation.client_name || "Client Name", pageWidth / 2 + 20, yPosition)
+    pdf.line(leftColX, yPosition, leftColX + 60, yPosition)
+    pdf.line(rightColX, yPosition, rightColX + 60, yPosition)
+    yPosition += 5
+
+    pdf.text(quotation.signature_name || "AIX Xymbiosis", leftColX, yPosition)
+    pdf.text(quotation.client_name || "Client Name", rightColX, yPosition)
+    yPosition += 4
+
+    pdf.text(quotation.signature_position || "Account Manager", leftColX, yPosition)
+    pdf.text(quotation.client_company_name || "COMPANY NAME", rightColX, yPosition)
     yPosition += 6
 
-    pdf.text("Account Management", margin, yPosition)
-    pdf.text(quotation.client_company_name || "Client Company", pageWidth / 2 + 20, yPosition)
-    yPosition += 15
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "italic")
+    pdf.text("This signed quotation serves as an", rightColX, yPosition)
+    yPosition += 3
+    pdf.text("official document for billing purposes", rightColX, yPosition)
+    yPosition += 8
 
-    // Official document note
-    pdf.setFontSize(9)
-    pdf.text("This signed Quotation serves as an", pageWidth / 2 + 20, yPosition)
-    yPosition += 4
-    pdf.text("official document for billing purposes", pageWidth / 2 + 20, yPosition)
-    yPosition += 15
-
-    // Footer
-    pdf.setFontSize(10)
-    pdf.text(
-      "No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53",
-      pageWidth / 2,
-      yPosition,
-      { align: "center" },
-    )
-    yPosition += 5
-    pdf.text("email: sales@goldentouchimaging.com or gtigolden@gmail.com", pageWidth / 2, yPosition, {
-      align: "center",
-    })
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "normal")
+    const companyAddress = formatCompanyAddress(companyData)
+    if (companyAddress) {
+      pdf.text(companyAddress, pageWidth / 2, yPosition, { align: "center" })
+      yPosition += 3
+    }
+    if (companyData?.phone) {
+      pdf.text(`Telephone: ${companyData.phone}`, pageWidth / 2, yPosition, { align: "center" })
+      yPosition += 3
+    }
+    if (companyData?.email) {
+      pdf.text(`Email: ${companyData.email}`, pageWidth / 2, yPosition, { align: "center" })
+    }
   }
 
-  // Save the PDF
   const fileName = `Quotation_${quotation.quotation_number || quotation.id?.slice(-8)}.pdf`
   pdf.save(fileName)
 }
 
-export const generateSeparateQuotationPDFs = async (quotation: Quotation) => {
-  if (!quotation.items || quotation.items.length <= 1) {
-    return generateQuotationPDF(quotation)
-  }
+/**
+ * Generate separate PDF files for multiple quotations with the same page_id
+ * Similar to cost estimate's generateSeparateCostEstimatePDFs function
+ */
+export const generateSeparateQuotationPDFsByPageId = async (
+  quotations: Quotation[],
+  selectedQuotations?: string[],
+  companyData?: any,
+): Promise<void> => {
+  try {
+    console.log(
+      "[v0] Generating separate PDFs for quotations:",
+      quotations.map((q) => q.id),
+    )
 
-  // Generate separate PDF for each item
-  for (let i = 0; i < quotation.items.length; i++) {
-    const item = quotation.items[i]
-    const singleItemQuotation: Quotation = {
-      ...quotation,
-      items: [item],
+    // Filter quotations if specific ones are selected
+    const quotationsToProcess =
+      selectedQuotations && selectedQuotations.length > 0
+        ? quotations.filter((q) => selectedQuotations.includes(q.id || ""))
+        : quotations
+
+    if (quotationsToProcess.length === 0) {
+      throw new Error("No quotations selected for PDF generation")
     }
 
-    await generateQuotationPDF(singleItemQuotation)
+    // Generate separate PDF for each quotation with unique numbering
+    for (let i = 0; i < quotationsToProcess.length; i++) {
+      const quotation = quotationsToProcess[i]
+
+      // Create unique quotation number with suffix if multiple quotations
+      const baseQuotationNumber = quotation.quotation_number || quotation.id?.slice(-8) || "QT-000"
+      const uniqueQuotationNumber =
+        quotations.length > 1
+          ? `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+          : baseQuotationNumber
+
+      // Create modified quotation with unique number
+      const modifiedQuotation: Quotation = {
+        ...quotation,
+        quotation_number: uniqueQuotationNumber,
+      }
+
+      // Generate PDF for this quotation
+      await generateQuotationPDF(modifiedQuotation, companyData)
+
+      // Add small delay between downloads to ensure proper file naming
+      if (i < quotationsToProcess.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+
+    console.log("[v0] Successfully generated", quotationsToProcess.length, "separate quotation PDFs")
+  } catch (error) {
+    console.error("Error generating separate quotation PDFs:", error)
+    throw error
   }
+}
+
+/**
+ * Generate quotation PDFs with multi-page support
+ * Handles both single quotations and multiple quotations with the same page_id
+ */
+export const generateQuotationPDFsWithMultiPageSupport = async (
+  quotations: Quotation | Quotation[],
+  selectedQuotations?: string[],
+  companyData?: any,
+  returnBase64 = false,
+): Promise<string | void> => {
+  try {
+    // Handle single quotation
+    if (!Array.isArray(quotations)) {
+      if (returnBase64) {
+        return await generateQuotationEmailPDF(quotations, true, undefined, companyData)
+      } else {
+        return await generateQuotationPDF(quotations, companyData)
+      }
+    }
+
+    // Handle multiple quotations
+    if (quotations.length === 1) {
+      const quotation = quotations[0]
+      if (returnBase64) {
+        return await generateQuotationEmailPDF(quotation, true, undefined, companyData)
+      } else {
+        return await generateQuotationPDF(quotation, companyData)
+      }
+    }
+
+    // Generate separate PDFs for multiple quotations
+    if (returnBase64) {
+      // For email, generate PDF for the first quotation only
+      const firstQuotation = quotations[0]
+      return await generateQuotationEmailPDF(firstQuotation, true, undefined, companyData)
+    } else {
+      // Generate separate PDFs for each quotation
+      await generateSeparateQuotationPDFsByPageId(quotations, selectedQuotations, companyData)
+    }
+  } catch (error) {
+    console.error("Error generating quotation PDFs with multi-page support:", error)
+    throw error
+  }
+}
+
+export const generateSeparateQuotationPDFs = async (quotation: Quotation, companyData?: any) => {
+  // If quotation has multiple items, generate separate PDF for each item
+  if (quotation.items && quotation.items.length > 1) {
+    for (let i = 0; i < quotation.items.length; i++) {
+      const item = quotation.items[i]
+      const singleItemQuotation: Quotation = {
+        ...quotation,
+        items: [item],
+        quotation_number: `${quotation.quotation_number || quotation.id?.slice(-8)}-${String.fromCharCode(65 + i)}`,
+      }
+
+      await generateQuotationPDF(singleItemQuotation, companyData)
+
+      // Add small delay between downloads
+      if (i < quotation.items.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+  } else {
+    // Single item, generate normal PDF
+    return generateQuotationPDF(quotation, companyData)
+  }
+}
+
+export const generateQuotationEmailPDF = async (
+  quotation: Quotation,
+  forEmail = false,
+  userData?: any,
+  companyData?: any,
+): Promise<string> => {
+  const pdf = new jsPDF("p", "mm", "a4")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 15
+
+  let yPosition = margin
+
+  pdf.setFontSize(20)
+  pdf.setFont("helvetica", "bold")
+  pdf.text(companyData?.name || "AI Xynergy", pageWidth / 2, yPosition, { align: "center" })
+  yPosition += 12
+
+  pdf.setFontSize(10)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(formatDate(new Date()), margin, yPosition)
+  pdf.text(`RFQ. No. ${quotation.quotation_number}`, pageWidth - margin, yPosition, { align: "right" })
+  yPosition += 8
+
+  pdf.text(quotation.client_name || "Client Name", margin, yPosition)
+  yPosition += 5
+  pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
+  yPosition += 10
+
+  const item = quotation.items?.[0]
+  pdf.setFontSize(14)
+  pdf.setFont("helvetica", "bold")
+  pdf.text(item?.name || "Site Name", pageWidth / 2, yPosition, { align: "center" })
+  yPosition += 10
+
+  pdf.setFontSize(10)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(
+    `Good Day! Thank you for considering ${companyData?.name || "AI Xynergy"} for your business needs.`,
+    pageWidth / 2,
+    yPosition,
+    { align: "center" },
+  )
+  yPosition += 4
+  pdf.text("We are pleased to submit our quotation for your requirements:", pageWidth / 2, yPosition, {
+    align: "center",
+  })
+  yPosition += 8
+
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Details as follows:", pageWidth / 2, yPosition, { align: "center" })
+  yPosition += 8
+
+  if (item) {
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    const details = [
+      `• Type: ${safeString(item.type) || "Rental"}`,
+      `• Size: ${quotation.size || "100ft (H) x 60ft (W)"}`,
+      `• Contract Duration: ${formatDuration(quotation.duration_days || 0)}`,
+      `• Contract Period: ${formatDate(quotation.start_date)} - ${formatDate(quotation.end_date)}`,
+      `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
+      `• Illumination: 10 units of 1000 watts metal Halide`,
+      `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
+      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
+    ]
+
+    details.forEach((detail) => {
+      pdf.text(detail, margin, yPosition)
+      yPosition += 5
+    })
+
+    yPosition += 8
+
+    yPosition += 6
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Lease rate per month", margin + 5, yPosition)
+    pdf.text(`PHP ${(item.price || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, { align: "right" })
+    yPosition += 5
+
+    pdf.text(`x ${formatDuration(quotation.duration_days || 0)}`, margin + 5, yPosition)
+    pdf.text(`PHP ${(item.item_total_amount || 0).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
+    yPosition += 5
+
+    pdf.text("12% VAT", margin + 5, yPosition)
+    pdf.text(`PHP ${((item.item_total_amount || 0) * 0.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
+    yPosition += 6
+
+    pdf.setFont("helvetica", "bold")
+    pdf.setFontSize(12)
+    pdf.text("TOTAL", margin + 5, yPosition)
+    pdf.text(`PHP ${((item.item_total_amount || 0) * 1.12).toLocaleString()}`, pageWidth - margin - 5, yPosition, {
+      align: "right",
+    })
+    yPosition += 10
+
+    const durationMonths = Math.ceil((quotation.duration_days || 0) / 30)
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(9)
+    pdf.text(`Note: free two (2) change material for ${durationMonths} month rental`, margin, yPosition)
+    yPosition += 8
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Terms and Conditions:", margin, yPosition)
+    yPosition += 5
+
+    pdf.setFont("helvetica", "normal")
+    const terms = [
+      "1. Quotation validity: 5 working days.",
+      "2. Availability of the site is on first-come-first-served-basis only. Only official documents such as P.O's,",
+      "    Media Orders, signed quotation, & contracts are accepted in order to booked the site.",
+      "3. To book the site, one (1) month advance and one (2) months security deposit",
+      "    payment dated 7 days before the start of rental is required.",
+      "4. Final artwork should be approved ten (10) days before the contract period",
+      `5. Print is exclusively for ${companyData?.name || "AI Xynergy"} Only.`,
+    ]
+
+    terms.forEach((term) => {
+      pdf.text(term, margin, yPosition)
+      yPosition += 4
+    })
+
+    yPosition += 10
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    const leftColX = margin
+    const rightColX = pageWidth / 2 + 10
+
+    pdf.text("Very truly yours,", leftColX, yPosition)
+    pdf.text("Conforme:", rightColX, yPosition)
+    yPosition += 12
+
+    pdf.line(leftColX, yPosition, leftColX + 60, yPosition)
+    pdf.line(rightColX, yPosition, rightColX + 60, yPosition)
+    yPosition += 5
+
+    pdf.text(quotation.signature_name || "AIX Xymbiosis", leftColX, yPosition)
+    pdf.text(quotation.client_name || "Client Name", rightColX, yPosition)
+    yPosition += 4
+
+    pdf.text(quotation.signature_position || "Account Manager", leftColX, yPosition)
+    pdf.text(quotation.client_company_name || "COMPANY NAME", rightColX, yPosition)
+    yPosition += 6
+
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "italic")
+    pdf.text("This signed quotation serves as an", rightColX, yPosition)
+    yPosition += 3
+    pdf.text("official document for billing purposes", rightColX, yPosition)
+    yPosition += 8
+
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "normal")
+    const companyAddress = formatCompanyAddress(companyData)
+    if (companyAddress) {
+      pdf.text(companyAddress, pageWidth / 2, yPosition, { align: "center" })
+      yPosition += 3
+    }
+    if (companyData?.phone) {
+      pdf.text(`Telephone: ${companyData.phone}`, pageWidth / 2, yPosition, { align: "center" })
+      yPosition += 3
+    }
+    if (companyData?.email) {
+      pdf.text(`Email: ${companyData.email}`, pageWidth / 2, yPosition, { align: "center" })
+    }
+  }
+
+  if (forEmail) {
+    return pdf.output("datauristring").split(",")[1]
+  }
+
+  const fileName = `Quotation_${quotation.quotation_number || quotation.id?.slice(-8)}.pdf`
+  pdf.save(fileName)
+  return fileName
 }

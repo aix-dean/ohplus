@@ -1,16 +1,18 @@
 "use client"
 import { useEffect, useState, useCallback } from "react"
+import type React from "react"
+
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
   getQuotationById,
-  updateQuotation,
   getQuotationsByPageId,
-  getQuotationsByClientId, // Import new function for client history
   updateQuotationStatus,
+  updateQuotation,
+  getQuotationsByProductIdAndCompanyId,
 } from "@/lib/quotation-service"
-import type { Quotation, QuotationStatus, QuotationLineItem } from "@/lib/types/quotation"
+import type { Quotation, QuotationLineItem } from "@/lib/types/quotation"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -46,6 +48,8 @@ import {
 import { generateQuotationPDF } from "@/lib/quotation-pdf-service" // Use quotation PDF service
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Use quotation success dialog
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
+import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
+import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
 
 interface CompanyData {
   id: string
@@ -134,14 +138,28 @@ const formatDuration = (days: number) => {
   return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
 }
 
+const safeFormatNumber = (value: any, options?: Intl.NumberFormatOptions): string => {
+  if (value === null || value === undefined || isNaN(Number(value))) return "0.00"
+  const numValue = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (isNaN(numValue)) return "0.00"
+  return numValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
+}
+
+const formatCurrency = (amount: number | string | undefined | null) => {
+  if (!amount || amount === 0) return "PHP 0.00"
+  const numAmount = typeof amount === "string" ? Number.parseFloat(amount) : amount
+  if (isNaN(numAmount)) return "PHP 0.00"
+  return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 export default function QuotationPage({ params }: { params: { id: string } }) {
-  const { id: quotationId } = params // Use quotationId instead of costEstimateId
+  const { id: quotationId } = params
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
-  const [quotation, setQuotation] = useState<Quotation | null>(null) // Use quotation state
-  const [editableQuotation, setEditableQuotation] = useState<Quotation | null>(null) // Use quotation state
-  const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([]) // Use quotations array
+  const [quotation, setQuotation] = useState<Quotation | null>(null)
+  const [editableQuotation, setEditableQuotation] = useState<Quotation | null>(null)
+  const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([])
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
@@ -163,105 +181,174 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
-  const [clientHistory, setClientHistory] = useState<Quotation[]>([]) // Use quotation history
+  const [clientHistory, setClientHistory] = useState<Quotation[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const [editingField, setEditingField] = useState<string | null>(null)
-  const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
+  const [tempValues, setTempValues] = useState<Record<string, any>>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-
-  const fetchQuotationHistory = useCallback(async () => {
-    if (!quotation?.items?.[0]?.id) return
-
-    setLoadingHistory(true)
-    try {
-      const productId = quotation.items[0].id
-      const history = await getQuotationsByPageId(productId) // Changed to filter by page_id instead of product_id
-      // Filter out current quotation from history
-      const filteredHistory = history.filter((q) => q.id !== quotation.id)
-      setQuotation(filteredHistory)
-    } catch (error) {
-      console.error("Error fetching quotation history:", error)
-    } finally {
-      setLoadingHistory(false)
-    }
-  }, [quotation?.items?.[0]?.id, quotation?.id])
-
-  const fetchClientHistory = useCallback(async () => {
-    if (!quotation?.client?.id) return // Use quotation client
-
-    setLoadingHistory(true)
-    try {
-      const history = await getQuotationsByClientId(quotation.client.id) // Use quotation service
-      // Filter out current quotation from history
-      const filteredHistory = history.filter((q) => q.id !== quotation.id)
-      setClientHistory(filteredHistory)
-    } catch (error) {
-      console.error("Error fetching client history:", error)
-    } finally {
-      setLoadingHistory(false)
-    }
-  }, [quotation?.client?.id, quotation?.id])
-
-  const fetchCompanyData = async () => {
-    try {
-      if (userData?.company_id) {
-        // Fetch company data logic here
-        setCompanyData({
-          name: "Golden Touch Imaging Specialist",
-          photo_url: "/oh-plus-logo.png",
-          id: userData?.company_id,
-        })
-      }
-    } catch (error) {
-      console.error("Error fetching company data:", error)
-    }
-  }
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
     setTempValues({ ...tempValues, [fieldName]: currentValue })
     setHasUnsavedChanges(true)
   }
+
   const updateTempValues = (fieldName: string, newValue: any) => {
     const updatedTempValues = { ...tempValues, [fieldName]: newValue }
+    setTempValues(updatedTempValues)
 
-    if (fieldName === "duration_days" && quotation?.start_date) {
-      const newEndDate = new Date(quotation.start_date)
-      newEndDate.setDate(newEndDate.getDate() + newValue)
-      updatedTempValues.end_date = newEndDate
-    } else if (fieldName === "start_date" || fieldName === "end_date") {
-      const startDate = fieldName === "start_date" ? newValue : tempValues.start_date || quotation?.start_date
-      const endDate = fieldName === "end_date" ? newValue : tempValues.end_date || quotation?.end_date
+    // Update the editable quotation with the new value
+    if (editableQuotation) {
+      if (fieldName === "duration_days") {
+        // When duration changes, update contract period and pricing
+        const durationDays = newValue
+        const startDate = editableQuotation.start_date ? new Date(editableQuotation.start_date) : new Date()
+        const endDate = new Date(startDate)
+        endDate.setDate(startDate.getDate() + durationDays - 1)
 
-      if (startDate && endDate) {
-        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-        const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        updatedTempValues.duration_days = newDurationDays
+        // Update pricing based on new duration
+        const price = editableQuotation.items?.[0]?.price || 0
+        const dailyRate = price / 30
+        const newTotalAmount = dailyRate * durationDays
+
+        setEditableQuotation({
+          ...editableQuotation,
+          duration_days: durationDays,
+          end_date: endDate.toISOString(),
+          items:
+            editableQuotation.items?.map((item, index) =>
+              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
+            ) || [],
+        })
+
+        // Update temp values for contract period
+        setTempValues((prev) => ({
+          ...prev,
+          duration_days: durationDays,
+          end_date: endDate,
+        }))
+      } else if (fieldName === "start_date" || fieldName === "end_date") {
+        // When contract period changes, update duration and pricing
+        const startDate =
+          fieldName === "start_date" ? new Date(newValue) : new Date(editableQuotation.start_date || new Date())
+        const endDate =
+          fieldName === "end_date" ? new Date(newValue) : new Date(editableQuotation.end_date || new Date())
+
+        const timeDiff = endDate.getTime() - startDate.getTime()
+        const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
+
+        // Update pricing based on new duration
+        const price = editableQuotation.items?.[0]?.price || 0
+        const dailyRate = price / 30
+        const newTotalAmount = dailyRate * durationDays
+
+        setEditableQuotation({
+          ...editableQuotation,
+          [fieldName]: newValue.toISOString(),
+          duration_days: durationDays,
+          items:
+            editableQuotation.items?.map((item, index) =>
+              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
+            ) || [],
+        })
+
+        // Update temp values for duration
+        setTempValues((prev) => ({
+          ...prev,
+          [fieldName]: newValue,
+          duration_days: durationDays,
+        }))
+      } else if (fieldName === "price" && editableQuotation.items?.[0]) {
+        const durationDays = editableQuotation.items[0].duration_days || 32
+        const dailyRate = newValue / 30 // Convert monthly price to daily rate
+        const newTotalAmount = dailyRate * durationDays
+
+        setEditableQuotation({
+          ...editableQuotation,
+          items: editableQuotation.items.map((item, index) =>
+            index === 0 ? { ...item, price: newValue, item_total_amount: newTotalAmount } : item,
+          ),
+        })
+      } else {
+        setEditableQuotation({
+          ...editableQuotation,
+          [fieldName]: newValue,
+        })
       }
     }
-
-    setTempValues(updatedTempValues)
-    setHasUnsavedChanges(true)
   }
+
+  const fetchQuotationHistory = useCallback(async () => {
+    if (!quotation?.items?.[0]?.id || !quotation?.items?.[0]?.company_id) return
+
+    setLoadingHistory(true)
+    try {
+      const productId = quotation.items[0].id
+      const companyId = quotation.items[0].company_id
+      const history = await getQuotationsByProductIdAndCompanyId(productId, companyId)
+      // Filter out current quotation from history
+      const filteredHistory = history.filter((q) => q.id !== quotation.id)
+      setClientHistory(filteredHistory)
+    } catch (error) {
+      console.error("Error fetching quotation history:", error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [quotation?.items?.[0]?.id, quotation?.items?.[0]?.company_id, quotation?.id])
+
+  const fetchCompanyData = useCallback(async () => {
+    if (!user || !userData) {
+      console.log("[v0] fetchCompanyData: Missing user or userData", { user: !!user, userData: !!userData })
+      return
+    }
+
+    try {
+      console.log("[v0] fetchCompanyData: userData:", userData)
+      console.log("[v0] fetchCompanyData: userData.company_id:", userData.company_id)
+
+      if (!userData.company_id) {
+        console.warn("[v0] No company_id found in userData:", userData)
+        return
+      }
+
+      console.log("[v0] Fetching company data for company_id:", userData.company_id)
+      const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+
+      if (companyDoc.exists()) {
+        const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
+        console.log("[v0] Company data fetched successfully:", companyData)
+        setCompanyData(companyData)
+      } else {
+        console.warn("[v0] No company data found for company_id:", userData.company_id)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching company data:", error)
+    }
+  }, [user, userData])
+
   useEffect(() => {
     const fetchQuotationData = async () => {
       if (!quotationId) return
 
       setLoading(true)
       try {
-        const q = await getQuotationById(quotationId) // Use quotation service
+        const q = await getQuotationById(quotationId)
         if (q) {
-          setQuotation(q)
-          setEditableQuotation(q)
+          console.log("[v0] Loaded quotation data:", q)
+          console.log("[v0] Items array:", q.items)
+          console.log("[v0] First item:", q.items?.[0])
 
-          console.log("[v0] Current quotation page_id:", q.page_id) // Log quotation page_id
+          setQuotation(q)
+          setEditableQuotation({ ...q }) // Create proper deep copy
+
+          console.log("[v0] Current quotation page_id:", q.page_id)
 
           if (q.page_id) {
-            const relatedQs = await getQuotationsByPageId(q.page_id) // Use quotation service
+            const relatedQs = await getQuotationsByPageId(q.page_id)
             console.log("[v0] Related quotations found:", relatedQs.length, relatedQs)
             setRelatedQuotations(relatedQs)
-            // Find current page index
             const currentIndex = relatedQs.findIndex((rq) => rq.id === q.id)
             console.log("[v0] Current page index:", currentIndex)
             setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
@@ -296,25 +383,21 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     }
 
     fetchQuotationData()
-  }, [quotationId, router, toast]) // Use quotationId
+  }, [quotationId, router, toast])
 
   useEffect(() => {
+    console.log("[v0] useEffect triggered - user:", !!user, "userData:", !!userData)
     if (user && userData) {
+      console.log("[v0] Calling fetchCompanyData")
       fetchCompanyData()
     }
-  }, [user, userData])
+  }, [user, userData, fetchCompanyData])
 
   useEffect(() => {
     if (quotation?.items?.[0]?.id) {
       fetchQuotationHistory()
     }
   }, [fetchQuotationHistory])
-
-  useEffect(() => {
-    if (quotation?.client?.id) {
-      fetchClientHistory()
-    }
-  }, [fetchClientHistory])
 
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {
@@ -337,49 +420,65 @@ The OH Plus Team`,
     }
   }, [isSendEmailDialogOpen, quotation, user?.email]) // Use quotation
 
+  const getCurrentQuotation = () => {
+    if (relatedQuotations.length > 0 && currentPageIndex >= 0 && currentPageIndex < relatedQuotations.length) {
+      return relatedQuotations[currentPageIndex]
+    }
+    return quotation
+  }
+
+  const getCurrentItem = () => {
+    const currentQuotation = getCurrentQuotation()
+    return currentQuotation?.items?.[0] || null
+  }
+
   const handleEditClick = () => {
-    if (quotation) {
-      setEditableQuotation({ ...quotation })
+    const currentQuotation = getCurrentQuotation()
+    if (currentQuotation) {
+      console.log("[v0] Entering edit mode with data:", currentQuotation)
+      setEditableQuotation({ ...currentQuotation }) // Create proper copy
+      setTempValues({}) // Clear temp values
       setIsEditing(true)
     }
   }
 
   const handleCancelEdit = () => {
-    setEditableQuotation(quotation)
-    setIsEditing(false)
-    setTempValues({})
-    setHasUnsavedChanges(false)
-    setEditingField(null)
-    toast({
-      title: "Cancelled",
-      description: "Editing cancelled. Changes were not saved.",
-    })
+    const currentQuotation = getCurrentQuotation()
+    if (currentQuotation) {
+      console.log("[v0] Canceling edit mode, restoring data:", currentQuotation)
+      setEditableQuotation({ ...currentQuotation }) // Restore original data
+      setTempValues({}) // Clear temp values
+      setIsEditing(false)
+      setHasUnsavedChanges(false)
+    }
   }
 
-  const handleSaveEdit = async () => {
-    if (!editableQuotation || !quotationId || !editableQuotation.id) return
+  const handleSaveChanges = async () => {
+    if (!editableQuotation) return
 
     setIsSaving(true)
     try {
-      const currentUserId = user?.id || "current_user_id"
-      const currentUserName = user?.first_name + " " + user?.last_name || "Current User"
+      console.log("[v0] Saving changes:", editableQuotation)
 
-      await updateQuotation(editableQuotation.id, editableQuotation, currentUserId, currentUserName)
+      await updateQuotation(
+        editableQuotation.id,
+        editableQuotation,
+        editableQuotation.created_by || "system",
+        `${editableQuotation.created_by_first_name || "User"} ${editableQuotation.created_by_last_name || ""}`,
+      )
 
       setQuotation(editableQuotation)
       setIsEditing(false)
-      setTempValues({})
       setHasUnsavedChanges(false)
-      setEditingField(null)
       toast({
         title: "Success",
-        description: "Quotation updated successfully!",
+        description: "Quotation updated successfully.",
       })
     } catch (error) {
       console.error("Error saving quotation:", error)
       toast({
         title: "Error",
-        description: "Failed to save quotation changes.",
+        description: "Failed to save changes. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -387,16 +486,74 @@ The OH Plus Team`,
     }
   }
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      [name]: value,
+    }))
+  }
+
+  const handleDateChange = (date: Date | undefined, field: "start_date" | "end_date") => {
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      [field]: date || new Date(),
+    }))
+  }
+
   const handleDownloadPDF = async () => {
     if (!quotation) return
 
     setDownloadingPDF(true)
     try {
-      await generateQuotationPDF(quotation)
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
+      // Check if there are multiple related quotations (same page_id)
+      if (relatedQuotations.length > 1) {
+        console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
+
+        // Download all related quotations as separate PDFs
+        for (let i = 0; i < relatedQuotations.length; i++) {
+          const relatedQuotation = relatedQuotations[i]
+
+          // Create unique quotation number with suffix
+          const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
+          const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+          // Create modified quotation with unique number
+          const modifiedQuotation = {
+            ...relatedQuotation,
+            quotation_number: uniqueQuotationNumber,
+          }
+
+          await generateQuotationPDF(modifiedQuotation, companyData)
+
+          // Add small delay between downloads to ensure proper file naming
+          if (i < relatedQuotations.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+
+        toast({
+          title: "PDFs Generated",
+          description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
+        })
+      } else {
+        // Single quotation - check if it has multiple items
+        if (quotation.items && quotation.items.length > 1) {
+          console.log("[v0] Downloading separate PDFs for multiple items:", quotation.items.length)
+          await generateSeparateQuotationPDFs(quotation, companyData)
+          toast({
+            title: "PDFs Generated",
+            description: `${quotation.items.length} separate PDF files have been downloaded for each item.`,
+          })
+        } else {
+          // Single quotation with single item
+          await generateQuotationPDF(quotation, companyData)
+          toast({
+            title: "Success",
+            description: "PDF downloaded successfully",
+          })
+        }
+      }
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -469,10 +626,10 @@ The OH Plus Team`,
   }
 
   const renderQuotationBlock = (siteName: string, items: QuotationLineItem[], pageNumber: number) => {
-    const currentQuotation = editableQuotation || quotation // Use quotation
+    const currentQuotation = editableQuotation || quotation
     if (!currentQuotation) return null
 
-    const item = items[0] // Get the first item for this quotation
+    const item = items[0]
     const monthlyRate = item?.price || 0
     const durationMonths = Math.ceil((Number(item?.duration_days) || 40) / 30)
     const totalLease = monthlyRate * durationMonths
@@ -482,151 +639,225 @@ The OH Plus Team`,
     return (
       <div key={siteName} className="p-8 bg-white">
         {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-6">Golden Touch Imaging Specialist</h1>
-        </div>
+        <div className="text-center mb-8"></div>
 
         {/* Client and RFQ Info */}
         <div className="flex justify-between items-start mb-8">
           <div className="text-left">
-            {isEditing && editingField === "client_name" ? (
-              <Input
-                type="text"
-                value={tempValues.client_name || ""}
-                onChange={(e) => updateTempValues("client_name", e.target.value)}
-                className="w-64 h-8 text-base font-medium mb-2"
-                placeholder="Enter client name"
-              />
-            ) : (
-              <p
-                className={`text-base font-medium mb-1 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("client_name", currentQuotation.client?.name || "")}
-              >
-                {tempValues.client_name || currentQuotation.client?.name || "Client Name"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </p>
-            )}
+            <p className="text-base font-medium mb-2">{format(new Date(), "MMMM dd, yyyy")}</p>
 
-            {isEditing && editingField === "client_company" ? (
-              <Input
-                type="text"
-                value={tempValues.client_company || ""}
-                onChange={(e) => updateTempValues("client_company", e.target.value)}
-                className="w-64 h-8 text-base"
-                placeholder="Enter company name"
-              />
-            ) : (
-              <p
-                className={`text-base font-medium ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("client_company", currentQuotation.client?.company || "")}
-              >
-                {tempValues.client_company || currentQuotation.client?.company || "COMPANY NAME"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </p>
-            )}
+            <p className="text-base font-medium mb-1">{currentQuotation.client_name || "Client Name"}</p>
+
+            <p className="text-base font-medium">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
           </div>
           <div className="text-right">
-            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotationNumber}</p>{" "}
+            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotation_number}</p>
           </div>
         </div>
 
-        {/* Company Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-4">GOLDEN TOUCH IMAGING SPECIALIST</h2>
-          <p className="text-base mb-2">Good Day! Thank you for considering Golden Touch for your business needs.</p>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{items[0]?.name || "Site Name"}</h1>
+        </div>
+
+        {/* Greeting */}
+        <div className="text-center mb-8">
+          <p className="text-base mb-2">
+            Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
+          </p>
           <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
           <p className="text-base font-semibold">Details as follows:</p>
         </div>
-        {/* Site Details - Updated for quotation data structure */}
-        <div className="mb-8 space-y-3">
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Site Location:</span>
-            <span className="font-bold">{items[0]?.siteLocation || "Site Location"}</span>
+
+        {/* Details Section with editable fields */}
+        <div className="space-y-3 mb-8">
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Type</span>
+            <span className="text-gray-700">: {item?.type || "Rental"}</span>
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Type:</span>
-            <span className="font-bold">{items[0]?.type || "Billboard"}</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Size</span>
+            <span className="text-gray-700">: </span>
+            {isEditing && editingField === "size" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="text"
+                  value={tempValues.size || ""}
+                  onChange={(e) => updateTempValues("size", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder={currentQuotation?.size || "100ft (H) x 60ft (W)"}
+                />
+              </div>
+            ) : (
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("size", currentQuotation?.size || "")}
+                title={isEditing ? "Click to edit size" : ""}
+              >
+                {currentQuotation?.size || "100ft (H) x 60ft (W)"}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Size:</span>
-            <span className="font-bold">{items[0]?.size || "100ft (H) x 60ft (W)"}</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Contract Duration</span>
+            <span className="text-gray-700">: </span>
+            {isEditing && editingField === "duration_days" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="number"
+                  value={tempValues.duration_days || ""}
+                  onChange={(e) => updateTempValues("duration_days", Number.parseInt(e.target.value) || 0)}
+                  className="w-24 h-6 text-sm"
+                  placeholder={currentQuotation?.duration_days?.toString() || "0"}
+                />
+                <span className="text-sm text-gray-600">days</span>
+              </div>
+            ) : (
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("duration_days", currentQuotation?.duration_days || 0)}
+                title={isEditing ? "Click to edit contract duration" : ""}
+              >
+                {formatDuration(currentQuotation?.duration_days || 0)}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Contract Duration:</span>
-            <span className="font-bold">{Math.ceil((currentQuotation.durationDays || 180) / 30)} MONTHS</span>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Contract Period</span>
+            <span className="text-gray-700">: </span>
+            {isEditing && editingField === "contractPeriod" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="date"
+                  value={tempValues.start_date ? format(new Date(tempValues.start_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => updateTempValues("start_date", new Date(e.target.value))}
+                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                />
+                <span className="text-gray-500">-</span>
+                <Input
+                  type="date"
+                  value={tempValues.end_date ? format(new Date(tempValues.end_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => updateTempValues("end_date", new Date(e.target.value))}
+                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                />
+              </div>
+            ) : (
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() =>
+                  isEditing &&
+                  handleFieldEdit("contractPeriod", {
+                    start_date: currentQuotation?.start_date,
+                    end_date: currentQuotation?.end_date,
+                  })
+                }
+                title={isEditing ? "Click to edit contract period" : ""}
+              >
+                {currentQuotation?.start_date ? format(new Date(currentQuotation.start_date), "MMMM d, yyyy") : ""}
+                {currentQuotation?.start_date && currentQuotation?.end_date ? " - " : ""}
+                {currentQuotation?.end_date ? format(new Date(currentQuotation.end_date), "MMMM d, yyyy") : ""}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
+            )}
           </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Contract Period:</span>
-            <span className="font-bold">
-              {format(currentQuotation.startDate || new Date(), "MMMM dd, yyyy")} -{" "}
-              {format(currentQuotation.endDate || new Date(), "MMMM dd, yyyy")}
+
+          <div className="flex">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Proposal to</span>
+            <span className="text-gray-700">: {currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
+          </div>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Illumination</span>
+            <span className="text-gray-700">: 10 units of 1000 watts metal Halide</span>
+          </div>
+
+          <div className="flex items-center">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
+            <span className="text-gray-700">: PHP </span>
+            {isEditing && editingField === "price" ? (
+              <div className="flex items-center gap-2 ml-1">
+                <Input
+                  type="number"
+                  value={tempValues.price || ""}
+                  onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
+                  className="w-32 h-6 text-sm"
+                  placeholder={items[0]?.price?.toString() || "0.00"}
+                />
+                <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+              </div>
+            ) : (
+              <span
+                className={`text-gray-700 ${
+                  isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                }`}
+                onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
+                title={isEditing ? "Click to edit lease rate" : ""}
+              >
+                : PHP {safeFormatNumber(items[0]?.price || 0)} (Exclusive of VAT)
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
+            )}
+          </div>
+
+          <div className="flex">
+            <span className="w-4 text-center">•</span>
+            <span className="font-medium text-gray-700 w-32">Total Lease</span>
+            <span className="text-gray-700">
+              : PHP{" "}
+              {safeFormatNumber(
+                isEditing && editableQuotation?.items?.[0]?.item_total_amount
+                  ? editableQuotation.items[0].item_total_amount
+                  : item?.item_total_amount || 0,
+              )}{" "}
+              (Exclusive of VAT)
             </span>
-          </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Proposal to:</span>
-            <span className="font-bold">{currentQuotation.client?.company || "CLIENT COMPANY NAME"}</span>
-          </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Illumination:</span>
-            <span className="font-bold">{items[0]?.illumination || "10 units of 1000 watts metal Halide"}</span>
-          </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Lease Rate/Month:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
-          </div>
-          <div className="flex items-start">
-            <span className="font-medium w-40 flex-shrink-0">● Total Lease:</span>
-            <span className="font-bold">(Exclusive of VAT)</span>
           </div>
         </div>
 
         {/* Pricing Table - Updated for quotation pricing */}
-        <div className="mb-8">
-          <div className="border border-gray-300">
-            <div className="grid grid-cols-3 bg-gray-100 border-b border-gray-300">
-              <div className="p-3 font-bold text-center">Lease rate per month</div>
-              <div className="p-3 font-bold text-center border-l border-gray-300">12% VAT</div>
-              <div className="p-3 font-bold text-center border-l border-gray-300">TOTAL</div>
+        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-700">Lease rate per month</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.price || 0)}</span>
             </div>
-            <div className="grid grid-cols-3">
-              <div className="p-3 text-center font-bold">PHP {(items[0]?.price || 0).toLocaleString()}</div>
-              <div className="p-3 text-center font-bold border-l border-gray-300">
-                PHP {((items[0]?.price || 0) * 0.12).toLocaleString()}
-              </div>
-              <div className="p-3 text-center font-bold border-l border-gray-300">
-                PHP {((items[0]?.price || 0) * 1.12).toLocaleString()}
-              </div>
+            <div className="flex justify-between">
+              <span className="text-gray-700">x {formatDuration(currentQuotation.duration_days || 180)}</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.item_total_amount || 0)}</span>
             </div>
-          </div>
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-base">x {Math.ceil((currentQuotation.durationDays || 180) / 30)} months</span>
-            <div className="text-right">
-              <div className="text-lg font-bold">
-                PHP {((items[0]?.price || 0) * Math.ceil((currentQuotation.durationDays || 180) / 30)).toLocaleString()}
-              </div>
-              <div className="text-lg font-bold">
-                PHP{" "}
-                {(
-                  (items[0]?.price || 0) *
-                  Math.ceil((currentQuotation.durationDays || 180) / 30) *
-                  0.12
-                ).toLocaleString()}
-              </div>
-              <div className="text-lg font-bold">
-                PHP{" "}
-                {(
-                  (items[0]?.price || 0) *
-                  Math.ceil((currentQuotation.durationDays || 180) / 30) *
-                  1.12
-                ).toLocaleString()}
+            <div className="flex justify-between">
+              <span className="text-gray-700">12% VAT</span>
+              <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 0.12)}</span>
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <div className="flex justify-between font-bold text-lg">
+                <span className="text-gray-900">TOTAL</span>
+                <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 1.12)}</span>
               </div>
             </div>
           </div>
@@ -641,132 +872,105 @@ The OH Plus Team`,
 
         {/* Terms and Conditions */}
         <div className="mb-8">
-          <h3 className="text-lg font-bold mb-4">Terms and Conditions:</h3>
+          <p className="font-semibold mb-4">Terms and Conditions:</p>
           <div className="space-y-2 text-sm">
             <p>1. Quotation validity: 5 working days.</p>
             <p>
               2. Availability of the site is on first-come-first-served-basis only. Only official documents such as
-              P.O's,
+              P.O's, Media Orders, signed quotation, & contracts are accepted in order to booked the site.
             </p>
-            <p className="ml-4">
-              Media Orders, signed quotation, & contracts are accepted in order to booked the site.
+            <p>
+              3. To book the site, one (1) month advance and one (2) months security deposit payment dated 7 days before
+              the start of rental is required.
             </p>
-            <p>3. To book the site, one (1) month advance and one (2) months security deposit</p>
-            <p className="ml-4">payment dated 7 days before the start of rental is required.</p>
             <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-            <p>5. Print is exclusively for {companyData?.name || "Golden Touch Imaging Specialist"} Only.</p>
+            <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
           </div>
         </div>
 
-        {/* Date */}
-        <div className="mb-8 text-right">
-          <p className="text-base">{formatDate(new Date())}</p>
-        </div>
-
-        {/* Site Location Header */}
-        <div className="mb-8 text-center">
-          <h3 className="text-xl font-bold">{item.location} QUOTATION</h3>
-        </div>
-
-        {/* Signature Section - Updated for quotation signatures */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            {/* Left side - Company signature */}
-            <div className="w-1/2">
-              <p className="text-base mb-8">Very truly yours,</p>
-              <div className="mb-2">
-                <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
-              </div>
-              {/* Editable name */}
-              {isEditing && editingField === "signatureName" ? (
+        <div className="grid grid-cols-2 gap-8 mb-8">
+          <div className="text-left">
+            <p className="mb-16">Very truly yours,</p>
+            {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
+              <div className="space-y-2">
                 <Input
                   type="text"
-                  value={tempValues.signatureName || ""}
-                  onChange={(e) => updateTempValues("signatureName", e.target.value)}
-                  className="w-48 h-8 text-base font-medium mb-1"
-                  placeholder="Enter name"
+                  value={tempValues.signature_first_name || ""}
+                  onChange={(e) => updateTempValues("signature_first_name", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder={
+                    currentQuotation?.signature_first_name || currentQuotation?.created_by_first_name || "AIX"
+                  }
                 />
-              ) : (
+                <Input
+                  type="text"
+                  value={tempValues.signature_last_name || ""}
+                  onChange={(e) => updateTempValues("signature_last_name", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder={
+                    currentQuotation?.signature_last_name || currentQuotation?.created_by_last_name || "Xymbiosis"
+                  }
+                />
+                <Input
+                  type="text"
+                  value={tempValues.signature_position || ""}
+                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
+                  className="w-48 h-6 text-sm"
+                  placeholder={currentQuotation?.signature_position || currentQuotation?.position || "Position"}
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="border-b border-gray-400 w-48 mb-2"></div>
                 <p
-                  className={`text-base font-medium text-gray-900 ${
+                  className={`font-medium ${
                     isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
+                  onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
+                  title={isEditing ? "Click to edit name" : ""}
+                >
+                  {currentQuotation?.signature_first_name && currentQuotation?.signature_last_name
+                    ? `${currentQuotation.signature_first_name} ${currentQuotation.signature_last_name}`
+                    : currentQuotation?.signature_name ||
+                      `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </p>
+                <p
+                  className={`text-sm ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
                   onClick={() =>
-                    isEditing &&
-                    handleFieldEdit(
-                      "signatureName",
-                      `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim(),
-                    )
+                    isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")
                   }
+                  title={isEditing ? "Click to edit position" : ""}
                 >
-                  {tempValues.signatureName ||
-                    `${userData?.first_name?.charAt(0).toUpperCase() + userData?.first_name?.slice(1) || ""} ${userData?.last_name?.charAt(0).toUpperCase() + userData?.last_name?.slice(1) || ""}`.trim() ||
-                    "Mathew Espanto"}
+                  {currentQuotation?.signature_position || currentQuotation?.position || "Position"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
-              )}
-              {/* Editable position */}
-              {isEditing && editingField === "signaturePosition" ? (
-                <Input
-                  type="text"
-                  value={tempValues.signaturePosition || ""}
-                  onChange={(e) => updateTempValues("signaturePosition", e.target.value)}
-                  className="w-48 h-8 text-base"
-                  placeholder="Enter position"
-                />
-              ) : (
-                <p
-                  className={`text-base text-gray-600 ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    isEditing && handleFieldEdit("signaturePosition", userData?.position || "Account Management")
-                  }
-                >
-                  {tempValues.signaturePosition || userData?.position || "Account Management"}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
-              )}
-            </div>
-
-            {/* Right side - Client conforme */}
-            <div className="w-1/2 pl-8">
-              <p className="text-base mb-8">C o n f o r m e:</p>
-              <div className="mb-2">
-                <div className="w-48 h-16 border-b border-gray-400 mb-2"></div>
               </div>
-              <p className="text-base font-medium text-gray-900 mb-1">
-                {currentQuotation.client?.name || "Client Name"}
-              </p>
-              <p className="text-base text-gray-600">{currentQuotation.client?.company || "Client Company"}</p>
-              <p className="text-sm text-gray-600 mt-4">
-                This signed Quotation serves as an
-                <br />
-                official document for billing purposes
-              </p>
-            </div>
+            )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
-          <p>No. 727 General Solano St., San Miguel, Manila 1005. Telephone: (02) 5310 1750 to 53</p>
-          <p>email: sales@goldentouchimaging.com or gtigolden@gmail.com</p>
-          {currentQuotation.validUntil && (
-            <p className="mt-2">This quotation is valid until {format(currentQuotation.validUntil, "PPP")}</p>
-          )}
-          <p className="mt-1">
-            © {new Date().getFullYear()} {companyData?.name || "Golden Touch Imaging Specialist"}. All rights reserved.
-          </p>
-          {relatedQuotations.length > 1 && (
-            <p className="mt-2 font-medium">
-              Page {pageNumber} of {relatedQuotations.length}
+          <div className="text-left">
+            <p className="mb-16">Conforme:</p>
+            <div className="border-b border-gray-400 w-48 mb-2"></div>
+            <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
+            <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
+            <p className="text-xs mt-4 text-gray-600 italic">
+              This signed quotation serves as an
+              <br />
+              official document for billing purposes
             </p>
-          )}
+          </div>
+        </div>
+
+        <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
+          <p>{formatCompanyAddress(companyData)}</p>
+          {companyData?.phone && <p>Telephone: {companyData.phone}</p>}
+          {companyData?.email && <p>Email: {companyData.email}</p>}
         </div>
       </div>
     )
@@ -812,8 +1016,18 @@ The OH Plus Team`,
     )
   }
 
-  const currentQuotation = editableQuotation || quotation
+  const currentQuotation = isEditing ? editableQuotation : quotation
   const hasMultipleSites = currentQuotation?.items && currentQuotation.items.length > 1
+
+  const handleSendClick = () => {
+    setIsSendOptionsDialogOpen(true)
+  }
+
+  const handleEmailClick = () => {
+    setIsSendOptionsDialogOpen(false)
+    // Navigate to compose email page like the current implementation
+    router.push(`/sales/quotations/${params.id}/compose-email`)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -906,7 +1120,7 @@ The OH Plus Team`,
                   </div>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
             </div>
             {hasMultipleSites ? (
               <>
@@ -947,9 +1161,9 @@ The OH Plus Team`,
           {/* Right Sidebar - Updated for quotation history */}
           <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3> {/* Updated title */}
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {quotation?.client?.company || quotation?.client?.name || "Client"}
+                {quotation?.items?.[0]?.name || "Product"}
               </div>
             </div>
 
@@ -966,10 +1180,11 @@ The OH Plus Team`,
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
-                      {historyItem.quotationNumber || historyItem.id.slice(-8)} {/* Use quotationNumber */}
+                      {historyItem.quotation_number || historyItem.id.slice(-8)}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                      PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)}
+                      /month
                     </div>
                     <div className="flex justify-end">
                       <span
@@ -1042,13 +1257,13 @@ The OH Plus Team`,
             Cancel
           </Button>
           <Button
-            onClick={handleSaveEdit}
+            onClick={handleSaveChanges}
             disabled={isSaving}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
           >
             {isSaving ? (
               <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving...
               </>
             ) : (
               <>
@@ -1079,8 +1294,7 @@ The OH Plus Team`,
 
             {currentPageIndex === relatedQuotations.length - 1 ? (
               <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
-                disabled={quotation?.status !== "draft"}
+                onClick={handleSendClick}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
                 Send
@@ -1101,8 +1315,7 @@ The OH Plus Team`,
       ) : (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
-            onClick={() => setIsSendOptionsDialogOpen(true)}
-            disabled={quotation?.status !== "draft"}
+            onClick={handleSendClick}
             className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
           >
             Send
@@ -1121,33 +1334,28 @@ The OH Plus Team`,
         </DialogContent>
       </Dialog>
 
-      {/* Send Quotation Options Dialog */}
-      <SendQuotationOptionsDialog
-        open={isSendOptionsDialogOpen}
-        onOpenChange={setIsSendOptionsDialogOpen}
-        onConfirm={() => {
-          setIsSendOptionsDialogOpen(false)
-          setIsSendEmailDialogOpen(true)
-        }}
-        onUpdateStatus={async (newStatus: QuotationStatus) => {
-          setIsSendOptionsDialogOpen(false)
-          await handleStatusUpdate(newStatus)
-        }}
-      />
+      {quotation && (
+        <SendQuotationOptionsDialog
+          isOpen={isSendOptionsDialogOpen}
+          onOpenChange={setIsSendOptionsDialogOpen}
+          quotation={quotation}
+          onEmailClick={handleEmailClick}
+        />
+      )}
 
-      {/* Send Email Dialog */}
+      {/* Email Dialog */}
       <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Send Quotation via Email</DialogTitle>
-            <DialogDescription>Customize and send the quotation email to the client.</DialogDescription>
+            <DialogDescription>Send this quotation to the client via email.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
                 To
               </Label>
-              <Input type="email" id="email" defaultValue={quotation?.client?.email} className="col-span-3" disabled />
+              <Input type="email" id="email" defaultValue={quotation?.client_email} className="col-span-3" disabled />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="cc" className="text-right">

@@ -5,19 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import {
-  ArrowLeft,
-  FileText,
-  ImageIcon,
-  Video,
-  File,
-  X,
-  Download,
-  ZoomIn,
-  Send,
-  ExternalLink,
-  Edit,
-} from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, ExternalLink } from "lucide-react"
 import { postReport, type ReportData } from "@/lib/report-service"
 import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -26,8 +14,9 @@ import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { CongratulationsDialog } from "@/components/congratulations-dialog"
 
-export default function ReportPreviewPage() {
+export default function SalesReportPreviewPage() {
   const router = useRouter()
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
@@ -42,6 +31,11 @@ export default function ReportPreviewPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
+  const [showCongratulations, setShowCongratulations] = useState(false)
+
+  const handleCongratulationsClose = () => {
+    setShowCongratulations(false)
+  }
 
   useEffect(() => {
     loadPreviewData()
@@ -145,7 +139,7 @@ export default function ReportPreviewPage() {
           description: "No preview data found",
           variant: "destructive",
         })
-        router.push("/logistics/dashboard")
+        router.push("/sales/dashboard")
       }
     } catch (error) {
       console.error("Error loading preview data:", error)
@@ -154,7 +148,7 @@ export default function ReportPreviewPage() {
         description: "Failed to load preview data",
         variant: "destructive",
       })
-      router.push("/logistics/dashboard")
+      router.push("/sales/dashboard")
     } finally {
       setLoading(false)
     }
@@ -176,7 +170,14 @@ export default function ReportPreviewPage() {
 
       const finalReportData: ReportData = {
         ...report,
+        // Ensure bookingDates exists with default values if undefined
+        bookingDates: report.bookingDates || {
+          start: new Date().toISOString().split("T")[0],
+          end: new Date().toISOString().split("T")[0],
+        },
+        breakdate: report.breakdate || report.date || new Date().toISOString().split("T")[0],
         status: "posted",
+        category: "sales",
         id: undefined,
         created: undefined,
         updated: undefined,
@@ -203,12 +204,7 @@ export default function ReportPreviewPage() {
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      toast({
-        title: "Success",
-        description: "Report posted successfully!",
-      })
-
-      router.push("/logistics/service-reports")
+      setShowCongratulations(true)
     } catch (error) {
       console.error("Error posting report:", error)
       toast({
@@ -218,6 +214,20 @@ export default function ReportPreviewPage() {
       })
     } finally {
       setPosting(false)
+    }
+  }
+
+  const handleSendReport = () => {
+    setIsSendDialogOpen(true)
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    setIsSendDialogOpen(false)
+
+    if (option === "email") {
+      console.log("Send via email")
+    } else {
+      console.log(`Send via ${option}`)
     }
   }
 
@@ -332,7 +342,7 @@ export default function ReportPreviewPage() {
         },
       }
 
-      await generateReportPDF(reportWithSafeDates, product, false)
+      await generateReportPDF(reportWithSafeDates, product, false, undefined, false, "sales")
     } catch (error) {
       console.error("Error generating report PDF:", error)
       toast({
@@ -342,20 +352,6 @@ export default function ReportPreviewPage() {
       })
     } finally {
       setIsGeneratingPDF(false)
-    }
-  }
-
-  const handleSendReport = () => {
-    setIsSendDialogOpen(true)
-  }
-
-  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
-    setIsSendDialogOpen(false)
-
-    if (option === "email") {
-      console.log("Send via email")
-    } else {
-      console.log(`Send via ${option}`)
     }
   }
 
@@ -462,7 +458,8 @@ export default function ReportPreviewPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">{getSiteName(report)}</div>
+          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">Lilo & Stitch</div>
+          {report.joNumber && <span className="text-lg font-medium text-gray-900">{report.joNumber}</span>}
         </div>
 
         <div className="ml-auto"></div>
@@ -473,17 +470,6 @@ export default function ReportPreviewPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col items-center">
               <Button
-                onClick={handleEdit}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                size="sm"
-              >
-                <Edit className="h-5 w-5" />
-              </Button>
-              <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
                 className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
@@ -492,17 +478,6 @@ export default function ReportPreviewPage() {
                 <Download className="h-5 w-5" />
               </Button>
               <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Button
-                onClick={handleSendReport}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                size="sm"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-              <span className="text-xs text-gray-600 mt-1 font-medium">Send</span>
             </div>
           </div>
         </div>
@@ -519,7 +494,7 @@ export default function ReportPreviewPage() {
                 }}
               ></div>
               <div className="relative z-10 h-full flex items-center px-6">
-                <div className="text-white text-lg font-semibold">Logistics</div>
+                <div className="text-white text-lg font-semibold">Sales</div>
               </div>
             </div>
           </div>
@@ -711,7 +686,7 @@ export default function ReportPreviewPage() {
                 <h3 className="font-semibold mb-2">Prepared by:</h3>
                 <div className="text-sm text-gray-600">
                   <div>{preparedByName || "Loading..."}</div>
-                  <div>LOGISTICS</div>
+                  <div>SALES</div>
                   <div>{formatDate(report.date)}</div>
                 </div>
               </div>
@@ -755,11 +730,14 @@ export default function ReportPreviewPage() {
 
       <div className="fixed bottom-6 right-6 z-50">
         <Button
-          onClick={handlePostReport}
+          onClick={handleSendReport}
           disabled={posting}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+          className="text-white px-8 py-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
+          style={{ backgroundColor: "#00bf63", minWidth: "120px", minHeight: "56px" }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#00a855")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#00bf63")}
         >
-          {posting ? "Posting..." : "Post Report"}
+          {posting ? "Sending..." : "Send"}
         </Button>
       </div>
 
@@ -850,6 +828,8 @@ export default function ReportPreviewPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CongratulationsDialog isOpen={showCongratulations} onClose={handleCongratulationsClose} />
     </div>
   )
 }

@@ -21,6 +21,9 @@ interface CreateReportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   siteId: string
+  module?: "logistics" | "sales"
+  hideJobOrderSelection?: boolean
+  preSelectedJobOrder?: string
 }
 
 interface Team {
@@ -40,7 +43,6 @@ interface AttachmentData {
   fileType?: string
 }
 
-
 interface JobOrder {
   id: string
   joNumber: string
@@ -52,7 +54,14 @@ interface JobOrder {
   product_id: string
 }
 
-export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
+export function CreateReportDialog({
+  open,
+  onOpenChange,
+  siteId,
+  module = "logistics",
+  hideJobOrderSelection = false,
+  preSelectedJobOrder,
+}: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
@@ -84,11 +93,17 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     if (open && siteId) {
       fetchProductData()
       fetchTeams()
-      fetchJobOrders()
+      if (!hideJobOrderSelection) {
+        fetchJobOrders()
+      }
       // Auto-fill date with current date
       setDate(new Date().toISOString().split("T")[0])
+
+      if (preSelectedJobOrder) {
+        setSelectedJO(preSelectedJobOrder)
+      }
     }
-  }, [open, siteId])
+  }, [open, siteId, hideJobOrderSelection, preSelectedJobOrder])
 
   const fetchJobOrders = async () => {
     setLoadingJOs(true)
@@ -423,15 +438,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
       return
     }
-    // Remove this block:
-    // if (!selectedJO) {
-    //   toast({
-    //     title: "Error",
-    //     description: "Please select a Job Order",
-    //     variant: "destructive",
-    //   })
-    //   return
-    // }
 
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
@@ -485,7 +491,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
-        category: "logistics",
+        category: module,
         subcategory: product.content_type || "general",
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
@@ -551,8 +557,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the report preview page with preview flag
-      router.push(`/logistics/reports/preview`)
+      const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
+      router.push(previewPath)
     } catch (error) {
       console.error("Error generating report preview:", error)
       toast({
@@ -584,42 +590,48 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">JO#:</span> {selectedJO === "none" ? "None" : selectedJO || "Select JO"}
+                <span className="font-medium">JO#:</span>{" "}
+                {hideJobOrderSelection
+                  ? preSelectedJobOrder || "None"
+                  : selectedJO === "none"
+                    ? "None"
+                    : selectedJO || "Select JO"}
               </div>
               <div className="text-base">
                 <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
               </div>
             </div>
 
-            {/* JO Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
-                Job Order:
-              </Label>
-              <Select value={selectedJO} onValueChange={setSelectedJO}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select Job Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {loadingJOs ? (
-                    <SelectItem value="loading" disabled>
-                      Loading job orders...
-                    </SelectItem>
-                  ) : jobOrders.length === 0 ? (
-                    <SelectItem value="no-jos" disabled>
-                      No job orders found for this site
-                    </SelectItem>
-                  ) : (
-                    jobOrders.map((jo) => (
-                      <SelectItem key={jo.id} value={jo.joNumber}>
-                        {jo.joNumber} - {jo.clientCompany} ({jo.joType})
+            {!hideJobOrderSelection && (
+              <div className="space-y-2">
+                <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
+                  Job Order:
+                </Label>
+                <Select value={selectedJO} onValueChange={setSelectedJO}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select Job Order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {loadingJOs ? (
+                      <SelectItem value="loading" disabled>
+                        Loading job orders...
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+                    ) : jobOrders.length === 0 ? (
+                      <SelectItem value="no-jos" disabled>
+                        No job orders found for this site
+                      </SelectItem>
+                    ) : (
+                      jobOrders.map((jo) => (
+                        <SelectItem key={jo.id} value={jo.joNumber}>
+                          {jo.joNumber} - {jo.clientCompany} ({jo.joType})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Report Type */}
             <div className="space-y-2">

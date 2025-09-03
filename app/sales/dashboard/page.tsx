@@ -59,6 +59,7 @@ import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -87,6 +88,9 @@ function SalesDashboardContent() {
   const [productsWithBookings, setProductsWithBookings] = useState<Record<string, boolean>>({})
   const [loadingBookings, setLoadingBookings] = useState(false)
   const { isMobile, isTablet } = useResponsive()
+
+  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
+  const [selectedProductForReport, setSelectedProductForReport] = useState<string>("")
 
   // Search state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -136,6 +140,13 @@ function SalesDashboardContent() {
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  const handleCreateReport = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedProductForReport(product.id)
+    setCreateReportDialogOpen(true)
+  }
 
   const handleCopySitesFromProposal = (sites: Product[]) => {
     // Switch to CE/Quote mode and select the copied sites
@@ -585,6 +596,7 @@ function SalesDashboardContent() {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
         companyId: userData.company_id, // Add company_id to the proposal creation
+        client_company_id: selectedClientForProposal.id, // Add client's company_id
       })
 
       toast({
@@ -732,24 +744,14 @@ function SalesDashboardContent() {
         return
       }
     } else {
-      // For cost estimates, check selectedProducts
-      if (selectedProducts.length === 0) {
+      if (selectedSites.length === 0) {
         toast({
-          title: "No Products Selected",
-          description: "Please select at least one product to create a cost estimate.",
+          title: "No Sites Selected",
+          description: "Please select at least one site to create a cost estimate.",
           variant: "destructive",
         })
         return
       }
-    }
-
-    if (!selectedClientForProposal) {
-      toast({
-        title: "No Client Selected",
-        description: `Please select a client to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
-        variant: "destructive",
-      })
-      return
     }
 
     if (actionAfterDateSelection === "quotation") {
@@ -779,6 +781,7 @@ function SalesDashboardContent() {
           startDate,
           endDate,
           company_id: userData.company_id,
+          client_company_id: selectedClientForProposal.id, // Add client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
           created_by_first_name: userData.first_name,
           created_by_last_name: userData.last_name,
@@ -824,13 +827,13 @@ function SalesDashboardContent() {
     }
     setIsCreatingCostEstimate(true)
     try {
-      const sitesData = selectedProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
-        location: product.location,
-        price: product.price,
-        type: product.type,
-        image: product.media && product.media.length > 0 ? product.media[0].url : undefined,
+      const sitesData = selectedSites.map((site) => ({
+        id: site.id,
+        name: site.name,
+        location: site.specs_rental?.location || site.light?.location || "N/A",
+        price: site.price || 0,
+        type: site.type || "Unknown",
+        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
       }))
 
       const clientData = {
@@ -848,23 +851,24 @@ function SalesDashboardContent() {
         startDate,
         endDate,
         company_id: userData.company_id,
-        page_id: selectedProducts.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        client_company_id: selectedClientForProposal.id, // Add client's company_id
+        page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
       console.log("[v0] handleDatesSelected - options being passed:", options)
 
       let costEstimateIds: string[]
 
-      if (selectedProducts.length > 1) {
-        // Create multiple cost estimates for multiple products
+      if (selectedSites.length > 1) {
+        // Create multiple cost estimates for multiple sites
         costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, options)
 
         toast({
           title: "Cost Estimates Created",
-          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected products.`,
+          description: `Successfully created ${costEstimateIds.length} cost estimates for the selected sites.`,
         })
       } else {
-        // Create single cost estimate for one product
+        // Create single cost estimate for one site
         const costEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, options)
         costEstimateIds = [costEstimateId]
 
@@ -935,6 +939,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
+          client_company_id: selectedClientForProposal.id, // Added client_company_id to skip dates options
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 
@@ -1214,42 +1219,44 @@ function SalesDashboardContent() {
                   </div>
                   {/* Results dropdown */}
                   {isClientDropdownOpen && (
-                    <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
-                      <div className="p-2">
-                        {/* Always show "Add New Client" option at the top */}
-                        <div
-                          className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                          onClick={() => setIsNewClientDialogOpen(true)}
-                        >
-                          <PlusCircle className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium text-blue-700">Add New Client</span>
-                        </div>
+                    <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
+                      <div className="max-h-[200px] overflow-y-auto">
+                        <div className="p-2">
+                          {/* Always show "Add New Client" option at the top */}
+                          <div
+                            className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                            onClick={() => setIsNewClientDialogOpen(true)}
+                          >
+                            <PlusCircle className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium text-blue-700">Add New Client</span>
+                          </div>
 
-                        {dashboardClientSearchResults.length > 0 ? (
-                          dashboardClientSearchResults.map((result) => (
-                            <div
-                              key={result.id}
-                              className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                              onClick={() => handleClientSelectOnDashboard(result)}
-                            >
-                              <div>
-                                <p className="font-medium">
-                                  {result.name} ({result.company})
-                                </p>
-                                <p className="text-xs text-gray-500">{result.email}</p>
+                          {dashboardClientSearchResults.length > 0 ? (
+                            dashboardClientSearchResults.map((result) => (
+                              <div
+                                key={result.id}
+                                className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                                onClick={() => handleClientSelectOnDashboard(result)}
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    {result.name} ({result.company})
+                                  </p>
+                                  <p className="text-xs text-gray-500">{result.email}</p>
+                                </div>
+                                {selectedClientForProposal?.id === result.id && (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                )}
                               </div>
-                              {selectedClientForProposal?.id === result.id && (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500 text-center py-2">
-                            {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                              ? `No clients found for "${dashboardClientSearchTerm}".`
-                              : "Start typing to search for clients."}
-                          </p>
-                        )}
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500 text-center py-2">
+                              {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                                ? `No clients found for "${dashboardClientSearchTerm}".`
+                                : "Start typing to search for clients."}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </Card>
                   )}
@@ -1452,6 +1459,7 @@ function SalesDashboardContent() {
                             onView={() => handleViewDetails(product.id)}
                             onEdit={(e) => handleEditClick(product, e)}
                             onDelete={(e) => handleDeleteClick(product, e)}
+                            onCreateReport={(e) => handleCreateReport(product, e)}
                             isSelected={
                               proposalCreationMode
                                 ? selectedProducts.some((p) => p.id === product.id)
@@ -1807,6 +1815,13 @@ function SalesDashboardContent() {
             })
           }}
         />
+
+        <CreateReportDialog
+          open={createReportDialogOpen}
+          onOpenChange={setCreateReportDialogOpen}
+          siteId={selectedProductForReport}
+          module="sales"
+        />
       </div>
     </div>
   )
@@ -1834,6 +1849,7 @@ function ProductCard({
   onView,
   onEdit,
   onDelete,
+  onCreateReport,
   isSelected = false,
   onSelect,
   selectionMode = false,
@@ -1843,10 +1859,37 @@ function ProductCard({
   onView: () => void
   onEdit: (e: React.MouseEvent) => void
   onDelete: (e: React.MouseEvent) => void
+  onCreateReport: (e: React.MouseEvent) => void
   isSelected?: boolean
   onSelect?: () => void
   selectionMode?: boolean
 }) {
+  if (!product) {
+    return (
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
+        <div className="relative h-56 bg-gray-100 p-3">
+          <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
+            <div className="text-gray-400 text-sm">No data available</div>
+          </div>
+        </div>
+        <CardContent className="p-4 flex-1 flex flex-col">
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="text-base font-bold text-gray-400">N/A</div>
+            <h3 className="text-sm text-gray-400">Record not available</h3>
+            <div className="text-sm font-semibold text-gray-400 mt-1">Price not available</div>
+            <Button
+              variant="outline"
+              className="mt-auto w-full h-9 text-sm bg-gray-100 text-gray-400 rounded-lg font-medium cursor-not-allowed"
+              disabled
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   // Get the first media item for the thumbnail
   const thumbnailUrl =
     product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
@@ -1854,11 +1897,27 @@ function ProductCard({
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
-  // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
+  const formattedPrice = product.price
+    ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
+    : "Price not set"
 
   // Get site code
   const siteCode = getSiteCode(product)
+
+  const getStatusInfo = () => {
+    if (product.status === "ACTIVE" || product.status === "OCCUPIED") {
+      return { label: "OPEN", color: "#38b6ff" }
+    }
+    if (product.status === "VACANT" || product.status === "AVAILABLE") {
+      return { label: "AVAILABLE", color: "#00bf63" }
+    }
+    if (product.status === "MAINTENANCE" || product.status === "REPAIR") {
+      return { label: "MAINTENANCE", color: "#ef4444" }
+    }
+    return { label: "OPEN", color: "#38b6ff" }
+  }
+
+  const statusInfo = getStatusInfo()
 
   const handleClick = () => {
     if (selectionMode && onSelect) {
@@ -1868,53 +1927,96 @@ function ProductCard({
     }
   }
 
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(e)
+  }
+
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="h-48 bg-gray-200 relative">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-          }}
-        />
+      <div className="relative h-56 p-3">
+        <div className="relative h-full w-full rounded-xl overflow-hidden">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "Product image"}
+            fill
+            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/abstract-geometric-sculpture.png"
+              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+            }}
+          />
+
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-3 left-3">
+            <div
+              className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
+              style={{ backgroundColor: statusInfo.color }}
+            >
+              {statusInfo.label}
+            </div>
+          </div>
+        </div>
 
         {/* Selection indicator */}
         {selectionMode && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-5 right-5 z-10">
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
                 isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+                isSelected ? "text-white" : "text-gray-500",
               )}
             >
-              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+              {isSelected && <CheckCircle className="h-4 w-4" />}
             </div>
           </div>
         )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+      <CardContent className="p-4 flex-1 flex flex-col">
+        <div className="flex flex-col gap-2 flex-1">
+          {/* Location/Site Name - Top text with gray color and smaller font */}
+          <div
+            className="font-medium truncate"
+            style={{
+              color: "#737373",
+              fontSize: "13.6px",
+              lineHeight: "1.2",
+            }}
+          >
+            {location}
+          </div>
 
-          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+          {/* Product Name - Bottom text with black color, larger font and bold */}
+          <h3
+            className="font-bold truncate"
+            style={{
+              color: "#000000",
+              fontSize: "15.2px",
+              lineHeight: "1.3",
+            }}
+          >
+            {product.name || "No name available"}
+          </h3>
 
-          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+          {/* Price - More prominent */}
+          <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
+
+          {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+            onClick={handleCreateReport}
           >
             Create Report
           </Button>
