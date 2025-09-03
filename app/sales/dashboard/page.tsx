@@ -1951,6 +1951,7 @@ function ProductCard({
     <Card
       className={cn(
         "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white flex flex-col",
+
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
@@ -1996,7 +1997,6 @@ function ProductCard({
           </div>
         )}
       </div>
-
       <CardContent className="p-4 flex-1 flex flex-col h-full">
         <div className="flex flex-col gap-2 flex-1">
           {/* Location/Site Name - Top text with gray color and smaller font */}
@@ -2025,7 +2025,6 @@ function ProductCard({
 
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
-
           <Button
             variant="outline"
             className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
