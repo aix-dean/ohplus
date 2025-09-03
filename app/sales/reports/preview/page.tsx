@@ -217,6 +217,20 @@ export default function SalesReportPreviewPage() {
     }
   }
 
+  const handleSendReport = () => {
+    setIsSendDialogOpen(true)
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    setIsSendDialogOpen(false)
+
+    if (option === "email") {
+      console.log("Send via email")
+    } else {
+      console.log(`Send via ${option}`)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "2-digit",
@@ -338,20 +352,6 @@ export default function SalesReportPreviewPage() {
       })
     } finally {
       setIsGeneratingPDF(false)
-    }
-  }
-
-  const handleSendReport = () => {
-    setIsSendDialogOpen(true)
-  }
-
-  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
-    setIsSendDialogOpen(false)
-
-    if (option === "email") {
-      console.log("Send via email")
-    } else {
-      console.log(`Send via ${option}`)
     }
   }
 
@@ -730,7 +730,7 @@ export default function SalesReportPreviewPage() {
 
       <div className="fixed bottom-6 right-6 z-50">
         <Button
-          onClick={handlePostReport}
+          onClick={handleSendReport}
           disabled={posting}
           className="text-white px-8 py-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
           style={{ backgroundColor: "#00bf63", minWidth: "120px", minHeight: "56px" }}
