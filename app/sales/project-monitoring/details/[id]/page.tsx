@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 
@@ -99,6 +100,8 @@ export default function JobOrderDetailsPage() {
   const [seller, setSeller] = useState<Seller | null>(null) // Added seller state
   const [reports, setReports] = useState<Report[]>([]) // Added reports state
   const [loading, setLoading] = useState(true)
+
+  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
 
   useEffect(() => {
     const fetchJobOrder = async () => {
@@ -372,14 +375,28 @@ export default function JobOrderDetailsPage() {
         <Button
           className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-lg px-4 py-2 flex items-center gap-2"
           onClick={() => {
-            // TODO: Open create report dialog or navigate to create report page
-            console.log("Create Report clicked for job order:", jobOrder?.joNumber)
+            if (jobOrder?.product_id) {
+              setCreateReportDialogOpen(true)
+            } else {
+              console.log("No product ID available for creating report")
+            }
           }}
         >
           <Plus className="h-4 w-4" />
           Create Report
         </Button>
       </div>
+
+      {jobOrder?.product_id && (
+        <CreateReportDialog
+          open={createReportDialogOpen}
+          onOpenChange={setCreateReportDialogOpen}
+          siteId={jobOrder.product_id}
+          module="sales"
+          hideJobOrderSelection={true}
+          preSelectedJobOrder={jobOrder.joNumber}
+        />
+      )}
     </div>
   )
 }

@@ -29,8 +29,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
     }
   }, [copied])
 
-  // Generate report view URL
-  const reportViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
+  const reportViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/public/reports/${report.id}`
 
   // Generate report filename
   const getReportTypeDisplay = (type: string) => {
