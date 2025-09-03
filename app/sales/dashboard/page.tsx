@@ -1910,13 +1910,13 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[1/2]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[4/3]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-56 bg-gray-200 p-3">
+      <div className="relative h-40 bg-gray-200 p-3">
         <div className="relative h-full w-full rounded-xl overflow-hidden">
           <Image
             src={thumbnailUrl || "/placeholder.svg"}
