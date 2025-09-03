@@ -39,6 +39,7 @@ export async function createProposal(
     // Removed sendEmail option
     campaignId?: string // Add optional campaign ID parameter
     companyId?: string // Add optional company ID parameter
+    client_company_id?: string // Add client_company_id parameter
   } = {},
 ): Promise<string> {
   try {
@@ -58,6 +59,7 @@ export async function createProposal(
       targetAudience: client.targetAudience || "",
       campaignObjective: client.campaignObjective || "",
       designation: client.designation || "", // Include designation
+      company_id: options.client_company_id || "", // Add client_company_id to client field map
     }
 
     // Clean the products data to ensure no undefined values
@@ -433,6 +435,7 @@ export async function updateProposal(
       if (data.client.targetAudience !== undefined) updateData["client.targetAudience"] = data.client.targetAudience
       if (data.client.campaignObjective !== undefined)
         updateData["client.campaignObjective"] = data.client.campaignObjective
+      if (data.client.company_id !== undefined) updateData["client.company_id"] = data.client.company_id // Add client_company_id to updateData
     }
 
     console.log("[v0] Final update data being sent to Firestore:", updateData) // Added debug logging

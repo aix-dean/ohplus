@@ -823,7 +823,15 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
+      quotations.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        startDate: data.startDate?.toDate() || new Date(),
+        endDate: data.endDate?.toDate() || new Date(),
+        validUntil: data.validUntil?.toDate(),
+      } as Quotation)
     })
 
     return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -923,6 +931,7 @@ export async function createDirectQuotation(
     page_id?: string
     created_by_first_name?: string
     created_by_last_name?: string
+    client_company_id?: string // Added client_company_id field
   },
 ): Promise<string> {
   try {
@@ -954,6 +963,7 @@ export async function createDirectQuotation(
       client_company_name: clientData.company,
       client_phone: clientData.phone,
       client_address: clientData.address,
+      client_company_id: options.client_company_id || "", // Added client_company_id field
       status: "draft",
       created_by: userId,
       seller_id: userId,
@@ -1007,6 +1017,7 @@ export async function createMultipleQuotations(
     page_id?: string
     created_by_first_name?: string
     created_by_last_name?: string
+    client_company_id?: string // Added client_company_id field
   },
 ): Promise<string[]> {
   try {
@@ -1040,6 +1051,7 @@ export async function createMultipleQuotations(
         client_company_name: clientData.company,
         client_phone: clientData.phone,
         client_address: clientData.address,
+        client_company_id: options.client_company_id || "", // Added client_company_id field
         status: "draft",
         created_by: userId,
         seller_id: userId,

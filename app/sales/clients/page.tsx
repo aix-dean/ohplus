@@ -13,7 +13,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, getDocs, query, where, deleteDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useRouter } from "next/navigation" // Added useRouter import
+import { useRouter } from "next/navigation"
 
 interface Company {
   id: string
@@ -29,7 +29,7 @@ interface Company {
 
 export default function ClientsPage() {
   const { userData } = useAuth()
-  const router = useRouter() // Added router instance
+  const router = useRouter()
 
   // State for companies data
   const [companies, setCompanies] = useState<Company[]>([])
@@ -90,6 +90,10 @@ export default function ClientsPage() {
     }
   }
 
+  const handleViewClient = (company: Company) => {
+    router.push(`/sales/clients/${company.id}`)
+  }
+
   // Filter companies by type and search
   const operators = companies.filter(
     (c) =>
@@ -111,7 +115,7 @@ export default function ClientsPage() {
 
   // Company card component
   const CompanyCard = ({ company }: { company: Company }) => (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewClient(company)}>
       <CardContent className="p-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -134,13 +138,28 @@ export default function ClientsPage() {
             </div>
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleDeleteCompany(company)}>Delete</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleViewClient(company)
+                }}
+              >
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteCompany(company)
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -284,7 +303,7 @@ export default function ClientsPage() {
       {/* Add Client Button */}
       <div className="fixed bottom-6 right-6">
         <Button
-          onClick={() => router.push("/sales/clients/add")} // Changed to navigate to add client page instead of opening dialog
+          onClick={() => router.push("/sales/clients/add")}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg"
         >
           + Add Client

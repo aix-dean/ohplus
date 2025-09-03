@@ -596,6 +596,7 @@ function SalesDashboardContent() {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
         companyId: userData.company_id, // Add company_id to the proposal creation
+        client_company_id: selectedClientForProposal.id, // Add client's company_id
       })
 
       toast({
@@ -780,6 +781,7 @@ function SalesDashboardContent() {
           startDate,
           endDate,
           company_id: userData.company_id,
+          client_company_id: selectedClientForProposal.id, // Add client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
           created_by_first_name: userData.first_name,
           created_by_last_name: userData.last_name,
@@ -849,6 +851,7 @@ function SalesDashboardContent() {
         startDate,
         endDate,
         company_id: userData.company_id,
+        client_company_id: selectedClientForProposal.id, // Add client's company_id
         page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
@@ -936,6 +939,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
+          client_company_id: selectedClientForProposal.id, // Added client_company_id to skip dates options
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 
