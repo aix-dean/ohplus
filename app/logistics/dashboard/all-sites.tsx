@@ -359,25 +359,6 @@ export default function AllSitesTab({
   return (
     <div className="flex flex-col gap-5 p-6 bg-transparent min-h-screen">
       {/* Debug Panel - Remove this in production */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
-          <h4 className="font-bold text-yellow-800 mb-2">Debug Info</h4>
-          <div className="text-sm text-yellow-700">
-            <p>
-              <strong>Company ID:</strong> {userData?.company_id}
-            </p>
-            <p>
-              <strong>Total JO Counts:</strong> {Object.keys(jobOrderCounts).length}
-            </p>
-            <p>
-              <strong>JO Counts:</strong> {JSON.stringify(jobOrderCounts, null, 2)}
-            </p>
-            <Button size="sm" onClick={fetchJobOrderCountsDirectly} className="mt-2">
-              Refresh JO Counts
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Loading State */}
       {loading && (

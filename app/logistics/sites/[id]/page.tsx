@@ -19,9 +19,12 @@ import {
   Edit,
   Bell,
   Sun,
+  Play,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
@@ -229,113 +232,103 @@ export default function SiteDetailsPage({ params }: Props) {
 
   return (
     <div className="container mx-auto py-4 space-y-4">
-      {/* Header */}
-      <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Logistics- Site Information</h1>
-        <Link href="/logistics/dashboard" className="inline-flex items-center text-sm text-white/80 hover:text-white">
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Dashboard
-        </Link>
-      </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Site Information */}
         <div className="lg:col-span-1 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Site Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Site Image */}
-              <div className="relative aspect-square w-full">
-                <Image
-                  src={thumbnailUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  fill
-                  className="object-cover rounded-md"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
-                  }}
-                />
-                {/* Map overlay */}
-                <div className="absolute inset-0 bg-black/20 rounded-md flex items-center justify-center">
-                  <MapPin className="h-8 w-8 text-red-500" />
+          <div className="space-y-4">
+            <div className="flex flex-row items-center">
+              <Link href="/logistics/dashboard" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mr-2">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <h2 className="text-lg font-semibold">Site Information</h2>
+            </div>
+            {/* Site Image */}
+            <div className="relative aspect-square w-full">
+              <Image
+                src={thumbnailUrl || "/placeholder.svg"}
+                alt={product.name}
+                fill
+                className="object-cover rounded-md"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
+                }}
+              />
+              <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                23
+              </div>
+              {/* Map overlay */}
+            </div>
+
+            {/* Site Details */}
+            <div className="space-y-2">
+              <h2 className="text-gray-500 text-sm">{product.site_code || product.id}</h2>
+              <h3 className="font-bold text-xl">{product.name}</h3>
+              <Button variant="outline" className="mt-2">
+                <Calendar className="mr-2 h-4 w-4" />
+                Site Calendar
+              </Button>
+
+              <div className="space-y-2 text-sm mt-4">
+                <div>
+                  <span className="font-bold">Type:</span> {isStatic ? "Static" : "Dynamic"} - Billboard
+                </div>
+                <div>
+                  <span className="font-bold">Dimension:</span> {dimension}
+                </div>
+                <div>
+                  <span className="font-bold">Location:</span> {location}
+                </div>
+                <div>
+                  <span className="font-bold">Geopoint:</span> {geopoint}
+                </div>
+                <div>
+                  <span className="font-bold">Site Orientation:</span>{" "}
+                  {product.specs_rental?.site_orientation || ""}
+                </div>
+                <div>
+                  <span className="font-bold">Site Owner:</span> {product.site_owner || ""}
+                </div>
+                <div>
+                  <span className="font-bold">Land Owner:</span> {product.specs_rental?.land_owner || ""}
+                </div>
+                <div>
+                  <span className="font-bold">Partner:</span> {product.partner || ""}
                 </div>
               </div>
+            </div>
 
-              {/* Site Details */}
-              <div className="space-y-2">
-                <h2 className="font-semibold text-lg">{product.site_code || product.id}</h2>
-                <h3 className="text-base">{product.name}</h3>
+            {/* Site Calendar */}
 
-                <div className="space-y-1 text-sm">
-                  <div>
-                    <span className="font-medium">Site Code:</span> {product.id}
-                  </div>
-                  <div>
-                    <span className="font-medium">Site Name:</span> {product.name}
-                  </div>
-                  <div>
-                    <span className="font-medium">Type:</span> {isStatic ? "Static" : "Dynamic"} - Billboard
-                  </div>
-                  <div>
-                    <span className="font-medium">Dimension:</span> {dimension}
-                  </div>
-                  <div>
-                    <span className="font-medium">Location:</span> {location}
-                  </div>
-                  <div>
-                    <span className="font-medium">Geopoint:</span> {geopoint}
-                  </div>
-                  <div>
-                    <span className="font-medium">Site Orientation:</span>{" "}
-                    {product.specs_rental?.site_orientation || ""}
-                  </div>
-                  <div>
-                    <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
-                  </div>
-                  <div>
-                    <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
-                  </div>
-                </div>
-              </div>
-
-              {/* Site Calendar */}
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-2">Site Calendar</h4>
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <Calendar className="h-4 w-4 mb-2" />
-                  <div className="text-sm text-gray-600">Calendar view placeholder</div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2">
-                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleCreateServiceAssignment}>
-                  Create Service Assignment
-                </Button>
-                <Button variant="outline" className="w-full bg-transparent">
-                  Create Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Action Buttons */}
+            <div className="border-t pt-4 space-y-2">
+              <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleCreateServiceAssignment}>
+                Create Service Assignment
+              </Button>
+              <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                Create Report
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Right Column - Site Data and Details */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Job Orders */}
+          <div className="flex justify-end mb-4">
+            <Button variant="outline" size="sm">
+              Site Expenses
+            </Button>
+          </div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Job Orders</CardTitle>
               <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
                 See All
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               {serviceAssignments.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No job orders found for this site.</div>
               ) : (
@@ -375,57 +368,43 @@ export default function SiteDetailsPage({ params }: Props) {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
-                  <Zap className="h-4 w-4 mr-2" />
+                  <Sun className="h-4 w-4 mr-2" />
                   Illumination
                 </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setAlarmDialogOpen(true)
-                      }}
-                    >
-                      <Bell className="mr-2 h-4 w-4" />
-                      Alarm Settings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center space-x-2">
+                  <Switch />
+                  <Bell className="h-4 w-4 text-gray-500" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setAlarmDialogOpen(true)
+                        }}
+                      >
+                        <Bell className="mr-2 h-4 w-4" />
+                        Alarm Settings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-4">
                   {/* Date and Time Section */}
                   <div className="text-sm">
-                    <div className="font-medium">
-                      {new Date().toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        weekday: "short",
-                      })}
-                      , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-                    </div>
-                    <div className="text-gray-600 text-xs">
-                      Lights ON at{" "}
-                      {product.specs_rental?.lights_on_time
-                        ? new Date(`2000-01-01T${product.specs_rental.lights_on_time}`).toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true,
-                          })
-                        : "6:00 PM"}{" "}
-                      everyday
-                    </div>
+                    <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                    <div className="text-gray-600 text-xs">Lights ON @ 6:00pm everyday</div>
                   </div>
 
                   {/* Illumination Specifications */}
@@ -461,19 +440,15 @@ export default function SiteDetailsPage({ params }: Props) {
                   {/* Power Consumption */}
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm space-x-4">
-                        <span>
+                      <div className="space-y-1 text-sm">
+                        <div>
                           <span className="font-medium">Power Consumption:</span>{" "}
-                          <span className="text-green-600">
-                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
-                          </span>
-                        </span>
-                        <span>
-                          <span className="font-medium">Average (3 months):</span>{" "}
-                          <span className="text-blue-600">
-                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
-                          </span>
-                        </span>
+                          <span className="text-green-600">150 kWh/month</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Average Power Consumption:</span>{" "}
+                          <span className="text-blue-600">160 kWh /over last 3 months</span>
+                        </div>
                       </div>
                       <Button
                         variant="outline"
@@ -502,7 +477,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   </CardTitle>
                   <AlertTriangle className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4">
                   <div className="space-y-3">
                     <div className="text-sm">
                       <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
@@ -549,24 +524,39 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Compliance - Always show */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
                   <Shield className="h-4 w-4 mr-2" />
                   Compliance{" "}
                   <Badge variant="secondary" className="ml-2">
-                    {product.compliance ? product.compliance.filter((item) => item.status === "Done").length : 0}/
-                    {product.compliance?.length || 0}
+                    3/5
                   </Badge>
                 </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4 text-gray-500" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => console.log("Edit compliance clicked")}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-1 text-sm">
                   {product.compliance && product.compliance.length > 0 ? (
-                    product.compliance.map((item, index) => (
+                    product.compliance.map((item: { name: string; status: string }, index: number) => (
                       <div className="flex items-center justify-between" key={index}>
                         <span>{item.name}</span>
                         <span className={item.status === "Done" ? "text-green-600" : "text-red-600"}>
-                          {item.status}
+                          {item.status === "Done" ? "Done" : "X"}
                         </span>
                       </div>
                     ))
@@ -575,7 +565,6 @@ export default function SiteDetailsPage({ params }: Props) {
                   )}
                 </div>
                 <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
-                  <Eye className="h-4 w-4 mr-2" />
                   See All
                 </Button>
               </CardContent>
@@ -583,13 +572,29 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Structure - Always show */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
                   <Settings className="h-4 w-4 mr-2" />
                   Structure
                 </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4 text-gray-500" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => console.log("Edit structure clicked")}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-2 text-sm">
                   <div>
                     <span className="font-medium">Color:</span> {product.specs_rental?.structure_color || ""}
@@ -622,16 +627,32 @@ export default function SiteDetailsPage({ params }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Content */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
-                  <FileCheck className="h-4 w-4 mr-2" />
+                  <Play className="h-4 w-4 mr-2" />
                   Content
                 </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4 text-gray-500" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => console.log("Edit content clicked")}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 {product.content_schedule && product.content_schedule.length > 0 ? (
                   <div className="space-y-2 text-sm">
-                    {product.content_schedule.map((content, index) => (
+                    {product.content_schedule.map((content: { start_date: any; end_date: any; name: string }, index: number) => (
                       <div key={index}>
                         <span className="font-medium">
                           {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
@@ -652,13 +673,26 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Crew */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
                   <Users className="h-4 w-4 mr-2" />
                   Crew
                 </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => console.log("Edit crew clicked")}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-2 text-sm">
                   <div>
                     <span className="font-medium">Security:</span> {product.specs_rental?.security || ""}
@@ -675,77 +709,73 @@ export default function SiteDetailsPage({ params }: Props) {
             </Card>
           </div>
 
-          {/* Issues - Full width */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Issues
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Issue</th>
-                      <th className="text-left py-2">Type</th>
-                      <th className="text-left py-2">Content</th>
-                      <th className="text-left py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {product.issues && product.issues.length > 0 ? (
-                      product.issues.map((issue, index) => (
-                        <tr key={index} className="border-b border-gray-100">
-                          <td className="py-2">{issue.title}</td>
-                          <td className="py-2">{issue.type}</td>
-                          <td className="py-2">{issue.description}</td>
-                          <td className="py-2">
-                            <Badge variant={issue.status === "resolved" ? "default" : "destructive"}>
-                              {issue.status}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="text-center py-4 text-gray-500">
-                          No issues reported
-                        </td>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Issues */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Issues
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => console.log("Edit issues clicked")}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Issue</th>
+                        <th className="text-left py-2">Content</th>
+                        <th className="text-left py-2">Status</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Automation - Full width */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <Settings className="h-4 w-4 mr-2" />
-                Automation
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {product.automation && product.automation.length > 0 ? (
-                <div className="space-y-2 text-sm">
-                  {product.automation.map((auto, index) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <span>{auto.name}</span>
-                      <Badge variant={auto.active ? "default" : "secondary"}>
-                        {auto.active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  ))}
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-2">06/25/25 Stretching</td>
+                        <td className="py-2">Lilo & Stitch</td>
+                        <td className="py-2 text-green-600">Done</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-2">03/17/25 Busted Light</td>
+                        <td className="py-2">Lilo & Stitch</td>
+                        <td className="py-2 text-green-600">Done</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-2">01/05/25 Busted Light</td>
+                        <td className="py-2">Wolverine</td>
+                        <td className="py-2 text-green-600">Done</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">No automation configured</div>
-              )}
-            </CardContent>
-          </Card>
+                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
+                  <History className="h-4 w-4 mr-2" />
+                  View History
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Automation */}
+            <Button
+              className="w-full bg-purple-100 text-black hover:bg-purple-200 flex items-center justify-start p-4 rounded-lg"
+              onClick={() => console.log("Automation button clicked")}
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              <span className="text-base font-semibold">Automation</span>
+            </Button>
+          </div>
         </div>
       </div>
 
