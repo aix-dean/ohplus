@@ -1985,11 +1985,29 @@ function ProductCard({
 
       <CardContent className="p-4 flex-1 flex flex-col">
         <div className="flex flex-col gap-2 flex-1">
-          {/* Site Code - More prominent */}
-          <div className="text-base font-bold text-gray-900 tracking-wide">{siteCode || "N/A"}</div>
+          {/* Location/Site Name - Top text with gray color and smaller font */}
+          <div
+            className="font-medium truncate"
+            style={{
+              color: "#737373",
+              fontSize: "13.6px",
+              lineHeight: "1.2",
+            }}
+          >
+            {location}
+          </div>
 
-          {/* Product Name/Location */}
-          <h3 className="text-sm text-gray-600 line-clamp-2">{product.name || "No name available"}</h3>
+          {/* Product Name - Bottom text with black color, larger font and bold */}
+          <h3
+            className="font-bold truncate"
+            style={{
+              color: "#000000",
+              fontSize: "15.2px",
+              lineHeight: "1.3",
+            }}
+          >
+            {product.name || "No name available"}
+          </h3>
 
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
