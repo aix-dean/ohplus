@@ -62,7 +62,7 @@ import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation
 import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 15
 
 // Function to get site code from product
 const getSiteCode = (product: Product | null) => {
