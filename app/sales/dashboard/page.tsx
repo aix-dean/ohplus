@@ -1295,7 +1295,7 @@ function SalesDashboardContent() {
                     <div>
                       {viewMode === "grid" ? (
                         // Grid View for Search Results
-                        // Changed from 6 to 5 desktop columns for better spacing
+                        // Changed from 6 to 5 columns for better spacing
                         <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={5} gap="sm">
                           {searchResults.map((result) => (
                             <Card
@@ -1866,10 +1866,9 @@ function ProductCard({
   selectionMode?: boolean
 }) {
   if (!product) {
-    // Changed aspect ratio from 4/3 to 3/4 for more height
     return (
-      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
-        <div className="relative h-40 bg-gray-100 p-3">
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[4/3]">
+        <div className="relative h-44 bg-gray-100 p-3">
           <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
             <div className="text-gray-400 text-sm">No data available</div>
           </div>
@@ -1936,17 +1935,15 @@ function ProductCard({
   }
 
   return (
-    // Changed aspect ratio from 4/3 to 3/4 for more height
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[4/3]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      // Changed aspect ratio from 4/3 to 3/4 for more height
-      <div className="relative h-32 p-3">
+      <div className="relative h-36 p-3">
         <div className="relative h-full w-full rounded-xl overflow-hidden">
           <Image
             src={thumbnailUrl || "/placeholder.svg"}
@@ -1986,6 +1983,7 @@ function ProductCard({
           </div>
         )}
       </div>
+
       <CardContent className="p-4 flex-1 flex flex-col">
         <div className="flex flex-col gap-2 flex-1">
           {/* Location/Site Name - Top text with gray color and smaller font */}
@@ -2015,7 +2013,6 @@ function ProductCard({
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
 
-          {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
             className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
