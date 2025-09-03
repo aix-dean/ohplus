@@ -1871,8 +1871,9 @@ function ProductCard({
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
-  // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
+  const formattedPrice = product.price
+    ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
+    : "Price not set"
 
   // Get site code
   const siteCode = getSiteCode(product)
@@ -1909,13 +1910,13 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-lg transition-all hover:shadow-lg bg-white",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-xl transition-all hover:shadow-md bg-white",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-32 bg-gray-200">
+      <div className="relative h-48 bg-gray-200">
         <Image
           src={thumbnailUrl || "/placeholder.svg"}
           alt={product.name || "Product image"}
@@ -1929,8 +1930,11 @@ function ProductCard({
         />
 
         {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: statusInfo.color }}>
+        <div className="absolute bottom-3 left-3">
+          <div
+            className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
+            style={{ backgroundColor: statusInfo.color }}
+          >
             {statusInfo.label}
           </div>
         </div>
@@ -1951,21 +1955,21 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-3">
-        <div className="flex flex-col gap-1">
-          {/* Site Code */}
-          {siteCode && <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{siteCode}</div>}
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-2">
+          {/* Site Code - More prominent */}
+          {siteCode && <div className="text-sm font-bold text-gray-900 tracking-wide">{siteCode}</div>}
 
           {/* Product Name/Location */}
-          <h3 className="font-bold text-sm text-gray-900 line-clamp-1">{product.name}</h3>
+          <h3 className="text-sm text-gray-700 line-clamp-1">{product.name}</h3>
 
-          {/* Price */}
-          <div className="text-sm font-bold text-gray-900 mt-1">{formattedPrice}</div>
+          {/* Price - More prominent */}
+          <div className="text-sm font-bold text-gray-900">{formattedPrice}</div>
 
-          {/* Create Report Button */}
+          {/* Create Report Button - Updated styling to match reference */}
           <Button
-            variant="secondary"
-            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            variant="outline"
+            className="mt-2 w-full h-9 text-sm bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
             onClick={handleCreateReport}
           >
             Create Report
