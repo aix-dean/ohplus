@@ -5,19 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import {
-  ArrowLeft,
-  FileText,
-  ImageIcon,
-  Video,
-  File,
-  X,
-  Download,
-  ZoomIn,
-  Send,
-  ExternalLink,
-  Edit,
-} from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, ExternalLink } from "lucide-react"
 import { postReport, type ReportData } from "@/lib/report-service"
 import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -482,17 +470,6 @@ export default function SalesReportPreviewPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col items-center">
               <Button
-                onClick={handleEdit}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                size="sm"
-              >
-                <Edit className="h-5 w-5" />
-              </Button>
-              <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
                 className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
@@ -501,17 +478,6 @@ export default function SalesReportPreviewPage() {
                 <Download className="h-5 w-5" />
               </Button>
               <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Button
-                onClick={handleSendReport}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                size="sm"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-              <span className="text-xs text-gray-600 mt-1 font-medium">Send</span>
             </div>
           </div>
         </div>
@@ -766,9 +732,12 @@ export default function SalesReportPreviewPage() {
         <Button
           onClick={handlePostReport}
           disabled={posting}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+          className="text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+          style={{ backgroundColor: "#00bf63" }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#00a855")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#00bf63")}
         >
-          {posting ? "Posting..." : "Post Report"}
+          {posting ? "Sending..." : "Send"}
         </Button>
       </div>
 
