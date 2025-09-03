@@ -19,7 +19,7 @@ import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 8
+const ITEMS_PER_PAGE = 15
 
 export default function StaticSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -327,7 +327,7 @@ export default function StaticSitesTab() {
 
       {/* Site Grid */}
       {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {products.map((product) => {
             const site = productToSite(product)
 

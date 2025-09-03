@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 8
+const ITEMS_PER_PAGE = 15
 
 export default function LEDSitesTab() {
   const [products, setProducts] = useState<Product[]>([])
@@ -315,7 +315,7 @@ export default function LEDSitesTab() {
       ) : (
         <>
           {/* LED Sites Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             {products.map((product) => {
               const site = productToSite(product)
               return (
