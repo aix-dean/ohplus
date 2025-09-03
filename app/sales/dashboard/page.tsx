@@ -1943,7 +1943,7 @@ function ProductCard({
       )}
       onClick={handleClick}
     >
-      <div className="relative h-40 p-3">
+      <div className="relative h-44 p-3">
         <div className="relative h-full w-full rounded-xl overflow-hidden">
           <Image
             src={thumbnailUrl || "/placeholder.svg"}
