@@ -62,7 +62,7 @@ import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation
 import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 15
 
 // Function to get site code from product
 const getSiteCode = (product: Product | null) => {
@@ -1295,14 +1295,21 @@ function SalesDashboardContent() {
                     <div>
                       {viewMode === "grid" ? (
                         // Grid View for Search Results
-                        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                        <ResponsiveCardGrid
+                          mobileColumns={1}
+                          tabletColumns={2}
+                          desktopColumns={5}
+                          xlColumns={6}
+                          xxlColumns={7}
+                          gap="sm"
+                        >
                           {searchResults.map((result) => (
                             <Card
                               key={result.objectID}
                               className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
                               onClick={() => handleSearchResultClick(result)}
                             >
-                              <div className="h-48 bg-gray-200 relative">
+                              <div className="h-52 bg-gray-200 relative">
                                 <Image
                                   src={result.image_url || "/abstract-geometric-sculpture.png"}
                                   alt={result.name || "Search result"}
@@ -1450,7 +1457,14 @@ function SalesDashboardContent() {
                   {/* Grid View */}
                   {!loading && products.length > 0 && viewMode === "grid" && (
                     <div className="flex-1 overflow-y-auto">
-                      <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                      <ResponsiveCardGrid
+                        mobileColumns={1}
+                        tabletColumns={2}
+                        desktopColumns={5}
+                        xlColumns={6}
+                        xxlColumns={7}
+                        gap="sm"
+                      >
                         {products.map((product) => (
                           <ProductCard
                             key={product.id}
@@ -1866,8 +1880,8 @@ function ProductCard({
 }) {
   if (!product) {
     return (
-      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
-        <div className="relative h-56 bg-gray-100 p-3">
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50">
+        <div className="relative h-48 bg-gray-100 p-3">
           <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
             <div className="text-gray-400 text-sm">No data available</div>
           </div>
@@ -1936,13 +1950,14 @@ function ProductCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white flex flex-col",
+
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-56 p-3">
+      <div className="relative h-44 p-3">
         <div className="relative h-full w-full rounded-xl overflow-hidden">
           <Image
             src={thumbnailUrl || "/placeholder.svg"}
@@ -1982,8 +1997,7 @@ function ProductCard({
           </div>
         )}
       </div>
-
-      <CardContent className="p-4 flex-1 flex flex-col">
+      <CardContent className="p-4 flex-1 flex flex-col h-full">
         <div className="flex flex-col gap-2 flex-1">
           {/* Location/Site Name - Top text with gray color and smaller font */}
           <div
@@ -2011,8 +2025,6 @@ function ProductCard({
 
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
-
-          {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
             className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"

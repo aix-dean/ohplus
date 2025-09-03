@@ -18,6 +18,10 @@ export default function AdminDashboardPage() {
   const { user, userData } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 15
 
   useEffect(() => {
     const registeredParam = searchParams.get("registered")
@@ -31,14 +35,14 @@ export default function AdminDashboardPage() {
     }
   }, [searchParams, router])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
     // No need to remove query param here, it's already done in useEffect
   }
-
-  // Existing content from app/admin/dashboard/page.tsx
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   // Define a type for department data
   interface Department {
@@ -300,6 +304,10 @@ export default function AdminDashboardPage() {
     )
   })
 
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedDepartments = filteredDepartments.slice(startIndex, startIndex + itemsPerPage)
+
   return (
     <RouteProtection requiredRoles="admin">
       <div className="flex-1 p-4 md:p-6">
@@ -340,12 +348,34 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Department Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredDepartments.map((department) => (
+          {/* Department Cards Grid - Fixed 3-column layout for 15 items (3×5 grid) */}
+          <div className="grid grid-cols-3 gap-4 min-h-[600px]">
+            {paginatedDepartments.map((department) => (
               <DepartmentCard key={department.id} department={department} />
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Registration Success Dialog */}
