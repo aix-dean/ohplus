@@ -1877,6 +1877,21 @@ function ProductCard({
   // Get site code
   const siteCode = getSiteCode(product)
 
+  const getStatusInfo = () => {
+    if (product.status === "ACTIVE" || product.status === "OCCUPIED") {
+      return { label: "OPEN", color: "#38b6ff" }
+    }
+    if (product.status === "VACANT" || product.status === "AVAILABLE") {
+      return { label: "AVAILABLE", color: "#00bf63" }
+    }
+    if (product.status === "MAINTENANCE" || product.status === "REPAIR") {
+      return { label: "MAINTENANCE", color: "#ef4444" }
+    }
+    return { label: "OPEN", color: "#38b6ff" }
+  }
+
+  const statusInfo = getStatusInfo()
+
   const handleClick = () => {
     if (selectionMode && onSelect) {
       onSelect()
@@ -1885,16 +1900,22 @@ function ProductCard({
     }
   }
 
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(e)
+  }
+
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-lg transition-all hover:shadow-lg bg-white",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="h-48 bg-gray-200 relative">
+      <div className="relative h-32 bg-gray-200">
         <Image
           src={thumbnailUrl || "/placeholder.svg"}
           alt={product.name || "Product image"}
@@ -1907,9 +1928,16 @@ function ProductCard({
           }}
         />
 
+        {/* Status Badge - Bottom Left */}
+        <div className="absolute bottom-2 left-2">
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: statusInfo.color }}>
+            {statusInfo.label}
+          </div>
+        </div>
+
         {/* Selection indicator */}
         {selectionMode && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-2 right-2 z-10">
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
@@ -1923,15 +1951,22 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
-          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-1">
+          {/* Site Code */}
+          {siteCode && <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{siteCode}</div>}
+
+          {/* Product Name/Location */}
+          <h3 className="font-bold text-sm text-gray-900 line-clamp-1">{product.name}</h3>
+
+          {/* Price */}
+          <div className="text-sm font-bold text-gray-900 mt-1">{formattedPrice}</div>
+
+          {/* Create Report Button */}
           <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={onCreateReport}
+            variant="secondary"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            onClick={handleCreateReport}
           >
             Create Report
           </Button>
