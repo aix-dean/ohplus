@@ -2015,7 +2015,7 @@ function ProductCard({
           {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
-            className="mt-auto w-full h-9 text-sm bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+            className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
             onClick={handleCreateReport}
           >
             Create Report
