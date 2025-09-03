@@ -1864,6 +1864,32 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
+  if (!product) {
+    return (
+      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50 aspect-[3/4]">
+        <div className="relative h-56 bg-gray-100 p-3">
+          <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
+            <div className="text-gray-400 text-sm">No data available</div>
+          </div>
+        </div>
+        <CardContent className="p-4 flex-1 flex flex-col">
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="text-base font-bold text-gray-400">N/A</div>
+            <h3 className="text-sm text-gray-400">Record not available</h3>
+            <div className="text-sm font-semibold text-gray-400 mt-1">Price not available</div>
+            <Button
+              variant="outline"
+              className="mt-auto w-full h-9 text-sm bg-gray-100 text-gray-400 rounded-lg font-medium cursor-not-allowed"
+              disabled
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   // Get the first media item for the thumbnail
   const thumbnailUrl =
     product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
@@ -1871,11 +1897,27 @@ function ProductCard({
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
-  // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
+  const formattedPrice = product.price
+    ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
+    : "Price not set"
 
   // Get site code
   const siteCode = getSiteCode(product)
+
+  const getStatusInfo = () => {
+    if (product.status === "ACTIVE" || product.status === "OCCUPIED") {
+      return { label: "OPEN", color: "#38b6ff" }
+    }
+    if (product.status === "VACANT" || product.status === "AVAILABLE") {
+      return { label: "AVAILABLE", color: "#00bf63" }
+    }
+    if (product.status === "MAINTENANCE" || product.status === "REPAIR") {
+      return { label: "MAINTENANCE", color: "#ef4444" }
+    }
+    return { label: "OPEN", color: "#38b6ff" }
+  }
+
+  const statusInfo = getStatusInfo()
 
   const handleClick = () => {
     if (selectionMode && onSelect) {
@@ -1885,31 +1927,49 @@ function ProductCard({
     }
   }
 
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(e)
+  }
+
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white aspect-[3/4]",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="h-48 bg-gray-200 relative">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-          }}
-        />
+      <div className="relative h-56 p-3">
+        <div className="relative h-full w-full rounded-xl overflow-hidden">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "Product image"}
+            fill
+            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/abstract-geometric-sculpture.png"
+              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+            }}
+          />
+
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-3 left-3">
+            <div
+              className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
+              style={{ backgroundColor: statusInfo.color }}
+            >
+              {statusInfo.label}
+            </div>
+          </div>
+        </div>
 
         {/* Selection indicator */}
         {selectionMode && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-5 right-5 z-10">
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
@@ -1923,15 +1983,40 @@ function ProductCard({
         )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
-          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+      <CardContent className="p-4 flex-1 flex flex-col">
+        <div className="flex flex-col gap-2 flex-1">
+          {/* Location/Site Name - Top text with gray color and smaller font */}
+          <div
+            className="font-medium truncate"
+            style={{
+              color: "#737373",
+              fontSize: "13.6px",
+              lineHeight: "1.2",
+            }}
+          >
+            {location}
+          </div>
+
+          {/* Product Name - Bottom text with black color, larger font and bold */}
+          <h3
+            className="font-bold truncate"
+            style={{
+              color: "#000000",
+              fontSize: "15.2px",
+              lineHeight: "1.3",
+            }}
+          >
+            {product.name || "No name available"}
+          </h3>
+
+          {/* Price - More prominent */}
+          <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
+
+          {/* Create Report Button - Positioned at bottom */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={onCreateReport}
+            className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+            onClick={handleCreateReport}
           >
             Create Report
           </Button>
