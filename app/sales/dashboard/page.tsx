@@ -1949,28 +1949,77 @@ function ProductCard({
             src={thumbnailUrl || "/placeholder.svg"}
             alt={product.name || "Product image"}
             fill
-            className="object-cover"
+            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
             onError={(e) => {
               const target = e.target as HTMLImageElement
               target.src = "/abstract-geometric-sculpture.png"
-              target.className = "opacity-50"
+              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
             }}
           />
-        </div>
-      </div>
-      <CardContent className="p-4 flex-1 flex flex-col">
-        <div className="flex flex-col gap-2 flex-1">
-          <div className="text-base font-bold line-clamp-1">{product.name}</div>
-          <h3 className="text-sm text-gray-500 line-clamp-1">{location}</h3>
-          <div className="text-sm font-semibold text-green-700 mt-1">{formattedPrice}</div>
-          <div className="flex items-center justify-between mt-auto">
-            <Badge variant="secondary" className="bg-[#e0f2fe] text-[#0369a1]">
+
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-3 left-3">
+            <div
+              className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
+              style={{ backgroundColor: statusInfo.color }}
+            >
               {statusInfo.label}
-            </Badge>
-            <Button variant="outline" size="sm" onClick={handleCreateReport}>
-              Create Report
-            </Button>
+            </div>
           </div>
+        </div>
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-5 right-5 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+                isSelected ? "text-white" : "text-gray-500",
+              )}
+            >
+              {isSelected && <CheckCircle className="h-4 w-4" />}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <CardContent className="p-4 flex-1 flex flex-col h-full">
+        <div className="flex flex-col gap-2 flex-1">
+          {/* Location/Site Name - Top text with gray color and smaller font */}
+          <div
+            className="font-medium truncate"
+            style={{
+              color: "#737373",
+              fontSize: "13.6px",
+              lineHeight: "1.2",
+            }}
+          >
+            {location}
+          </div>
+
+          {/* Product Name - Bottom text with black color, larger font and bold */}
+          <h3
+            className="font-bold truncate"
+            style={{
+              color: "#000000",
+              fontSize: "15.2px",
+              lineHeight: "1.3",
+            }}
+          >
+            {product.name || "No name available"}
+          </h3>
+
+          {/* Price - More prominent */}
+          <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
+
+          <Button
+            variant="outline"
+            className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
