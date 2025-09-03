@@ -393,6 +393,8 @@ export default function JobOrderDetailsPage() {
           onOpenChange={setCreateReportDialogOpen}
           siteId={jobOrder.product_id}
           module="sales"
+          hideJobOrderSelection={true}
+          preSelectedJobOrder={jobOrder.joNumber}
         />
       )}
     </div>

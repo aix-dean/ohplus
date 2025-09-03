@@ -22,6 +22,8 @@ interface CreateReportDialogProps {
   onOpenChange: (open: boolean) => void
   siteId: string
   module?: "logistics" | "sales"
+  hideJobOrderSelection?: boolean
+  preSelectedJobOrder?: string
 }
 
 interface Team {
@@ -52,7 +54,14 @@ interface JobOrder {
   product_id: string
 }
 
-export function CreateReportDialog({ open, onOpenChange, siteId, module = "logistics" }: CreateReportDialogProps) {
+export function CreateReportDialog({
+  open,
+  onOpenChange,
+  siteId,
+  module = "logistics",
+  hideJobOrderSelection = false,
+  preSelectedJobOrder,
+}: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
@@ -84,11 +93,17 @@ export function CreateReportDialog({ open, onOpenChange, siteId, module = "logis
     if (open && siteId) {
       fetchProductData()
       fetchTeams()
-      fetchJobOrders()
+      if (!hideJobOrderSelection) {
+        fetchJobOrders()
+      }
       // Auto-fill date with current date
       setDate(new Date().toISOString().split("T")[0])
+
+      if (preSelectedJobOrder) {
+        setSelectedJO(preSelectedJobOrder)
+      }
     }
-  }, [open, siteId])
+  }, [open, siteId, hideJobOrderSelection, preSelectedJobOrder])
 
   const fetchJobOrders = async () => {
     setLoadingJOs(true)
@@ -575,42 +590,48 @@ export function CreateReportDialog({ open, onOpenChange, siteId, module = "logis
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">JO#:</span> {selectedJO === "none" ? "None" : selectedJO || "Select JO"}
+                <span className="font-medium">JO#:</span>{" "}
+                {hideJobOrderSelection
+                  ? preSelectedJobOrder || "None"
+                  : selectedJO === "none"
+                    ? "None"
+                    : selectedJO || "Select JO"}
               </div>
               <div className="text-base">
                 <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
               </div>
             </div>
 
-            {/* JO Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
-                Job Order:
-              </Label>
-              <Select value={selectedJO} onValueChange={setSelectedJO}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select Job Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {loadingJOs ? (
-                    <SelectItem value="loading" disabled>
-                      Loading job orders...
-                    </SelectItem>
-                  ) : jobOrders.length === 0 ? (
-                    <SelectItem value="no-jos" disabled>
-                      No job orders found for this site
-                    </SelectItem>
-                  ) : (
-                    jobOrders.map((jo) => (
-                      <SelectItem key={jo.id} value={jo.joNumber}>
-                        {jo.joNumber} - {jo.clientCompany} ({jo.joType})
+            {!hideJobOrderSelection && (
+              <div className="space-y-2">
+                <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
+                  Job Order:
+                </Label>
+                <Select value={selectedJO} onValueChange={setSelectedJO}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select Job Order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {loadingJOs ? (
+                      <SelectItem value="loading" disabled>
+                        Loading job orders...
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+                    ) : jobOrders.length === 0 ? (
+                      <SelectItem value="no-jos" disabled>
+                        No job orders found for this site
+                      </SelectItem>
+                    ) : (
+                      jobOrders.map((jo) => (
+                        <SelectItem key={jo.id} value={jo.joNumber}>
+                          {jo.joNumber} - {jo.clientCompany} ({jo.joType})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Report Type */}
             <div className="space-y-2">
