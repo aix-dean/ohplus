@@ -1295,7 +1295,14 @@ function SalesDashboardContent() {
                     <div>
                       {viewMode === "grid" ? (
                         // Grid View for Search Results
-                        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={6} gap="sm">
+                        <ResponsiveCardGrid
+                          mobileColumns={1}
+                          tabletColumns={2}
+                          desktopColumns={5}
+                          xlColumns={6}
+                          xxlColumns={7}
+                          gap="sm"
+                        >
                           {searchResults.map((result) => (
                             <Card
                               key={result.objectID}
@@ -1450,7 +1457,14 @@ function SalesDashboardContent() {
                   {/* Grid View */}
                   {!loading && products.length > 0 && viewMode === "grid" && (
                     <div className="flex-1 overflow-y-auto">
-                      <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={6} gap="sm">
+                      <ResponsiveCardGrid
+                        mobileColumns={1}
+                        tabletColumns={2}
+                        desktopColumns={5}
+                        xlColumns={6}
+                        xxlColumns={7}
+                        gap="sm"
+                      >
                         {products.map((product) => (
                           <ProductCard
                             key={product.id}
