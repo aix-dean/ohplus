@@ -59,8 +59,8 @@ export class ChatDatabaseService {
         currentPage,
         sessionId: sessionId || this.generateSessionId(),
         metadata: {
-          userAgent: typeof window !== "undefined" ? navigator.userAgent : undefined,
-          platform: typeof window !== "undefined" ? navigator.platform : undefined,
+          userAgent: undefined,
+          platform: undefined,
         },
       }
 
@@ -97,8 +97,8 @@ export class ChatDatabaseService {
         content,
         timestamp: new Date(),
         metadata: {
-          userAgent: typeof window !== "undefined" ? navigator.userAgent : undefined,
-          platform: typeof window !== "undefined" ? navigator.platform : undefined,
+          userAgent: undefined,
+          platform: undefined,
           errorOccurred: false,
           retryCount: 0,
         },
