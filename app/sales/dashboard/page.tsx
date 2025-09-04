@@ -149,16 +149,13 @@ function SalesDashboardContent() {
   }
 
   const handleCopySitesFromProposal = (sites: Product[]) => {
-    // Switch to CE/Quote mode and select the copied sites
-    setCeQuoteMode(true)
-    // Don't turn off proposal creation mode to preserve UI elements
-    // setProposalCreationMode(false) // Removed this line
-    setSelectedSites(sites)
+    // Just add the copied sites to the selected products for proposal creation
+    setSelectedProducts(sites)
 
     // Show success message
     toast({
       title: "Sites Copied",
-      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and selected. You can now create cost estimates or quotations.`,
+      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
     })
   }
 
@@ -1671,7 +1668,7 @@ function SalesDashboardContent() {
               )}
             </div>
 
-            {/* Right Column: Proposal History - Conditionally rendered */}
+            {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
             {proposalCreationMode && (
               <div className="flex flex-col gap-4 pt-4 md:pt-6">
                 <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
