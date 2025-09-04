@@ -151,13 +151,14 @@ function SalesDashboardContent() {
   const handleCopySitesFromProposal = (sites: Product[]) => {
     // Switch to CE/Quote mode and select the copied sites
     setCeQuoteMode(true)
-    setProposalCreationMode(false)
+    // Don't turn off proposal creation mode to preserve UI elements
+    // setProposalCreationMode(false) // Removed this line
     setSelectedSites(sites)
 
     // Show success message
     toast({
       title: "Sites Copied",
-      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and selected.`,
+      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and selected. You can now create cost estimates or quotations.`,
     })
   }
 
