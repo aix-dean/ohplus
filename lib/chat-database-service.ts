@@ -97,8 +97,6 @@ export class ChatDatabaseService {
         content,
         timestamp: new Date(),
         metadata: {
-          userAgent: undefined,
-          platform: undefined,
           errorOccurred: false,
           retryCount: 0,
         },
