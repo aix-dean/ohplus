@@ -8,6 +8,7 @@ type ToastProps = {
   description?: React.ReactNode
   action?: React.ReactNode
   variant?: "default" | "destructive"
+  onOpenChange?: (open: boolean) => void
 }
 
 type ToasterToast = ToastProps & {
@@ -103,7 +104,7 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = Omit<ToasterToast, "id">
+type Toast = Omit<ToasterToast, "id" | "open">
 
 function toast({ ...props }: Toast) {
   const id = genId()

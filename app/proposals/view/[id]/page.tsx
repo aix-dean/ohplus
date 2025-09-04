@@ -1,99 +1,270 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Eye, CheckCircle, XCircle, Mail, Phone, AlertCircle, ArrowLeft, FileDown } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  ArrowLeft,
+  Loader2,
+  FileText,
+  Grid3X3,
+  Edit,
+  Download,
+  Plus,
+  X,
+  ImageIcon,
+  Upload,
+  Check,
+  Minus,
+  Send,
+} from "lucide-react"
+import { getProposalById, updateProposal } from "@/lib/proposal-service"
+import {
+  getProposalTemplatesByCompanyId,
+  createProposalTemplate,
+  uploadFileToFirebaseStorage,
+} from "@/lib/firebase-service"
 import type { Proposal } from "@/lib/types/proposal"
-import Image from "next/image"
-import { initializeApp, getApps } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
-import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
+import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
+import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 
-// Helper function to generate QR code URL
-const generateQRCodeUrl = (proposalId: string) => {
-  const proposalViewUrl = `https://ohplus.aix.ph/proposals/view/${proposalId}`
-  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(proposalViewUrl)}`
-}
-
-// Firebase initialization function
-function initializeFirebaseIfNeeded() {
-  try {
-    const firebaseConfig = {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    }
-
-    // Check if Firebase is already initialized
-    const existingApps = getApps()
-
-    let app
-    if (existingApps.length === 0) {
-      app = initializeApp(firebaseConfig)
-    } else {
-      app = existingApps[0]
-    }
-
-    // Initialize Firestore
-    const db = getFirestore(app)
-
-    return { success: true, db }
-  } catch (error) {
-    console.error("Firebase initialization error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
-  }
-}
-
-export default function PublicProposalViewPage() {
-  const params = useParams()
-  const router = useRouter()
-  const [proposal, setProposal] = useState<Proposal | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
-  const { toast } = useToast()
-  const [lightboxImage, setLightboxImage] = useState<{ url: string; isVideo: boolean } | null>(null)
+const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState(false)
 
   useEffect(() => {
-    // Initialize Firebase when component mounts
-    const firebaseInit = initializeFirebaseIfNeeded()
-    if (!firebaseInit.success) {
-      setError(`Firebase initialization failed: ${firebaseInit.error}`)
+    const initializeMaps = async () => {
+      try {
+        await loadGoogleMaps()
+        await initializeMap()
+      } catch (error) {
+        console.error("Error loading Google Maps:", error)
+        setMapError(true)
+      }
     }
 
-    async function fetchProposal() {
-      if (!params.id) {
-        setError("Proposal ID is missing.")
+    const initializeMap = async () => {
+      if (!mapRef.current || !window.google) return
+
+      try {
+        const geocoder = new window.google.maps.Geocoder()
+
+        // Geocode the location
+        geocoder.geocode(
+          { address: location },
+          (
+            results: google.maps.GeocoderResult[] | null,
+            status: google.maps.GeocoderStatus,
+          ) => {
+          if (status === "OK" && results && results[0]) {
+            const map = new window.google.maps.Map(mapRef.current!, {
+              center: results[0].geometry.location,
+              zoom: 15,
+              disableDefaultUI: true,
+              gestureHandling: "none",
+              zoomControl: false,
+              mapTypeControl: false,
+              scaleControl: false,
+              streetViewControl: false,
+              rotateControl: false,
+              fullscreenControl: false,
+              styles: [
+                {
+                  featureType: "poi",
+                  elementType: "labels",
+                  stylers: [{ visibility: "off" }],
+                },
+              ],
+            })
+
+            // Add marker
+            new window.google.maps.Marker({
+              position: results[0].geometry.location,
+              map: map,
+              title: location,
+              icon: {
+                url:
+                  "data:image/svg+xml;charset=UTF-8," +
+                  encodeURIComponent(`
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#ef4444"/>
+                  </svg>
+                `),
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 32),
+              },
+            })
+
+            setMapLoaded(true)
+          } else {
+            console.error("Geocoding failed:", status)
+            setMapError(true)
+          }
+        })
+      } catch (error) {
+        console.error("Error initializing map:", error)
+        setMapError(true)
+      }
+    }
+
+    initializeMaps()
+  }, [location])
+
+  if (mapError) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <div className="text-center text-gray-500">
+          <p className="text-sm">Map unavailable</p>
+          <p className="text-xs mt-1">{location}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <div ref={mapRef} className="w-full h-full rounded-lg" />
+      {!mapLoaded && (
+        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Loading map...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
+  const { userData } = useAuth()
+  const [companyLogo, setCompanyLogo] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompanyLogo = async () => {
+      if (!userData?.company_id) {
+        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
         setLoading(false)
         return
       }
 
       try {
-        const response = await fetch(`/api/proposals/public/${params.id}`)
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to fetch proposal.")
-        }
-        const data = await response.json()
-        if (data.success && data.proposal) {
-          setProposal({
-            ...data.proposal,
-            createdAt: new Date(data.proposal.createdAt),
-            updatedAt: new Date(data.proposal.updatedAt),
-            validUntil: new Date(data.proposal.validUntil),
-          })
+        const companyDocRef = doc(db, "companies", userData.company_id)
+        const companyDocSnap = await getDoc(companyDocRef)
+
+        if (companyDocSnap.exists()) {
+          const companyData = companyDocSnap.data()
+          if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+            setCompanyLogo(companyData.photo_url)
+          } else {
+            setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+          }
         } else {
-          setError("Proposal not found or invalid data.")
+          setCompanyLogo("/ohplus-new-logo.png") // Default fallback
         }
-      } catch (err) {
-        console.error("Error fetching proposal:", err)
-        setError(err instanceof Error ? err.message : "Failed to load proposal.")
+      } catch (error) {
+        console.error("Error fetching company logo:", error)
+        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompanyLogo()
+  }, [userData?.company_id])
+
+  if (loading) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={companyLogo || "/placeholder.svg"}
+      alt="Company logo"
+      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
+      onError={(e) => {
+        // Fallback to default logo if image fails to load
+        const target = e.target as HTMLImageElement
+        target.src = "/ohplus-new-logo.png"
+      }}
+    />
+  )
+}
+
+export default function ProposalDetailsPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { toast, dismiss } = useToast()
+  const { userData } = useAuth()
+  const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isEditingPrice, setIsEditingPrice] = useState(false)
+  const [editablePrice, setEditablePrice] = useState<string>("")
+  const [savingPrice, setSavingPrice] = useState(false)
+  const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [formData, setFormData] = useState({
+    name: "",
+    background_url: "",
+  })
+  const [formLoading, setFormLoading] = useState(false)
+  const [templates, setTemplates] = useState<ProposalTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string>("")
+  const [uploading, setUploading] = useState(false)
+  const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
+  const [selectedSize, setSelectedSize] = useState<string>("A4")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedLayout, setSelectedLayout] = useState<string>("1")
+  const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
+  const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
+  const [isApplying, setIsApplying] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState<number>(1)
+  const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    async function fetchProposal() {
+      if (!params.id) return
+
+      setLoading(true)
+      try {
+        const proposalData = await getProposalById(params.id as string)
+        if (proposalData) {
+          setProposal(proposalData)
+          const currentPageContent = getPageContent(1)
+          const currentPagePrice = getPagePrice(currentPageContent)
+          setEditablePrice(currentPagePrice.toString())
+
+          if (proposalData.templateSize) setSelectedSize(proposalData.templateSize)
+          if (proposalData.templateOrientation) setSelectedOrientation(proposalData.templateOrientation)
+          if (proposalData.templateLayout) setSelectedLayout(proposalData.templateLayout)
+          if (proposalData.templateBackground) setSelectedTemplateBackground(proposalData.templateBackground)
+        }
+      } catch (error) {
+        console.error("Error fetching proposal:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load proposal",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
@@ -102,10 +273,365 @@ export default function PublicProposalViewPage() {
     fetchProposal()
   }, [params.id])
 
-  const handleDownloadPDF = async () => {
-    if (!proposal) return
+  useEffect(() => {
+    if (!proposal) {
+      return
+    }
 
-    setIsGeneratingPDF(true)
+    const handleScroll = () => {
+      const pageScrollOffset = 100 // Offset to consider a page "in view"
+      let foundPage = 1
+      for (let i = 0; i < pageRefs.current.length; i++) {
+        const page = pageRefs.current[i]
+        if (page) {
+          const rect = page.getBoundingClientRect()
+          // console.log(`Page ${i + 1}: top=${rect.top}, bottom=${rect.bottom}`) // Re-enable if needed
+          if (rect.top <= pageScrollOffset && rect.bottom >= pageScrollOffset) {
+            foundPage = i + 1
+            break
+          }
+        }
+      }
+      setCurrentPage(foundPage)
+    }
+
+    document.documentElement.addEventListener("scroll", handleScroll)
+    // Initial check
+    handleScroll()
+
+    return () => {
+      document.documentElement.removeEventListener("scroll", handleScroll)
+    }
+  }, [proposal, proposal?.products?.length, selectedLayout, selectedSize, selectedOrientation])
+
+  const fetchTemplates = async () => {
+    if (!userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "Company information not available",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setTemplatesLoading(true)
+    try {
+      const templatesData = await getProposalTemplatesByCompanyId(userData.company_id)
+      setTemplates(templatesData)
+    } catch (error) {
+      console.error("Error fetching templates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load templates",
+        variant: "destructive",
+      })
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }
+
+  const handleTemplates = () => {
+    setShowTemplatesPanel(true)
+    setShowCreateForm(false)
+    setShowBackgroundTemplates(false)
+    // Don't reset template settings when opening dialog - preserve current values
+  }
+
+  const handleShowBackgroundTemplates = () => {
+    setShowBackgroundTemplates(true)
+    fetchTemplates()
+  }
+
+  const handleBackToTemplateOptions = () => {
+    setShowBackgroundTemplates(false)
+    setShowCreateForm(false)
+  }
+
+  const handleApplyTemplate = async () => {
+    if (!proposal || !userData) return
+
+    setIsApplying(true)
+    try {
+      // Only include templateBackground in update if it has been explicitly changed
+      const updateData: any = {
+        templateSize: selectedSize,
+        templateOrientation: selectedOrientation,
+        templateLayout: selectedLayout,
+      }
+
+      // Only update templateBackground if it's been explicitly changed
+      if (selectedTemplateBackground !== "") {
+        updateData.templateBackground = selectedTemplateBackground
+      }
+
+      console.log("[v0] Updating proposal with data:", updateData)
+
+      await updateProposal(proposal.id, updateData, userData.uid, userData.displayName || "User")
+
+      setProposal((prev) =>
+        prev
+          ? {
+              ...prev,
+              templateSize: selectedSize,
+              templateOrientation: selectedOrientation,
+              templateLayout: selectedLayout,
+              templateBackground:
+                selectedTemplateBackground !== "" ? selectedTemplateBackground : prev.templateBackground,
+            }
+          : null,
+      )
+
+      toast({
+        title: "Template Applied",
+        description: "Template settings have been applied and saved",
+      })
+    } catch (error) {
+      console.error("Error updating price:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update price",
+        variant: "destructive",
+      })
+    } finally {
+      setIsApplying(false)
+    }
+  }
+
+  const handleCreateTemplate = () => {
+    setShowCreateForm(true)
+    setFormData({ name: "", background_url: "" })
+    setSelectedFile(null)
+    setFilePreview("")
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload only image files (JPEG, PNG, GIF, WebP)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedFile(file)
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setFilePreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null)
+    setFilePreview("")
+    setFormData((prev) => ({ ...prev, background_url: "" }))
+  }
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Template name is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "Company information not available",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setFormLoading(true)
+    try {
+      let backgroundUrl = formData.background_url
+
+      if (selectedFile) {
+        setUploading(true)
+        try {
+          const uploadPath = `templates/backgrounds/${Date.now()}_${selectedFile.name}`
+          backgroundUrl = await uploadFileToFirebaseStorage(selectedFile, uploadPath)
+          toast({
+            title: "Success",
+            description: "Background image uploaded successfully",
+          })
+        } catch (uploadError) {
+          console.error("Error uploading file:", uploadError)
+          toast({
+            title: "Error",
+            description: "Failed to upload background image",
+            variant: "destructive",
+          })
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
+
+      await createProposalTemplate({
+        name: formData.name.trim(),
+        background_url: backgroundUrl,
+        company_id: userData.company_id,
+      })
+      toast({
+        title: "Success",
+        description: "Template created successfully",
+      })
+      setShowCreateForm(false)
+      setFormData({ name: "", background_url: "" })
+      setSelectedFile(null)
+      setFilePreview("")
+      fetchTemplates()
+    } catch (error) {
+      console.error("Error creating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleBackToList = () => {
+    setShowCreateForm(false)
+    setFormData({ name: "", background_url: "" })
+    setSelectedFile(null)
+    setFilePreview("")
+  }
+
+  const getPagePrice = (pageContent: any[]) => {
+    return pageContent.reduce((total, product) => {
+      return total + (product.price || 0)
+    }, 0)
+  }
+
+  const handleEditPrice = (pageNum: number) => {
+    setIsEditingPrice(true)
+    const currentPageContent = getPageContent(pageNum)
+    const currentPagePrice = getPagePrice(currentPageContent)
+    setEditablePrice(currentPagePrice.toString())
+    setCurrentEditingPage(pageNum)
+  }
+
+  const handleSavePrice = async () => {
+    if (!proposal || !userData) {
+      toast({
+        title: "Error",
+        description: "Unable to save price changes",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newPrice = Number.parseFloat(editablePrice)
+    if (isNaN(newPrice) || newPrice < 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid price",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSavingPrice(true)
+    try {
+      const currentPageContent = getPageContent(currentEditingPage || 1)
+      if (currentPageContent.length > 0) {
+        const updatedProducts = proposal.products.map((product: any) => {
+          // Update price for all products on the current page
+          const productOnCurrentPage = currentPageContent.find((p) => p.id === product.id)
+          if (productOnCurrentPage) {
+            // If multiple products on page, distribute the price evenly
+            const pricePerProduct = newPrice / currentPageContent.length
+            return { ...product, price: pricePerProduct }
+          }
+          return product
+        })
+
+        await updateProposal(
+          proposal.id,
+          { products: updatedProducts },
+          userData.uid || "current_user",
+          userData.displayName || "Current User",
+        )
+
+        setProposal((prev) => (prev ? { ...prev, products: updatedProducts } : null))
+      }
+
+      setIsEditingPrice(false)
+      setCurrentEditingPage(null)
+
+      toast({
+        title: "Success",
+        description: "Price updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating price:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update price",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingPrice(false)
+    }
+  }
+
+  const handleCancelPriceEdit = () => {
+    setIsEditingPrice(false)
+    setCurrentEditingPage(null)
+    const currentPageContent = getPageContent(currentEditingPage || 1)
+    const currentPagePrice = getPagePrice(currentPageContent)
+    setEditablePrice(currentPagePrice.toString())
+  }
+
+  const handleEdit = () => {
+    setIsEditingPrice(true)
+    // Don't set currentEditingPage here - let individual pages handle their own editing
+  }
+
+  const handleDownload = async () => {
+    if (!proposal) {
+      toast({
+        title: "Error",
+        description: "No proposal data available",
+        variant: "destructive",
+      })
+      return
+    }
+
+    toast({
+      title: "Download",
+      description: "Generating PDF...",
+    })
+
     try {
       const response = await fetch("/api/proposals/generate-pdf", {
         method: "POST",
@@ -119,543 +645,908 @@ export default function PublicProposalViewPage() {
         throw new Error("Failed to generate PDF")
       }
 
-      // Get the PDF as a blob
-      const pdfBlob = await response.blob()
-
-      // Create a temporary download link
-      const url = window.URL.createObjectURL(pdfBlob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = "proposal.pdf"
-
-      // Trigger the download
-      document.body.appendChild(link)
-      link.click()
-
-      // Clean up
-      document.body.removeChild(link)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+      document.body.appendChild(a)
+      a.click()
       window.URL.revokeObjectURL(url)
-
-      // Log PDF generation activity (only for client-side downloads)
-      try {
-        await logProposalPDFGenerated(
-          proposal.id,
-          "public_viewer",
-          `${proposal.client.contactPerson} (${proposal.client.company})`,
-        )
-      } catch (error) {
-        console.error("Error logging PDF generation:", error)
-        // Don't block the UI if logging fails
-      }
+      document.body.removeChild(a)
 
       toast({
-        title: "PDF Downloaded",
-        description: "The proposal PDF has been generated and downloaded successfully.",
+        title: "Success",
+        description: "PDF downloaded successfully",
       })
     } catch (error) {
-      console.error("Error generating PDF:", error)
+      console.error("Error downloading PDF:", error)
       toast({
-        title: "Download Failed",
-        description: "Failed to generate PDF. Please try again.",
+        title: "Error",
+        description: "Failed to download PDF. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsGeneratingPDF(false)
     }
   }
 
-  const handleContactSales = () => {
-    const subject = encodeURIComponent(`Inquiry about Proposal: ${proposal?.title || "Proposal"}`)
-    const body = encodeURIComponent(`Hello,
+  const handleTemplateSelect = async (template: any) => {
+    if (!proposal || !userData) return
 
-I would like to discuss the proposal "${proposal?.title || "Proposal"}" for ${proposal?.client.company || "our company"}.
+    const newBackground = template.background_url || ""
+    setSelectedTemplateBackground(newBackground)
+    setShowTemplatesPanel(false)
 
-Please contact me at your earliest convenience.
+    // Save the background template immediately to Firestore
+    try {
+      await updateProposal(
+        proposal.id,
+        { templateBackground: newBackground },
+        userData.uid,
+        userData.displayName || "User",
+      )
 
-Best regards,
-${proposal?.client.contactPerson || "Client"}`)
-
-    window.location.href = `mailto:sales@oohoperator.com?subject=${subject}&body=${body}`
+      toast({
+        title: "Template Selected",
+        description: `Selected template: ${template.name}`,
+      })
+    } catch (error) {
+      console.error("[v0] Error saving background template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save background template",
+      })
+    }
   }
 
-  const handleImageClick = (media: { url: string; isVideo: boolean }) => {
-    setLightboxImage(media)
+  const handleRemoveBackground = async () => {
+    if (!proposal || !userData) return
+
+    setSelectedTemplateBackground("")
+    setShowTemplatesPanel(false)
+
+    // Remove the background template from Firestore
+    try {
+      await updateProposal(proposal.id, { templateBackground: "" }, userData.uid, userData.displayName || "User")
+
+      toast({
+        title: "Background Removed",
+        description: "Background template has been removed",
+      })
+    } catch (error) {
+      console.error("[v0] Error removing background template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove background template",
+      })
+    }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "draft":
-        return "bg-gray-500"
-      case "sent":
-        return "bg-blue-500"
-      case "viewed":
-        return "bg-yellow-500"
-      case "accepted":
-        return "bg-green-500"
-      case "declined":
-        return "bg-red-500"
+  // Helper functions to calculate container styles based on template settings
+  const getContainerDimensions = () => {
+    const baseStyles = "bg-white shadow-lg border-transparent relative"
+
+    // Size-based dimensions
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        sizeStyles = "w-[210mm] min-h-[297mm]" // A4 dimensions
+        break
+      case "Letter size":
+        sizeStyles = "w-[8.5in] min-h-[11in]" // US Letter dimensions
+        break
+      case "Legal size":
+        sizeStyles = "w-[8.5in] min-h-[14in]" // US Legal dimensions
+        break
       default:
-        return "bg-gray-500"
+        sizeStyles = "w-full max-w-4xl min-h-[600px]"
     }
-  }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return <CheckCircle className="h-4 w-4" />
-      case "declined":
-        return <XCircle className="h-4 w-4" />
-      case "viewed":
-        return <Eye className="h-4 w-4" />
+    let orientationStyles = ""
+    switch (selectedOrientation) {
+      case "Square":
+        // Make container square-shaped but allow content to flow naturally
+        orientationStyles = "max-w-[600px] min-h-[600px]"
+        break
+      case "Landscape":
+        // Make container wider than tall
+        orientationStyles = "max-w-[800px] min-h-[500px]"
+        break
+      case "Portrait":
+        // Make container taller than wide (default behavior)
+        orientationStyles = "max-w-[600px] min-h-[800px]"
+        break
       default:
-        return null
+        orientationStyles = ""
+    }
+
+    return `${baseStyles} ${sizeStyles} ${orientationStyles}`
+  }
+
+  const getSitesPerPage = () => Number.parseInt(selectedLayout)
+
+  const getTotalPages = () => {
+    const numberOfSites = proposal?.products?.length || 1
+    const sitesPerPage = getSitesPerPage()
+    return Math.ceil(numberOfSites / sitesPerPage)
+  }
+
+  const getPageContent = (pageNumber: number) => {
+    if (!proposal?.products) return []
+
+    const sitesPerPage = getSitesPerPage()
+    const startIndex = (pageNumber - 1) * sitesPerPage
+    const endIndex = startIndex + sitesPerPage
+
+    return proposal.products.slice(startIndex, endIndex)
+  }
+
+  const getLayoutGridClass = () => {
+    const sitesPerPage = getSitesPerPage()
+    switch (sitesPerPage) {
+      case 1:
+        return "grid-cols-1"
+      case 2:
+        return "grid-cols-1 lg:grid-cols-2"
+      case 4:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
+      default:
+        return "grid-cols-1"
     }
   }
 
-  // Show loading state
+  const saveTemplateSettings = async () => {
+    if (!proposal || !userData) return
+
+    try {
+      await updateProposal(
+        proposal.id,
+        {
+          templateSize: selectedSize,
+          templateOrientation: selectedOrientation,
+          templateLayout: selectedLayout,
+          templateBackground: selectedTemplateBackground,
+        },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      toast({
+        title: "Success",
+        description: "Template settings saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving template settings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save template settings",
+      })
+    }
+  }
+
+  const getPageTitle = (pageContent: any[]): string => {
+    if (!pageContent || pageContent.length === 0) {
+      return "Company Name"
+    }
+
+    const siteCodes = pageContent.map((product) => product.site_code).filter(Boolean)
+
+    if (siteCodes.length === 0) {
+      return "Company Name"
+    }
+
+    if (siteCodes.length === 1) {
+      return siteCodes[0]
+    }
+
+    if (siteCodes.length === 2) {
+      return `${siteCodes[0]} & ${siteCodes[1]}`
+    }
+
+    return `${siteCodes[0]} & ${siteCodes.length - 1} more sites`
+  }
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(prev + 0.1, 2)) // Max zoom 200%
+  }
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3)) // Min zoom 30%
+  }
+
+  const handleResetZoom = () => {
+    setZoomLevel(1)
+  }
+
+  // Added handler functions for Save as Draft and Send
+  const handleUpdatePublicStatus = async (status: string) => {
+    if (!proposal || !userData) return
+
+    try {
+      await updateProposal(
+        proposal.id,
+        { status: status as Proposal["status"] },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      setProposal((prev) => (prev ? { ...prev, status: status as Proposal["status"] } : null))
+
+      toast({
+        title: "Success",
+        description: `Proposal ${status === "draft" ? "saved as draft" : "status updated"}`,
+      })
+    } catch (error) {
+      console.error("Error updating proposal status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update proposal status",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-gray-600">Loading proposal...</p>
         </div>
       </div>
     )
   }
 
-  // Show error state
-  if (error) {
+  if (!proposal) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
-          <div className="mb-6">
-            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={80} height={80} className="mx-auto mb-4" />
-            <div className="flex items-center justify-center mb-4">
-              <AlertCircle className="h-8 w-8 text-red-500 mr-2" />
-              <h1 className="text-2xl font-bold text-gray-900">Error Loading Proposal</h1>
-            </div>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <div className="mt-4">
-              <Button onClick={() => window.location.reload()} variant="outline" className="text-sm">
-                Try Again
-              </Button>
-            </div>
+          <div className="w-16 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <FileText className="h-8 w-8 text-gray-400" />
           </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Proposal Not Found</h1>
+          <p className="text-gray-600 mb-6">The proposal you're looking for doesn't exist or may have been removed.</p>
+          <Button onClick={() => router.push("/sales/proposals")} className="bg-blue-600 hover:bg-blue-700">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Proposals
+          </Button>
         </div>
       </div>
     )
   }
 
-  // Show proposal not found if no proposal after loading
-  if (!proposal) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="mb-6">
-            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={80} height={80} className="mx-auto mb-4" />
-            <div className="flex items-center justify-center mb-4">
-              <AlertCircle className="h-8 w-8 text-red-500 mr-2" />
-              <h1 className="text-2xl font-bold text-gray-900">Proposal Not Found</h1>
-            </div>
-            <p className="text-gray-600 mb-4">The proposal you're looking for doesn't exist or has been removed.</p>
-            <div className="mt-4">
-              <Button onClick={() => window.location.reload()} variant="outline" className="text-sm">
-                Try Again
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  const getPageContainerClass = () => {
+    const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
+
+    // Size-based dimensions with orientation support
+    let sizeStyles = ""
+    switch (selectedSize) {
+      case "A4":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
+        } else {
+          sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
+        }
+        break
+      case "Letter size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
+        }
+        break
+      case "Legal size":
+        if (selectedOrientation === "Landscape") {
+          sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
+        } else {
+          sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
+        }
+        break
+      default:
+        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+    }
+
+    // Square orientation for any paper size
+    if (selectedOrientation === "Square") {
+      switch (selectedSize) {
+        case "A4":
+          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
+          break
+        case "Letter size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
+          break
+        case "Legal size":
+          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
+          break
+      }
+    }
+
+    return `${baseStyles} ${sizeStyles}`
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-1 hover:bg-gray-100">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-gray-900">View Proposal {proposal.id.slice(0, 8).toUpperCase()}</h1>
+    <div className="min-h-screen bg-gray-50/50 flex flex-col">
+      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
+        <span className="text-black font-medium">Finalize Proposal</span>
+        <span className="text-black italic ml-2">{proposal?.proposalNumber || params.id}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomOut}
+              className="h-7 w-7 p-0 hover:bg-gray-200"
+              disabled={zoomLevel <= 0.3}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetZoom}
+              className="h-7 px-2 text-xs font-medium hover:bg-gray-200 min-w-[50px]"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomIn}
+              className="h-7 w-7 p-0 hover:bg-gray-200"
+              disabled={zoomLevel >= 2}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
+          <div className="flex items-center">
+            <Button
+              onClick={handleDownload}
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-gray-200"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
       </div>
 
-      <div className="flex h-[calc(100vh-60px)]">
-        {/* Main Content Area with Limited Action Buttons */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="flex gap-6">
-            <div className="flex flex-col space-y-4 pt-8">
-              <div
-                className="flex flex-col items-center space-y-2 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors w-16"
-                onClick={handleDownloadPDF}
-              >
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <FileDown className="h-6 w-6 text-gray-600" />
-                </div>
-                <span className="text-xs text-gray-600 font-medium text-center">
-                  {isGeneratingPDF ? "Loading..." : "Download"}
-                </span>
-              </div>
-            </div>
-
-            {/* Proposal Content */}
-            <div className="flex-1">
-              <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
-                {/* Document Header */}
-                <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
-                    <div>
-                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">PROPOSAL</h1>
-                      <p className="text-sm text-gray-500">{proposal.title}</p>
-                    </div>
-                    <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                      <Badge className={`${getStatusColor(proposal.status)} text-white border-0`}>
-                        {getStatusIcon(proposal.status)}
-                        <span className="ml-1 capitalize">{proposal.status}</span>
-                      </Badge>
-                      <Image src="/oh-plus-logo.png" alt="Company Logo" width={40} height={40} />
-                    </div>
-                  </div>
+      {/* Main content area */}
+      <div className="flex-1 flex">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+          {showTemplatesPanel && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h2 className="text-lg font-semibold text-gray-900">Choose a Template</h2>
+                  <Button variant="ghost" size="sm" onClick={() => setShowTemplatesPanel(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                {/* Document Content */}
-                <div className="p-6 sm:p-8">
-                  {/* Proposal Information */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Proposal Information
-                    </h2>
+                <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
+                  {showCreateForm ? (
+                    <form onSubmit={handleFormSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="template-name">Template Name</Label>
+                        <Input
+                          id="template-name"
+                          type="text"
+                          placeholder="Enter template name"
+                          value={formData.name}
+                          onChange={(e) => handleInputChange("name", e.target.value)}
+                          required
+                        />
+                      </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
-                        <p className="text-base font-medium text-gray-900">{proposal.title}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                        <p className="text-base text-gray-900">{proposal.createdAt.toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
-                        <p className="text-base text-gray-900">{proposal.validUntil.toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Total Investment</h3>
-                        <p className="text-base font-semibold text-green-600">
-                          ₱{proposal.totalAmount.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Client Information */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Client Information
-                    </h2>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Company</h3>
-                        <p className="text-base font-medium text-gray-900">{proposal.client.company}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Person</h3>
-                        <p className="text-base text-gray-900">{proposal.client.contactPerson}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Email</h3>
-                        <p className="text-base text-gray-900">{proposal.client.email}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Phone</h3>
-                        <p className="text-base text-gray-900">{proposal.client.phone}</p>
-                      </div>
-                      {proposal.client.industry && (
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">Industry</h3>
-                          <p className="text-base text-gray-900">{proposal.client.industry}</p>
-                        </div>
-                      )}
-                      {proposal.client.targetAudience && (
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">Target Audience</h3>
-                          <p className="text-base text-gray-900">{proposal.client.targetAudience}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {proposal.client.address && (
-                      <div className="mt-4">
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Address</h3>
-                        <p className="text-base text-gray-900">{proposal.client.address}</p>
-                      </div>
-                    )}
-
-                    {proposal.client.campaignObjective && (
-                      <div className="mt-4">
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign Objective</h3>
-                        <p className="text-base text-gray-900">{proposal.client.campaignObjective}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Products & Services */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Products & Services
-                    </h2>
-
-                    <div className="border border-gray-300 rounded-sm overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                              Product
-                            </th>
-                            <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                              Type
-                            </th>
-                            <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
-                              Location
-                            </th>
-                            <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
-                              Price
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {proposal.products.map((product, index) => (
-                            <tr key={product.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                              <td className="py-3 px-4 border-b border-gray-200">
-                                <div className="font-medium text-gray-900">{product.name}</div>
-                                {product.site_code && (
-                                  <div className="text-xs text-gray-500">Site: {product.site_code}</div>
-                                )}
-                              </td>
-                              <td className="py-3 px-4 border-b border-gray-200">
-                                <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                                  {product.type}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 border-b border-gray-200">{product.location}</td>
-                              <td className="py-3 px-4 text-right border-b border-gray-200">
-                                <div className="font-medium text-gray-900">₱{product.price.toLocaleString()}</div>
-                                <div className="text-xs text-gray-500">per day</div>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-gray-50">
-                            <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                              Total Investment:
-                            </td>
-                            <td className="py-3 px-4 text-right font-bold text-green-600">
-                              ₱{proposal.totalAmount.toLocaleString()}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Product Details */}
-                    <div className="mt-8 space-y-8">
-                      {proposal.products.map((product) => (
-                        <div key={product.id} className="border border-gray-200 rounded-sm p-4">
-                          <h3 className="text-lg font-medium text-gray-900 mb-3">{product.name} Details</h3>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                            {product.specs_rental?.traffic_count && (
-                              <div>
-                                <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
-                                <p className="text-sm text-gray-900">
-                                  {product.specs_rental.traffic_count.toLocaleString()}/day
-                                </p>
+                      <div className="space-y-2">
+                        <Label>Background Image (Optional)</Label>
+                        {!selectedFile ? (
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              id="background-upload"
+                              disabled={uploading}
+                            />
+                            <label htmlFor="background-upload" className="cursor-pointer">
+                              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                            </label>
+                          </div>
+                        ) : (
+                          <div className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <ImageIcon className="h-8 w-8 text-blue-500" />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
                               </div>
-                            )}
-
-                            {product.specs_rental?.height && product.specs_rental?.width && (
-                              <div>
-                                <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
-                                <p className="text-sm text-gray-900">
-                                  {product.specs_rental.height}m × {product.specs_rental.width}m
-                                </p>
-                              </div>
-                            )}
-
-                            {product.specs_rental?.audience_type && (
-                              <div>
-                                <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
-                                <p className="text-sm text-gray-900">{product.specs_rental.audience_type}</p>
-                              </div>
-                            )}
-
-                            {product.health_percentage && (
-                              <div>
-                                <h4 className="text-xs font-medium text-gray-500 uppercase">Health Status</h4>
-                                <p className="text-sm text-gray-900">{product.health_percentage}%</p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleRemoveFile}
+                                className="text-gray-400 hover:text-gray-600"
+                                disabled={uploading}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {filePreview && (
+                              <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                                <img
+                                  src={filePreview || "/placeholder.svg"}
+                                  alt="Background preview"
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
                             )}
                           </div>
+                        )}
+                      </div>
 
-                          {product.description && (
-                            <div className="mb-4">
-                              <h4 className="text-xs font-medium text-gray-500 uppercase mb-1">Description</h4>
-                              <p className="text-sm text-gray-700 leading-relaxed">{product.description}</p>
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleBackToList}
+                          disabled={formLoading || uploading}
+                        >
+                          Back to Templates
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="bg-blue-600 hover:bg-blue-700"
+                          disabled={formLoading || uploading}
+                        >
+                          {formLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              {uploading ? "Uploading..." : "Creating..."}
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Template
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : showBackgroundTemplates ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-6">
+                        <p className="text-gray-600">Choose a background template</p>
+                        <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Template
+                        </Button>
+                      </div>
+
+                      {templatesLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                          <span className="ml-2 text-gray-600">Loading templates...</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div
+                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group border-red-200 hover:border-red-300"
+                            onClick={handleRemoveBackground}
+                          >
+                            <div className="aspect-video bg-red-50 rounded-md flex items-center justify-center mb-3 group-hover:bg-red-100 transition-colors">
+                              <X className="h-12 w-12 text-red-400" />
+                            </div>
+                            <h3 className="font-medium text-red-600 truncate">Remove Background</h3>
+                            <p className="text-xs text-red-500 mt-1">Clear current background template</p>
+                          </div>
+
+                          {templates.length > 0 ? (
+                            templates.map((template) => (
+                              <div
+                                key={template.id}
+                                className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                                onClick={() => handleTemplateSelect(template)}
+                              >
+                                {template.background_url ? (
+                                  <div className="aspect-video bg-gray-100 rounded-md overflow-hidden mb-3">
+                                    <img
+                                      src={template.background_url || "/placeholder.svg"}
+                                      alt={template.name}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3">
+                                    <ImageIcon className="h-12 w-12 text-gray-400" />
+                                  </div>
+                                )}
+                                <h3 className="font-medium text-gray-900 truncate">{template.name}</h3>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Created {new Date(template.created.seconds * 1000).toLocaleDateString()}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="col-span-full text-center py-8">
+                              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <Grid3X3 className="h-8 w-8 text-gray-400" />
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
+                              <p className="text-gray-600 mb-4">Create your first proposal template to get started</p>
+                              <Button onClick={handleCreateTemplate} className="bg-blue-600 hover:bg-blue-700">
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Your First Template
+                              </Button>
                             </div>
                           )}
+                        </div>
+                      )}
 
-                          {product.media && product.media.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Media</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {product.media.map((media, mediaIndex) => (
-                                  <div
-                                    key={mediaIndex}
-                                    className="relative aspect-video bg-gray-100 rounded border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
-                                    onClick={() => handleImageClick(media)}
-                                  >
-                                    {media.isVideo ? (
-                                      <video src={media.url} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <img
-                                        src={media.url || "/placeholder.svg"}
-                                        alt="Product media"
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                      />
-                                    )}
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-2">
-                                        <svg
-                                          className="w-6 h-6 text-gray-700"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-                                          />
-                                        </svg>
-                                      </div>
-                                    </div>
+                      <div className="flex gap-3 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={handleBackToTemplateOptions}>
+                          Back to Options
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Size:</Label>
+                        <div className="flex gap-2">
+                          {["A4", "Letter size", "Legal size"].map((size) => (
+                            <Button
+                              key={size}
+                              variant={selectedSize === size ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedSize(size)}
+                              className={selectedSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
+                            >
+                              {size}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Orientation:</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { name: "Square", aspect: "aspect-square" },
+                            { name: "Landscape", aspect: "aspect-video" },
+                            { name: "Portrait", aspect: "aspect-[3/4]" },
+                          ].map((orientation) => (
+                            <div
+                              key={orientation.name}
+                              className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
+                                selectedOrientation === orientation.name
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200 hover:border-gray-300"
+                              }`}
+                              onClick={() => setSelectedOrientation(orientation.name)}
+                            >
+                              <div className={`${orientation.aspect} bg-gray-100 rounded mb-2 mx-auto max-w-16`}></div>
+                              <span className="text-xs font-medium text-gray-700">{orientation.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-gray-900 mb-3 block">Layout:</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            {
+                              name: "1 per page",
+                              value: "1",
+                              layout: "grid-cols-1",
+                              description: "Single site per page",
+                            },
+                            {
+                              name: "2 per page",
+                              value: "2",
+                              layout: "grid-cols-2",
+                              description: "Two sites side by side",
+                            },
+                            {
+                              name: "4 per page",
+                              value: "4",
+                              layout: "grid-cols-2",
+                              description: "Four sites in grid layout",
+                            },
+                          ].map((layout) => (
+                            <div
+                              key={layout.value}
+                              className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
+                                selectedLayout === layout.value
+                                  ? "border-blue-500 bg-blue-50 shadow-md scale-105"
+                                  : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                              }`}
+                              onClick={() => {
+                                setSelectedLayout(layout.value)
+                                toast({
+                                  title: "Layout Updated",
+                                  description: `Switched to ${layout.name} layout`,
+                                })
+                              }}
+                            >
+                              <div className="aspect-[3/4] bg-gray-50 rounded mb-2 mx-auto max-w-16 p-1">
+                                <div className={`grid ${layout.layout} gap-0.5 h-full`}>
+                                  {Array.from({ length: Number.parseInt(layout.value) }).map((_, i) => (
+                                    <div key={i} className="bg-gray-200 rounded-sm"></div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-xs font-medium text-gray-700 block">{layout.name}</span>
+                                <span className="text-xs text-gray-500 block">{layout.description}</span>
+                              </div>
+                              {selectedLayout === layout.value && (
+                                <div className="absolute top-2 right-2">
+                                  <Check className="h-4 w-4 text-blue-500" />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={handleShowBackgroundTemplates}
+                          className="w-full mb-3 bg-transparent"
+                        >
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          Choose Background Template (Optional)
+                        </Button>
+                        {selectedTemplateBackground && (
+                          <div className="text-xs text-gray-600 text-center">Background template selected</div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end pt-4 border-t">
+                        <Button
+                          onClick={handleApplyTemplate}
+                          className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          <div
+            className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
+          >
+            {Array.from({ length: getTotalPages() }, (_, index) => {
+              const pageNumber = index + 1
+              const pageContent = getPageContent(pageNumber)
+
+              return (
+                <div
+                  key={pageNumber}
+                  ref={(el) => {
+                    pageRefs.current[index] = el
+                  }}
+                  className={getPageContainerClass()}
+                >
+                  {selectedTemplateBackground && (
+                    <div
+                      className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
+                      style={{ backgroundImage: `url(${selectedTemplateBackground})` }}
+                    />
+                  )}
+
+                  {/* Content */}
+                  <div className="relative z-10 p-4 md:p-6 bg-transparent">
+                    <div className="flex justify-between items-start mb-4 md:mb-6">
+                      <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
+                      <div className="text-right">
+                        <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
+                          {getPageTitle(pageContent)}
+                        </h1>
+
+                        {isEditingPrice ? (
+                          <div className="flex items-center gap-2 justify-end">
+                            <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                              <span className="text-gray-600 mr-1">₱</span>
+                              <Input
+                                type="number"
+                                value={
+                                  currentEditingPage === pageNumber
+                                    ? editablePrice
+                                    : getPagePrice(pageContent).toString()
+                                }
+                                onChange={(e) => {
+                                  if (currentEditingPage !== pageNumber) {
+                                    setCurrentEditingPage(pageNumber)
+                                    setEditablePrice(e.target.value)
+                                  } else {
+                                    setEditablePrice(e.target.value)
+                                  }
+                                }}
+                                onFocus={() => {
+                                  setCurrentEditingPage(pageNumber)
+                                  setEditablePrice(getPagePrice(pageContent).toString())
+                                }}
+                                className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                                min="0"
+                                step="0.01"
+                                disabled={savingPrice}
+                              />
+                            </div>
+                            {isEditingPrice && currentEditingPage && (
+                              <div className="flex items-center gap-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsEditingPrice(false)
+                                    setCurrentEditingPage(null)
+                                    setEditablePrice("")
+                                  }}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
+                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Product content grid */}
+                    <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
+                      {pageContent.map((product, productIndex) => (
+                        <div key={product.id} className="space-y-4 transition-all duration-300">
+                          {/* Rest of product content */}
+                          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                            <div className="flex-shrink-0">
+                              <div
+                                className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
+                                  getSitesPerPage() === 1
+                                    ? "w-48 h-60 md:w-64 md:h-80"
+                                    : getSitesPerPage() === 2
+                                      ? "w-40 h-48 md:w-48 md:h-60"
+                                      : "w-32 h-40 md:w-36 md:h-44"
+                                }`}
+                              >
+                                {product.media && product.media.length > 0 ? (
+                                  <img
+                                    src={product.media[0].url || "/placeholder.svg"}
+                                    alt={product.name || "Product image"}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <ImageIcon
+                                      className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                    />
                                   </div>
-                                ))}
+                                )}
                               </div>
                             </div>
-                          )}
+
+                            <div className="flex-1 min-w-0">
+                              <h3
+                                className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
+                              >
+                                Location Map:
+                              </h3>
+
+                              {product.specs_rental?.location ? (
+                                <GoogleMap
+                                  location={product.specs_rental.location}
+                                  className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                />
+                              ) : (
+                                <div
+                                  className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                >
+                                  <p className="text-gray-500 text-xs">Location not specified</p>
+                                </div>
+                              )}
+
+                              <div
+                                className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
+                              >
+                                {product.specs_rental?.location && (
+                                  <p>
+                                    <span className="font-semibold">Location:</span> {product.specs_rental.location}
+                                  </p>
+                                )}
+                                {product.specs_rental?.traffic_count && (
+                                  <p>
+                                    <span className="font-semibold">Traffic Count:</span>{" "}
+                                    {product.specs_rental.traffic_count.toLocaleString()} vehicles
+                                  </p>
+                                )}
+                                {product.specs_rental?.elevation !== undefined && (
+                                  <p>
+                                    <span className="font-semibold">Visibility:</span> {product.specs_rental.elevation}{" "}
+                                    meters
+                                  </p>
+                                )}
+                                {product.specs_rental?.height && product.specs_rental?.width && (
+                                  <p>
+                                    <span className="font-semibold">Dimension:</span> {product.specs_rental.height}ft x{" "}
+                                    {product.specs_rental.width}ft
+                                  </p>
+                                )}
+                                <p>
+                                  <span className="font-semibold">Type:</span> {product.type || "Advertising Space"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Additional Information */}
-                  {(proposal.notes || proposal.customMessage) && (
-                    <div className="mb-8">
-                      <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                        Additional Information
-                      </h2>
-
-                      {proposal.customMessage && (
-                        <div className="mb-4">
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">Custom Message</h3>
-                          <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
-                            <p className="text-sm text-gray-700 leading-relaxed">{proposal.customMessage}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {proposal.notes && (
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">Internal Notes</h3>
-                          <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                            <p className="text-sm text-gray-700 leading-relaxed">{proposal.notes}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Contact Information */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                      Contact Information
-                    </h2>
-
-                    <div className="bg-gray-50 border border-gray-200 rounded-sm p-6">
-                      <p className="text-sm text-gray-600 mb-4">
-                        Have questions about this proposal? We'd love to discuss it with you.
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-3">
-                          <Mail className="h-5 w-5 text-blue-600" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Email</p>
-                            <p className="text-sm text-blue-600">sales@oohoperator.com</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <Phone className="h-5 w-5 text-blue-600" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Phone</p>
-                            <p className="text-sm text-blue-600">+63 123 456 7890</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-3">
-                          This is a read-only view of the proposal. For any changes or to accept this proposal, please
-                          contact our sales team.
-                        </p>
-                        <Button variant="outline" className="w-full bg-transparent" onClick={handleContactSales}>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Contact Sales Team
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Document Footer */}
-                  <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-                    <p>This proposal is valid until {proposal.validUntil.toLocaleDateString()}</p>
-                    <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
-                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
         </div>
+
       </div>
 
-      {/* Image Lightbox */}
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
-          onClick={() => setLightboxImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setLightboxImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            {lightboxImage.isVideo ? (
-              <video src={lightboxImage.url} className="max-w-full max-h-full rounded-lg" controls autoPlay />
-            ) : (
-              <img
-                src={lightboxImage.url || "/placeholder.svg"}
-                alt="Expanded view"
-                className="max-w-full max-h-full rounded-lg"
-              />
-            )}
-          </div>
+      {/* Bottom Action Buttons */}
+      {!loading && proposal && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
+          {isEditingPrice ? (
+            <>
+              <Button
+                onClick={() => setIsEditingPrice(false)}
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePrice}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+                disabled={savingPrice}
+              >
+                {savingPrice ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
+            </>
+          ) : (
+            <>
+            </>
+          )}
         </div>
       )}
+
+      {/* Send Options Dialog */}
+      <SendProposalShareDialog
+        isOpen={isSendOptionsDialogOpen}
+        onClose={() => setIsSendOptionsDialogOpen(false)}
+        proposal={proposal}
+      />
     </div>
   )
 }
+

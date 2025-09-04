@@ -173,12 +173,14 @@ function SalesDashboardContent() {
       toast({
         title: "Sites and Client Copied",
         description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and client ${client.company || client.contactPerson} selected.`,
+        open: true,
       })
     } else {
       // Show success message for sites only
       toast({
         title: "Sites Copied",
         description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
+        open: true,
       })
     }
   }
@@ -638,7 +640,7 @@ function SalesDashboardContent() {
         type: product.type || "rental",
         price: product.price || 0,
         location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
-        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || "",
+        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || undefined, // Ensure site_code is present
         media: product.media || [],
         specs_rental: product.specs_rental || null,
         light: (product as any).light || null,
@@ -821,7 +823,7 @@ function SalesDashboardContent() {
       setIsCreatingDocument(true)
       try {
         const sitesData = selectedSites.map((site) => ({
-          id: site.id,
+          id: site.id!, // Ensure id is a string
           name: site.name,
           location: site.specs_rental?.location || (site as any).light?.location || "N/A",
           price: site.price || 0,
@@ -894,7 +896,7 @@ function SalesDashboardContent() {
     setIsCreatingCostEstimate(true)
     try {
       const sitesData = selectedSites.map((site) => ({
-        id: site.id || "",
+        id: site.id!, // Ensure id is a string
         name: site.name,
         location: site.specs_rental?.location || (site as any).light?.location || "N/A",
         price: site.price || 0,
@@ -997,7 +999,7 @@ function SalesDashboardContent() {
         }
 
         const sitesData = selectedSites.map((site) => ({
-          id: site.id,
+          id: site.id!, // Ensure id is a string
           name: site.name,
           location: site.specs_rental?.location || (site as any).light?.location || "N/A",
           price: site.price || 0,
@@ -1372,8 +1374,6 @@ function SalesDashboardContent() {
                           mobileColumns={1}
                           tabletColumns={2}
                           desktopColumns={5}
-                          xlColumns={6} // Keep this if it's a valid prop for ResponsiveCardGrid
-                          xxlColumns={7} // Keep this if it's a valid prop for ResponsiveCardGrid
                           gap="sm"
                         >
                           {searchResults.map((result) => (
@@ -1534,8 +1534,6 @@ function SalesDashboardContent() {
                         mobileColumns={1}
                         tabletColumns={2}
                         desktopColumns={5}
-                        xlColumns={6} // Keep this if it's a valid prop for ResponsiveCardGrid
-                        xxlColumns={7} // Keep this if it's a valid prop for ResponsiveCardGrid
                         gap="sm"
                       >
                         {products.map((product) => (
@@ -2102,13 +2100,16 @@ function ProductCard({
 
           {/* Price - More prominent */}
           <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
-          <Button
-            variant="outline"
-            className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+          {/* Hide Create Report button when in selectionMode */}
+          {!selectionMode && (
+            <Button
+              variant="outline"
+              className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
