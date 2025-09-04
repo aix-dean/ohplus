@@ -1549,4 +1549,3 @@ export default function ProposalDetailsPage() {
     </div>
   )
 }
-
