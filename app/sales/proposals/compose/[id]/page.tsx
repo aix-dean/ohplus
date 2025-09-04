@@ -424,6 +424,8 @@ OH PLUS
     const template = templates.find((t) => t.id === templateId)
     if (!template) return
 
+    console.log(`handleTemplateAction called with templateId: ${templateId}, action: ${action}`); // Debug log
+
     switch (action) {
       case "copy":
         setEmailData((prev) => ({
@@ -727,17 +729,14 @@ OH PLUS
                   <div className="space-y-2">
                     {templates.map((template) => (
                       <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <span className="text-sm text-gray-700">{template.name}</span>
+                        <span
+                          className="text-sm text-gray-700 cursor-pointer"
+                          onClick={() => handleTemplateAction(template.id!, "copy")}
+                          title="Apply template"
+                        >
+                          {template.name}
+                        </span>
                         <div className="flex items-center space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleTemplateAction(template.id!, "copy")}
-                            className="h-6 w-6 p-0"
-                            title="Apply template"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
