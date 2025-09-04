@@ -148,15 +148,39 @@ function SalesDashboardContent() {
     setCreateReportDialogOpen(true)
   }
 
-  const handleCopySitesFromProposal = (sites: Product[]) => {
-    // Just add the copied sites to the selected products for proposal creation
+  const handleCopySitesFromProposal = (sites: Product[], client?: any) => {
+    // Add the copied sites to the selected products for proposal creation
     setSelectedProducts(sites)
 
-    // Show success message
-    toast({
-      title: "Sites Copied",
-      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
-    })
+    // If no client is currently selected and we have client info from the proposal, select it
+    if (!selectedClientForProposal && client) {
+      setSelectedClientForProposal({
+        id: client.id || "",
+        company: client.company || "",
+        contactPerson: client.contactPerson || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.address || "",
+        industry: client.industry || "",
+        designation: client.designation || "",
+        targetAudience: client.targetAudience || "",
+        campaignObjective: client.campaignObjective || "",
+      })
+
+      // Update the search term to show the selected client
+      setDashboardClientSearchTerm(client.company || client.contactPerson || "")
+
+      toast({
+        title: "Sites and Client Copied",
+        description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and client ${client.company || client.contactPerson} selected.`,
+      })
+    } else {
+      // Show success message for sites only
+      toast({
+        title: "Sites Copied",
+        description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
+      })
+    }
   }
 
   // On mobile, default to grid view

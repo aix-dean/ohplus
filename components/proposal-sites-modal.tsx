@@ -17,7 +17,7 @@ interface ProposalSitesModalProps {
   proposal: Proposal | null
   isOpen: boolean
   onClose: () => void
-  onCopySites?: (sites: Product[]) => void
+  onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
 }
 
@@ -78,7 +78,7 @@ export function ProposalSitesModal({
         active: true,
       }))
 
-      onCopySites(dashboardProducts)
+      onCopySites(dashboardProducts, proposal.client)
       handleClose()
       return
     }
