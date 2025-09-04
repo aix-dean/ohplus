@@ -260,6 +260,9 @@ export default function SiteDetailsPage({ params }: Props) {
                 23
               </div>
               {/* Map overlay */}
+              <div className="absolute inset-0 bg-black/20 rounded-md flex items-center justify-center">
+                <MapPin className="h-8 w-8 text-red-500" />
+              </div>
             </div>
 
             {/* Site Details */}
@@ -817,7 +820,7 @@ export default function SiteDetailsPage({ params }: Props) {
         open={illuminationIndexCardDialogOpen}
         onOpenChange={setIlluminationIndexCardDialogOpen}
         product={product}
-        onCreateJO={() => {
+        onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
@@ -825,7 +828,7 @@ export default function SiteDetailsPage({ params }: Props) {
       <DisplayIndexCardDialog
         open={displayIndexCardDialogOpen}
         onOpenChange={setDisplayIndexCardDialogOpen}
-        onCreateJO={() => {
+        onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}

@@ -65,7 +65,14 @@ export interface Product {
   }
   type?: string
   status?: string
-  position?: number
+  health_percentage?: number
+  location?: string
+  address?: string
+  site_code?: string
+  light?: {
+    illumination_status?: string
+    location?: string
+  }
 }
 
 // ServiceAssignment interface
