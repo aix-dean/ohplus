@@ -69,7 +69,7 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
 
   return (
     <>
-      <Card className="w-full h-[500px] flex flex-col">
+      <Card className="w-full min-h-[85vh] max-h-[120vh] flex flex-col">
         <CardHeader>
           <CardTitle>
             Proposal History

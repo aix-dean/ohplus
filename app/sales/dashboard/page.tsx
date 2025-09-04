@@ -1743,12 +1743,16 @@ function SalesDashboardContent() {
               )}
             </div>
 
-            {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
-            {proposalCreationMode && (
-              <div className="flex flex-col gap-4 pt-4 md:pt-6">
-                <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />
-              </div>
-            )}
+{/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
+{proposalCreationMode && (
+  <div className="flex flex-col gap-4 pt-4 md:pt-6 h-[calc(100vh-120px)]">
+    <ProposalHistory
+      selectedClient={selectedClientForProposal}
+      onCopySites={handleCopySitesFromProposal}
+    />
+  </div>
+)}
+
           </div>
         )}
 

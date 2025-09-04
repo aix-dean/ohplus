@@ -61,30 +61,35 @@ export function ProposalSitesModal({
       const dashboardProducts: Product[] = selectedProducts.map((product) => ({
         id: product.id,
         name: product.name,
-        description: product.description || "", // Added missing field
+        description: product.description || "",
         type: product.type || "rental",
         price: product.price || 0,
         media: (product.media || []).map(mediaItem => ({
           url: mediaItem.url,
-          distance: "", // Default or infer if possible
-          type: "",     // Default or infer if possible
+          distance: mediaItem.distance || "",
+          type: mediaItem.type || "",
           isVideo: mediaItem.isVideo,
         })),
-        specs_rental: {
-          location: product.location || "",
-          site_code: product.site_code || "",
-          audience_type: product.specs_rental?.audience_type || "",
-        },
-        light: product.light || {},
-        site_code: product.site_code,
-        created: new Date(), // Changed from created_at to created
-        updated: new Date(), // Changed from updated_at to updated
-        uploaded_by: "",
-        company_id: "",
-        active: true,
-        deleted: false, // Added missing field
-        seller_id: "", // Added missing field
-        seller_name: "", // Added missing field
+        specs_rental: product.specs_rental || null,
+        light: product.light || null,
+        site_code: product.site_code || "",
+        created: product.created || new Date(),
+        updated: product.updated || new Date(),
+        uploaded_by: product.uploaded_by || "",
+        company_id: product.company_id || "",
+        active: product.active !== undefined ? product.active : true,
+        deleted: product.deleted !== undefined ? product.deleted : false,
+        seller_id: product.seller_id || "",
+        seller_name: product.seller_name || "",
+        categories: product.categories || [],
+        category_names: product.category_names || [],
+        content_type: product.content_type || "",
+        cms: product.cms || null,
+        status: product.status || "",
+        health_percentage: product.health_percentage || 0,
+        location: product.location || "",
+        address: product.address || "",
+        position: product.position || 0,
       }))
 
       onCopySites(dashboardProducts, proposal.client)

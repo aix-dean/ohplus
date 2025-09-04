@@ -30,6 +30,8 @@ export type ProductLight = {
 
 export type ProductMedia = {
   url: string
+  distance?: string // Added missing field
+  type?: string     // Added missing field
   isVideo: boolean
 }
 
@@ -45,6 +47,27 @@ export type ProposalProduct = {
   light?: ProductLight | null
   description?: string
   health_percentage?: number
+  // Add all other fields from Product interface that might be needed
+  active?: boolean
+  deleted?: boolean
+  created?: any
+  updated?: any
+  seller_id?: string
+  seller_name?: string
+  company_id?: string | null
+  position?: number
+  categories?: string[]
+  category_names?: string[]
+  content_type?: string
+  cms?: {
+    start_time?: string
+    end_time?: string
+    spot_duration?: number
+    loops_per_day?: number
+    spots_per_loop?: number
+  } | null
+  status?: string
+  address?: string
 }
 
 export type Proposal = {
