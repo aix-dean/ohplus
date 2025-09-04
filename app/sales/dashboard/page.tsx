@@ -148,35 +148,40 @@ function SalesDashboardContent() {
     setCreateReportDialogOpen(true)
   }
 
-  const handleCopySitesFromProposal = (sites: Product[], client: ProposalClient) => {
-    // Add the copied sites to selectedProducts for proposal creation
-    setSelectedProducts((prev) => {
-      const newProducts = [...prev];
-      sites.forEach((site) => {
-        if (!newProducts.some((p) => p.id === site.id)) {
-          newProducts.push(site);
-        }
-      });
-      return newProducts;
-    });
+  const handleCopySitesFromProposal = (sites: Product[], client?: any) => {
+    // Add the copied sites to the selected products for proposal creation
+    setSelectedProducts(sites)
 
-    // If no client is currently selected, automatically select the client from the copied proposal
-    if (!selectedClientForProposal) {
-      setSelectedClientForProposal(client);
-      setDashboardClientSearchTerm(client.company || client.contactPerson || ""); // Display selected client in search bar
+    // If no client is currently selected and we have client info from the proposal, select it
+    if (!selectedClientForProposal && client) {
+      setSelectedClientForProposal({
+        id: client.id || "",
+        company: client.company || "",
+        contactPerson: client.contactPerson || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.address || "",
+        industry: client.industry || "",
+        designation: client.designation || "",
+        targetAudience: client.targetAudience || "",
+        campaignObjective: client.campaignObjective || "",
+      })
+
+      // Update the search term to show the selected client
+      setDashboardClientSearchTerm(client.company || client.contactPerson || "")
+
+      toast({
+        title: "Sites and Client Copied",
+        description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and client ${client.company || client.contactPerson} selected.`,
+      })
+    } else {
+      // Show success message for sites only
+      toast({
+        title: "Sites Copied",
+        description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
+      })
     }
-
-    // Keep the user in proposal creation mode
-    setProposalCreationMode(true);
-    setCeQuoteMode(false); // Ensure CE/Quote mode is off
-
-    // Show success message
-    toast({
-      title: "Sites Copied",
-      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and added to your proposal.`,
-      open: true, // Add the missing 'open' property
-    });
-  };
+  }
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -1738,7 +1743,7 @@ function SalesDashboardContent() {
               )}
             </div>
 
-            {/* Right Column: Proposal History - Conditionally rendered */}
+            {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
             {proposalCreationMode && (
               <div className="flex flex-col gap-4 pt-4 md:pt-6">
                 <ProposalHistory selectedClient={selectedClientForProposal} onCopySites={handleCopySitesFromProposal} />

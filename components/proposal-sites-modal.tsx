@@ -17,7 +17,7 @@ interface ProposalSitesModalProps {
   proposal: Proposal | null
   isOpen: boolean
   onClose: () => void
-  onCopySites?: (sites: Product[], client: ProposalClient) => void
+  onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
 }
 
