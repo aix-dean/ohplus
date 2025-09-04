@@ -7,19 +7,19 @@ import { X } from "lucide-react"
 interface IlluminationIndexCardDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateJO?: () => void
+  onCreateSA?: () => void
   product?: any
 }
 
 export function IlluminationIndexCardDialog({
   open,
   onOpenChange,
-  onCreateJO,
+  onCreateSA,
   product,
 }: IlluminationIndexCardDialogProps) {
-  const handleCreateJO = () => {
-    if (onCreateJO) {
-      onCreateJO()
+  const handleCreateSA = () => {
+    if (onCreateSA) {
+      onCreateSA()
     }
     onOpenChange(false)
   }
@@ -244,8 +244,8 @@ export function IlluminationIndexCardDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreateJO} className="bg-blue-600 hover:bg-blue-700">
-            Create JO
+          <Button onClick={handleCreateSA} className="bg-blue-600 hover:bg-blue-700">
+            Create SA
           </Button>
         </DialogFooter>
       </DialogContent>

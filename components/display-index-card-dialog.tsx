@@ -7,13 +7,13 @@ import { X } from "lucide-react"
 interface DisplayIndexCardDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateJO?: () => void
+  onCreateSA?: () => void
 }
 
-export function DisplayIndexCardDialog({ open, onOpenChange, onCreateJO }: DisplayIndexCardDialogProps) {
-  const handleCreateJO = () => {
-    if (onCreateJO) {
-      onCreateJO()
+export function DisplayIndexCardDialog({ open, onOpenChange, onCreateSA }: DisplayIndexCardDialogProps) {
+  const handleCreateSA = () => {
+    if (onCreateSA) {
+      onCreateSA()
     }
     onOpenChange(false)
   }
@@ -33,13 +33,6 @@ export function DisplayIndexCardDialog({ open, onOpenChange, onCreateJO }: Displ
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader className="relative">
           <DialogTitle className="text-lg font-semibold">Index Card</DialogTitle>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute right-0 top-0 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
         </DialogHeader>
 
         <div className="py-4">
@@ -90,8 +83,8 @@ export function DisplayIndexCardDialog({ open, onOpenChange, onCreateJO }: Displ
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreateJO} className="bg-blue-600 hover:bg-blue-700">
-            Create JO
+          <Button onClick={handleCreateSA} className="bg-blue-600 hover:bg-blue-700">
+            Create SA
           </Button>
         </DialogFooter>
       </DialogContent>

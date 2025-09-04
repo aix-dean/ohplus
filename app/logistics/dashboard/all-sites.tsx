@@ -325,7 +325,7 @@ export default function AllSitesTab({
       statusColor,
       image,
       address,
-      contentType: product.content_type || "static",
+      contentType: (product.content_type || "static").toLowerCase(),
       healthPercentage,
       siteCode: product.site_code || product.id?.substring(0, 8),
       joCount,
@@ -551,9 +551,9 @@ function UnifiedSiteCard({
   }
 
   return (
-    <div className="p-3 bg-gray-200 rounded-xl">
+    <div className="p-2 bg-gray-100 rounded-xl">
       <Card
-        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-xl w-full"
         onClick={handleCardClick}
       >
         <div className="relative h-32 bg-gray-200">
@@ -588,12 +588,9 @@ function UnifiedSiteCard({
             {/* Site Code */}
             <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
 
-            {/* Site Name with Badge */}
+            {/* Site Name */}
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-              <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-                {site.contentType === "dynamic" ? "M" : "S"}
-              </div>
             </div>
 
             {/* Site Information */}
@@ -637,27 +634,49 @@ function UnifiedSiteCard({
                   </span>
                 </span>
               </div>
-            </div>
 
-            {/* JO Notification */}
-            <div className="flex items-center gap-1 text-xs">
-              <Bell className="h-3 w-3 text-gray-400" />
-              {site.joCount > 0 ? (
-                <button
-                  onClick={handleJOClick}
-                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
-                >
-                  JO ({site.joCount})
-                </button>
-              ) : (
-                <span className="text-gray-600">None</span>
-              )}
-              {/* Debug info - remove in production */}
-              {process.env.NODE_ENV === "development" && (
-                <span className="text-red-500 ml-2">
-                  [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Content:</span>
+                  <span className="ml-1 text-black">{site.content}</span>
                 </span>
+              </div>
+
+              {site.contentType === "static" && (
+                <div className="flex flex-col">
+                  <span className="text-black">
+                    <span className="font-bold">Illumination:</span>
+                    <span
+                      className={`ml-1 ${
+                        site.illumination === "on" ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {site.illumination}
+                    </span>
+                  </span>
+                </div>
               )}
+
+              {/* JO Notification */}
+              <div className="flex items-center gap-1 text-xs">
+                <Bell className="h-3 w-3 text-gray-400" />
+                {site.joCount > 0 ? (
+                  <button
+                    onClick={handleJOClick}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                  >
+                    JO ({site.joCount})
+                  </button>
+                ) : (
+                  <span className="text-gray-600">None</span>
+                )}
+                {/* Debug info - remove in production */}
+                {process.env.NODE_ENV === "development" && (
+                  <span className="text-red-500 ml-2">
+                    [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Create Report Button */}
