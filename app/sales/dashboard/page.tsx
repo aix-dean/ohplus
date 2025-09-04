@@ -49,7 +49,7 @@ import { Input } from "@/components/ui/input"
 import { useDebounce } from "@/hooks/use-debounce"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { createProposal } from "@/lib/proposal-service"
-import type { ProposalClient } from "@/lib/types/proposal"
+import type { ProposalClient, ProposalProduct } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
@@ -71,7 +71,7 @@ const getSiteCode = (product: Product | null) => {
   // Try different possible locations for site_code
   if (product.site_code) return product.site_code
   if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
-  if (product.light && "site_code" in product.light) return product.light.siteCode
+  if ((product as any).light && "siteCode" in (product as any).light) return (product as any).light.siteCode
 
   // Check for camelCase variant
   if ("siteCode" in product) return (product as any).siteCode
@@ -144,22 +144,39 @@ function SalesDashboardContent() {
   const handleCreateReport = (product: Product, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setSelectedProductForReport(product.id)
+    setSelectedProductForReport(product.id || "")
     setCreateReportDialogOpen(true)
   }
 
-  const handleCopySitesFromProposal = (sites: Product[]) => {
-    // Switch to CE/Quote mode and select the copied sites
-    setCeQuoteMode(true)
-    setProposalCreationMode(false)
-    setSelectedSites(sites)
+  const handleCopySitesFromProposal = (sites: Product[], client: ProposalClient) => {
+    // Add the copied sites to selectedProducts for proposal creation
+    setSelectedProducts((prev) => {
+      const newProducts = [...prev];
+      sites.forEach((site) => {
+        if (!newProducts.some((p) => p.id === site.id)) {
+          newProducts.push(site);
+        }
+      });
+      return newProducts;
+    });
+
+    // If no client is currently selected, automatically select the client from the copied proposal
+    if (!selectedClientForProposal) {
+      setSelectedClientForProposal(client);
+      setDashboardClientSearchTerm(client.company || client.contactPerson || ""); // Display selected client in search bar
+    }
+
+    // Keep the user in proposal creation mode
+    setProposalCreationMode(true);
+    setCeQuoteMode(false); // Ensure CE/Quote mode is off
 
     // Show success message
     toast({
       title: "Sites Copied",
-      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and selected.`,
-    })
-  }
+      description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and added to your proposal.`,
+      open: true, // Add the missing 'open' property
+    });
+  };
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -269,6 +286,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to load product count. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setLoadingCount(false)
@@ -287,7 +305,7 @@ function SalesDashboardContent() {
         setLastDoc(cachedData.lastDoc)
 
         // Check for ongoing bookings for the cached products
-        const productIds = cachedData.items.map((product) => product.id)
+        const productIds = cachedData.items.map((product) => product.id).filter((id): id is string => id !== undefined) as string[];
         checkOngoingBookings(productIds)
 
         return
@@ -309,7 +327,7 @@ function SalesDashboardContent() {
         setHasMore(result.hasMore)
 
         // Check for ongoing bookings
-        const productIds = result.items.map((product) => product.id)
+        const productIds = result.items.map((product) => product.id).filter((id): id is string => id !== undefined) as string[];
         checkOngoingBookings(productIds)
 
         // Cache this page
@@ -334,6 +352,7 @@ function SalesDashboardContent() {
           title: "Error",
           description: "Failed to load product count. Please try again.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
       } finally {
         setLoading(false)
@@ -431,7 +450,18 @@ function SalesDashboardContent() {
     if (!productToDelete) return
 
     try {
-      await softDeleteProduct(productToDelete.id)
+      if (productToDelete.id) {
+        await softDeleteProduct(productToDelete.id)
+      } else {
+        console.error("Product to delete has no ID:", productToDelete);
+        toast({
+          title: "Error",
+          description: "Cannot delete product: ID is missing.",
+          variant: "destructive",
+          open: true, // Add the missing 'open' property
+        });
+        return;
+      }
 
       // Update the UI by removing the deleted product
       setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
@@ -448,6 +478,7 @@ function SalesDashboardContent() {
       toast({
         title: "Product deleted",
         description: `${productToDelete.name} has been successfully deleted.`,
+        open: true, // Add the missing 'open' property
       })
     } catch (error) {
       console.error("Error deleting product:", error)
@@ -455,6 +486,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to delete the product. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     }
   }
@@ -536,7 +568,7 @@ function SalesDashboardContent() {
     toast({
       title: "Client Selected",
       description: `Selected ${client.name} (${client.company}). Now select products.`,
-      variant: "success",
+      open: true, // Add the missing 'open' property
     })
     setIsClientDropdownOpen(false) // Close dropdown after selection
   }
@@ -566,6 +598,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -574,6 +607,7 @@ function SalesDashboardContent() {
         title: "No products selected",
         description: "Please select at least one product for the proposal.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -583,6 +617,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: "Please log in to create a proposal.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -592,7 +627,21 @@ function SalesDashboardContent() {
       // Generate a simple title for the proposal
       const proposalTitle = `Proposal for ${selectedClientForProposal.company} - ${new Date().toLocaleDateString()}`
 
-      const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
+      const proposalProducts = selectedProducts.map(product => ({
+        id: product.id || "",
+        name: product.name,
+        type: product.type || "rental",
+        price: product.price || 0,
+        location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
+        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || "",
+        media: product.media || [],
+        specs_rental: product.specs_rental || null,
+        light: (product as any).light || null,
+        description: product.description || "",
+        health_percentage: 0, // Default value
+      }));
+
+      const proposalId = await createProposal(proposalTitle, selectedClientForProposal, proposalProducts as ProposalProduct[], user.uid, {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
         companyId: userData.company_id, // Add company_id to the proposal creation
@@ -602,6 +651,7 @@ function SalesDashboardContent() {
       toast({
         title: "Proposal Created",
         description: "Your proposal has been created successfully.",
+        open: true, // Add the missing 'open' property
       })
 
       // Redirect to the new proposal's detail page
@@ -617,6 +667,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create proposal. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingProposal(false) // Reset loading state
@@ -673,6 +724,7 @@ function SalesDashboardContent() {
         title: "No sites selected",
         description: "Please select at least one site for the cost estimate.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -681,6 +733,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -694,6 +747,7 @@ function SalesDashboardContent() {
         title: "No sites selected",
         description: "Please select at least one site for the quotation.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -702,6 +756,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -729,6 +784,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: `Please log in to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -740,6 +796,7 @@ function SalesDashboardContent() {
           title: "No Sites Selected",
           description: "Please select at least one site to create a quotation.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
         return
       }
@@ -749,6 +806,7 @@ function SalesDashboardContent() {
           title: "No Sites Selected",
           description: "Please select at least one site to create a cost estimate.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
         return
       }
@@ -760,28 +818,28 @@ function SalesDashboardContent() {
         const sitesData = selectedSites.map((site) => ({
           id: site.id,
           name: site.name,
-          location: site.specs_rental?.location || site.light?.location || "N/A",
+          location: site.specs_rental?.location || (site as any).light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
         const clientData = {
-          id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
-          email: selectedClientForProposal.email,
-          company: selectedClientForProposal.company,
-          phone: selectedClientForProposal.phone,
-          address: selectedClientForProposal.address,
-          designation: selectedClientForProposal.designation,
-          industry: selectedClientForProposal.industry,
+          id: selectedClientForProposal!.id,
+          name: selectedClientForProposal!.contactPerson,
+          email: selectedClientForProposal!.email,
+          company: selectedClientForProposal!.company,
+          phone: selectedClientForProposal!.phone,
+          address: selectedClientForProposal!.address,
+          designation: selectedClientForProposal!.designation,
+          industry: selectedClientForProposal!.industry,
         }
 
         const options = {
           startDate,
           endDate,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal.id, // Add client's company_id
+          client_company_id: selectedClientForProposal!.id, // Add client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
           created_by_first_name: userData.first_name,
           created_by_last_name: userData.last_name,
@@ -798,6 +856,7 @@ function SalesDashboardContent() {
           toast({
             title: "Quotations Created",
             description: `Successfully created ${quotationIds.length} quotations for the selected sites.`,
+            open: true, // Add the missing 'open' property
           })
         } else {
           // Create single quotation for one site
@@ -807,6 +866,7 @@ function SalesDashboardContent() {
           toast({
             title: "Quotation Created",
             description: "Quotation has been created successfully.",
+            open: true, // Add the missing 'open' property
           })
         }
 
@@ -818,6 +878,7 @@ function SalesDashboardContent() {
           title: "Error",
           description: "Failed to create quotation. Please try again.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
       } finally {
         setIsCreatingDocument(false)
@@ -828,30 +889,30 @@ function SalesDashboardContent() {
     setIsCreatingCostEstimate(true)
     try {
       const sitesData = selectedSites.map((site) => ({
-        id: site.id,
+        id: site.id || "",
         name: site.name,
-        location: site.specs_rental?.location || site.light?.location || "N/A",
+        location: site.specs_rental?.location || (site as any).light?.location || "N/A",
         price: site.price || 0,
         type: site.type || "Unknown",
         image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
       }))
 
       const clientData = {
-        id: selectedClientForProposal.id,
-        name: selectedClientForProposal.contactPerson,
-        email: selectedClientForProposal.email,
-        company: selectedClientForProposal.company,
-        phone: selectedClientForProposal.phone,
-        address: selectedClientForProposal.address,
-        designation: selectedClientForProposal.designation,
-        industry: selectedClientForProposal.industry,
+        id: selectedClientForProposal!.id,
+        name: selectedClientForProposal!.contactPerson,
+        email: selectedClientForProposal!.email,
+        company: selectedClientForProposal!.company,
+        phone: selectedClientForProposal!.phone,
+        address: selectedClientForProposal!.address,
+        designation: selectedClientForProposal!.designation,
+        industry: selectedClientForProposal!.industry,
       }
 
       const options = {
         startDate,
         endDate,
         company_id: userData.company_id,
-        client_company_id: selectedClientForProposal.id, // Add client's company_id
+        client_company_id: selectedClientForProposal!.id, // Add client's company_id
         page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
@@ -866,6 +927,7 @@ function SalesDashboardContent() {
         toast({
           title: "Cost Estimates Created",
           description: `Successfully created ${costEstimateIds.length} cost estimates for the selected sites.`,
+          open: true, // Add the missing 'open' property
         })
       } else {
         // Create single cost estimate for one site
@@ -875,6 +937,7 @@ function SalesDashboardContent() {
         toast({
           title: "Cost Estimate Created",
           description: "Cost estimate has been created successfully.",
+          open: true, // Add the missing 'open' property
         })
       }
 
@@ -886,6 +949,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingCostEstimate(false)
@@ -908,6 +972,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: "Please log in to create a cost estimate.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -929,7 +994,7 @@ function SalesDashboardContent() {
         const sitesData = selectedSites.map((site) => ({
           id: site.id,
           name: site.name,
-          location: site.specs_rental?.location || site.light?.location || "N/A",
+          location: site.specs_rental?.location || (site as any).light?.location || "N/A",
           price: site.price || 0,
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
@@ -939,7 +1004,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal.id, // Added client_company_id to skip dates options
+          client_company_id: selectedClientForProposal!.id, // Added client_company_id to skip dates options
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 
@@ -952,6 +1017,7 @@ function SalesDashboardContent() {
           toast({
             title: "Cost Estimate Created",
             description: "Your cost estimate has been created successfully without dates.",
+            open: true, // Add the missing 'open' property
           })
           router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
         } else {
@@ -961,6 +1027,7 @@ function SalesDashboardContent() {
           toast({
             title: "Cost Estimates Created",
             description: `${newCostEstimateIds.length} cost estimates have been created successfully without dates - one for each selected site.`,
+            open: true, // Add the missing 'open' property
           })
 
           // Navigate to the first cost estimate
@@ -975,6 +1042,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingDocument(false)
@@ -1299,8 +1367,8 @@ function SalesDashboardContent() {
                           mobileColumns={1}
                           tabletColumns={2}
                           desktopColumns={5}
-                          xlColumns={6}
-                          xxlColumns={7}
+                          xlColumns={6} // Keep this if it's a valid prop for ResponsiveCardGrid
+                          xxlColumns={7} // Keep this if it's a valid prop for ResponsiveCardGrid
                           gap="sm"
                         >
                           {searchResults.map((result) => (
@@ -1461,16 +1529,16 @@ function SalesDashboardContent() {
                         mobileColumns={1}
                         tabletColumns={2}
                         desktopColumns={5}
-                        xlColumns={6}
-                        xxlColumns={7}
+                        xlColumns={6} // Keep this if it's a valid prop for ResponsiveCardGrid
+                        xxlColumns={7} // Keep this if it's a valid prop for ResponsiveCardGrid
                         gap="sm"
                       >
                         {products.map((product) => (
                           <ProductCard
                             key={product.id}
                             product={product}
-                            hasOngoingBooking={productsWithBookings[product.id] || false}
-                            onView={() => handleViewDetails(product.id)}
+                            hasOngoingBooking={productsWithBookings[product.id || ""] || false}
+                            onView={() => handleViewDetails(product.id || "")}
                             onEdit={(e) => handleEditClick(product, e)}
                             onDelete={(e) => handleDeleteClick(product, e)}
                             onCreateReport={(e) => handleCreateReport(product, e)}
@@ -1518,7 +1586,7 @@ function SalesDashboardContent() {
                                     } else if (ceQuoteMode) {
                                       handleSiteSelect(product)
                                     } else {
-                                      handleViewDetails(product.id)
+                                      handleViewDetails(product.id || "")
                                     }
                                   }}
                                 >
@@ -1531,7 +1599,7 @@ function SalesDashboardContent() {
                                             alt={product.name || "Product image"}
                                             width={48}
                                             height={48}
-                                            className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
+                                            className={`h-full w-full object-cover ${productsWithBookings[product.id || ""] ? "grayscale" : ""}`}
                                             onError={(e) => {
                                               const target = e.target as HTMLImageElement
                                               target.src = "/abstract-geometric-sculpture.png"
@@ -1560,7 +1628,7 @@ function SalesDashboardContent() {
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="hidden md:table-cell">
-                                    {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                                    {product.specs_rental?.location || (product as any).light?.location || "Unknown location"}
                                   </TableCell>
                                   <TableCell>
                                     {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
@@ -1568,7 +1636,7 @@ function SalesDashboardContent() {
                                   <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
                                   <TableCell>
                                     {product.type?.toLowerCase() === "rental" &&
-                                      (productsWithBookings[product.id] ? (
+                                      (productsWithBookings[product.id || ""] ? (
                                         <Badge
                                           variant="outline"
                                           className="bg-amber-50 text-amber-700 border-amber-200"
@@ -1797,7 +1865,7 @@ function SalesDashboardContent() {
           onClose={() => setIsDateRangeDialogOpen(false)}
           onSelectDates={handleDatesSelected}
           onSkipDates={handleSkipDates}
-          selectedSiteIds={selectedSites.map((site) => site.id)}
+          selectedSiteIds={selectedSites.map((site) => site.id || "")}
           selectedClientId={selectedClientForProposal?.id}
           showSkipButton={actionAfterDateSelection === "cost_estimate"}
         />
@@ -1825,7 +1893,7 @@ function SalesDashboardContent() {
             toast({
               title: "Client Added",
               description: `${newClient.name} (${newClient.company}) has been added.`,
-              variant: "success",
+              open: true, // Add the missing 'open' property
             })
           }}
         />
@@ -1909,7 +1977,7 @@ function ProductCard({
     product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
 
   // Determine location based on product type
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+  const location = product.specs_rental?.location || (product as any).light?.location || "Unknown location"
 
   const formattedPrice = product.price
     ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`

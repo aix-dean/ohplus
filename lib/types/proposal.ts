@@ -1,4 +1,5 @@
 export type ProposalClient = {
+  id: string // Added missing id field
   company: string
   contactPerson: string
   email: string
