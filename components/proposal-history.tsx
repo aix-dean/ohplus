@@ -18,7 +18,7 @@ interface ProposalHistoryProps {
     company: string
     contactPerson: string
   } | null
-  onCopySites?: (sites: Product[]) => void
+  onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
 }
 
@@ -125,6 +125,7 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
         onClose={handleCloseModal}
         onCopySites={onCopySites}
         useProposalViewer={useProposalViewer}
+        client={selectedClient}
       />
     </>
   )

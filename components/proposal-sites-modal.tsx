@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Copy } from "lucide-react"
 import { format } from "date-fns"
-import type { Proposal } from "@/lib/types/proposal"
+import type { Proposal, ProposalClient } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
 import { toast } from "sonner"
 import { ProposalPagesViewerDialog } from "./proposal-pages-viewer-dialog"
@@ -17,7 +17,7 @@ interface ProposalSitesModalProps {
   proposal: Proposal | null
   isOpen: boolean
   onClose: () => void
-  onCopySites?: (sites: Product[]) => void
+  onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
 }
 
@@ -61,9 +61,15 @@ export function ProposalSitesModal({
       const dashboardProducts: Product[] = selectedProducts.map((product) => ({
         id: product.id,
         name: product.name,
+        description: product.description || "", // Added missing field
         type: product.type || "rental",
         price: product.price || 0,
-        media: product.media || [],
+        media: (product.media || []).map(mediaItem => ({
+          url: mediaItem.url,
+          distance: "", // Default or infer if possible
+          type: "",     // Default or infer if possible
+          isVideo: mediaItem.isVideo,
+        })),
         specs_rental: {
           location: product.location || "",
           site_code: product.site_code || "",
@@ -71,14 +77,17 @@ export function ProposalSitesModal({
         },
         light: product.light || {},
         site_code: product.site_code,
-        created_at: new Date(),
-        updated_at: new Date(),
+        created: new Date(), // Changed from created_at to created
+        updated: new Date(), // Changed from updated_at to updated
         uploaded_by: "",
         company_id: "",
         active: true,
+        deleted: false, // Added missing field
+        seller_id: "", // Added missing field
+        seller_name: "", // Added missing field
       }))
 
-      onCopySites(dashboardProducts)
+      onCopySites(dashboardProducts, proposal.client)
       handleClose()
       return
     }
@@ -109,6 +118,14 @@ export function ProposalSitesModal({
     setCopied(false)
     onClose()
   }
+
+  const handleCopySitesFromProposal = (sites: Product[]) => {
+    if (onCopySites) {
+      onCopySites(sites, proposal.client);
+      toast.success(`${sites.length} sites copied from proposal history.`);
+    }
+    handleClose();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
