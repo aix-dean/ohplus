@@ -150,15 +150,19 @@ export default function GenerateQuotationPage() {
         return await createQuotation(quotationData)
       })
 
-      await Promise.all(quotationPromises)
+      const createdQuotations = await Promise.all(quotationPromises)
 
       toast({
         title: "Quotations Generated Successfully!",
         description: `${selectedProducts.length} quotation(s) have been created.`,
       })
 
-      // Navigate back to proposals
-      router.push(`/sales/proposals/${params.id}`)
+      // Redirect to the first created quotation, indicating it's a new creation
+      if (createdQuotations.length > 0) {
+        router.push(`/sales/quotations/${createdQuotations[0].id}?new=true`)
+      } else {
+        router.push(`/sales/proposals/${params.id}`)
+      }
     } catch (error) {
       console.error("Error generating quotations:", error)
       toast({

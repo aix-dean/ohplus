@@ -16,7 +16,7 @@ type ToasterToast = ToastProps & {
 }
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 2500
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -50,8 +50,11 @@ interface State {
 }
 
 const reducer = (state: State, action: Action): State => {
+  console.log("Reducer - Current State:", state); // Added log
+  console.log("Reducer - Action:", action); // Added log
   switch (action.type) {
     case actionTypes.ADD_TOAST:
+      console.log("Reducer - ADD_TOAST:", action.toast); // Added log
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
@@ -98,15 +101,17 @@ const listeners: Array<(state: State) => void> = []
 let memoryState: State = { toasts: [] }
 
 function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action)
+  console.log("Dispatching action:", action); // Added log
+  memoryState = reducer(memoryState, action);
+  console.log("New memoryState:", memoryState); // Added log
   listeners.forEach((listener) => {
-    listener(memoryState)
-  })
+    listener(memoryState);
+  });
 }
 
-type Toast = Omit<ToasterToast, "id" | "open">
+type ToastInput = Omit<ToasterToast, "id" | "open"> // This is essentially ToastProps
 
-function toast({ ...props }: Toast) {
+function toast({ ...props }: ToastInput) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -122,11 +127,13 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
     },
   })
+
+  // Schedule the toast to be dismissed after TOAST_REMOVE_DELAY
+  setTimeout(() => {
+    dismiss();
+  }, TOAST_REMOVE_DELAY);
 
   return {
     id: id,
@@ -139,8 +146,10 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
+    console.log("useToast - useEffect: Component mounted or state updated. Current state:", state); // Added log
     listeners.push(setState)
     return () => {
+      console.log("useToast - useEffect cleanup: Removing listener."); // Added log
       const index = listeners.indexOf(setState)
       if (index > -1) {
         listeners.splice(index, 1)

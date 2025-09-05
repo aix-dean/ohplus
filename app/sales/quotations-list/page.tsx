@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import {
   CheckCircle,
   Search,
@@ -49,6 +49,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
+import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
+import { CreateEventFormDialog } from "@/components/create-event-form-dialog"
 
 export default function QuotationsListPage() {
   const router = useRouter()
@@ -67,6 +69,9 @@ export default function QuotationsListPage() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [isSendOptionsDialogOpenList, setIsSendOptionsDialogOpenList] = useState(false)
+  const [isAlarmDialogOpen, setIsAlarmDialogOpen] = useState(false)
+  const [selectedQuotationForAlarm, setSelectedQuotationForAlarm] = useState<any>(null)
   const pageSize = 10
   const { toast } = useToast()
 
@@ -240,7 +245,7 @@ export default function QuotationsListPage() {
           const collectibleData = {
             // Basic information from quotation
             client_name: quotation.client_name || fullQuotationData.client_name || "",
-            company_id: user.company_id || user.uid,
+            company_id: user.uid,
             type: "sites", // Default to sites type based on the business model
 
             // Financial data - proportional amount for this period
@@ -535,7 +540,7 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
       setSelectedQuotationForShare(quotation)
-      setShareDialogOpen(true)
+      setIsSendOptionsDialogOpenList(true) // Open the SendQuotationOptionsDialog
     } catch (error: any) {
       console.error("Error loading quotation for sharing:", error)
       toast({
@@ -691,36 +696,6 @@ export default function QuotationsListPage() {
 
   const handleCreateJO = (quotationId: string) => {
     console.log("[v0] Create JO clicked for quotationId:", quotationId)
-    console.log(
-      "[v0] Available quotations:",
-      quotations.map((q) => ({ id: q.id, number: q.quotation_number })),
-    )
-
-    const quotation = quotations.find((q) => q.id === quotationId)
-    console.log(
-      "[v0] Found quotation:",
-      quotation ? { id: quotation.id, number: quotation.quotation_number } : "NOT FOUND",
-    )
-
-    if (!quotation) {
-      toast({
-        title: "Error",
-        description: "Quotation not found. Please try again.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const validation = validateComplianceForJO(quotation)
-
-    if (!validation.isValid) {
-      toast({
-        title: "Compliance Requirements Not Met",
-        description: `Please complete the following items before creating a Job Order: ${validation.missingItems.join(", ")}`,
-        variant: "destructive",
-      })
-      return
-    }
 
     // Navigate to JO creation with the quotation ID
     router.push(`/sales/job-orders/create?quotationId=${quotationId}`)
@@ -972,7 +947,7 @@ export default function QuotationsListPage() {
                                                   </span>
                                                 ) : null}
                                               </div>
-                                            </div>
+                                            </div >
                                           )
                                         })}
 
@@ -1006,9 +981,9 @@ export default function QuotationsListPage() {
                                           {compliance.items.find((item) => item.note)?.note}
                                         </div>
                                       )}
-                                    </div>
-                                  </div>
-                                </div>
+                                    </div >
+                                  </div >
+                                </div >
                               </TableCell>
                               <TableCell
                                 className="py-3 cursor-pointer"
@@ -1062,7 +1037,12 @@ export default function QuotationsListPage() {
                                     <DropdownMenuItem onClick={() => console.log("Cancel", quotation.id)}>
                                       Cancel
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => console.log("Set alarm for", quotation.id)}>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedQuotationForAlarm(quotation)
+                                        setIsAlarmDialogOpen(true)
+                                      }}
+                                    >
                                       Set an Alarm
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -1120,131 +1100,24 @@ export default function QuotationsListPage() {
         )}
       </div>
 
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Share2 className="w-5 h-5" />
-              Share Quotation
-            </DialogTitle>
-            <DialogDescription>Share this quotation with others using various platforms and methods.</DialogDescription>
-          </DialogHeader>
+      {selectedQuotationForShare && (
+        <SendQuotationOptionsDialog
+          isOpen={isSendOptionsDialogOpenList}
+          onOpenChange={setIsSendOptionsDialogOpenList}
+          quotation={selectedQuotationForShare}
+          onEmailClick={() => {
+            setIsSendOptionsDialogOpenList(false)
+            router.push(`/sales/quotations/${selectedQuotationForShare.id}/compose-email?attachSingle=true`)
+          }}
+        />
+      )}
 
-          {selectedQuotationForShare && (
-            <div className="space-y-4">
-              {/* Quotation Info */}
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-900">
-                  {selectedQuotationForShare.quotation_number || "New Quotation"}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {selectedQuotationForShare.client_name} • {selectedQuotationForShare.items?.[0]?.name || "Service"}
-                </div>
-              </div>
-
-              {/* Copy Link */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Share Link</label>
-                <div className="flex gap-2">
-                  <Input value={generateShareableLink(selectedQuotationForShare)} readOnly className="flex-1 text-sm" />
-                  <Button
-                    size="sm"
-                    onClick={() => copyToClipboard(generateShareableLink(selectedQuotationForShare))}
-                    className="flex-shrink-0"
-                  >
-                    {copiedToClipboard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Native Share (if supported) */}
-              {navigator.share && (
-                <Button
-                  onClick={() => shareViaNativeAPI(selectedQuotationForShare)}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share via Device
-                </Button>
-              )}
-
-              {/* Share Options */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Share via</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaEmail(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Email
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaSMS(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    SMS
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaWhatsApp(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    WhatsApp
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaFacebook(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Facebook className="w-4 h-4 mr-2" />
-                    Facebook
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaTwitter(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Twitter className="w-4 h-4 mr-2" />
-                    Twitter
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaLinkedIn(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Linkedin className="w-4 h-4 mr-2" />
-                    LinkedIn
-                  </Button>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end pt-2">
-                <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Alarm Dialog */}
+      <CreateEventFormDialog
+        isOpen={isAlarmDialogOpen}
+        onOpenChange={setIsAlarmDialogOpen}
+        quotation={selectedQuotationForAlarm}
+      />
     </div>
   )
 }

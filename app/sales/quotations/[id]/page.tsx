@@ -1,8 +1,8 @@
 "use client"
 import { useEffect, useState, useCallback } from "react"
-import type React from "react"
+import React, { use } from "react"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -153,8 +153,9 @@ const formatCurrency = (amount: number | string | undefined | null) => {
 }
 
 export default function QuotationPage({ params }: { params: { id: string } }) {
-  const { id: quotationId } = params
+  const { id: quotationId } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, userData } = useAuth()
   const { toast } = useToast()
   const [quotation, setQuotation] = useState<Quotation | null>(null)
@@ -350,8 +351,12 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
             console.log("[v0] Related quotations found:", relatedQs.length, relatedQs)
             setRelatedQuotations(relatedQs)
             const currentIndex = relatedQs.findIndex((rq) => rq.id === q.id)
-            console.log("[v0] Current page index:", currentIndex)
-            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+            const isNewQuotation = searchParams.get("new") === "true"
+            if (isNewQuotation) {
+              setCurrentPageIndex(0)
+            } else {
+              setCurrentPageIndex(currentIndex)
+            }
           } else {
             console.log("[v0] No page_id found for this quotation")
           }
@@ -656,7 +661,7 @@ The OH Plus Team`,
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{items[0]?.name || "Site Name"}</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{items[0]?.name || "Site Name"} Quotation</h1>
         </div>
 
         {/* Greeting */}
@@ -692,11 +697,10 @@ The OH Plus Team`,
               </div>
             ) : (
               <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
+                className={`text-gray-700 ${isEditing
+                  ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                  : ""
+                  }`}
                 onClick={() => isEditing && handleFieldEdit("size", currentQuotation?.size || "")}
                 title={isEditing ? "Click to edit size" : ""}
               >
@@ -723,11 +727,10 @@ The OH Plus Team`,
               </div>
             ) : (
               <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
+                className={`text-gray-700 ${isEditing
+                  ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                  : ""
+                  }`}
                 onClick={() => isEditing && handleFieldEdit("duration_days", currentQuotation?.duration_days || 0)}
                 title={isEditing ? "Click to edit contract duration" : ""}
               >
@@ -759,11 +762,10 @@ The OH Plus Team`,
               </div>
             ) : (
               <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
+                className={`text-gray-700 ${isEditing
+                  ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                  : ""
+                  }`}
                 onClick={() =>
                   isEditing &&
                   handleFieldEdit("contractPeriod", {
@@ -810,11 +812,10 @@ The OH Plus Team`,
               </div>
             ) : (
               <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
+                className={`text-gray-700 ${isEditing
+                  ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                  : ""
+                  }`}
                 onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
                 title={isEditing ? "Click to edit lease rate" : ""}
               >
@@ -923,26 +924,24 @@ The OH Plus Team`,
               <div>
                 <div className="border-b border-gray-400 w-48 mb-2"></div>
                 <p
-                  className={`font-medium ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                      : ""
-                  }`}
+                  className={`font-medium ${isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                    }`}
                   onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
                   title={isEditing ? "Click to edit name" : ""}
                 >
                   {currentQuotation?.signature_first_name && currentQuotation?.signature_last_name
                     ? `${currentQuotation.signature_first_name} ${currentQuotation.signature_last_name}`
                     : currentQuotation?.signature_name ||
-                      `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
+                    `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
                 <p
-                  className={`text-sm ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                      : ""
-                  }`}
+                  className={`text-sm ${isEditing
+                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                    : ""
+                    }`}
                   onClick={() =>
                     isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")
                   }
@@ -1020,10 +1019,12 @@ The OH Plus Team`,
   const hasMultipleSites = currentQuotation?.items && currentQuotation.items.length > 1
 
   const handleSendClick = () => {
+    console.log("[DEBUG] handleSendClick: Opening SendQuotationOptionsDialog")
     setIsSendOptionsDialogOpen(true)
   }
 
   const handleEmailClick = () => {
+    console.log("[DEBUG] handleEmailClick: Closing SendQuotationOptionsDialog and navigating to compose email.")
     setIsSendOptionsDialogOpen(false)
     // Navigate to compose email page like the current implementation
     router.push(`/sales/quotations/${params.id}/compose-email`)
@@ -1033,8 +1034,8 @@ The OH Plus Team`,
     <div className="min-h-screen bg-gray-50">
       {/* Word-style Toolbar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="w-full px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center space-x-4 justify-start">
             <Button
               variant="ghost"
               size="sm"
@@ -1060,14 +1061,24 @@ The OH Plus Team`,
               <History className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Activity</span>
             </Button>
+            {/* Toggle button for history on small screens */}
+            <Button
+              onClick={() => setShowHistory(!showHistory)}
+              variant="outline"
+              size="sm"
+              className="lg:hidden bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* New Wrapper for Sidebar + Document */}
+      {/*Side button section */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+        <div className="fixed bottom-6 left-6 flex flex-col space-y-4 z-2 mr-2 lg:relative lg:flex lg:space-y-4 lg:z-20 lg:bottom-auto lg:right-auto">
           <Button
             variant="ghost"
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
@@ -1159,9 +1170,29 @@ The OH Plus Team`,
           </div>
 
           {/* Right Sidebar - Updated for quotation history */}
-          <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
+          <div
+            className={`
+              w-80 bg-white shadow-md rounded-lg p-4 max-h-[calc(100vh-120px)] overflow-y-auto
+              xl:sticky xl:top-24 xl:block
+              ${showHistory ? "fixed top-24 right-4 z-50" : "hidden"}
+              xl:${showHistory ? "block" : "block"}
+            `}
+          >
             <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">Quotation History</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="xl:hidden">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="mb-4 hidden lg:block"> {/* Hide on small screens, show on large */}
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
+              <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
+                {quotation?.items?.[0]?.name || "Product"}
+              </div>
+            </div>
+            <div className="mb-4 lg:hidden"> {/* Show on small screens, hide on large */}
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
                 {quotation?.items?.[0]?.name || "Product"}
               </div>
@@ -1176,61 +1207,40 @@ The OH Plus Team`,
                 {clientHistory.map((historyItem) => (
                   <div
                     key={historyItem.id}
-                    onClick={() => router.push(`/sales/quotations/${historyItem.id}`)} // Navigate to quotations
-                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => router.push(`/sales/quotations/${historyItem.id}`)}
+                    className="relative p-4 bg-white rounded-lg shadow-sm hover:bg-gray-100 cursor-pointer transition"
                   >
-                    <div className="text-sm font-medium text-gray-900 mb-1">
-                      {historyItem.quotation_number || historyItem.id.slice(-8)}
+                    <div className="flex items-center space-x-3">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-blue-600" />
+                      </div>
+
+                      {/* Text content */}
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {historyItem.quotation_number}
+                        </div>
+                        <div className="text-xs text-red-600 font-semibold mt-1">
+                          PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)} / month
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)}
-                      /month
-                    </div>
-                    <div className="flex justify-end">
+
+                    {/* Status badge (bottom-right) */}
+                    <div className="absolute bottom-3 right-3">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(historyItem.status)}`}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(historyItem.status)}`}
                       >
                         {historyItem.status}
                       </span>
                     </div>
                   </div>
                 ))}
-                {currentQuotation.client_phone && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_phone)}</p>
-                  </div>
-                )}
-                {currentQuotation.client_address && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Address</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_address)}</p>
-                  </div>
-                )}
-                {currentQuotation.quotation_request_id && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
-                    <p className="text-base text-gray-900 font-mono">
-                      {safeString(currentQuotation.quotation_request_id)}
-                    </p>
-                  </div>
-                )}
-                {currentQuotation.proposalId && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Proposal ID</Label>
-                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.proposalId)}</p>
-                  </div>
-                )}
-                {currentQuotation.campaignId && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Related Campaign ID</Label>
-                    <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.campaignId)}</p>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <div className="text-sm">No other quotations found for this client</div> {/* Updated message */}
+                <div className="text-sm">No other quotations found for this Site</div> {/* Updated message */}
               </div>
             )}
           </div>
@@ -1445,3 +1455,4 @@ The OH Plus Team`,
     </div>
   )
 }
+

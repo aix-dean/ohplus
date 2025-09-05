@@ -12,12 +12,14 @@ const CLIENTS_COLLECTION = "client_db"
 
 // New interface for quotation items
 export interface QuotationItem {
-  price: number
-  product_id: string
-  product_location: string
-  product_name: string
-  site_code: string
-  type: string
+  price?: number // Made optional
+  product_id?: string // Made optional
+  product_location?: string // Made optional
+  product_name?: string // Made optional
+  site_code?: string // Made optional
+  type?: string // Made optional
+  name?: string // Added name to match Product interface
+  item_total_amount?: number // Added item_total_amount
 }
 
 export async function getQuotationsForSelection(userId: string): Promise<Quotation[]> {

@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback, use } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -9,8 +8,9 @@ import {
   getCostEstimate,
   updateCostEstimate,
   getCostEstimatesByPageId,
-  getCostEstimatesByClientId, // Import new function
-  updateCostEstimateStatus, // Import updateCostEstimateStatus
+  getCostEstimatesByClientId,
+  updateCostEstimateStatus,
+  getCostEstimatesByLineItemIds, // Import new function
 } from "@/lib/cost-estimate-service"
 import type {
   CostEstimate,
@@ -60,6 +60,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { connectStorageEmulator } from "firebase/storage"
 
 interface CompanyData {
   id: string
@@ -125,7 +126,7 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
 }
 
 export default function CostEstimatePage({ params }: { params: { id: string } }) {
-  const { id: costEstimateId } = params
+  const { id: costEstimateId } = use(params)
   const router = useRouter()
   const { user, userData } = useAuth()
 
@@ -155,7 +156,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
   const [projectData, setProjectData] = useState<{ company_logo?: string; company_name?: string } | null>(null)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
-  const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
+  const [costEstimateHistory, setCostEstimateHistory] = useState<CostEstimate[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
@@ -444,21 +445,22 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     }
   }
 
-  const fetchClientHistory = useCallback(async () => {
-    if (!costEstimate?.client?.id) return
+  const fetchCostEstimateHistory = useCallback(async () => {
+    if (!costEstimate?.lineItems || costEstimate.lineItems.length === 0) return
 
     setLoadingHistory(true)
     try {
-      const history = await getCostEstimatesByClientId(costEstimate.client.id)
+      const lineItemIds = costEstimate.lineItems.map((item) => item.id)
+      const history = await getCostEstimatesByLineItemIds(lineItemIds)
       // Filter out current cost estimate from history
       const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
-      setClientHistory(filteredHistory)
+      setCostEstimateHistory(filteredHistory)
     } catch (error) {
-      console.error("Error fetching client history:", error)
+      console.error("Error fetching cost estimate history:", error)
     } finally {
       setLoadingHistory(false)
     }
-  }, [costEstimate?.client?.id, costEstimate?.id])
+  }, [costEstimate?.lineItems, costEstimate?.id])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -521,10 +523,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }, [user, userData])
 
   useEffect(() => {
-    if (costEstimate?.client?.id) {
-      fetchClientHistory()
+    if (costEstimate?.lineItems) {
+      fetchCostEstimateHistory()
     }
-  }, [fetchClientHistory])
+  }, [fetchCostEstimateHistory])
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -1072,8 +1074,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
-
+    const adjustedTitle = hasMultipleSites
+      ? `${siteLineItems[0]?.description || siteName} `
+      : `${costEstimate?.title}`
+    console.log(`site name : ${siteLineItems[0]?.description}`)
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
       ? `${baseCENumber}-${String.fromCharCode(64 + pageNumber)}` // Appends -A, -B, -C, etc.
@@ -1130,7 +1134,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
           <div className="text-center mb-8">
             {/* Updated title to remove uppercase COST ESTIMATE */}
-            <h2 className="text-xl font-bold text-gray-900 underline">{adjustedTitle}</h2>
+            <h2 className="text-xl font-bold text-gray-900 underline">{siteLineItems[0]?.description} Cost Estimate</h2>
           </div>
 
           <div className="mb-6 p-4 text-center">
@@ -1360,21 +1364,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </div>
         </div>
-        {process.env.NODE_ENV === "development" && (
-          <div className="text-xs text-gray-500 mt-2">
-            Debug: isEditing={isEditing.toString()}, hasUnsavedChanges={hasUnsavedChanges.toString()}, tempValues=
-            {Object.keys(tempValues).length}
-          </div>
-        )}
         {!isEditing && (
-          <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
-            <Button
-              onClick={handleSaveAsDraft}
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white"
-            >
-              <FileText className="h-4 w-4" />
-              Save as Draft
-            </Button>
+          <div className="fixed bottom-6 right-6 flex gap-3 p-4 rounded-lg z-50">
             {hasUnsavedChanges && (
               <Button
                 onClick={(e) => {
@@ -1417,7 +1408,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
       {/* Word-style Toolbar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="w-full px-4 py-2 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -1434,14 +1425,30 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             </Badge>
           </div>
 
-          <div className="flex items-center space-x-2"></div>
+          <div className="flex items-center space-x-2">
+            <Button
+            onClick={() => setShowHistory(!showHistory)}
+            className="lg:hidden bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
+
+          {showHistory && (
+            <div
+              className="inset-0 bg-black bg-opacity-50 z-40 xl:hidden"
+              onClick={() => setShowHistory(false)}
+            />
+          )}
+          </div>
         </div>
       </div>
 
-      {/* New Wrapper for Sidebar + Document */}
+      {/*Side button section */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel (now part of flow) */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+        <div className="fixed bottom-6 left-6 flex flex-col space-y-4 z-2 lg:relative lg:flex lg:space-y-4 lg:z-20 lg:bottom-auto lg:right-auto mr-2">
           <Button
             variant="ghost"
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
@@ -1534,21 +1541,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </div>
 
-          <Button
-            onClick={() => setShowHistory(!showHistory)}
-            className="fixed top-24 right-4 z-50 xl:hidden bg-blue-600 hover:bg-blue-700 text-white"
-            size="sm"
-          >
-            <History className="h-4 w-4 mr-2" />
-            History
-          </Button>
-
-          {showHistory && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40 xl:hidden"
-              onClick={() => setShowHistory(false)}
-            />
-          )}
+          
 
           <div
             className={`
@@ -1560,13 +1553,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           >
             <div className="mb-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Cost Estimate History</h3>
+                <h3 className="text-xl font-bold text-gray-900">Cost Estimate History</h3>
                 <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="xl:hidden">
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
-              <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
               </div>
             </div>
 
@@ -1574,33 +1564,30 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
-            ) : clientHistory.length > 0 ? (
+            ) : costEstimateHistory.length > 0 ? (
               <div className="space-y-3">
-                {clientHistory.map((historyItem) => (
+                {costEstimateHistory.map((historyItem) => (
                   <div
                     key={historyItem.id}
                     onClick={() => router.push(`/sales/cost-estimates/${historyItem.id}`)}
-                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="flex items-center p-3 bg-gray-50 rounded-lg shadow-sm hover:bg-gray-100 cursor-pointer"
                   >
-                    <div className="text-sm font-medium text-gray-900 mb-1">
-                      {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
+                    
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                      <FileText className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
-                    </div>
-                    <div className="flex justify-end">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(historyItem.status)}`}
-                      >
-                        {historyItem.status}
-                      </span>
+                    <div>
+                      <div className="text-xs font-medium text-gray-900">
+                        {`${historyItem.costEstimateNumber}`}
+                      </div>
+                      <div className="text-xs text-gray-600">{format(historyItem.createdAt, "MMM d, yyyy")}</div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <div className="text-sm">No other cost estimates found for this client</div>
+                <div className="text-sm">No other cost estimates found with similar line items.</div>
               </div>
             )}
           </div>
@@ -1696,37 +1683,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         </div>
       ) : null}
 
-      {!isEditing && hasMultipleSites && relatedCostEstimates.length <= 1 && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Previous
-            </Button>
-            <div className="relative">
-              <span className="text-sm font-medium text-gray-700 px-4">
-                {currentProductIndex + 1} of {Object.keys(siteGroups).length}
-              </span>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
+      
       {/* Send Cost Estimate Options Dialog */}
       {costEstimate && (
         <SendCostEstimateOptionsDialog
@@ -1974,3 +1931,4 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     </div>
   )
 }
+
