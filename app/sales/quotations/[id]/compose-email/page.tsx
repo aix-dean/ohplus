@@ -816,7 +816,7 @@ ${user?.email || ""}`)
                 id="template-subject"
                 value={newTemplateSubject}
                 onChange={(e) => setNewTemplateSubject(e.target.value)}
-                placeholder="e.g., Quotation: {title} - {companyName}"
+                placeholder="e.g., Quotation: title - companyName"
               />
             </div>
             <div className="space-y-2">
