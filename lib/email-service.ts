@@ -117,13 +117,18 @@ class EmailService {
   }
 
   // Template CRUD operations
-  async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<string> {
+  async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<EmailTemplate> {
     try {
       const docRef = await addDoc(collection(db, this.templatesCollection), {
         ...templateData,
         created: Timestamp.now(),
       })
-      return docRef.id
+      const newTemplate: EmailTemplate = {
+        id: docRef.id,
+        ...templateData,
+        created: Timestamp.now(), // Re-add created as Timestamp
+      }
+      return newTemplate
     } catch (error) {
       console.error("Error creating email template:", error)
       throw new Error("Failed to create email template")

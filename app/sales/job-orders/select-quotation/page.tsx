@@ -65,15 +65,22 @@ export default function SelectQuotationPage() {
     fetchQuotations()
   }, [user?.uid, toast, productId])
 
-  const filteredQuotations = quotations.filter(
-    (q) =>
-      q.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.product_name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredQuotations = quotations.filter((q) => {
+    const matchesQuotationNumber = q.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesClientName = q.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesProductOrSite =
+      q.items?.some(
+        (item) =>
+          item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.site_code?.toLowerCase().includes(searchTerm.toLowerCase()),
+      ) || false
+
+    return matchesQuotationNumber || matchesClientName || matchesProductOrSite
+  })
 
   const handleSelect = (quotation: Quotation) => {
     setSelectedQuotation(quotation)
+    router.push(`/sales/job-orders/create?quotationId=${quotation.id}`)
   }
 
   const getProductCount = (quotation: Quotation): number => {
@@ -87,19 +94,7 @@ export default function SelectQuotationPage() {
     if (quotation.items && Array.isArray(quotation.items)) {
       return quotation.items.map((item: any) => item.site_code).join(", ")
     }
-    return quotation.site_code || "N/A"
-  }
-
-  const handleConfirm = () => {
-    if (selectedQuotation) {
-      router.push(`/sales/job-orders/create?quotationId=${selectedQuotation.id}`)
-    } else {
-      toast({
-        title: "No Quotation Selected",
-        description: "Please select a quotation to proceed.",
-        variant: "destructive",
-      })
-    }
+    return "N/A" // If no items or not an array, return N/A
   }
 
   return (
@@ -185,13 +180,7 @@ export default function SelectQuotationPage() {
         )}
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => router.back()}>
-            Cancel
-          </Button>
-          <Button onClick={handleConfirm} disabled={!selectedQuotation}>
-            <FileText className="mr-2 h-4 w-4" />
-            {selectedQuotation && getProductCount(selectedQuotation) > 1
-              ? `Create ${getProductCount(selectedQuotation)} Job Orders`
-              : "Create Job Order"}
+            Back
           </Button>
         </div>
       </Card>

@@ -12,10 +12,17 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
+
 const app = initializeApp(firebaseConfig)
 
 export const db = getFirestore(app)
 export const auth = getAuth(app)
+
+// Set the tenant ID if available in environment variables
+if (process.env.NEXT_PUBLIC_FIREBASE_TENANT_ID) {
+  auth.tenantId = process.env.NEXT_PUBLIC_FIREBASE_TENANT_ID
+}
+
 export const storage = getStorage(app)
 
 export { doc, getDoc }
