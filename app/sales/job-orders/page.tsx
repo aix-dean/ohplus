@@ -15,6 +15,20 @@ import { useAuth } from "@/contexts/auth-context"
 import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useRouter } from "next/navigation" // Added useRouter
+import { Timestamp } from "firebase/firestore" // Import Timestamp type
+
+// Helper function to safely parse date values
+const safeParseDate = (dateValue: string | Date | Timestamp | undefined): Date | null => {
+  if (!dateValue) return null;
+  if (dateValue instanceof Date) return dateValue;
+  // Check if it's a Firebase Timestamp object
+  if (typeof dateValue === 'object' && dateValue instanceof Timestamp) {
+    return dateValue.toDate();
+  }
+  // Attempt to parse as a string
+  const parsedDate = new Date(dateValue);
+  return isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
 
 export default function JobOrdersPage() {
   const { user } = useAuth()
@@ -223,50 +237,54 @@ export default function JobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobOrders.map((jo) => (
-                  <TableRow
-                    key={jo.id}
-                    className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    onClick={() => router.push(`/sales/job-orders/${jo.id}`)} // Placeholder navigation
-                  >
-                    <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
-                    <TableCell className="py-3">{jo.siteName}</TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.dateRequested ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className={`${getJoTypeColor(jo.joType)} border font-medium`}>
-                        {jo.joType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.deadline ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                    <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
-                    <TableCell className="text-right py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/sales/job-orders/${jo.id}`)}>
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Delete JO ${jo.joNumber}`)}>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredJobOrders.map((jo) => {
+                  const dateRequested = safeParseDate(jo.dateRequested);
+                  const deadline = safeParseDate(jo.deadline);
+                  return (
+                    <TableRow
+                      key={jo.id}
+                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                      onClick={() => router.push(`/sales/job-orders/${jo.id}`)} // Placeholder navigation
+                    >
+                      <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
+                      <TableCell className="py-3">{jo.siteName}</TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
+                          {dateRequested ? format(dateRequested, "MMM d, yyyy") : "N/A"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="outline" className={`${getJoTypeColor(jo.joType)} border font-medium`}>
+                          {jo.joType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
+                          {deadline ? format(deadline, "MMM d, yyyy") : "N/A"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3">{jo.requestedBy}</TableCell>
+                      <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
+                      <TableCell className="text-right py-3">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/sales/job-orders/${jo.id}`)}>
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => alert(`Delete JO ${jo.joNumber}`)}>Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
@@ -274,7 +292,7 @@ export default function JobOrdersPage() {
 
    
           <Button
-             onClick={() => router.push("/sales/job-orders/select-quotation")} 
+             onClick={() => router.push("/sales/job-orders/select-quotation")}
            size="lg" className="rounded-full shadow-lg px-6 py-3 text-lg">
             <Plus className="mr-2 h-5 w-5" />
             Create JO
