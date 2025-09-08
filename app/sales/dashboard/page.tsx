@@ -191,7 +191,7 @@ function SalesDashboardContent() {
       setViewMode("grid")
     }
   }, [isMobile])
-
+  console.log(`user comoany id ${userData?.company_id}`)
   // Fetch clients for dashboard client selection (for proposals and CE/Quote)
   useEffect(() => {
     const fetchClients = async () => {
@@ -199,7 +199,9 @@ function SalesDashboardContent() {
         // Ensure user is logged in
         setIsSearchingDashboardClients(true)
         try {
-          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim(), null, user.uid) // Pass user.uid as uploadedByFilter
+          const itemsPerPage = debouncedDashboardClientSearchTerm.trim() ? 10000 : 100; // 1. Adjust itemsPerPage for initial load to 100. 2. If search term is not empty, fetch all clients (10000).
+          const lastDocForSearch = debouncedDashboardClientSearchTerm.trim() ? null : null; // Ensure lastDoc is null for full client fetch when searching.
+          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id);
           setDashboardClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients for dashboard:", error)
@@ -570,6 +572,7 @@ function SalesDashboardContent() {
       designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
+      company_id: client.company_id || "", // Add company_id here
     })
     setDashboardClientSearchTerm(client.company || client.name || "") // Display selected client in search bar
     toast({
@@ -652,7 +655,7 @@ function SalesDashboardContent() {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
         companyId: userData.company_id, // Add company_id to the proposal creation
-        client_company_id: selectedClientForProposal.id, // Add client's company_id
+        client_company_id: selectedClientForProposal.company_id, // Use client's company_id
       })
 
       toast({
@@ -846,7 +849,7 @@ function SalesDashboardContent() {
           startDate,
           endDate,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal!.id, // Add client's company_id
+          client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
           created_by_first_name: userData.first_name,
           created_by_last_name: userData.last_name,
@@ -858,6 +861,7 @@ function SalesDashboardContent() {
 
         if (selectedSites.length > 1) {
           // Create multiple quotations for multiple sites
+          console.log(`client data: ${JSON.stringify(clientData)}`)
           quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
 
           toast({
@@ -878,7 +882,7 @@ function SalesDashboardContent() {
         }
 
         // Navigate to the first quotation
-        router.push(`/sales/quotations/${quotationIds[0]}`)
+        router.push(`/sales/quotations/${quotationIds[quotationIds.length - 1]}`)
       } catch (error) {
         console.error("Error creating quotation:", error)
         toast({
@@ -919,7 +923,7 @@ function SalesDashboardContent() {
         startDate,
         endDate,
         company_id: userData.company_id,
-        client_company_id: selectedClientForProposal!.id, // Add client's company_id
+        client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
         page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
@@ -1011,7 +1015,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal!.id, // Added client_company_id to skip dates options
+          client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 
@@ -1917,7 +1921,7 @@ function SalesDashboardContent() {
 }
 
 export default function SalesDashboardPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
 
   return (
     <RouteProtection requiredRoles="sales">

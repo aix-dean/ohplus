@@ -233,7 +233,7 @@ export default function JobOrdersPage() {
                     <TableCell className="py-3">{jo.siteName}</TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.dateRequested ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
+                        {jo.dateRequested && !isNaN(new Date(jo.dateRequested).getTime()) ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">
@@ -243,7 +243,18 @@ export default function JobOrdersPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.deadline ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
+                        {(() => {
+                          console.log("jo.deadline value:", jo.deadline, "type:", typeof jo.deadline);
+                          try {
+                            const date = new Date(jo.deadline);
+                            if (jo.deadline && !isNaN(date.getTime())) {
+                              return format(date, "MMM d, yyyy");
+                            }
+                          } catch (e) {
+                            console.error("Error parsing jo.deadline:", e, "value:", jo.deadline);
+                          }
+                          return "N/A";
+                        })()}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">{jo.requestedBy}</TableCell>

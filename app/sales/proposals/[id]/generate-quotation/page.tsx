@@ -143,6 +143,7 @@ export default function GenerateQuotationPage() {
           created_by: "current_user",
           client_name: proposal.client.contactPerson,
           client_email: proposal.client.email,
+          client_id: proposal.client.id, // Added client_id
           campaignId: proposal.campaignId, // Include campaign ID from proposal
           proposalId: proposal.id, // Include proposal ID
         }
