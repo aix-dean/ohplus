@@ -61,7 +61,7 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
         const geocoder = new window.google.maps.Geocoder()
 
         // Geocode the location
-        geocoder.geocode({ address: location }, (results, status) => {
+        geocoder.geocode({ address: location }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
           if (status === "OK" && results && results[0]) {
             const map = new window.google.maps.Map(mapRef.current!, {
               center: results[0].geometry.location,
@@ -228,6 +228,10 @@ export default function ProposalDetailsPage() {
   const [selectedSize, setSelectedSize] = useState<string>("A4")
   const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
   const [selectedLayout, setSelectedLayout] = useState<string>("1")
+  const [previewSize, setPreviewSize] = useState<string>("A4")
+  const [previewOrientation, setPreviewOrientation] = useState<string>("Portrait")
+  const [previewLayout, setPreviewLayout] = useState<string>("1")
+  const [previewTemplateBackground, setPreviewTemplateBackground] = useState<string>("")
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
@@ -243,14 +247,26 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
-          const currentPageContent = getPageContent(1)
+          const currentPageContent = getPageContent(1, proposalData.templateLayout || "1")
           const currentPagePrice = getPagePrice(currentPageContent)
           setEditablePrice(currentPagePrice.toString())
 
-          if (proposalData.templateSize) setSelectedSize(proposalData.templateSize)
-          if (proposalData.templateOrientation) setSelectedOrientation(proposalData.templateOrientation)
-          if (proposalData.templateLayout) setSelectedLayout(proposalData.templateLayout)
-          if (proposalData.templateBackground) setSelectedTemplateBackground(proposalData.templateBackground)
+          if (proposalData.templateSize) {
+            setSelectedSize(proposalData.templateSize)
+            setPreviewSize(proposalData.templateSize)
+          }
+          if (proposalData.templateOrientation) {
+            setSelectedOrientation(proposalData.templateOrientation)
+            setPreviewOrientation(proposalData.templateOrientation)
+          }
+          if (proposalData.templateLayout) {
+            setSelectedLayout(proposalData.templateLayout)
+            setPreviewLayout(proposalData.templateLayout)
+          }
+          if (proposalData.templateBackground) {
+            setSelectedTemplateBackground(proposalData.templateBackground)
+            setPreviewTemplateBackground(proposalData.templateBackground)
+          }
         }
       } catch (error) {
         console.error("Error fetching proposal:", error)
@@ -297,7 +313,11 @@ export default function ProposalDetailsPage() {
     setShowTemplatesPanel(true)
     setShowCreateForm(false)
     setShowBackgroundTemplates(false)
-    // Don't reset template settings when opening dialog - preserve current values
+    // Initialize preview states with current selected states when opening dialog
+    setPreviewSize(selectedSize)
+    setPreviewOrientation(selectedOrientation)
+    setPreviewLayout(selectedLayout)
+    setPreviewTemplateBackground(selectedTemplateBackground)
   }
 
   const handleShowBackgroundTemplates = () => {
@@ -315,19 +335,19 @@ export default function ProposalDetailsPage() {
 
     setIsApplying(true)
     try {
-      // Only include templateBackground in update if it has been explicitly changed
       const updateData: any = {
-        templateSize: selectedSize,
-        templateOrientation: selectedOrientation,
-        templateLayout: selectedLayout,
+        templateSize: previewSize,
+        templateOrientation: previewOrientation,
+        templateLayout: previewLayout,
       }
 
-      // Only update templateBackground if it's been explicitly changed
-      if (selectedTemplateBackground !== "") {
-        updateData.templateBackground = selectedTemplateBackground
+      if (previewTemplateBackground !== "") {
+        updateData.templateBackground = previewTemplateBackground
+      } else {
+        updateData.templateBackground = ""
       }
 
-      console.log("[v0] Updating proposal with data:", updateData)
+      console.log("[v0] Applying template with data:", updateData)
 
       await updateProposal(proposal.id, updateData, userData.uid, userData.displayName || "User")
 
@@ -335,24 +355,30 @@ export default function ProposalDetailsPage() {
         prev
           ? {
               ...prev,
-              templateSize: selectedSize,
-              templateOrientation: selectedOrientation,
-              templateLayout: selectedLayout,
-              templateBackground:
-                selectedTemplateBackground !== "" ? selectedTemplateBackground : prev.templateBackground,
+              templateSize: previewSize,
+              templateOrientation: previewOrientation,
+              templateLayout: previewLayout,
+              templateBackground: previewTemplateBackground,
             }
           : null,
       )
+
+      setSelectedSize(previewSize)
+      setSelectedOrientation(previewOrientation)
+      setSelectedLayout(previewLayout)
+      setSelectedTemplateBackground(previewTemplateBackground)
+
+      setShowTemplatesPanel(false)
 
       toast({
         title: "Template Applied",
         description: "Template settings have been applied and saved",
       })
     } catch (error) {
-      console.error("Error updating price:", error)
+      console.error("Error applying template:", error)
       toast({
         title: "Error",
-        description: "Failed to update price",
+        description: "Failed to apply template settings",
         variant: "destructive",
       })
     } finally {
@@ -497,7 +523,7 @@ export default function ProposalDetailsPage() {
 
   const handleEditPrice = (pageNum: number) => {
     setIsEditingPrice(true)
-    const currentPageContent = getPageContent(pageNum)
+    const currentPageContent = getPageContent(pageNum, selectedLayout)
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
     setCurrentEditingPage(pageNum)
@@ -525,7 +551,7 @@ export default function ProposalDetailsPage() {
 
     setSavingPrice(true)
     try {
-      const currentPageContent = getPageContent(currentEditingPage || 1)
+      const currentPageContent = getPageContent(currentEditingPage || 1, selectedLayout)
       if (currentPageContent.length > 0) {
         const updatedProducts = proposal.products.map((product: any) => {
           // Update price for all products on the current page
@@ -570,7 +596,7 @@ export default function ProposalDetailsPage() {
   const handleCancelPriceEdit = () => {
     setIsEditingPrice(false)
     setCurrentEditingPage(null)
-    const currentPageContent = getPageContent(currentEditingPage || 1)
+    const currentPageContent = getPageContent(currentEditingPage || 1, selectedLayout)
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
   }
@@ -633,65 +659,32 @@ export default function ProposalDetailsPage() {
     }
   }
 
-  const handleTemplateSelect = async (template: any) => {
-    if (!proposal || !userData) return
-
+  const handleTemplateSelect = (template: any) => {
     const newBackground = template.background_url || ""
-    setSelectedTemplateBackground(newBackground)
-    setShowTemplatesPanel(false)
-
-    // Save the background template immediately to Firestore
-    try {
-      await updateProposal(
-        proposal.id,
-        { templateBackground: newBackground },
-        userData.uid,
-        userData.displayName || "User",
-      )
-
-      toast({
-        title: "Template Selected",
-        description: `Selected template: ${template.name}`,
-      })
-    } catch (error) {
-      console.error("[v0] Error saving background template:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save background template",
-      })
-    }
+    setPreviewTemplateBackground(newBackground)
+    setShowBackgroundTemplates(false) // Navigate back to options
+    toast({
+      title: "Background Selected for Preview",
+      description: `Selected template: ${template.name}`,
+    })
   }
 
-  const handleRemoveBackground = async () => {
-    if (!proposal || !userData) return
-
-    setSelectedTemplateBackground("")
-    setShowTemplatesPanel(false)
-
-    // Remove the background template from Firestore
-    try {
-      await updateProposal(proposal.id, { templateBackground: "" }, userData.uid, userData.displayName || "User")
-
-      toast({
-        title: "Background Removed",
-        description: "Background template has been removed",
-      })
-    } catch (error) {
-      console.error("[v0] Error removing background template:", error)
-      toast({
-        title: "Error",
-        description: "Failed to remove background template",
-      })
-    }
+  const handleRemoveBackground = () => {
+    setPreviewTemplateBackground("")
+    setShowBackgroundTemplates(false) // Navigate back to options
+    toast({
+      title: "Background Removed for Preview",
+      description: "Background template has been removed from preview",
+    })
   }
 
   // Helper functions to calculate container styles based on template settings
-  const getContainerDimensions = () => {
+  const getContainerDimensions = (size: string, orientation: string) => {
     const baseStyles = "bg-white shadow-lg border-transparent relative"
 
     // Size-based dimensions
     let sizeStyles = ""
-    switch (selectedSize) {
+    switch (size) {
       case "A4":
         sizeStyles = "w-[210mm] min-h-[297mm]" // A4 dimensions
         break
@@ -706,17 +699,14 @@ export default function ProposalDetailsPage() {
     }
 
     let orientationStyles = ""
-    switch (selectedOrientation) {
+    switch (orientation) {
       case "Square":
-        // Make container square-shaped but allow content to flow naturally
         orientationStyles = "max-w-[600px] min-h-[600px]"
         break
       case "Landscape":
-        // Make container wider than tall
         orientationStyles = "max-w-[800px] min-h-[500px]"
         break
       case "Portrait":
-        // Make container taller than wide (default behavior)
         orientationStyles = "max-w-[600px] min-h-[800px]"
         break
       default:
@@ -726,26 +716,26 @@ export default function ProposalDetailsPage() {
     return `${baseStyles} ${sizeStyles} ${orientationStyles}`
   }
 
-  const getSitesPerPage = () => Number.parseInt(selectedLayout)
+  const getSitesPerPage = (layout: string) => Number.parseInt(layout)
 
-  const getTotalPages = () => {
+  const getTotalPages = (layout: string) => {
     const numberOfSites = proposal?.products?.length || 1
-    const sitesPerPage = getSitesPerPage()
+    const sitesPerPage = getSitesPerPage(layout)
     return Math.ceil(numberOfSites / sitesPerPage)
   }
 
-  const getPageContent = (pageNumber: number) => {
+  const getPageContent = (pageNumber: number, layout: string) => {
     if (!proposal?.products) return []
 
-    const sitesPerPage = getSitesPerPage()
+    const sitesPerPage = getSitesPerPage(layout)
     const startIndex = (pageNumber - 1) * sitesPerPage
     const endIndex = startIndex + sitesPerPage
 
     return proposal.products.slice(startIndex, endIndex)
   }
 
-  const getLayoutGridClass = () => {
-    const sitesPerPage = getSitesPerPage()
+  const getLayoutGridClass = (layout: string) => {
+    const sitesPerPage = getSitesPerPage(layout)
     switch (sitesPerPage) {
       case 1:
         return "grid-cols-1"
@@ -755,35 +745,6 @@ export default function ProposalDetailsPage() {
         return "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
       default:
         return "grid-cols-1"
-    }
-  }
-
-  const saveTemplateSettings = async () => {
-    if (!proposal || !userData) return
-
-    try {
-      await updateProposal(
-        proposal.id,
-        {
-          templateSize: selectedSize,
-          templateOrientation: selectedOrientation,
-          templateLayout: selectedLayout,
-          templateBackground: selectedTemplateBackground,
-        },
-        userData.uid,
-        userData.displayName || "User",
-      )
-
-      toast({
-        title: "Success",
-        description: "Template settings saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving template settings:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save template settings",
-      })
     }
   }
 
@@ -826,9 +787,14 @@ export default function ProposalDetailsPage() {
     if (!proposal || !userData) return
 
     try {
-      await updateProposal(proposal.id, { status }, userData.uid, userData.displayName || "User")
+      await updateProposal(
+        proposal.id,
+        { status: status as Proposal["status"] },
+        userData.uid,
+        userData.displayName || "User",
+      )
 
-      setProposal((prev) => (prev ? { ...prev, status } : null))
+      setProposal((prev) => (prev ? { ...prev, status: status as Proposal["status"] } : null))
 
       toast({
         title: "Success",
@@ -873,28 +839,28 @@ export default function ProposalDetailsPage() {
     )
   }
 
-  const getPageContainerClass = () => {
+  const getPageContainerClass = (size: string, orientation: string) => {
     const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
 
     // Size-based dimensions with orientation support
     let sizeStyles = ""
-    switch (selectedSize) {
+    switch (size) {
       case "A4":
-        if (selectedOrientation === "Landscape") {
+        if (orientation === "Landscape") {
           sizeStyles = "w-[297mm] min-h-[210mm]" // A4 Landscape
         } else {
           sizeStyles = "w-[210mm] min-h-[297mm]" // A4 Portrait
         }
         break
       case "Letter size":
-        if (selectedOrientation === "Landscape") {
+        if (orientation === "Landscape") {
           sizeStyles = "w-[11in] min-h-[8.5in]" // Letter Landscape
         } else {
           sizeStyles = "w-[8.5in] min-h-[11in]" // Letter Portrait
         }
         break
       case "Legal size":
-        if (selectedOrientation === "Landscape") {
+        if (orientation === "Landscape") {
           sizeStyles = "w-[14in] min-h-[8.5in]" // Legal Landscape
         } else {
           sizeStyles = "w-[8.5in] min-h-[14in]" // Legal Portrait
@@ -905,8 +871,8 @@ export default function ProposalDetailsPage() {
     }
 
     // Square orientation for any paper size
-    if (selectedOrientation === "Square") {
-      switch (selectedSize) {
+    if (orientation === "Square") {
+      switch (size) {
         case "A4":
           sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
           break
@@ -1162,10 +1128,10 @@ export default function ProposalDetailsPage() {
                           {["A4", "Letter size", "Legal size"].map((size) => (
                             <Button
                               key={size}
-                              variant={selectedSize === size ? "default" : "outline"}
+                              variant={previewSize === size ? "default" : "outline"}
                               size="sm"
-                              onClick={() => setSelectedSize(size)}
-                              className={selectedSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              onClick={() => setPreviewSize(size)}
+                              className={previewSize === size ? "bg-blue-600 hover:bg-blue-700" : ""}
                             >
                               {size}
                             </Button>
@@ -1184,11 +1150,11 @@ export default function ProposalDetailsPage() {
                             <div
                               key={orientation.name}
                               className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-colors ${
-                                selectedOrientation === orientation.name
+                                previewOrientation === orientation.name
                                   ? "border-blue-500 bg-blue-50"
                                   : "border-gray-200 hover:border-gray-300"
                               }`}
-                              onClick={() => setSelectedOrientation(orientation.name)}
+                              onClick={() => setPreviewOrientation(orientation.name)}
                             >
                               <div className={`${orientation.aspect} bg-gray-100 rounded mb-2 mx-auto max-w-16`}></div>
                               <span className="text-xs font-medium text-gray-700">{orientation.name}</span>
@@ -1223,15 +1189,15 @@ export default function ProposalDetailsPage() {
                             <div
                               key={layout.value}
                               className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-200 ${
-                                selectedLayout === layout.value
+                                previewLayout === layout.value
                                   ? "border-blue-500 bg-blue-50 shadow-md scale-105"
                                   : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                               }`}
                               onClick={() => {
-                                setSelectedLayout(layout.value)
+                                setPreviewLayout(layout.value)
                                 toast({
-                                  title: "Layout Updated",
-                                  description: `Switched to ${layout.name} layout`,
+                                  title: "Layout Updated for Preview",
+                                  description: `Switched to ${layout.name} layout in preview`,
                                 })
                               }}
                             >
@@ -1265,8 +1231,27 @@ export default function ProposalDetailsPage() {
                           <ImageIcon className="h-4 w-4 mr-2" />
                           Choose Background Template (Optional)
                         </Button>
-                        {selectedTemplateBackground && (
-                          <div className="text-xs text-gray-600 text-center">Background template selected</div>
+                        {previewTemplateBackground ? (
+                          <div className="mt-4 p-3 border rounded-lg bg-gray-50 flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <img
+                                src={previewTemplateBackground}
+                                alt="Selected background preview"
+                                className="h-10 w-10 object-cover rounded-md border"
+                              />
+                              <span className="text-sm text-gray-700 truncate">Background selected</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveBackground}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-600 text-center mt-2">No background template selected</div>
                         )}
                       </div>
 
@@ -1328,12 +1313,12 @@ export default function ProposalDetailsPage() {
             className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
             style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
           >
-            {Array.from({ length: getTotalPages() }, (_, index) => {
+            {Array.from({ length: getTotalPages(selectedLayout) }, (_, index) => {
               const pageNumber = index + 1
-              const pageContent = getPageContent(pageNumber)
+              const pageContent = getPageContent(pageNumber, selectedLayout)
 
               return (
-                <div key={pageNumber} className={getPageContainerClass()}>
+                <div key={pageNumber} className={getPageContainerClass(selectedSize, selectedOrientation)}>
                   {selectedTemplateBackground && (
                     <div
                       className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-90 z-0"
@@ -1405,7 +1390,7 @@ export default function ProposalDetailsPage() {
                     </div>
 
                     {/* Product content grid */}
-                    <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass()}`}>
+                    <div className={`grid gap-4 transition-all duration-300 ${getLayoutGridClass(selectedLayout)}`}>
                       {pageContent.map((product, productIndex) => (
                         <div key={product.id} className="space-y-4 transition-all duration-300">
                           {/* Rest of product content */}
@@ -1413,9 +1398,9 @@ export default function ProposalDetailsPage() {
                             <div className="flex-shrink-0">
                               <div
                                 className={`border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 transition-all duration-300 ${
-                                  getSitesPerPage() === 1
+                                  getSitesPerPage(selectedLayout) === 1
                                     ? "w-48 h-60 md:w-64 md:h-80"
-                                    : getSitesPerPage() === 2
+                                    : getSitesPerPage(selectedLayout) === 2
                                       ? "w-40 h-48 md:w-48 md:h-60"
                                       : "w-32 h-40 md:w-36 md:h-44"
                                 }`}
@@ -1429,7 +1414,7 @@ export default function ProposalDetailsPage() {
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <ImageIcon
-                                      className={`text-gray-400 ${getSitesPerPage() === 1 ? "h-12 w-12" : "h-8 w-8"}`}
+                                      className={`text-gray-400 ${getSitesPerPage(selectedLayout) === 1 ? "h-12 w-12" : "h-8 w-8"}`}
                                     />
                                   </div>
                                 )}
@@ -1438,7 +1423,7 @@ export default function ProposalDetailsPage() {
 
                             <div className="flex-1 min-w-0">
                               <h3
-                                className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage() === 1 ? "text-lg" : "text-sm md:text-base"}`}
+                                className={`font-semibold text-gray-900 mb-3 ${getSitesPerPage(selectedLayout) === 1 ? "text-lg" : "text-sm md:text-base"}`}
                               >
                                 Location Map:
                               </h3>
@@ -1446,18 +1431,18 @@ export default function ProposalDetailsPage() {
                               {product.specs_rental?.location ? (
                                 <GoogleMap
                                   location={product.specs_rental.location}
-                                  className={`w-full rounded-lg mb-4 ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                  className={`w-full rounded-lg mb-4 ${getSitesPerPage(selectedLayout) === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
                                 />
                               ) : (
                                 <div
-                                  className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage() === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
+                                  className={`w-full bg-gray-100 rounded-lg mb-4 flex items-center justify-center ${getSitesPerPage(selectedLayout) === 1 ? "h-24 md:h-32" : "h-16 md:h-20"}`}
                                 >
                                   <p className="text-gray-500 text-xs">Location not specified</p>
                                 </div>
                               )}
 
                               <div
-                                className={`space-y-1 text-gray-800 ${getSitesPerPage() === 1 ? "text-sm" : "text-xs"}`}
+                                className={`space-y-1 text-gray-800 ${getSitesPerPage(selectedLayout) === 1 ? "text-sm" : "text-xs"}`}
                               >
                                 {product.specs_rental?.location && (
                                   <p>
