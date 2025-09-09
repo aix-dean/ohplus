@@ -35,10 +35,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
-import type { JobOrder } from "@/lib/types/job-order" // Import the JobOrder type
 
 // Helper function to convert Firebase timestamp to readable date
-export const formatFirebaseDate = (timestamp: any): string => {
+const formatFirebaseDate = (timestamp: any): string => {
   if (!timestamp) return ""
 
   try {
@@ -99,10 +98,11 @@ interface ServiceAssignment {
 
 export default function SiteDetailsPage({ params }: Props) {
   const [product, setProduct] = useState<any>(null)
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([]) // Changed from serviceAssignments
-  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]) // Keep service assignments for other parts if needed
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
   const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
   const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
@@ -110,7 +110,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
 
-  // Fetch product data and job orders
+  // Fetch product data and service assignments
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -123,33 +123,27 @@ export default function SiteDetailsPage({ params }: Props) {
         }
         setProduct(productData)
 
-        // Fetch job orders for this product
-        const jobOrdersQuery = query(
-          collection(db, "job_orders"), // Changed collection to "job_orders"
-          where("product_id", "==", params.id), // Assuming "product_id" links to the site
-          orderBy("createdAt", "desc"), // Changed from 'created' to 'createdAt'
+        // Fetch service assignments for this product
+        const assignmentsQuery = query(
+          collection(db, "service_assignments"),
+          where("projectSiteId", "==", params.id),
+          orderBy("created", "desc"),
         )
 
-        const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
-        const jobOrdersData: JobOrder[] = [] // Changed to JobOrder[]
+        const assignmentsSnapshot = await getDocs(assignmentsQuery)
+        const assignmentsData: ServiceAssignment[] = []
 
-        jobOrdersSnapshot.forEach((doc) => {
-          jobOrdersData.push({
+        assignmentsSnapshot.forEach((doc) => {
+          assignmentsData.push({
             id: doc.id,
             ...doc.data(),
-          } as JobOrder) // Cast to JobOrder
+          } as ServiceAssignment)
         })
 
-        setJobOrders(jobOrdersData) // Set job orders
-
-        // Optionally, fetch service assignments if they are still needed elsewhere
-        // For now, we'll assume the "Job Orders" card is the primary place for this data.
-        // If service assignments are needed for other components, their fetching logic
-        // would need to be re-added here or in a separate useEffect.
-
+        setServiceAssignments(assignmentsData)
       } catch (err) {
         setError(err as Error)
-        console.error("Error fetching data (SiteDetailsPage):", err) // More specific error logging
+        console.error("Error fetching data:", err)
       } finally {
         setLoading(false)
       }
@@ -262,6 +256,13 @@ export default function SiteDetailsPage({ params }: Props) {
                   target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
                 }}
               />
+              <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                23
+              </div>
+              {/* Map overlay */}
+              <div className="absolute inset-0 bg-black/20 rounded-md flex items-center justify-center">
+                <MapPin className="h-8 w-8 text-red-500" />
+              </div>
             </div>
 
             {/* Site Details */}
@@ -331,27 +332,31 @@ export default function SiteDetailsPage({ params }: Props) {
               </Button>
             </CardHeader>
             <CardContent className="p-4">
-              {jobOrders.length === 0 ? (
+              {serviceAssignments.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No job orders found for this site.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {jobOrders.map((jobOrder) => (
+                <div className="space-y-3">
+                  {serviceAssignments.slice(0, 3).map((assignment) => (
                     <div
-                      key={jobOrder.id}
-                      className="flex items-center gap-3 p-3 border border-blue-200 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                      key={assignment.id}
+                      className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
                       onClick={() => {
-                        router.push(`/logistics/assignments/create?jobOrderId=${jobOrder.id}`)
+                        setSelectedAssignmentId(assignment.id)
+                        setDetailsDialogOpen(true)
                       }}
                     >
-                      <Users className="h-6 w-6 text-blue-600" /> {/* Using Users as a placeholder for running person icon */}
-                      <div>
-                        <p className="text-blue-700 font-semibold text-sm">You have a JO!</p>
-                        <p className="text-gray-800 text-sm">
-                          JO#{jobOrder.joNumber} from SALES_{jobOrder.requestedBy}.
-                        </p>
-                        <p className="text-gray-600 text-xs">
-                          Sent on {formatFirebaseDate(jobOrder.createdAt)}
-                        </p>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-sm">SA: {assignment.saNumber}</div>
+                          <div className="text-xs text-gray-500 mt-1">{assignment.serviceType}</div>
+                          <div className="text-xs text-gray-600 mt-1 line-clamp-2">{assignment.jobDescription}</div>
+                        </div>
+                        <Badge
+                          variant={assignment.status === "completed" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {assignment.status}
+                        </Badge>
                       </div>
                     </div>
                   ))}
@@ -777,12 +782,38 @@ export default function SiteDetailsPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Keeping ServiceAssignmentDetailsDialog for now, but disabled, in case it's used elsewhere */}
       <ServiceAssignmentDetailsDialog
-        open={false}
-        onOpenChange={() => {}}
-        assignmentId={null}
-        onStatusChange={() => {}}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        assignmentId={selectedAssignmentId}
+        onStatusChange={() => {
+          // Refresh service assignments after status change
+          const fetchAssignments = async () => {
+            try {
+              const assignmentsQuery = query(
+                collection(db, "service_assignments"),
+                where("projectSiteId", "==", params.id),
+                orderBy("created", "desc"),
+              )
+
+              const assignmentsSnapshot = await getDocs(assignmentsQuery)
+              const assignmentsData: ServiceAssignment[] = []
+
+              assignmentsSnapshot.forEach((doc) => {
+                assignmentsData.push({
+                  id: doc.id,
+                  ...doc.data(),
+                } as ServiceAssignment)
+              })
+
+              setServiceAssignments(assignmentsData)
+            } catch (err) {
+              console.error("Error refreshing assignments:", err)
+            }
+          }
+
+          fetchAssignments()
+        }}
       />
       <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
       <IlluminationIndexCardDialog
