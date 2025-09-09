@@ -14,6 +14,7 @@ import {
   ImageIcon,
   XCircle,
   Package,
+  CircleCheck 
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +26,6 @@ import { Calendar } from "@/components/ui/calendar"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -33,13 +33,14 @@ import {
   createMultipleJobOrders,
   getQuotationDetailsForJobOrder,
   generatePersonalizedJONumber,
-  type QuotationItem,
 } from "@/lib/job-order-service"
+import { updateQuotation } from "@/lib/quotation-service" // Import updateQuotation
+import type { QuotationProduct } from "@/lib/types/quotation" // Corrected import for QuotationProduct
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation } from "@/lib/types/quotation"
 import type { Product } from "@/lib/firebase-service"
-import type { Client } from "@/lib/client-service"
+import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
@@ -50,8 +51,8 @@ interface JobOrderFormData {
   joType: JobOrderType | ""
   dateRequested: Date | undefined
   deadline: Date | undefined
+  campaignName: string // Added campaign name
   remarks: string
-  assignTo: string
   attachmentFile: File | null
   attachmentUrl: string | null
   uploadingAttachment: boolean
@@ -72,27 +73,50 @@ export default function CreateJobOrderPage() {
   const [quotationData, setQuotationData] = useState<{
     quotation: Quotation
     products: Product[]
-    client: Client | null
-    items?: QuotationItem[]
+    client: ClientCompany | null // This should be ClientCompany
+    items?: QuotationProduct[] // Changed from QuotationItem
   } | null>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Shared compliance states
+  // Client Compliance states
+  const [dtiBirFile, setDtiBirFile] = useState<File | null>(null)
+  const [dtiBirUrl, setDtiBirUrl] = useState<string | null>(null)
+  const [uploadingDtiBir, setUploadingDtiBir] = useState(false)
+  const [dtiBirError, setDtiBirError] = useState<string | null>(null)
+
+  const [gisFile, setGisFile] = useState<File | null>(null)
+  const [gisUrl, setGisUrl] = useState<string | null>(null)
+  const [uploadingGis, setUploadingGis] = useState(false)
+  const [gisError, setGisError] = useState<string | null>(null)
+
+  const [idSignatureFile, setIdSignatureFile] = useState<File | null>(null)
+  const [idSignatureUrl, setIdSignatureUrl] = useState<string | null>(null)
+  const [uploadingIdSignature, setUploadingIdSignature] = useState(false)
+  const [idSignatureError, setIdSignatureError] = useState<string | null>(null)
+
+  // Project Compliance states
   const [signedQuotationFile, setSignedQuotationFile] = useState<File | null>(null)
   const [signedQuotationUrl, setSignedQuotationUrl] = useState<string | null>(null)
   const [uploadingSignedQuotation, setUploadingSignedQuotation] = useState(false)
   const [signedQuotationError, setSignedQuotationError] = useState<string | null>(null)
+
+  const [signedContractFile, setSignedContractFile] = useState<File | null>(null)
+  const [signedContractUrl, setSignedContractUrl] = useState<string | null>(null)
+  const [uploadingSignedContract, setUploadingSignedContract] = useState(false)
+  const [signedContractError, setSignedContractError] = useState<string | null>(null)
 
   const [poMoFile, setPoMoFile] = useState<File | null>(null)
   const [poMoUrl, setPoMoUrl] = useState<string | null>(null)
   const [uploadingPoMo, setUploadingPoMo] = useState(false)
   const [poMoError, setPoMoError] = useState<string | null>(null)
 
-  const [projectFaFile, setProjectFaFile] = useState<File | null>(null)
-  const [projectFaUrl, setProjectFaUrl] = useState<string | null>(null)
-  const [uploadingProjectFa, setUploadingProjectFa] = useState(false)
-  const [projectFaError, setProjectFaError] = useState<string | null>(null)
+  const [finalArtworkFile, setFinalArtworkFile] = useState<File | null>(null)
+  const [finalArtworkUrl, setFinalArtworkUrl] = useState<string | null>(null)
+  const [uploadingFinalArtwork, setUploadingFinalArtwork] = useState(false)
+  const [finalArtworkError, setFinalArtworkError] = useState<string | null>(null)
+
+  const [paymentAdvanceConfirmed, setPaymentAdvanceConfirmed] = useState(false)
 
   // Form data for each product
   const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
@@ -104,29 +128,36 @@ export default function CreateJobOrderPage() {
   // Coming soon dialog state
   const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
 
-  // Active tab for multi-product forms
-  const [activeTab, setActiveTab] = useState("0")
 
   // Calculate derived values using useMemo - these will always be called
-  const quotationItems = useMemo(() => {
-    return quotationData?.quotation?.items || []
-  }, [quotationData])
 
-  const isMultiProduct = useMemo(() => {
-    return quotationItems.length > 1
-  }, [quotationItems])
-
-  const hasItems = useMemo(() => {
-    return quotationItems.length > 0
-  }, [quotationItems])
 
   const missingCompliance = useMemo(() => {
+    const projectCompliance = quotationData?.quotation?.projectCompliance
     return {
-      signedQuotation: !signedQuotationUrl,
-      poMo: !poMoUrl,
-      projectFa: !projectFaUrl,
+      dtiBir: !dtiBirUrl && !quotationData?.client?.compliance?.dti,
+      gis: !gisUrl && !quotationData?.client?.compliance?.gis,
+      idSignature: !idSignatureUrl && !quotationData?.client?.compliance?.id,
+      signedQuotation: !signedQuotationUrl && !(projectCompliance?.signedQuotation?.fileUrl || projectCompliance?.signedQuotation?.status === "completed"),
+      signedContract: !signedContractUrl && !projectCompliance?.signedContract?.fileUrl,
+      poMo: !poMoUrl && !projectCompliance?.poMo?.fileUrl,
+      finalArtwork: !finalArtworkUrl && !projectCompliance?.finalArtwork?.fileUrl,
+      paymentAdvance: !paymentAdvanceConfirmed && !(projectCompliance?.paymentAsDeposit?.completed),
     }
-  }, [signedQuotationUrl, poMoUrl, projectFaUrl])
+  }, [
+    dtiBirUrl,
+    gisUrl,
+    idSignatureUrl,
+    signedQuotationUrl,
+    signedContractUrl,
+    poMoUrl,
+    finalArtworkUrl,
+    paymentAdvanceConfirmed,
+    quotationData?.client?.compliance?.dti,
+    quotationData?.client?.compliance?.gis,
+    quotationData?.client?.compliance?.id,
+    quotationData?.quotation?.projectCompliance, // Depend on the whole object
+  ])
 
   // Calculate duration in months
   const totalDays = useMemo(() => {
@@ -140,41 +171,29 @@ export default function CreateJobOrderPage() {
     if (!quotationData) return []
 
     const quotation = quotationData.quotation
+    const products = quotationData.products // Access products here
 
-    if (hasItems) {
-      // Multiple products from quotation.items
-      return quotationItems.map((item: any) => {
-        const subtotal = item.item_total_amount || 0 // Use item_total_amount for subtotal
-        const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
-        const total = subtotal + vat // Recalculate total
+    // Always treat as a single product from quotation object
+    const subtotal = quotation.total_amount || 0 // Use total_amount for single product
+    const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
+    const total = subtotal + vat // Recalculate total
 
-        return {
-          subtotal,
-          vat,
-          total,
-          monthlyRate: item.price || 0, // Keep monthlyRate for display if needed
-          siteCode: item.site_code || "N/A",
-          productName: item.product_name || "N/A",
-        }
-      })
-    } else {
-      // Single product from quotation object
-      const subtotal = quotation.item_total_amount || 0 // Use item_total_amount for subtotal
-      const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
-      const total = subtotal + vat // Recalculate total
+    const monthlyRate =
+      quotation.duration_days && quotation.duration_days > 0
+        ? subtotal / (quotation.duration_days / 30) // Approximate monthly rate
+        : 0
 
-      return [
-        {
-          subtotal,
-          vat,
-          total,
-          monthlyRate: quotation.price || 0, // Keep monthlyRate for display if needed
-          siteCode: quotation.site_code || "N/A",
-          productName: quotation.product_name || "N/A",
-        },
-      ]
-    }
-  }, [quotationData, quotationItems, hasItems])
+    return [
+      {
+        subtotal,
+        vat,
+        total,
+        monthlyRate: monthlyRate,
+        siteCode: products[0]?.site_code || "N/A", // Get from product
+        productName: products[0]?.name || "N/A", // Get from product
+      },
+    ]
+  }, [quotationData])
 
   // Calculate overall totals
   const overallTotal = useMemo(() => {
@@ -214,6 +233,8 @@ export default function CreateJobOrderPage() {
       setUploadingState: React.Dispatch<React.SetStateAction<boolean>>,
       setErrorState: React.Dispatch<React.SetStateAction<string | null>>,
       path: string,
+      clientId?: string, // Optional client ID
+      fieldToUpdate?: string, // Optional field to update in client document
     ) => {
       setUploadingState(true)
       setErrorState(null)
@@ -251,6 +272,122 @@ export default function CreateJobOrderPage() {
         const downloadURL = await uploadFileToFirebaseStorage(file, path)
         setUrlState(downloadURL)
         setFileState(file)
+
+        // If client_company_id is available, update the client_company document
+        if (quotationData?.quotation?.client_company_id && fieldToUpdate) {
+          let complianceFieldKey: "dti" | "gis" | "id" | undefined
+
+          if (fieldToUpdate === "dti_bir_2303_url") {
+            complianceFieldKey = "dti"
+          } else if (fieldToUpdate === "gis_url") {
+            complianceFieldKey = "gis"
+          } else if (fieldToUpdate === "id_signature_url") {
+            complianceFieldKey = "id"
+          }
+
+          if (complianceFieldKey) {
+            // Construct the current compliance state from the client object (which holds merged data)
+            const currentClientCompliance: Partial<ClientCompany["compliance"]> = {
+              dti: quotationData.client?.compliance?.dti || undefined,
+              gis: quotationData.client?.compliance?.gis || undefined,
+              id: quotationData.client?.compliance?.id || undefined,
+            }
+
+            await updateClientCompany(quotationData.quotation.client_company_id, {
+              compliance: {
+                ...currentClientCompliance, // Preserve existing compliance fields
+                [complianceFieldKey]: downloadURL, // Update the specific field
+              },
+            })
+            toast({
+              title: "Client Company Document Updated",
+              description: `Client company's ${fieldToUpdate} updated successfully.`,
+            })
+          } else {
+            console.warn(`Unknown compliance field to update: ${fieldToUpdate}`)
+            toast({
+              title: "Update Failed",
+              description: `Could not update client company compliance for unknown field: ${fieldToUpdate}.`,
+              variant: "destructive",
+            })
+          }
+          toast({
+            title: "Client Company Document Updated",
+            description: `Client company's ${fieldToUpdate} updated successfully.`,
+          })
+        } else if (quotationId && fieldToUpdate) {
+          // Handle project compliance updates for the quotation document
+          let projectComplianceFieldKey:
+            | "signedQuotation"
+            | "signedContract"
+            | "poMo"
+            | "finalArtwork"
+            | "paymentAsDeposit"
+            | undefined
+
+          if (fieldToUpdate === "signedQuotation") {
+            projectComplianceFieldKey = "signedQuotation"
+          } else if (fieldToUpdate === "signedContract") {
+            projectComplianceFieldKey = "signedContract"
+          } else if (fieldToUpdate === "poMo") {
+            projectComplianceFieldKey = "poMo"
+          } else if (fieldToUpdate === "finalArtwork") {
+            projectComplianceFieldKey = "finalArtwork"
+          } else if (fieldToUpdate === "paymentAsDeposit") {
+            projectComplianceFieldKey = "paymentAsDeposit"
+          }
+
+          if (projectComplianceFieldKey) {
+            const defaultProjectComplianceItem: ProjectComplianceItem = { completed: false, fileName: null, fileUrl: null, notes: null, uploadedAt: null, uploadedBy: null, status: "pending" }
+
+            const currentProjectCompliance: Quotation["projectCompliance"] = {
+              finalArtwork: quotationData?.quotation?.projectCompliance?.finalArtwork || defaultProjectComplianceItem,
+              paymentAsDeposit: quotationData?.quotation?.projectCompliance?.paymentAsDeposit || defaultProjectComplianceItem,
+              poMo: quotationData?.quotation?.projectCompliance?.poMo || defaultProjectComplianceItem,
+              signedContract: quotationData?.quotation?.projectCompliance?.signedContract || defaultProjectComplianceItem,
+              signedQuotation: quotationData?.quotation?.projectCompliance?.signedQuotation || defaultProjectComplianceItem,
+            }
+
+            await updateQuotation(
+              quotationId,
+              {
+                projectCompliance: {
+                  ...currentProjectCompliance, // Spread the fully initialized object
+                  [projectComplianceFieldKey]: {
+                    ...(currentProjectCompliance[projectComplianceFieldKey as keyof Quotation["projectCompliance"]] as ProjectComplianceItem), // Now this will always be an object
+                    completed: true,
+                    fileName: file.name,
+                    fileUrl: downloadURL,
+                    uploadedAt: new Date().toISOString(),
+                    uploadedBy: user?.uid || null,
+                    ...(projectComplianceFieldKey === "signedQuotation" && { status: "completed" }), // Add status for signedQuotation
+                  },
+                },
+              },
+              user?.uid || "unknown",
+              userData?.first_name || "System",
+            )
+            toast({
+              title: "Project Compliance Document Updated",
+              description: `Quotation's ${fieldToUpdate} updated successfully.`,
+            })
+          } else {
+            console.warn(`Unknown project compliance field to update: ${fieldToUpdate}`)
+            toast({
+              title: "Update Failed",
+              description: `Could not update project compliance for unknown field: ${fieldToUpdate}.`,
+              variant: "destructive",
+            })
+          }
+        } else if (clientId && fieldToUpdate) {
+          // Fallback to updating the individual client document if no client_company_id
+          await updateClient(clientId, { [fieldToUpdate]: downloadURL })
+          toast({
+            title: "Client Document Updated",
+            description: `Client's ${fieldToUpdate} updated successfully.`,
+          })
+        }
+
         toast({
           title: "Upload Successful",
           description: `${file.name} uploaded successfully.`,
@@ -364,120 +501,120 @@ export default function CreateJobOrderPage() {
       try {
         let jobOrdersData = []
 
-        if (hasItems) {
-          jobOrdersData = await Promise.all(
-            quotationItems.map(async (item: any, index: number) => {
-              const form = jobOrderForms[index]
-              const product = products[index] || {}
+        // Single product from quotation object
+        const form = jobOrderForms[0]
+        const product = products[0] || {}
 
-              const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
+        const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-              const subtotal = item.item_total_amount || 0 // Use item_total_amount
-              const productVat = subtotal * 0.12 // Recalculate VAT
-              const productTotal = subtotal + productVat // Recalculate total
+        const subtotal = quotation.total_amount || 0 // Use total_amount for single product
+        const productVat = subtotal * 0.12 // Recalculate VAT
+        const productTotal = subtotal + productVat // Recalculate total
 
-              return {
-                quotationId: quotation.id,
-                joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
-                dateRequested: form.dateRequested!.toISOString(),
-                joType: form.joType as JobOrderType,
-                deadline: form.deadline!.toISOString(),
-                requestedBy: userData?.first_name || "Auto-Generated",
-                remarks: form.remarks,
-                assignTo: form.assignTo,
-                attachments: form.attachmentUrl
-                  ? [
-                      {
-                        url: form.attachmentUrl,
-                        name: form.attachmentFile?.name || "Attachment",
-                        type: form.attachmentFile?.type || "image",
-                      },
-                    ]
-                  : [],
-                signedQuotationUrl: signedQuotationUrl,
-                poMoUrl: poMoUrl,
-                projectFaUrl: projectFaUrl,
-                quotationNumber: quotation.quotation_number,
-                clientName: client?.name || "N/A",
-                clientCompany: client?.company || "N/A",
-                contractDuration: contractDuration, // Use new contractDuration
-                contractPeriodStart: quotation.start_date || "",
-                contractPeriodEnd: quotation.end_date || "",
-                siteName: item.product_name || product.name || "",
-                siteCode: item.site_code || product.site_code || "N/A",
-                siteType: item.type || product.type || "N/A",
-                siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-                siteIllumination: product.light?.illumination || "N/A",
-                leaseRatePerMonth: item.price || 0, // Keep monthlyRate for display if needed
-                totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
-                totalLease: subtotal, // totalLease is now the subtotal
-                vatAmount: productVat, // Use recalculated VAT
-                totalAmount: productTotal, // Use recalculated total
-                siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-                missingCompliance: missingCompliance,
-                product_id: item.product_id || product.id || "",
-                company_id: userData?.company_id || "",
-              }
-            }),
-          )
-        } else {
-          // Single product from quotation object
-          const form = jobOrderForms[0]
-          const product = products[0] || {}
-
-          const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
-
-          const subtotal = quotation.item_total_amount || 0 // Use item_total_amount
-          const productVat = subtotal * 0.12 // Recalculate VAT
-          const productTotal = subtotal + productVat // Recalculate total
-
-          jobOrdersData = [
-            {
-              quotationId: quotation.id,
-              joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
-              dateRequested: form.dateRequested!.toISOString(),
-              joType: form.joType as JobOrderType,
-              deadline: form.deadline!.toISOString(),
-              requestedBy: userData?.first_name || "Auto-Generated",
-              remarks: form.remarks,
-              assignTo: form.assignTo,
-              attachments: form.attachmentUrl
-                ? [
-                    {
-                      url: form.attachmentUrl,
-                      name: form.attachmentFile?.name || "Attachment",
-                      type: form.attachmentFile?.type || "image",
-                    },
-                  ]
-                : [],
-              signedQuotationUrl: signedQuotationUrl,
-              poMoUrl: poMoUrl,
-              projectFaUrl: projectFaUrl,
-              quotationNumber: quotation.quotation_number,
-              clientName: client?.name || "N/A",
-              clientCompany: client?.company || "N/A",
-              contractDuration: contractDuration, // Use new contractDuration
-              contractPeriodStart: quotation.start_date || "",
-              contractPeriodEnd: quotation.end_date || "",
-              siteName: quotation.product_name || product.name || "",
-              siteCode: quotation.site_code || product.site_code || "N/A",
-              siteType: product.type || "N/A",
-              siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-              siteIllumination: product.light?.illumination || "N/A",
-              leaseRatePerMonth: quotation.price || 0, // Keep monthlyRate for display if needed
-              totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
-              totalLease: subtotal, // totalLease is now the subtotal
-              vatAmount: productVat, // Use recalculated VAT
-              totalAmount: productTotal, // Use recalculated total
-              siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-              missingCompliance: missingCompliance,
-              product_id: quotation.product_id || product.id || "",
-              company_id: userData?.company_id || "",
+        jobOrdersData = [
+          {
+            quotationId: quotation.id,
+            joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
+            dateRequested: form.dateRequested!.toISOString(),
+            joType: form.joType as JobOrderType,
+            deadline: form.deadline!.toISOString(),
+            campaignName: form.campaignName, // Added campaign name
+            requestedBy: userData?.first_name || "Auto-Generated",
+            remarks: form.remarks,
+            attachments: form.attachmentUrl
+              ? [
+                  {
+                    url: form.attachmentUrl,
+                    name: form.attachmentFile?.name || "Attachment",
+                    type: form.attachmentFile?.type || "image",
+                  },
+                ]
+              : [],
+            dtiBirUrl: dtiBirUrl, // Added client compliance
+            gisUrl: gisUrl, // Added client compliance
+            idSignatureUrl: idSignatureUrl, // Added client compliance
+            quotationNumber: quotation.quotation_number,
+            clientName: client?.name || "N/A",
+            clientCompany: client?.name || "N/A", // Changed from client?.company to client?.name
+            contractDuration: contractDuration, // Use new contractDuration
+            contractPeriodStart: quotation.start_date || "",
+            contractPeriodEnd: quotation.end_date || "",
+            siteName: product.name || "", // Get from product
+            siteCode: product.site_code || "N/A", // Get from product
+            siteType: product.type || "N/A",
+            siteSize:
+              (product.specs_rental?.width && product.specs_rental?.height
+                ? `${product.specs_rental.width}x${product.specs_rental.height}ft`
+                : "N/A") || "N/A", // Corrected siteSize
+            siteIllumination: product.light?.illumination_status || "N/A", // Corrected siteIllumination
+            leaseRatePerMonth:
+              quotation.duration_days && quotation.duration_days > 0
+                ? subtotal / (quotation.duration_days / 30)
+                : 0, // Corrected monthlyRate
+            totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+            totalLease: subtotal, // totalLease is now the subtotal
+            vatAmount: productVat, // Use recalculated VAT
+            totalAmount: productTotal, // Use recalculated total
+            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            missingCompliance: missingCompliance,
+            product_id: quotation.product_id || product.id || "",
+            company_id: userData?.company_id || "",
+            created_by: user.uid, // Added created_by
+            projectCompliance: { // Construct projectCompliance object
+              signedQuotation: {
+                completed: !!signedQuotationUrl,
+                fileName: signedQuotationFile?.name || null,
+                fileUrl: signedQuotationUrl,
+                notes: null,
+                uploadedAt: signedQuotationUrl ? new Date().toISOString() : null,
+                uploadedBy: user?.uid || null,
+                status: signedQuotationUrl ? "completed" : "pending",
+              },
+              signedContract: {
+                completed: !!signedContractUrl,
+                fileName: signedContractFile?.name || null,
+                fileUrl: signedContractUrl,
+                notes: null,
+                uploadedAt: signedContractUrl ? new Date().toISOString() : null,
+                uploadedBy: user?.uid || null,
+                status: signedContractUrl ? "completed" : "pending",
+              },
+              poMo: {
+                completed: !!poMoUrl,
+                fileName: poMoFile?.name || null,
+                fileUrl: poMoUrl,
+                notes: null,
+                uploadedAt: poMoUrl ? new Date().toISOString() : null,
+                uploadedBy: user?.uid || null,
+                status: poMoUrl ? "completed" : "pending",
+              },
+              finalArtwork: {
+                completed: !!finalArtworkUrl,
+                fileName: finalArtworkFile?.name || null,
+                fileUrl: finalArtworkUrl,
+                notes: null,
+                uploadedAt: finalArtworkUrl ? new Date().toISOString() : null,
+                uploadedBy: user?.uid || null,
+                status: finalArtworkUrl ? "completed" : "pending",
+              },
+              paymentAsDeposit: {
+                completed: paymentAdvanceConfirmed,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: paymentAdvanceConfirmed ? new Date().toISOString() : null,
+                uploadedBy: user?.uid || null,
+                status: paymentAdvanceConfirmed ? "completed" : "pending",
+              },
             },
-          ]
-        }
+          },
+        ]
 
-        const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
+        const joIds = await createMultipleJobOrders(
+          jobOrdersData.map((jo) => ({ ...jo, assignTo: "" })), // Add default assignTo
+          user.uid,
+          status,
+        )
         setCreatedJoIds(joIds)
         setShowJobOrderSuccessDialog(true)
       } catch (error: any) {
@@ -495,13 +632,13 @@ export default function CreateJobOrderPage() {
       quotationData,
       user,
       validateForms,
-      hasItems,
-      quotationItems,
       jobOrderForms,
       totalDays,
       signedQuotationUrl,
+      signedContractUrl,
       poMoUrl,
-      projectFaUrl,
+      finalArtworkUrl,
+      paymentAdvanceConfirmed,
       missingCompliance,
       userData,
       toast,
@@ -529,8 +666,70 @@ export default function CreateJobOrderPage() {
       setLoading(true)
       try {
         const data = await getQuotationDetailsForJobOrder(quotationId)
+        console.log(`Fetched Quotation Data: ${JSON.stringify(data?.quotation.projectCompliance, null, 2)}`)
         if (data) {
           setQuotationData(data)
+
+          // Fetch the client_company document using the client_company_id from the quotation
+          if (data.quotation.client_company_id) {
+            const clientCompanyDoc = await getClientCompanyById(data.quotation.client_company_id)
+            if (clientCompanyDoc) {
+              console.log("Client Company Document:", JSON.stringify(clientCompanyDoc, null, 2))
+              // Use clientCompanyDoc data to set compliance URLs
+              if (clientCompanyDoc.compliance?.dti) {
+                setDtiBirUrl(clientCompanyDoc.compliance.dti)
+              }
+              if (clientCompanyDoc.compliance?.gis) {
+                setGisUrl(clientCompanyDoc.compliance.gis)
+              }
+              if (clientCompanyDoc.compliance?.id) {
+                setIdSignatureUrl(clientCompanyDoc.compliance.id)
+              }
+            } else {
+              console.warn(`Client company with ID ${data.quotation.client_company_id} not found.`)
+              // Fallback to data.client if clientCompanyDoc is not found
+              if (data.client?.compliance?.dti) {
+                setDtiBirUrl(data.client.compliance.dti)
+              }
+              if (data.client?.compliance?.gis) {
+                setGisUrl(data.client.compliance.gis)
+              }
+              if (data.client?.compliance?.id) {
+                setIdSignatureUrl(data.client.compliance.id)
+              }
+            }
+          } else {
+            // If no client_company_id, still try to set from data.client (which might have compliance from client_db)
+            if (data.client?.compliance?.dti) {
+              setDtiBirUrl(data.client.compliance.dti)
+            }
+            if (data.client?.compliance?.gis) {
+              setGisUrl(data.client.compliance.gis)
+            }
+            if (data.client?.compliance?.id) {
+              setIdSignatureUrl(data.client.compliance.id)
+            }
+          }
+
+          // Initialize project compliance states from quotationData
+          if (data.quotation.projectCompliance) {
+            const projectCompliance = data.quotation.projectCompliance
+            if (projectCompliance.signedQuotation?.fileUrl) {
+              setSignedQuotationUrl(projectCompliance.signedQuotation.fileUrl)
+            }
+            if (projectCompliance.signedContract?.fileUrl) {
+              setSignedContractUrl(projectCompliance.signedContract.fileUrl)
+            }
+            if (projectCompliance.poMo?.fileUrl) {
+              setPoMoUrl(projectCompliance.poMo.fileUrl)
+            }
+            if (projectCompliance.finalArtwork?.fileUrl) {
+              setFinalArtworkUrl(projectCompliance.finalArtwork.fileUrl)
+            }
+            if (projectCompliance.paymentAsDeposit?.completed) {
+              setPaymentAdvanceConfirmed(true)
+            }
+          }
         } else {
           toast({
             title: "Error",
@@ -558,23 +757,24 @@ export default function CreateJobOrderPage() {
   // Initialize forms when quotation data changes
   useEffect(() => {
     if (quotationData && userData?.uid) {
-      const productCount = hasItems ? quotationItems.length : 1
-      const initialForms: JobOrderFormData[] = Array.from({ length: productCount }, () => ({
-        joType: "",
-        dateRequested: new Date(),
-        deadline: undefined,
-        remarks: "",
-        assignTo: userData.uid,
-        attachmentFile: null,
-        attachmentUrl: null,
-        uploadingAttachment: false,
-        attachmentError: null,
-        joTypeError: false,
-        dateRequestedError: false,
-      }))
+      const initialForms: JobOrderFormData[] = [
+        {
+          joType: "",
+          dateRequested: new Date(),
+          deadline: undefined,
+          campaignName: quotationData.quotation?.campaignId || "", // Initialize with quotation campaignId
+          remarks: "",
+          attachmentFile: null,
+          attachmentUrl: null,
+          uploadingAttachment: false,
+          attachmentError: null,
+          joTypeError: false,
+          dateRequestedError: false,
+        },
+      ]
       setJobOrderForms(initialForms)
     }
-  }, [quotationData, userData?.uid, hasItems, quotationItems.length])
+  }, [quotationData, userData?.uid])
 
   // Early returns after all hooks
   if (loading) {
@@ -608,18 +808,12 @@ export default function CreateJobOrderPage() {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold text-gray-900">Create Job Order{isMultiProduct ? "s" : ""}</h1>
-        {isMultiProduct && (
-          <Badge variant="secondary">
-            <Package className="h-3 w-3 mr-1" />
-            {quotationItems.length} Products
-          </Badge>
-        )}
+        <h1 className="text-2xl font-bold text-gray-900">Create Job Order</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto w-full">
         {/* Left Column: Booking Information */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:border-r lg:border-gray-200 lg:pr-8">
           <h2 className="text-lg font-bold text-gray-900">Booking Information</h2>
           <div className="space-y-3 text-gray-800">
             <div className="space-y-0.5">
@@ -633,7 +827,7 @@ export default function CreateJobOrderPage() {
             </div>
             <div className="space-y-0.5">
               <p className="text-sm">
-                <span className="font-semibold">Client Name:</span> {client?.company || client?.name || "N/A"}
+                <span className="font-semibold">Client Name:</span> {client?.name || "N/A"}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
@@ -646,10 +840,10 @@ export default function CreateJobOrderPage() {
 
             {/* Products/Sites List */}
             <div className="space-y-1 mt-3">
-              <p className="text-sm font-semibold">{isMultiProduct ? "Sites:" : "Site:"}</p>
+              <p className="text-sm font-semibold">Site:</p>
               <div className="space-y-2">
                 {productTotals.map((productTotal, index) => {
-                  const item = hasItems ? quotationItems[index] : quotation
+                  const item = quotation
                   const product = products[index] || {}
 
                   return (
@@ -674,96 +868,318 @@ export default function CreateJobOrderPage() {
 
             {/* Totals Section */}
             <div className="space-y-0.5 mt-3">
-              {isMultiProduct ? (
-                <div className="space-y-3">
-                  {productTotals.map((productTotal, index) => (
-                    <div key={index} className="border-l-2 border-blue-500 pl-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">{productTotal.siteCode}</p>
-                      <p className="text-xs">
-                        <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotal.subtotal)}
-                      </p>
-                      <p className="text-xs">
-                        <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotal.vat)}
-                      </p>
-                      <p className="text-sm font-bold">Total: {formatCurrency(productTotal.total)}</p>
-                    </div>
-                  ))}
-
-                  {/* Overall totals - ONLY GRAND TOTAL REMAINS */}
-                  <div className="border-t border-gray-300 pt-2 mt-3">
-                    <p className="font-bold text-lg mt-1">GRAND TOTAL: {formatCurrency(overallTotal)}</p>
-                  </div>
-                </div>
-              ) : (
-                // Single product totals - no change needed here as overall totals were only for multi-product
-                <div>
-                  <p className="text-sm">
-                    <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotals[0].subtotal)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotals[0].vat)}
-                  </p>
-                  <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(productTotals[0].total)}</p>
-                </div>
-              )}
+              <div>
+                <p className="text-sm">
+                  <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotals[0].subtotal)}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotals[0].vat)}
+                </p>
+                <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(productTotals[0].total)}</p>
+              </div>
             </div>
 
-            {/* Shared Compliance Documents */}
+            {/* Client Compliance Documents */}
+            <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
+              <p className="text-sm font-semibold mb-2">Client Compliance:</p>
+
+              {/* DTI/BIR 2303 */}
+              <div className="flex items-center gap-2">
+                {dtiBirUrl ? (
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="dti-bir-radio"
+                    name="client-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="dti-bir-radio" className="text-sm flex-1">
+                  DTI/BIR 2303
+                </Label>
+                {dtiBirUrl ? (
+                  <a
+                    href={dtiBirUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    JMCL Media2303.pdf
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="dti-bir-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setDtiBirFile,
+                          setDtiBirUrl,
+                          setUploadingDtiBir,
+                          setDtiBirError,
+                          "documents/client-compliance/dti-bir/",
+                          client?.id, // Pass client ID
+                          "dti_bir_2303_url", // Field to update
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!dtiBirUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("dti-bir-upload")?.click()}
+                    disabled={uploadingDtiBir}
+                  >
+                    {uploadingDtiBir ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingDtiBir ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {dtiBirError && <span className="text-xs text-red-500 ml-2">{dtiBirError}</span>}
+              </div>
+
+              {/* GIS */}
+              <div className="flex items-center gap-2">
+                {gisUrl ? (
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="gis-radio"
+                    name="client-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="gis-radio" className="text-sm flex-1">
+                  GIS
+                </Label>
+                {gisUrl ? (
+                  <a
+                    href={gisUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    JMCL GIS.pdf
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="gis-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setGisFile,
+                          setGisUrl,
+                          setUploadingGis,
+                          setGisError,
+                          "documents/client-compliance/gis/",
+                          client?.id, // Pass client ID
+                          "gis_url", // Field to update
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!gisUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("gis-upload")?.click()}
+                    disabled={uploadingGis}
+                  >
+                    {uploadingGis ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingGis ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {gisError && <span className="text-xs text-red-500 ml-2">{gisError}</span>}
+              </div>
+
+              {/* ID with Signature */}
+              <div className="flex items-center gap-2">
+                {idSignatureUrl ? (
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="id-signature-radio"
+                    name="client-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="id-signature-radio" className="text-sm flex-1">
+                  ID with Signature
+                </Label>
+                {idSignatureUrl ? (
+                  <a
+                    href={idSignatureUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    Jalvin_Castro_PRC.pdf
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="id-signature-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setIdSignatureFile,
+                          setIdSignatureUrl,
+                          setUploadingIdSignature,
+                          setIdSignatureError,
+                          "documents/client-compliance/id-signature/",
+                          client?.id, // Pass client ID
+                          "id_signature_url", // Field to update
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!idSignatureUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("id-signature-upload")?.click()}
+                    disabled={uploadingIdSignature}
+                  >
+                    {uploadingIdSignature ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingIdSignature ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {idSignatureError && <span className="text-xs text-red-500 ml-2">{idSignatureError}</span>}
+              </div>
+            </div>
+
+            {/* Project Compliance Documents */}
             <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
               <p className="text-sm font-semibold mb-2">Project Compliance (Shared for all Job Orders):</p>
-
-              {/* Signed Quotation Upload */}
+              {/* Signed Quotation */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="signed-quotation-upload" className="text-sm w-36">
-                  <span className="font-semibold">Signed Quotation:</span>
+                {signedQuotationUrl ? (
+                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="signed-quotation-radio"
+                    name="project-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="signed-quotation-radio" className="text-sm flex-1">
+                  Signed Quotation
                 </Label>
-                <input
-                  type="file"
-                  id="signed-quotation-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setSignedQuotationFile,
-                        setSignedQuotationUrl,
-                        setUploadingSignedQuotation,
-                        setSignedQuotationError,
-                        "documents/signed-quotations/",
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("signed-quotation-upload")?.click()}
-                  disabled={uploadingSignedQuotation}
-                >
-                  {uploadingSignedQuotation ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
-                  )}
-                  {uploadingSignedQuotation ? "Uploading..." : "Upload Document"}
-                </Button>
-                {signedQuotationFile && !uploadingSignedQuotation && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{signedQuotationFile.name}</span>
+                {signedQuotationUrl ? (
+                  <a
+                    href={signedQuotationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    Quotation_Fairyskin.jpeg
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="signed-quotation-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setSignedQuotationFile,
+                          setSignedQuotationUrl,
+                          setUploadingSignedQuotation,
+                          setSignedQuotationError,
+                          "documents/signed-quotations/",
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!signedQuotationUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("signed-quotation-upload")?.click()}
+                    disabled={uploadingSignedQuotation}
+                  >
+                    {uploadingSignedQuotation ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingSignedQuotation ? "Uploading..." : "Upload"}
+                  </Button>
                 )}
                 {signedQuotationError && <span className="text-xs text-red-500 ml-2">{signedQuotationError}</span>}
               </div>
 
-              {/* PO/MO Upload */}
+              {/* Signed Contract */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="po-mo-upload" className="text-sm w-36">
-                  <span className="font-semibold">PO/MO:</span>
+                {signedContractUrl ? (
+                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="signed-contract-radio"
+                    name="project-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="signed-contract-radio" className="text-sm flex-1">
+                  Signed Contract
                 </Label>
+                {signedContractUrl && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">SignedContract.pdf</span>
+                )}
                 <input
                   type="file"
-                  id="po-mo-upload"
+                  id="signed-contract-upload"
                   accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   className="hidden"
                   onChange={(event) => {
@@ -771,85 +1187,199 @@ export default function CreateJobOrderPage() {
                       handleFileUpload(
                         event.target.files[0],
                         "document",
-                        setPoMoFile,
-                        setPoMoUrl,
-                        setUploadingPoMo,
-                        setPoMoError,
-                        "documents/po-mo/",
+                        setSignedContractFile,
+                        setSignedContractUrl,
+                        setUploadingSignedContract,
+                        setSignedContractError,
+                        "documents/signed-contracts/",
                       )
                     }
                   }}
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("po-mo-upload")?.click()}
-                  disabled={uploadingPoMo}
-                >
-                  {uploadingPoMo ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
-                  )}
-                  {uploadingPoMo ? "Uploading..." : "Upload Document"}
-                </Button>
-                {poMoFile && !uploadingPoMo && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{poMoFile.name}</span>
+                {!signedContractUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("signed-contract-upload")?.click()}
+                    disabled={uploadingSignedContract}
+                  >
+                    {uploadingSignedContract ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingSignedContract ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {signedContractError && <span className="text-xs text-red-500 ml-2">{signedContractError}</span>}
+              </div>
+
+              {/* PO/MO */}
+              <div className="flex items-center gap-2">
+                {poMoUrl ? (
+                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="po-mo-radio"
+                    name="project-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="po-mo-radio" className="text-sm flex-1">
+                  PO/MO
+                </Label>
+                {poMoUrl ? (
+                  <a
+                    href={poMoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    PO_MO.pdf
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="po-mo-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setPoMoFile,
+                          setPoMoUrl,
+                          setUploadingPoMo,
+                          setPoMoError,
+                          "documents/po-mo/",
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!poMoUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("po-mo-upload")?.click()}
+                    disabled={uploadingPoMo}
+                  >
+                    {uploadingPoMo ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingPoMo ? "Uploading..." : "Upload"}
+                  </Button>
                 )}
                 {poMoError && <span className="text-xs text-red-500 ml-2">{poMoError}</span>}
               </div>
 
-              {/* Project FA Upload */}
+              {/* Final Artwork */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="project-fa-upload" className="text-sm w-36">
-                  <span className="font-semibold">Project FA:</span>
-                </Label>
-                <input
-                  type="file"
-                  id="project-fa-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setProjectFaFile,
-                        setProjectFaUrl,
-                        setUploadingProjectFa,
-                        setProjectFaError,
-                        "documents/project-fa/",
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs bg-transparent"
-                  onClick={() => document.getElementById("project-fa-upload")?.click()}
-                  disabled={uploadingProjectFa}
-                >
-                  {uploadingProjectFa ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <FileText className="mr-1 h-3 w-3" />
-                  )}
-                  {uploadingProjectFa ? "Uploading..." : "Upload Document"}
-                </Button>
-                {projectFaFile && !uploadingProjectFa && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{projectFaFile.name}</span>
+                {finalArtworkUrl ? (
+                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="final-artwork-radio"
+                    name="project-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
                 )}
-                {projectFaError && <span className="text-xs text-red-500 ml-2">{projectFaError}</span>}
+                <Label htmlFor="final-artwork-radio" className="text-sm flex-1">
+                  Final Artwork
+                </Label>
+                {finalArtworkUrl ? (
+                  <a
+                    href={finalArtworkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    FinalArtwork.jpeg
+                  </a>
+                ) : (
+                  <input
+                    type="file"
+                    id="final-artwork-upload"
+                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setFinalArtworkFile,
+                          setFinalArtworkUrl,
+                          setUploadingFinalArtwork,
+                          setFinalArtworkError,
+                          "documents/final-artwork/",
+                        )
+                      }
+                    }}
+                  />
+                )}
+                {!finalArtworkUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-transparent"
+                    onClick={() => document.getElementById("final-artwork-upload")?.click()}
+                    disabled={uploadingFinalArtwork}
+                  >
+                    {uploadingFinalArtwork ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <FileText className="mr-1 h-3 w-3" />
+                    )}
+                    {uploadingFinalArtwork ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {finalArtworkError && <span className="text-xs text-red-500 ml-2">{finalArtworkError}</span>}
+              </div>
+
+              {/* Payment as Deposit/Advance */}
+              <div className="flex items-center gap-2">
+                {paymentAdvanceConfirmed ? (
+                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                ) : (
+                  <input
+                    type="radio"
+                    id="payment-advance-radio"
+                    name="project-compliance"
+                    className="form-radio h-4 w-4 text-blue-600"
+                    checked={false}
+                    readOnly
+                  />
+                )}
+                <Label htmlFor="payment-advance-radio" className="text-sm flex-1">
+                  Payment as Deposit/Advance
+                </Label>
+                <span className="text-xs text-gray-500">For Treasury's confirmation</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Right Column: Job Order Forms */}
-        <div className="space-y-6">
-          {missingCompliance.signedQuotation || missingCompliance.poMo || missingCompliance.projectFa ? (
+        <div className="space-y-4">
+          {missingCompliance.dtiBir ||
+          missingCompliance.gis ||
+          missingCompliance.idSignature ||
+          missingCompliance.signedQuotation ||
+          missingCompliance.signedContract ||
+          missingCompliance.poMo ||
+          missingCompliance.finalArtwork ||
+          missingCompliance.paymentAdvance ? (
             <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <AlertTitle className="text-red-700 text-sm">
@@ -858,408 +1388,222 @@ export default function CreateJobOrderPage() {
               <AlertDescription className="text-red-700 text-xs">
                 <ul className="list-disc list-inside ml-2">
                   {missingCompliance.signedQuotation && <li>- Signed Quotation</li>}
+                  {missingCompliance.signedContract && <li>- Signed Contract</li>}
                   {missingCompliance.poMo && <li>- PO/MO</li>}
-                  {missingCompliance.projectFa && <li>- Project FA</li>}
+                  {missingCompliance.finalArtwork && <li>- Final Artwork</li>}
                 </ul>
               </AlertDescription>
             </Alert>
           ) : null}
 
           <h2 className="text-lg font-bold text-gray-900">
-            Job Order{isMultiProduct ? "s" : ""} ({hasItems ? quotationItems.length : 1})
+            Job Order
           </h2>
 
-          {isMultiProduct ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {quotationItems.map((item: any, index: number) => (
-                  <TabsTrigger
-                    key={index}
-                    value={index.toString()}
-                    className="text-xs max-w-[150px] truncate overflow-hidden whitespace-nowrap"
-                  >
-                    {item.site_code || `Site ${index + 1}`}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          <div className="space-y-4">
+            <div className="space-y-4 pt-6">
+              {/* Same form fields as in the tabs, but without the card header */}
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">JO #</Label>
+                <Input value="(Auto-Generated)" disabled className="flex-1 bg-gray-100 text-gray-600 text-sm h-9" />
+              </div>
 
-              {quotationItems.map((item: any, index: number) => {
-                const form = jobOrderForms[index]
-                const product = products[index] || {}
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Campaign Name</Label>
+                <Input
+                  placeholder="Fantastic 4"
+                  value={jobOrderForms[0]?.campaignName || ""}
+                  onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
+                  className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
+                />
+              </div>
 
-                if (!form) return null
-
-                return (
-                  <TabsContent key={index} value={index.toString()}>
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Image
-                            src={product.media?.[0]?.url || "/placeholder.svg?height=24&width=24&query=billboard"}
-                            alt={item.product_name || "Site image"}
-                            width={24}
-                            height={24}
-                            className="rounded object-cover"
-                          />
-                          <span className="truncate">{item.product_name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {item.site_code || `Site ${index + 1}`}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {/* Job Order Form Fields */}
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">JO #</Label>
-                          <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Date Requested</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                  !form.dateRequested && "text-gray-500",
-                                  form.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
-                                )}
-                                onClick={() => handleFormUpdate(index, "dateRequestedError", false)}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                                {form.dateRequested ? format(form.dateRequested, "PPP") : <span>Date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={form.dateRequested}
-                                onSelect={(date) => {
-                                  handleFormUpdate(index, "dateRequested", date)
-                                  handleFormUpdate(index, "dateRequestedError", false)
-                                }}
-                                // Removed initialFocus to ensure it opens to the selected date
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">JO Type</Label>
-                          <Select
-                            onValueChange={(value: JobOrderType) => {
-                              handleFormUpdate(index, "joType", value)
-                              handleFormUpdate(index, "joTypeError", false)
-                            }}
-                            value={form.joType}
-                          >
-                            <SelectTrigger
-                              className={cn(
-                                "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                form.joTypeError && "border-red-500 focus-visible:ring-red-500",
-                              )}
-                            >
-                              <SelectValue placeholder="Choose JO Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {joTypes.map((type) => (
-                                <SelectItem key={type} value={type} className="text-sm">
-                                  {type}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Deadline</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                  !form.deadline && "text-gray-500",
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                                {form.deadline ? format(form.deadline, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={form.deadline}
-                                onSelect={(date) => handleFormUpdate(index, "deadline", date)}
-                                disabled={{ before: new Date() }} // Disable past dates
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Requested By</Label>
-                          <Input
-                            value={userData?.first_name || "(Auto-Generated)"}
-                            disabled
-                            className="bg-gray-100 text-gray-600 text-sm h-9"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Remarks</Label>
-                          <Textarea
-                            placeholder="Remarks..."
-                            value={form.remarks}
-                            onChange={(e) => handleFormUpdate(index, "remarks", e.target.value)}
-                            className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
-                          />
-                        </div>
-
-                        {/* Attachments */}
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Attachments</Label>
-                          <input
-                            type="file"
-                            id={`attachment-upload-${index}`}
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) => {
-                              if (event.target.files && event.target.files[0]) {
-                                handleProductAttachmentUpload(index, event.target.files[0])
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                            onClick={() => document.getElementById(`attachment-upload-${index}`)?.click()}
-                            disabled={form.uploadingAttachment}
-                          >
-                            {form.uploadingAttachment ? (
-                              <Loader2 className="h-6 w-6 animate-spin" />
-                            ) : (
-                              <Plus className="h-6 w-6" />
-                            )}
-                            <span className="text-xs mt-1">{form.uploadingAttachment ? "Uploading..." : "Upload"}</span>
-                          </Button>
-                          {form.attachmentFile && !form.uploadingAttachment && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <ImageIcon className="h-4 w-4" />
-                              <span>{form.attachmentFile.name}</span>
-                            </div>
-                          )}
-                          {form.attachmentError && <p className="text-xs text-red-500 mt-1">{form.attachmentError}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Assign to</Label>
-                          <Select
-                            onValueChange={(value) => handleFormUpdate(index, "assignTo", value)}
-                            value={form.assignTo}
-                          >
-                            <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                              <SelectValue placeholder="Choose Assignee" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={userData?.first_name || ""} className="text-sm">
-                                {userData?.first_name}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )
-              })}
-            </Tabs>
-          ) : (
-            // Single product form
-            <div className="space-y-4">
-              <Card>
-                <CardContent className="space-y-4 pt-6">
-                  {/* Same form fields as in the tabs, but without the card header */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">JO #</Label>
-                    <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Date Requested</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                            !jobOrderForms[0]?.dateRequested && "text-gray-500",
-                            jobOrderForms[0]?.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
-                          )}
-                          onClick={() => handleFormUpdate(0, "dateRequestedError", false)}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                          {jobOrderForms[0]?.dateRequested ? (
-                            format(jobOrderForms[0].dateRequested, "PPP")
-                          ) : (
-                            <span>Date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={jobOrderForms[0]?.dateRequested}
-                          onSelect={(date) => {
-                            handleFormUpdate(0, "dateRequested", date)
-                            handleFormUpdate(0, "dateRequestedError", false)
-                          }}
-                          // Removed initialFocus to ensure it opens to the selected date
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">JO Type</Label>
-                    <Select
-                      onValueChange={(value: JobOrderType) => {
-                        handleFormUpdate(0, "joType", value)
-                        handleFormUpdate(0, "joTypeError", false)
-                      }}
-                      value={jobOrderForms[0]?.joType}
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Date Requested</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                        !jobOrderForms[0]?.dateRequested && "text-gray-500",
+                        jobOrderForms[0]?.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
+                      )}
+                      onClick={() => handleFormUpdate(0, "dateRequestedError", false)}
                     >
-                      <SelectTrigger
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {jobOrderForms[0]?.dateRequested ? (
+                        format(jobOrderForms[0].dateRequested, "PPP")
+                      ) : (
+                        <span>Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={jobOrderForms[0]?.dateRequested}
+                      onSelect={(date) => {
+                        handleFormUpdate(0, "dateRequested", date)
+                        handleFormUpdate(0, "dateRequestedError", false)
+                      }}
+                      // Removed initialFocus to ensure it opens to the selected date
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">JO Type</Label>
+                <Select
+                  onValueChange={(value: JobOrderType) => {
+                    handleFormUpdate(0, "joType", value)
+                    handleFormUpdate(0, "joTypeError", false)
+                  }}
+                  value={jobOrderForms[0]?.joType}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      "flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                      jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
+                    )}
+                  >
+                    <SelectValue placeholder="Choose JO Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {joTypes.map((type) => (
+                      <SelectItem key={type} value={type} className="text-sm">
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Deadline</Label>
+                <div className="flex-1 flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
                         className={cn(
-                          "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                          jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
+                          "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                          !jobOrderForms[0]?.deadline && "text-gray-500",
                         )}
                       >
-                        <SelectValue placeholder="Choose JO Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {joTypes.map((type) => (
-                          <SelectItem key={type} value={type} className="text-sm">
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                        {jobOrderForms[0]?.deadline ? (
+                          format(jobOrderForms[0].deadline, "PPP")
+                        ) : (
+                          <span>Select Date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={jobOrderForms[0]?.deadline}
+                        onSelect={(date) => handleFormUpdate(0, "deadline", date)}
+                        disabled={{ before: new Date() }} // Disable past dates
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="outline"
+                    className="w-24 h-9 text-xs bg-transparent"
+                    onClick={() => setShowComingSoonDialog(true)}
+                  >
+                    Timeline
+                  </Button>
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Deadline</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                            !jobOrderForms[0]?.deadline && "text-gray-500",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                          {jobOrderForms[0]?.deadline ? (
-                            format(jobOrderForms[0].deadline, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={jobOrderForms[0]?.deadline}
-                          onSelect={(date) => handleFormUpdate(0, "deadline", date)}
-                          disabled={{ before: new Date() }} // Disable past dates
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+              <div className="flex items-center space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Requested By</Label>
+                <Input
+                  value={userData?.first_name || "(Auto-Generated)"}
+                  disabled
+                  className="flex-1 bg-gray-100 text-gray-600 text-sm h-9"
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Requested By</Label>
-                    <Input
-                      value={userData?.first_name || "(Auto-Generated)"}
-                      disabled
-                      className="bg-gray-100 text-gray-600 text-sm h-9"
-                    />
-                  </div>
+              <div className="flex items-start space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Remarks</Label>
+                <Input
+                  placeholder="Remarks..."
+                  value={jobOrderForms[0]?.remarks || ""}
+                  onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                  className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Remarks</Label>
-                    <Textarea
-                      placeholder="Remarks..."
-                      value={jobOrderForms[0]?.remarks || ""}
-                      onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
-                      className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
-                    />
-                  </div>
-
-                  {/* Attachments */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Attachments</Label>
-                    <input
-                      type="file"
-                      id="attachment-upload-0"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => {
-                        if (event.target.files && event.target.files[0]) {
-                          handleProductAttachmentUpload(0, event.target.files[0])
-                        }
-                      }}
+              {/* Material Preview */}
+              <div className="flex items-start space-x-2">
+                <Label className="w-36 text-sm text-gray-800">Material Preview</Label>
+                {jobOrderForms[0]?.attachmentUrl ? (
+                  <div className="relative w-12 h-12 rounded-md overflow-hidden">
+                    <Image
+                      src={jobOrderForms[0].attachmentUrl}
+                      alt="Material Preview"
+                      layout="fill"
+                      objectFit="cover"
                     />
                     <Button
-                      variant="outline"
-                      className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                      onClick={() => document.getElementById("attachment-upload-0")?.click()}
-                      disabled={jobOrderForms[0]?.uploadingAttachment}
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-0 right-0 h-4 w-4 text-white bg-black/50 hover:bg-black/70"
+                      onClick={() => {
+                        handleFormUpdate(0, "attachmentUrl", null)
+                        handleFormUpdate(0, "attachmentFile", null)
+                      }}
                     >
-                      {jobOrderForms[0]?.uploadingAttachment ? (
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      ) : (
-                        <Plus className="h-6 w-6" />
-                      )}
-                      <span className="text-xs mt-1">
-                        {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : "Upload"}
-                      </span>
+                      <XCircle className="h-3 w-3" />
                     </Button>
-                    {jobOrderForms[0]?.attachmentFile && !jobOrderForms[0]?.uploadingAttachment && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <ImageIcon className="h-4 w-4" />
-                        <span>{jobOrderForms[0].attachmentFile.name}</span>
-                      </div>
-                    )}
-                    {jobOrderForms[0]?.attachmentError && (
-                      <p className="text-xs text-red-500 mt-1">{jobOrderForms[0].attachmentError}</p>
-                    )}
                   </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Assign to</Label>
-                    <Select
-                      onValueChange={(value) => handleFormUpdate(0, "assignTo", value)}
-                      value={jobOrderForms[0]?.assignTo}
-                    >
-                      <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                        <SelectValue placeholder="Choose Assignee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={userData?.uid || ""} className="text-sm">
-                          {userData?.first_name}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
+                ) : (
+                  <input
+                    type="file"
+                    id="attachment-upload-0"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      if (event.target.files && event.target.files[0]) {
+                        handleProductAttachmentUpload(0, event.target.files[0])
+                      }
+                    }}
+                  />
+                )}
+                {!jobOrderForms[0]?.attachmentUrl && (
+                  <Button
+                    variant="outline"
+                    className="w-12 h-12 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                    onClick={() => document.getElementById("attachment-upload-0")?.click()}
+                    disabled={jobOrderForms[0]?.uploadingAttachment}
+                  >
+                    {jobOrderForms[0]?.uploadingAttachment ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    <span className="text-xs mt-1">
+                      {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : "Upload"}
+                    </span>
+                  </Button>
+                )}
+                {jobOrderForms[0]?.attachmentError && (
+                  <p className="text-xs text-red-500 mt-1">{jobOrderForms[0].attachmentError}</p>
+                )}
+              </div>
             </div>
-          )}
+          </div>
+
+          <p className="text-xs text-gray-500 mt-4 text-center">
+            This Job Order will be forwarded to your Logistics Team.
+          </p>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 pt-4 justify-center">
             <Button
               variant="outline"
               onClick={() => handleCreateJobOrders("draft")}
@@ -1275,7 +1619,7 @@ export default function CreateJobOrderPage() {
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Create Job Order{isMultiProduct ? "s" : ""}
+              Create Job Order
             </Button>
           </div>
         </div>
@@ -1286,11 +1630,11 @@ export default function CreateJobOrderPage() {
         isOpen={showJobOrderSuccessDialog}
         onClose={handleDismissAndNavigate}
         joIds={createdJoIds}
-        isMultiple={isMultiProduct}
+        isMultiple={false}
       />
 
       {/* Coming Soon Dialog */}
-      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} />
+      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />
     </div>
   )
 }

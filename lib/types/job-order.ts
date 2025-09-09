@@ -15,7 +15,7 @@ export interface JobOrder {
   deadline: string | Date
   jobDescription?: string
   message?: string
-  attachments: string[]
+  attachments: { url: string; name: string; type: string }[] // Changed to array of objects
   status: JobOrderStatus | string
   created?: Date | Timestamp
   updated?: Date | Timestamp
@@ -31,22 +31,11 @@ export interface JobOrder {
   contractPeriodStart?: string | Date
   leaseRatePerMonth?: number
   missingCompliance?: Record<string, any>
-  poMo?: boolean
-  projectFa?: boolean
-  signedQuotation?: boolean
-  poMoUrl?: string | null
-  product_id?: string
-  projectFaUrl?: string | null
   quotationNumber?: string
   remarks?: string
-  signedQuotationUrl?: string | null
-  siteCode?: string
-  siteIllumination?: string
-  siteImageUrl?: string
-  siteSize?: string
-  siteType?: string
-  totalAmount?: number
-  totalLease?: number
-  totalMonths?: number
-  vatAmount?: number
+  product_id?: string
+  projectCompliance?: ProjectCompliance // Added project compliance object
+  dtiBirUrl?: string | null // Added client compliance URL
+  gisUrl?: string | null // Added client compliance URL
+  idSignatureUrl?: string | null // Added client compliance URL
 }

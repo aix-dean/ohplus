@@ -41,6 +41,9 @@ export interface Client {
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field
+  dti_bir_2303_url?: string // Added for client compliance
+  gis_url?: string // Added for client compliance
+  id_signature_url?: string // Added for client compliance
 }
 
 export interface ClientCompany {
@@ -53,6 +56,11 @@ export interface ClientCompany {
   companyLogoUrl?: string
   created: Date
   user_company_id?: string // Added
+  compliance?: { // Added nested compliance object
+    dti?: string
+    gis?: string
+    id?: string
+  }
 }
 
 export interface PaginatedResult<T> {
@@ -327,5 +335,49 @@ export async function getAllClients(): Promise<Client[]> {
   } catch (error) {
     console.error("Error fetching all clients:", error)
     return []
+  }
+}
+
+export async function updateClientCompany(
+  clientCompanyId: string,
+  clientCompanyData: Partial<ClientCompany>,
+): Promise<void> {
+  try {
+    console.log("Updating client company:", clientCompanyId, clientCompanyData)
+    const clientCompanyRef = doc(db, "client_company", clientCompanyId)
+
+    const updateData = {
+      ...clientCompanyData,
+      updated: serverTimestamp(),
+    }
+
+    // Remove undefined values to avoid Firestore errors
+    Object.keys(updateData).forEach((key) => {
+      if ((updateData as { [key: string]: any })[key] === undefined) {
+        delete (updateData as { [key: string]: any })[key]
+      }
+    })
+
+    await updateDoc(clientCompanyRef, updateData)
+    console.log("Client company updated successfully")
+  } catch (error) {
+    console.error("Error updating client company:", error)
+    throw error
+  }
+}
+
+export async function getClientCompanyById(clientCompanyId: string): Promise<ClientCompany | null> {
+  try {
+    console.log("Getting client company by ID:", clientCompanyId)
+    const clientCompanyDoc = await getDoc(doc(db, "client_company", clientCompanyId))
+
+    if (clientCompanyDoc.exists()) {
+      return { id: clientCompanyDoc.id, ...clientCompanyDoc.data() } as ClientCompany
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching client company:", error)
+    return null
   }
 }
