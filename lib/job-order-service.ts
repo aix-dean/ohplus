@@ -1,6 +1,6 @@
 import { db } from "./firebase"
 import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, orderBy } from "firebase/firestore"
-import type { Quotation } from "./types/quotation"
+import type { Quotation, QuotationProduct } from "./types/quotation" // Import QuotationProduct
 import type { JobOrder, JobOrderStatus } from "./types/job-order"
 import type { Product } from "./firebase-service"
 import type { Client } from "./client-service"
@@ -10,17 +10,7 @@ const JOB_ORDERS_COLLECTION = "job_orders"
 const PRODUCTS_COLLECTION = "products"
 const CLIENTS_COLLECTION = "client_db"
 
-// New interface for quotation items
-export interface QuotationItem {
-  price?: number // Made optional
-  product_id?: string // Made optional
-  product_location?: string // Made optional
-  product_name?: string // Made optional
-  site_code?: string // Made optional
-  type?: string // Made optional
-  name?: string // Added name to match Product interface
-  item_total_amount?: number // Added item_total_amount
-}
+// Removed local QuotationItem interface, will use QuotationProduct from types/quotation.ts
 
 export async function getQuotationsForSelection(userId: string): Promise<Quotation[]> {
   try {
@@ -35,7 +25,7 @@ export async function getQuotationsForSelection(userId: string): Promise<Quotati
       ...doc.data(),
     })) as Quotation[]
     return quotations
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching quotations for selection:", error)
     throw error
   }
@@ -51,7 +41,7 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
     } else {
       return null
     }
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching quotation by ID:", error)
     throw error
   }
@@ -61,7 +51,7 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
   quotation: Quotation
   products: Product[]
   client: Client | null
-  items?: QuotationItem[]
+  items?: QuotationProduct[] // Use QuotationProduct
 } | null> {
   console.log(`[getQuotationDetailsForJobOrder] Attempting to fetch details for quotationId: ${quotationId}`)
   try {
@@ -76,12 +66,12 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
     console.log("[getQuotationDetailsForJobOrder] Fetched quotation:", quotation)
 
     const products: Product[] = []
-    let items: QuotationItem[] = []
+    let items: QuotationProduct[] = [] // Use QuotationProduct
 
     // Check if quotation has items array (multiple products)
     if (quotation.items && Array.isArray(quotation.items)) {
       console.log(`[getQuotationDetailsForJobOrder] Found ${quotation.items.length} items in quotation`)
-      items = quotation.items as QuotationItem[]
+      items = quotation.items // No need for explicit cast if types align
 
       // Fetch all products for the items
       for (const item of items) {
@@ -98,7 +88,7 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
           }
         }
       }
-    } else if (quotation.product_id) {
+    } else if (quotation.product_id) { // Now product_id exists on Quotation type
       // Single product (legacy format)
       console.log(`[getQuotationDetailsForJobOrder] Fetching single product with ID: ${quotation.product_id}`)
       const productDocRef = doc(db, PRODUCTS_COLLECTION, quotation.product_id)
@@ -132,7 +122,7 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
 
     console.log("[getQuotationDetailsForJobOrder] Successfully fetched all details.")
     return { quotation, products, client, items }
-  } catch (error: any) {
+  } catch (error: any) { // Explicitly type error
     console.error("[getQuotationDetailsForJobOrder] Error fetching quotation details for job order:", error)
     throw new Error("Failed to fetch quotation details due to an unexpected error.")
   }
@@ -158,7 +148,7 @@ export async function createJobOrder(
     console.log("Job Order successfully added with ID:", docRef.id)
 
     return docRef.id
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error adding job order to Firestore:", error)
     throw error
   }
@@ -211,16 +201,33 @@ export async function createMultipleJobOrders(
           })
           console.log(`Single notification created for job order ${docRef.id}`)
         }
-      } catch (notificationError) {
+      } catch (notificationError: any) { // Explicitly type error
         console.error("Error creating notification for job order:", docRef.id, notificationError)
         // Don't throw here - we don't want notification failure to break job order creation
       }
     }
 
     return jobOrderIds
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error adding multiple job orders to Firestore:", error)
     throw error
+  }
+}
+
+export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | null> {
+  try {
+    const docRef = doc(db, JOB_ORDERS_COLLECTION, jobOrderId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as JobOrder;
+    } else {
+      console.warn(`Job Order with ID ${jobOrderId} not found.`);
+      return null;
+    }
+  } catch (error: any) { // Explicitly type error
+    console.error(`Error fetching job order by ID ${jobOrderId}:`, error);
+    throw error;
   }
 }
 
@@ -237,7 +244,7 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
       ...doc.data(),
     })) as JobOrder[]
     return jobOrders
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching job orders:", error)
     throw error
   }
@@ -291,7 +298,7 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
     console.log("DEBUG: getJobOrdersByCompanyId returning", jobOrders.length, "job orders")
     console.log("DEBUG: Job orders:", jobOrders)
     return jobOrders
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching job orders by company ID:", error)
     console.error("Error details:", {
       name: error.name,
@@ -344,7 +351,7 @@ export async function getJobOrdersByProductId(productId: string): Promise<JobOrd
 
     console.log(`Found ${jobOrders.length} job orders for product ${productId}`)
     return jobOrders
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching job orders by product ID:", error)
     throw error
   }
@@ -359,7 +366,7 @@ export async function getAllJobOrders(): Promise<JobOrder[]> {
       ...doc.data(),
     })) as JobOrder[]
     return jobOrders
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error fetching all job orders:", error)
     throw error
   }
@@ -399,7 +406,7 @@ export async function generatePersonalizedJONumber(userData: any): Promise<strin
     const sequenceNumber = nextSequence.toString().padStart(4, "0")
 
     return `${initials}-${sequenceNumber}`
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Error generating personalized JO number:", error)
     // Fallback to original method if there's an error
     return generateJONumber()

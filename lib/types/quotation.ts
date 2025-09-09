@@ -81,6 +81,7 @@ export interface Quotation {
   company_id?: string // Added company ID
   valid_until?: any // Firebase Timestamp
   seller_id?: string
+  product_id?: string // Added to support legacy single product quotations
   items: QuotationProduct[] // Renamed from 'products' to 'items'
   project_compliance?: ProjectCompliance
 }

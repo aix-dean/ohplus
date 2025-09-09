@@ -14,7 +14,6 @@ const firebaseConfig = {
   measurementId: "G-7CPDJLG85K"
 };
 
-
 const app = initializeApp(firebaseConfig)
 let analytics;
 if (typeof window !== "undefined") {
@@ -23,12 +22,6 @@ if (typeof window !== "undefined") {
 
 export const db = getFirestore(app)
 export const auth = getAuth(app)
-
-// Set the tenant ID if available in environment variables
-if (process.env.NEXT_PUBLIC_FIREBASE_TENANT_ID) {
-  auth.tenantId = process.env.NEXT_PUBLIC_FIREBASE_TENANT_ID
-}
-
 export const storage = getStorage(app)
 
 export { doc, getDoc }

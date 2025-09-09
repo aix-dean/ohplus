@@ -14,7 +14,6 @@ import {
   ImageIcon,
   XCircle,
   Package,
-  CheckCircle, // Added CheckCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,7 +48,6 @@ const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"
 
 interface JobOrderFormData {
   joType: JobOrderType | ""
-  campaignName: string // Added campaignName
   dateRequested: Date | undefined
   deadline: Date | undefined
   remarks: string
@@ -160,9 +158,8 @@ export default function CreateJobOrderPage() {
         }
       })
     } else {
-      // Single product from quotation.items[0]
-      const singleItem = quotationItems[0]
-      const subtotal = singleItem?.item_total_amount || 0 // Use item_total_amount for subtotal
+      // Single product from quotation object
+      const subtotal = quotation.item_total_amount || 0 // Use item_total_amount for subtotal
       const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
       const total = subtotal + vat // Recalculate total
 
@@ -171,9 +168,9 @@ export default function CreateJobOrderPage() {
           subtotal,
           vat,
           total,
-          monthlyRate: singleItem?.price || 0, // Keep monthlyRate for display if needed
-          siteCode: singleItem?.site_code || "N/A",
-          productName: singleItem?.name || "N/A", // Changed from product_name to name
+          monthlyRate: quotation.price || 0, // Keep monthlyRate for display if needed
+          siteCode: quotation.site_code || "N/A",
+          productName: quotation.product_name || "N/A",
         },
       ]
     }
@@ -386,9 +383,17 @@ export default function CreateJobOrderPage() {
                 joType: form.joType as JobOrderType,
                 deadline: form.deadline!.toISOString(),
                 requestedBy: userData?.first_name || "Auto-Generated",
-                assignTo: form.assignTo,
                 remarks: form.remarks,
-                attachments: form.attachmentUrl ? [form.attachmentUrl] : [],
+                assignTo: form.assignTo,
+                attachments: form.attachmentUrl
+                  ? [
+                      {
+                        url: form.attachmentUrl,
+                        name: form.attachmentFile?.name || "Attachment",
+                        type: form.attachmentFile?.type || "image",
+                      },
+                    ]
+                  : [],
                 signedQuotationUrl: signedQuotationUrl,
                 poMoUrl: poMoUrl,
                 projectFaUrl: projectFaUrl,
@@ -399,35 +404,30 @@ export default function CreateJobOrderPage() {
                 contractPeriodStart: quotation.start_date || "",
                 contractPeriodEnd: quotation.end_date || "",
                 siteName: item.product_name || product.name || "",
-                siteCode: item.site_code || product.specs_rental?.location || "N/A", // Use item.site_code or product.specs_rental.location
+                siteCode: item.site_code || product.site_code || "N/A",
                 siteType: item.type || product.type || "N/A",
-                siteSize:
-                  product.specs_rental?.width && product.specs_rental?.height
-                    ? `${product.specs_rental.width}ft x ${product.specs_rental.height}ft`
-                    : "N/A",
-                siteIllumination: "N/A", // Removed as it doesn't exist on Product
-                leaseRatePerMonth: item.price || 0,
-                totalMonths: totalDays,
-                totalLease: subtotal,
-                vatAmount: productVat,
-                totalAmount: productTotal,
+                siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+                siteIllumination: product.light?.illumination || "N/A",
+                leaseRatePerMonth: item.price || 0, // Keep monthlyRate for display if needed
+                totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+                totalLease: subtotal, // totalLease is now the subtotal
+                vatAmount: productVat, // Use recalculated VAT
+                totalAmount: productTotal, // Use recalculated total
                 siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
                 missingCompliance: missingCompliance,
                 product_id: item.product_id || product.id || "",
                 company_id: userData?.company_id || "",
-                created_by: user.uid, // Added created_by
               }
             }),
           )
         } else {
-          // Single product from quotation.items[0]
+          // Single product from quotation object
           const form = jobOrderForms[0]
           const product = products[0] || {}
-          const singleItem = quotationItems[0]
 
           const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-          const subtotal = singleItem?.item_total_amount || 0 // Use item_total_amount
+          const subtotal = quotation.item_total_amount || 0 // Use item_total_amount
           const productVat = subtotal * 0.12 // Recalculate VAT
           const productTotal = subtotal + productVat // Recalculate total
 
@@ -439,9 +439,17 @@ export default function CreateJobOrderPage() {
               joType: form.joType as JobOrderType,
               deadline: form.deadline!.toISOString(),
               requestedBy: userData?.first_name || "Auto-Generated",
-              assignTo: form.assignTo,
               remarks: form.remarks,
-              attachments: form.attachmentUrl ? [form.attachmentUrl] : [],
+              assignTo: form.assignTo,
+              attachments: form.attachmentUrl
+                ? [
+                    {
+                      url: form.attachmentUrl,
+                      name: form.attachmentFile?.name || "Attachment",
+                      type: form.attachmentFile?.type || "image",
+                    },
+                  ]
+                : [],
               signedQuotationUrl: signedQuotationUrl,
               poMoUrl: poMoUrl,
               projectFaUrl: projectFaUrl,
@@ -451,24 +459,20 @@ export default function CreateJobOrderPage() {
               contractDuration: contractDuration, // Use new contractDuration
               contractPeriodStart: quotation.start_date || "",
               contractPeriodEnd: quotation.end_date || "",
-              siteName: singleItem?.name || product.name || "", // Changed from product_name to name
-              siteCode: singleItem?.site_code || product.specs_rental?.location || "N/A", // Use item.site_code or product.specs_rental.location
-              siteType: singleItem?.type || product.type || "N/A",
-              siteSize:
-                product.specs_rental?.width && product.specs_rental?.height
-                  ? `${product.specs_rental.width}ft x ${product.specs_rental.height}ft`
-                  : "N/A",
-              siteIllumination: "N/A", // Removed as it doesn't exist on Product
-              leaseRatePerMonth: singleItem?.price || 0,
-              totalMonths: totalDays,
-              totalLease: subtotal,
-              vatAmount: productVat,
-              totalAmount: productTotal,
+              siteName: quotation.product_name || product.name || "",
+              siteCode: quotation.site_code || product.site_code || "N/A",
+              siteType: product.type || "N/A",
+              siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+              siteIllumination: product.light?.illumination || "N/A",
+              leaseRatePerMonth: quotation.price || 0, // Keep monthlyRate for display if needed
+              totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+              totalLease: subtotal, // totalLease is now the subtotal
+              vatAmount: productVat, // Use recalculated VAT
+              totalAmount: productTotal, // Use recalculated total
               siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
               missingCompliance: missingCompliance,
-              product_id: singleItem?.product_id || product.id || "",
+              product_id: quotation.product_id || product.id || "",
               company_id: userData?.company_id || "",
-              created_by: user.uid, // Added created_by
             },
           ]
         }
@@ -557,7 +561,6 @@ export default function CreateJobOrderPage() {
       const productCount = hasItems ? quotationItems.length : 1
       const initialForms: JobOrderFormData[] = Array.from({ length: productCount }, () => ({
         joType: "",
-        campaignName: "", // Initialized campaignName
         dateRequested: new Date(),
         deadline: undefined,
         remarks: "",
@@ -650,47 +653,18 @@ export default function CreateJobOrderPage() {
                   const product = products[index] || {}
 
                   return (
-                    <div key={index} className="p-3 bg-gray-100 rounded-md space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Image
-                          src={product.media?.[0]?.url || "/placeholder.svg?height=48&width=48&query=billboard"}
-                          alt={productTotal.productName || "Site image"}
-                          width={48}
-                          height={48}
-                          className="rounded-md object-cover"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-base">{productTotal.siteCode}</p>
-                          <p className="text-sm text-gray-600">{productTotal.productName}</p>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-700 space-y-0.5">
-                        <p>
-                          <span className="font-semibold">Site Type:</span> {(item as QuotationItem).type || product.type || "N/A"}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Size:</span>{" "}
-                          {product.specs_rental?.width && product.specs_rental?.height
-                            ? `${product.specs_rental.width}ft x ${product.specs_rental.height}ft`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Illumination:</span> N/A
-                        </p>
-                        <p>
-                          <span className="font-semibold">Lease Rate/Month:</span>{" "}
-                          {formatCurrency((item as QuotationItem).price || 0)}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Total months:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Total Lease:</span> {formatCurrency(productTotal.subtotal)}
-                        </p>
-                        <p>
-                          <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotal.vat)}
-                        </p>
-                        <p className="font-bold text-sm">TOTAL: {formatCurrency(productTotal.total)}</p>
+                    <div key={index} className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md">
+                      <Image
+                        src={product.media?.[0]?.url || "/placeholder.svg?height=40&width=40&query=billboard"}
+                        alt={productTotal.productName || "Site image"}
+                        width={40}
+                        height={40}
+                        className="rounded-md object-cover"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm">{productTotal.siteCode}</p>
+                        <p className="text-xs text-gray-600">{productTotal.productName}</p>
+                        <p className="text-xs text-gray-500">{formatCurrency(productTotal.monthlyRate)}/month</p>
                       </div>
                     </div>
                   )
@@ -734,133 +708,140 @@ export default function CreateJobOrderPage() {
               )}
             </div>
 
-            {/* Client Compliance Documents */}
-            <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
-              <p className="text-sm font-semibold mb-2">Client Compliance:</p>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <p className="text-sm text-gray-700">DTI/BIR 2303</p>
-                {client?.dti_bir_2303_url && (
-                  <a href={client.dti_bir_2303_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    JMCL Media2303.pdf
-                  </a>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <p className="text-sm text-gray-700">GIS</p>
-                {client?.gis_url && (
-                  <a href={client.gis_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    JMCL GIS.pdf
-                  </a>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <p className="text-sm text-gray-700">ID with Signature</p>
-                {client?.id_with_signature_url && (
-                  <a href={client.id_with_signature_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    Jalvin_Castro_PRC.pdf
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {/* Project Compliance Documents */}
+            {/* Shared Compliance Documents */}
             <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
               <p className="text-sm font-semibold mb-2">Project Compliance (Shared for all Job Orders):</p>
 
-              {/* Signed Quotation */}
+              {/* Signed Quotation Upload */}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="signed-quotation-checkbox"
-                  checked={!!signedQuotationUrl}
-                  onChange={() => {}} // Read-only checkbox
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <Label htmlFor="signed-quotation-checkbox" className="text-sm text-gray-700">
-                  Signed Quotation
+                <Label htmlFor="signed-quotation-upload" className="text-sm w-36">
+                  <span className="font-semibold">Signed Quotation:</span>
                 </Label>
-                {signedQuotationUrl ? (
-                  <a href={signedQuotationUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    {signedQuotationFile?.name || "View Document"}
-                  </a>
-                ) : (
-                  <span className="text-xs text-gray-500">Upload</span>
+                <input
+                  type="file"
+                  id="signed-quotation-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setSignedQuotationFile,
+                        setSignedQuotationUrl,
+                        setUploadingSignedQuotation,
+                        setSignedQuotationError,
+                        "documents/signed-quotations/",
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("signed-quotation-upload")?.click()}
+                  disabled={uploadingSignedQuotation}
+                >
+                  {uploadingSignedQuotation ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingSignedQuotation ? "Uploading..." : "Upload Document"}
+                </Button>
+                {signedQuotationFile && !uploadingSignedQuotation && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{signedQuotationFile.name}</span>
                 )}
+                {signedQuotationError && <span className="text-xs text-red-500 ml-2">{signedQuotationError}</span>}
               </div>
 
-              {/* Signed Contract */}
+              {/* PO/MO Upload */}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="signed-contract-checkbox"
-                  checked={false} // Assuming signed contract is not yet implemented
-                  onChange={() => {}}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <Label htmlFor="signed-contract-checkbox" className="text-sm text-gray-700">
-                  Signed Contract
+                <Label htmlFor="po-mo-upload" className="text-sm w-36">
+                  <span className="font-semibold">PO/MO:</span>
                 </Label>
-                <span className="text-xs text-gray-500">Upload</span>
-              </div>
-
-              {/* PO/MO */}
-              <div className="flex items-center gap-2">
                 <input
-                  type="checkbox"
-                  id="po-mo-checkbox"
-                  checked={!!poMoUrl}
-                  onChange={() => {}} // Read-only checkbox
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  type="file"
+                  id="po-mo-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setPoMoFile,
+                        setPoMoUrl,
+                        setUploadingPoMo,
+                        setPoMoError,
+                        "documents/po-mo/",
+                      )
+                    }
+                  }}
                 />
-                <Label htmlFor="po-mo-checkbox" className="text-sm text-gray-700">
-                  PO/MO
-                </Label>
-                {poMoUrl ? (
-                  <a href={poMoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    {poMoFile?.name || "View Document"}
-                  </a>
-                ) : (
-                  <span className="text-xs text-gray-500">Upload</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("po-mo-upload")?.click()}
+                  disabled={uploadingPoMo}
+                >
+                  {uploadingPoMo ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingPoMo ? "Uploading..." : "Upload Document"}
+                </Button>
+                {poMoFile && !uploadingPoMo && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{poMoFile.name}</span>
                 )}
+                {poMoError && <span className="text-xs text-red-500 ml-2">{poMoError}</span>}
               </div>
 
-              {/* Final Artwork */}
+              {/* Project FA Upload */}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="final-artwork-checkbox"
-                  checked={!!projectFaUrl}
-                  onChange={() => {}} // Read-only checkbox
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <Label htmlFor="final-artwork-checkbox" className="text-sm text-gray-700">
-                  Final Artwork
+                <Label htmlFor="project-fa-upload" className="text-sm w-36">
+                  <span className="font-semibold">Project FA:</span>
                 </Label>
-                {projectFaUrl ? (
-                  <a href={projectFaUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">
-                    {projectFaFile?.name || "View Document"}
-                  </a>
-                ) : (
-                  <span className="text-xs text-gray-500">Upload</span>
+                <input
+                  type="file"
+                  id="project-fa-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setProjectFaFile,
+                        setProjectFaUrl,
+                        setUploadingProjectFa,
+                        setProjectFaError,
+                        "documents/project-fa/",
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("project-fa-upload")?.click()}
+                  disabled={uploadingProjectFa}
+                >
+                  {uploadingProjectFa ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingProjectFa ? "Uploading..." : "Upload Document"}
+                </Button>
+                {projectFaFile && !uploadingProjectFa && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{projectFaFile.name}</span>
                 )}
-              </div>
-
-              {/* Payment as Deposit/Advance */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="payment-deposit-checkbox"
-                  checked={false} // Assuming this is not yet implemented
-                  onChange={() => {}}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <Label htmlFor="payment-deposit-checkbox" className="text-sm text-gray-700">
-                  Payment as Deposit/Advance
-                </Label>
-                <span className="text-xs text-gray-500">For Treasury's confirmation</span>
+                {projectFaError && <span className="text-xs text-red-500 ml-2">{projectFaError}</span>}
               </div>
             </div>
           </div>
@@ -934,16 +915,6 @@ export default function CreateJobOrderPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Campaign Name</Label>
-                          <Input
-                            placeholder="Fantastic 4"
-                            value={form.campaignName}
-                            onChange={(e) => handleFormUpdate(index, "campaignName", e.target.value)}
-                            className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
                           <Label className="text-sm text-gray-800">Date Requested</Label>
                           <Popover>
                             <PopoverTrigger asChild>
@@ -1002,17 +973,7 @@ export default function CreateJobOrderPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm text-gray-800">Deadline</Label>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs text-blue-600 hover:underline"
-                              onClick={() => setShowComingSoonDialog(true)}
-                            >
-                              Timeline
-                            </Button>
-                          </div>
+                          <Label className="text-sm text-gray-800">Deadline</Label>
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
@@ -1023,7 +984,7 @@ export default function CreateJobOrderPage() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                                {form.deadline ? format(form.deadline, "PPP") : <span>Select Date</span>}
+                                {form.deadline ? format(form.deadline, "PPP") : <span>Pick a date</span>}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
@@ -1054,20 +1015,6 @@ export default function CreateJobOrderPage() {
                             onChange={(e) => handleFormUpdate(index, "remarks", e.target.value)}
                             className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
                           />
-                        </div>
-
-                        {/* Material Preview */}
-                        <div className="space-y-2">
-                          <Label className="text-sm text-gray-800">Material Preview:</Label>
-                          {form.attachmentUrl ? (
-                            <div className="relative w-24 h-24 rounded-md overflow-hidden">
-                              <Image src={form.attachmentUrl} alt="Material Preview" layout="fill" objectFit="cover" />
-                            </div>
-                          ) : (
-                            <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-md text-gray-400">
-                              <ImageIcon className="h-8 w-8" />
-                            </div>
-                          )}
                         </div>
 
                         {/* Attachments */}
@@ -1140,16 +1087,6 @@ export default function CreateJobOrderPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Campaign Name</Label>
-                    <Input
-                      placeholder="Fantastic 4"
-                      value={jobOrderForms[0]?.campaignName || ""}
-                      onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
-                      className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <Label className="text-sm text-gray-800">Date Requested</Label>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -1212,17 +1149,7 @@ export default function CreateJobOrderPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm text-gray-800">Deadline</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-blue-600 hover:underline"
-                        onClick={() => setShowComingSoonDialog(true)}
-                      >
-                        Timeline
-                      </Button>
-                    </div>
+                    <Label className="text-sm text-gray-800">Deadline</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -1236,7 +1163,7 @@ export default function CreateJobOrderPage() {
                           {jobOrderForms[0]?.deadline ? (
                             format(jobOrderForms[0].deadline, "PPP")
                           ) : (
-                            <span>Select Date</span>
+                            <span>Pick a date</span>
                           )}
                         </Button>
                       </PopoverTrigger>
@@ -1268,25 +1195,6 @@ export default function CreateJobOrderPage() {
                       onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
                       className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
                     />
-                  </div>
-
-                  {/* Material Preview */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-800">Material Preview:</Label>
-                    {jobOrderForms[0]?.attachmentUrl ? (
-                      <div className="relative w-24 h-24 rounded-md overflow-hidden">
-                        <Image
-                          src={jobOrderForms[0].attachmentUrl}
-                          alt="Material Preview"
-                          layout="fill"
-                          objectFit="cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-md text-gray-400">
-                        <ImageIcon className="h-8 w-8" />
-                      </div>
-                    )}
                   </div>
 
                   {/* Attachments */}
@@ -1382,7 +1290,7 @@ export default function CreateJobOrderPage() {
       />
 
       {/* Coming Soon Dialog */}
-      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />
+      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} />
     </div>
   )
 }

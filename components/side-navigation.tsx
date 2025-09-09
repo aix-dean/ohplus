@@ -58,7 +58,7 @@ const navigationItems = [
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
       { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-      { title: "Reservation", href: "/sales/reservation", icon: CalendarCheck },
+      { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
       { title: "Billings", href: "#", icon: FileText },
@@ -1065,7 +1065,7 @@ export function SideNavigation() {
                 </div>
               </div>
               <div className="flex justify-end mt-3">
-                <button classNameclassName="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
               </div>
             </div>
           </>
@@ -1244,7 +1244,7 @@ export function SideNavigation() {
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "Reservation", href: "/sales/reservation", icon: CalendarCheck },
+                  { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
                   { title: "Billings", href: "#", icon: FileText },

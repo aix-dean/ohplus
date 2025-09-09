@@ -38,9 +38,6 @@ export interface Client {
   uploadedByName?: string
   created: any
   updated: any
-  dti_bir_2303_url?: string // Added for client compliance
-  gis_url?: string // Added for client compliance
-  id_with_signature_url?: string // Added for client compliance
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field

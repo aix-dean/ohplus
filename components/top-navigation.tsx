@@ -116,6 +116,9 @@ export function TopNavigation() {
       }
 
       if (page) {
+        if (section === "Sales" && page === "Reservation") {
+          return "Reservations"
+        }
         return `${section} - ${page}`
       }
       return section
