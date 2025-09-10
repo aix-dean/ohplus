@@ -125,6 +125,7 @@ export interface User {
   name: string
   email: string
   company?: string
+  company_id?: string // Added company_id
   phone?: string
   role?: string
   created?: string | Timestamp
