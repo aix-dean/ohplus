@@ -23,7 +23,7 @@ import { Pagination } from "@/components/ui/pagination"
 
 interface Booking {
   id: string
-  product_name?: string
+  product_name?: string,
   product_id?: string
   product_owner?: string
   client_name?: string

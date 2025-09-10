@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
-import { getProductById } from "@/lib/firebase-service"
 
 interface SendReportDialogProps {
   isOpen: boolean
@@ -18,42 +17,11 @@ interface SendReportDialogProps {
 }
 
 export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
-   const { toast } = useToast()
-   const router = useRouter()
-   const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
-   const [productImageUrl, setProductImageUrl] = useState<string>("")
-   const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false)
+  const { toast } = useToast()
+  const router = useRouter()
+  const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
 
-   useEffect(() => {
-     const fetchProductImage = async () => {
-       if (!isOpen || !report?.product?.id) {
-         setProductImageUrl("")
-         setIsLoadingImage(false)
-         return
-       }
-
-       setIsLoadingImage(true)
-       try {
-         const product = await getProductById(report.product.id)
-         if (product?.media && product.media.length > 0) {
-           // Use the first media item that has a URL
-           const firstMedia = product.media.find(media => media.url)
-           setProductImageUrl(firstMedia?.url || "")
-         } else {
-           setProductImageUrl("")
-         }
-       } catch (error) {
-         console.error("Error fetching product image:", error)
-         setProductImageUrl("")
-       } finally {
-         setIsLoadingImage(false)
-       }
-     }
-
-     fetchProductImage()
-   }, [isOpen, report?.product?.id])
-
-   const handleCopyLink = async () => {
+  const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(reportUrl)
       toast({
@@ -97,11 +65,11 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
       .join(" ")
   }
 
-  const reportFileName = `${report.siteName.replace(/\s+/g, "_")}.pdf`
+  const reportFileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px] p-0">
+      <DialogContent className="sm:max-w-[700px] p-0">
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-4">
           <h2 className="text-lg font-semibold text-gray-900">Send Report To</h2>
@@ -111,25 +79,17 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
         <div className="px-6 pb-4">
           <div className="flex items-center space-x-3">
             <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-              {isOpen && (productImageUrl ? (
-                <img
-                  src={productImageUrl || "/placeholder.svg"}
-                  alt="Product image"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    console.error("Product image failed to load:", productImageUrl)
-                    setProductImageUrl("")
-                  }}
-                />
-              ) : !isLoadingImage ? (
-                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <div className="text-white text-xs font-bold">REPORT</div>
-                </div>
-              ) : null)}
+              {/* Report thumbnail placeholder - using gradient like proposal */}
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="text-white text-xs font-bold">REPORT</div>
+              </div>
             </div>
             <div className="flex-1">
               <div className="text-xs font-medium text-gray-400 mb-1">{report.id?.slice(0, 8) || "N/A"}...</div>
-              <div className="text-sm font-medium text-gray-500 break-words max-w-full">{reportFileName}</div>
+              <div className="text-sm font-medium text-gray-500">{reportFileName}</div>
+              <div className="text-sm font-semibold text-gray-900">
+                {getReportTypeDisplay(report.reportType)}
+              </div>
             </div>
           </div>
         </div>

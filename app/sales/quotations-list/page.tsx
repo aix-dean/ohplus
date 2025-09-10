@@ -1239,7 +1239,7 @@ export default function QuotationsListPage() {
               </div>
 
               {/* Native Share (if supported) */}
-              {typeof navigator.share === "function" && (
+              {navigator.share && (
                 <Button
                   onClick={() => shareViaNativeAPI(selectedQuotationForShare)}
                   className="w-full"

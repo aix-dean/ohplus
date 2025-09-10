@@ -275,23 +275,13 @@ export default function ProjectMonitoringPage() {
                 .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((product) => (
-                  <div
-                    key={product.id}
-                    className="bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => {
-                      console.log('Product ID:', product.id)
-                      console.log('Latest JO IDs:', latestJoIds)
-                      console.log('Latest JO ID for this product:', latestJoIds[product.id!])
-                      if (latestJoIds[product.id!]) {
-                        router.push(`/sales/project-monitoring/details/${latestJoIds[product.id!]}`)
-                      } else {
-                        console.log('No latest JO ID found for product:', product.id)
-                      }
-                    }}
-                  >
-                    <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
-                      <span style={{ padding: '0 2px' }}>{product.id! || 'No JO'}</span>
-                    </div>
+                  <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
+                    <button
+                      onClick={() => handleOpenDialog(product)}
+                      className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
+                    >
+                      Job Orders: {jobOrderCounts[product.id] || 0}
+                    </button>
 
                     {/* Project Title Banner */}
                     <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
