@@ -33,6 +33,7 @@ export async function createQuotation(quotationData: Omit<Quotation, "id">): Pro
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
+    console.log("New quotation data being sent to Firestore:", newQuotation);
 
     const docRef = await addDoc(collection(db, "quotations"), newQuotation)
     console.log("Quotation created with ID:", docRef.id)
@@ -960,6 +961,7 @@ export async function createDirectQuotation(
       quotation_number: quotationNumber,
       client_name: clientData.name,
       client_email: clientData.email,
+      client_id: clientData.id, // Added client_id
       client_company_name: clientData.company,
       client_phone: clientData.phone,
       client_address: clientData.address,
@@ -972,14 +974,14 @@ export async function createDirectQuotation(
       page_number: 1, // Single document gets page number 1
       created_by_first_name: options.created_by_first_name,
       created_by_last_name: options.created_by_last_name,
-      start_date: options.startDate?.toISOString().split("T")[0],
-      end_date: options.endDate?.toISOString().split("T")[0],
+      start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
+      end_date: options.endDate ? options.endDate.toISOString().split("T")[0] : "",
       duration_days: durationDays,
       total_amount: totalAmount,
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       items: [
         {
-          id: site.id, // This serves as the product_id
+          product_id: site.id, // This serves as the product_id
           name: site.name,
           location: site.location,
           price: site.price || 0,
@@ -987,7 +989,6 @@ export async function createDirectQuotation(
           duration_days: durationDays,
           item_total_amount: totalAmount,
           media_url: site.image,
-          product_id: site.id,
         },
       ],
       projectCompliance: {
@@ -1048,6 +1049,7 @@ export async function createMultipleQuotations(
         quotation_number: quotationNumber,
         client_name: clientData.name,
         client_email: clientData.email,
+        client_id: clientData.id, // Added client_id
         client_company_name: clientData.company,
         client_phone: clientData.phone,
         client_address: clientData.address,
@@ -1060,14 +1062,14 @@ export async function createMultipleQuotations(
         page_number: i + 1, // Sequential page numbers (1, 2, 3, etc.)
         created_by_first_name: options.created_by_first_name,
         created_by_last_name: options.created_by_last_name,
-        start_date: options.startDate?.toISOString().split("T")[0],
-        end_date: options.endDate?.toISOString().split("T")[0],
+        start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
+        end_date: options.endDate ? options.endDate.toISOString().split("T")[0] : "",
         duration_days: durationDays,
         total_amount: totalAmount,
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         items: [
           {
-            id: site.id, // This serves as the product_id
+            product_id: site.id, // This serves as the product_id
             name: site.name,
             location: site.location,
             price: site.price || 0,
@@ -1075,7 +1077,6 @@ export async function createMultipleQuotations(
             duration_days: durationDays,
             item_total_amount: totalAmount,
             media_url: site.image,
-            product_id: site.id,
           },
         ],
         projectCompliance: {
@@ -1143,15 +1144,20 @@ export async function getQuotationsByClientId(clientId: string): Promise<Quotati
       quotations.push({
         id: doc.id,
         ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        startDate: data.startDate?.toDate() || new Date(),
-        endDate: data.endDate?.toDate() || new Date(),
-        validUntil: data.validUntil?.toDate(),
+        created: data.created?.toDate() || new Date(), // Use 'created' instead of 'createdAt'
+        updated: data.updated?.toDate() || new Date(), // Use 'updated' instead of 'updatedAt'
+        start_date: data.start_date || "", // Ensure start_date is a string
+        end_date: data.end_date || "", // Ensure end_date is a string
+        total_amount: data.total_amount || 0, // Ensure total_amount is a number
+        duration_days: data.duration_days || 0, // Ensure duration_days is a number
+        quotation_number: data.quotation_number || "", // Ensure quotation_number is a string
+        status: data.status || "draft", // Ensure status is a valid type
+        valid_until: data.valid_until?.toDate(),
+        items: data.items || [], // Ensure items is an array
       } as Quotation)
     })
 
-    return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    return quotations.sort((a, b) => (b.created?.getTime() || 0) - (a.created?.getTime() || 0))
   } catch (error) {
     console.error("Error fetching quotations by client ID:", error)
     throw error
@@ -1251,6 +1257,43 @@ export async function getAllQuotations(): Promise<Quotation[]> {
     return quotations
   } catch (error) {
     console.error("Error fetching all quotations:", error)
+    throw error
+  }
+}
+
+export async function getQuotationsByClientCompanyId(clientCompanyId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("client_company_id", "==", clientCompanyId), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({
+        id: doc.id,
+        ...data,
+        created: data.created?.toDate() || new Date(), // Use 'created' instead of 'createdAt'
+        updated: data.updated?.toDate() || new Date(), // Use 'updated' instead of 'updatedAt'
+        start_date: data.start_date || "", // Ensure start_date is a string
+        end_date: data.end_date || "", // Ensure end_date is a string
+        total_amount: data.total_amount || 0, // Ensure total_amount is a number
+        duration_days: data.duration_days || 0, // Ensure duration_days is a number
+        quotation_number: data.quotation_number || "", // Ensure quotation_number is a string
+        status: data.status || "draft", // Ensure status is a valid type
+        valid_until: data.valid_until?.toDate(),
+        items: data.items || [], // Ensure items is an array
+      } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by client company ID:", error)
     throw error
   }
 }
