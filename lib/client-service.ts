@@ -38,6 +38,28 @@ export interface Client {
   uploadedByName?: string
   created: any
   updated: any
+  clientType?: string // New field
+  partnerType?: string // New field
+  user_company_id?: string // New field
+
+}
+
+export interface ClientCompany {
+  id: string
+  name: string
+  address?: string
+  industry?: string
+  clientType?: string
+  partnerType?: string
+  companyLogoUrl?: string
+  created: Date
+  updated?: any // Added for consistency with Client interface
+  user_company_id?: string // Added
+  compliance?: { // Added nested compliance object
+    dti?: string | null
+    gis?: string | null
+    id?: string | null
+  }
 }
 
 export interface PaginatedResult<T> {
@@ -312,5 +334,49 @@ export async function getAllClients(): Promise<Client[]> {
   } catch (error) {
     console.error("Error fetching all clients:", error)
     return []
+  }
+}
+
+export async function updateClientCompany(
+  clientCompanyId: string,
+  clientCompanyData: Partial<ClientCompany>,
+): Promise<void> {
+  try {
+    console.log("Updating client company:", clientCompanyId, clientCompanyData)
+    const clientCompanyRef = doc(db, "client_company", clientCompanyId)
+
+    const updateData = {
+      ...clientCompanyData,
+      updated: serverTimestamp(),
+    }
+
+    // Remove undefined values to avoid Firestore errors
+    Object.keys(updateData).forEach((key) => {
+      if ((updateData as { [key: string]: any })[key] === undefined) {
+        delete (updateData as { [key: string]: any })[key]
+      }
+    })
+
+    await updateDoc(clientCompanyRef, updateData)
+    console.log("Client company updated successfully")
+  } catch (error) {
+    console.error("Error updating client company:", error)
+    throw error
+  }
+}
+
+export async function getClientCompanyById(clientCompanyId: string): Promise<ClientCompany | null> {
+  try {
+    console.log("Getting client company by ID:", clientCompanyId)
+    const clientCompanyDoc = await getDoc(doc(db, "client_company", clientCompanyId))
+
+    if (clientCompanyDoc.exists()) {
+      return { id: clientCompanyDoc.id, ...clientCompanyDoc.data() } as ClientCompany
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching client company:", error)
+    return null
   }
 }
