@@ -29,7 +29,6 @@ import {
   CreditCard,
   Wallet,
   CalendarCheck,
-  Calculator, // Import Calculator icon
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -55,15 +54,17 @@ const navigationItems = [
     icon: BarChart3,
     items: [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+      { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-      { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
       { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
+      { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
-      { title: "Billings", href: "/sales/billings", icon: FileText },
+      { title: "Billings", href: "#", icon: FileText },
       { title: "Planner", href: "/sales/planner", icon: Calendar },
       { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
+      { title: "Collectibles", href: "/sales/collectibles", icon: Package },
     ],
   },
   {
@@ -177,10 +178,6 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/sales/quotations-list")) {
     // Ensure sales section is active for new quotations page
-    currentSection = "sales"
-  }
-  if (pathname?.startsWith("/sales/cost-estimates")) {
-    // Ensure sales section is active for cost estimates page
     currentSection = "sales"
   }
   if (pathname?.startsWith("/business")) {
@@ -1212,7 +1209,9 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+                  { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
                   { title: "Project Bulletins", href: "/sales/project-monitoring", icon: Monitor },
+                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1243,14 +1242,15 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
+                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
-                  { title: "Billings", href: "/sales/billings", icon: FileText },
+                  { title: "Billings", href: "#", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
+                  { title: "Collectibles", href: "/sales/collectibles", icon: Package },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)

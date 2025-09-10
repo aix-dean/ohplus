@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation" // Add useSearchParams
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -174,12 +174,14 @@ function SalesDashboardContent() {
       toast({
         title: "Sites and Client Copied",
         description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and client ${client.company || client.contactPerson} selected.`,
+        open: true,
       })
     } else {
       // Show success message for sites only
       toast({
         title: "Sites Copied",
         description: `${sites.length} site${sites.length === 1 ? "" : "s"} copied and ready for proposal creation.`,
+        open: true,
       })
     }
   }
@@ -190,7 +192,7 @@ function SalesDashboardContent() {
       setViewMode("grid")
     }
   }, [isMobile])
-
+  console.log(`user comoany id ${userData?.company_id}`)
   // Fetch clients for dashboard client selection (for proposals and CE/Quote)
   useEffect(() => {
     const fetchClients = async () => {
@@ -198,7 +200,9 @@ function SalesDashboardContent() {
         // Ensure user is logged in
         setIsSearchingDashboardClients(true)
         try {
-          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim(), null, user.uid) // Pass user.uid as uploadedByFilter
+          const itemsPerPage = debouncedDashboardClientSearchTerm.trim() ? 10000 : 100; // 1. Adjust itemsPerPage for initial load to 100. 2. If search term is not empty, fetch all clients (10000).
+          const lastDocForSearch = debouncedDashboardClientSearchTerm.trim() ? null : null; // Ensure lastDoc is null for full client fetch when searching.
+          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id);
           setDashboardClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients for dashboard:", error)
@@ -292,6 +296,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to load product count. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setLoadingCount(false)
@@ -357,6 +362,7 @@ function SalesDashboardContent() {
           title: "Error",
           description: "Failed to load product count. Please try again.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
       } finally {
         setLoading(false)
@@ -462,6 +468,7 @@ function SalesDashboardContent() {
           title: "Error",
           description: "Cannot delete product: ID is missing.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         });
         return;
       }
@@ -481,6 +488,7 @@ function SalesDashboardContent() {
       toast({
         title: "Product deleted",
         description: `${productToDelete.name} has been successfully deleted.`,
+        open: true, // Add the missing 'open' property
       })
     } catch (error) {
       console.error("Error deleting product:", error)
@@ -488,6 +496,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to delete the product. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     }
   }
@@ -543,44 +552,14 @@ function SalesDashboardContent() {
   }
 
   // Handle proposal creation flow
-  const handleInitiateProposalFlow = useCallback(() => {
+  const handleInitiateProposalFlow = () => {
     setProposalCreationMode(true) // Activate the combined client & product selection mode
     setCeQuoteMode(false) // Ensure CE/Quote mode is off
     setSelectedClientForProposal(null) // Reset selected client
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
     setSelectedSites([]) // Clear any previously selected sites
-  }, [])
-
-  const handleCeMode = useCallback(() => {
-    setCeMode(true)
-    setQuoteMode(false)
-    setCeQuoteMode(true)
-    setProposalCreationMode(false)
-    setSelectedSites([])
-    setSelectedClientForProposal(null)
-    setDashboardClientSearchTerm("")
-    setSelectedProducts([])
-  }, [])
-
-  // Handle query parameter for initiating proposal creation flow
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    const action = searchParams.get("action")
-    if (action === "create-proposal") {
-      handleInitiateProposalFlow()
-      // Remove the query parameter to prevent re-triggering
-      const url = new URL(window.location.href)
-      url.searchParams.delete("action")
-      window.history.replaceState({}, "", url.toString())
-    } else if (action === "create-cost-estimate") {
-      handleCeMode()
-      // Remove the query parameter to prevent re-triggering
-      const url = new URL(window.location.href)
-      url.searchParams.delete("action")
-      window.history.replaceState({}, "", url.toString())
-    }
-  }, [searchParams, handleInitiateProposalFlow, handleCeMode])
+  }
 
   const handleClientSelectOnDashboard = (client: Client) => {
     setSelectedClientForProposal({
@@ -600,6 +579,7 @@ function SalesDashboardContent() {
     toast({
       title: "Client Selected",
       description: `Selected ${client.name} (${client.company}). Now select products.`,
+      open: true, // Add the missing 'open' property
     })
     setIsClientDropdownOpen(false) // Close dropdown after selection
   }
@@ -629,6 +609,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -637,6 +618,7 @@ function SalesDashboardContent() {
         title: "No products selected",
         description: "Please select at least one product for the proposal.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -646,6 +628,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: "Please log in to create a proposal.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -661,7 +644,7 @@ function SalesDashboardContent() {
         type: product.type || "rental",
         price: product.price || 0,
         location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
-        site_code: getSiteCode(product) || undefined, // Ensure site_code is present
+        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || undefined, // Ensure site_code is present
         media: product.media || [],
         specs_rental: product.specs_rental || null,
         light: (product as any).light || null,
@@ -673,12 +656,13 @@ function SalesDashboardContent() {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
         companyId: userData.company_id, // Add company_id to the proposal creation
-        client_company_id: selectedClientForProposal.id, // Add client's company_id
+        client_company_id: selectedClientForProposal.company_id, // Use client's company_id
       })
 
       toast({
         title: "Proposal Created",
         description: "Your proposal has been created successfully.",
+        open: true, // Add the missing 'open' property
       })
 
       // Redirect to the new proposal's detail page
@@ -694,6 +678,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create proposal. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingProposal(false) // Reset loading state
@@ -708,6 +693,17 @@ function SalesDashboardContent() {
     setSelectedClientForProposal(null) // Reset selected client
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
+  }
+
+  const handleCeMode = () => {
+    setCeMode(true)
+    setQuoteMode(false)
+    setCeQuoteMode(true)
+    setProposalCreationMode(false)
+    setSelectedSites([])
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+    setSelectedProducts([])
   }
 
   const handleQuoteMode = () => {
@@ -739,6 +735,7 @@ function SalesDashboardContent() {
         title: "No sites selected",
         description: "Please select at least one site for the cost estimate.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -747,6 +744,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -760,6 +758,7 @@ function SalesDashboardContent() {
         title: "No sites selected",
         description: "Please select at least one site for the quotation.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -768,6 +767,7 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -795,6 +795,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: `Please log in to create a ${actionAfterDateSelection === "quotation" ? "quotation" : "cost estimate"}.`,
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -806,6 +807,7 @@ function SalesDashboardContent() {
           title: "No Sites Selected",
           description: "Please select at least one site to create a quotation.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
         return
       }
@@ -815,6 +817,7 @@ function SalesDashboardContent() {
           title: "No Sites Selected",
           description: "Please select at least one site to create a cost estimate.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
         return
       }
@@ -860,11 +863,13 @@ function SalesDashboardContent() {
 
         if (selectedSites.length > 1) {
           // Create multiple quotations for multiple sites
+          console.log(`client data: ${JSON.stringify(clientData)}`)
           quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
 
           toast({
             title: "Quotations Created",
             description: `Successfully created ${quotationIds.length} quotations for the selected sites.`,
+            open: true, // Add the missing 'open' property
           })
         } else {
           // Create single quotation for one site
@@ -874,17 +879,19 @@ function SalesDashboardContent() {
           toast({
             title: "Quotation Created",
             description: "Quotation has been created successfully.",
+            open: true, // Add the missing 'open' property
           })
         }
 
         // Navigate to the first quotation
-        router.push(`/sales/quotations/${quotationIds[0]}`)
+        router.push(`/sales/quotations/${quotationIds[quotationIds.length - 1]}`)
       } catch (error) {
         console.error("Error creating quotation:", error)
         toast({
           title: "Error",
           description: "Failed to create quotation. Please try again.",
           variant: "destructive",
+          open: true, // Add the missing 'open' property
         })
       } finally {
         setIsCreatingDocument(false)
@@ -918,7 +925,7 @@ function SalesDashboardContent() {
         startDate,
         endDate,
         company_id: userData.company_id,
-        client_company_id: selectedClientForProposal!.id, // Add client's company_id
+        client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
         page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
       }
 
@@ -933,6 +940,7 @@ function SalesDashboardContent() {
         toast({
           title: "Cost Estimates Created",
           description: `Successfully created ${costEstimateIds.length} cost estimates for the selected sites.`,
+          open: true, // Add the missing 'open' property
         })
       } else {
         // Create single cost estimate for one site
@@ -942,6 +950,7 @@ function SalesDashboardContent() {
         toast({
           title: "Cost Estimate Created",
           description: "Cost estimate has been created successfully.",
+          open: true, // Add the missing 'open' property
         })
       }
 
@@ -953,6 +962,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingCostEstimate(false)
@@ -975,6 +985,7 @@ function SalesDashboardContent() {
         title: "Authentication Required",
         description: "Please log in to create a cost estimate.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -1019,6 +1030,7 @@ function SalesDashboardContent() {
           toast({
             title: "Cost Estimate Created",
             description: "Your cost estimate has been created successfully without dates.",
+            open: true, // Add the missing 'open' property
           })
           router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
         } else {
@@ -1028,6 +1040,7 @@ function SalesDashboardContent() {
           toast({
             title: "Cost Estimates Created",
             description: `${newCostEstimateIds.length} cost estimates have been created successfully without dates - one for each selected site.`,
+            open: true, // Add the missing 'open' property
           })
 
           // Navigate to the first cost estimate
@@ -1042,6 +1055,7 @@ function SalesDashboardContent() {
         title: "Error",
         description: "Failed to create cost estimate. Please try again.",
         variant: "destructive",
+        open: true, // Add the missing 'open' property
       })
     } finally {
       setIsCreatingDocument(false)
@@ -1892,6 +1906,7 @@ function SalesDashboardContent() {
             toast({
               title: "Client Added",
               description: `${newClient.name} (${newClient.company}) has been added.`,
+              open: true, // Add the missing 'open' property
             })
           }}
         />
@@ -1908,7 +1923,7 @@ function SalesDashboardContent() {
 }
 
 export default function SalesDashboardPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
 
   return (
     <RouteProtection requiredRoles="sales">

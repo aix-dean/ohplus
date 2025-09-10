@@ -66,6 +66,7 @@ export interface ReportData {
   installationTimeline?: string
   delayReason?: string
   delayDays?: string
+  descriptionOfWork?: string
 }
 
 // Helper function to clean data by removing undefined values recursively

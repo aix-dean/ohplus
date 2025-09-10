@@ -63,6 +63,7 @@ export function CreateReportDialog({
   const [date, setDate] = useState("")
   const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
+  const [description, setDescription] = useState("")
 
   // Installation report specific fields
   const [status, setStatus] = useState("")
@@ -375,6 +376,16 @@ export function CreateReportDialog({
       return
     }
 
+    // Check if description is provided
+    if (!description.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a description of work",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
     if (!hasValidAttachments) {
@@ -537,6 +548,7 @@ export function CreateReportDialog({
       setDelayReason("")
       setDelayDays("")
       setDescriptionOfWork("")
+
 
       const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
