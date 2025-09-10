@@ -828,7 +828,7 @@ OH PLUS
 
       {/* Success Dialog */}
       <Dialog open={successDialogOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-transparent border-transparent" >
+        <DialogContent className="max-w-sm bg-transparent" >
           <div className="text-center">
             <div className="flex justify-center bg-transparent">
               <img
