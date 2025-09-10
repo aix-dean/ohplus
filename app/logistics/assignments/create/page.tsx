@@ -5,9 +5,18 @@ import Image from "next/image"
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
+<<<<<<< HEAD
 
 import { Loader2, ArrowLeft } from "lucide-react"
 
+=======
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download, PlusCircle, X, Calendar } from "lucide-react"
+>>>>>>> develop
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order" // Import JobOrder type
@@ -652,7 +661,6 @@ export default function CreateServiceAssignmentPage() {
       }
 
       if (action === "print") {
-
         // Generate PDF and open in new window for printing
         await generateServiceAssignmentPDF(serviceAssignmentData, false)
       } else {

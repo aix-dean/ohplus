@@ -38,13 +38,10 @@ export interface Client {
   uploadedByName?: string
   created: any
   updated: any
-
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field
-  dti_bir_2303_url?: string | null // Added for client compliance
-  gis_url?: string | null // Added for client compliance
-  id_signature_url?: string | null // Added for client compliance
+
 }
 
 export interface ClientCompany {
@@ -63,7 +60,6 @@ export interface ClientCompany {
     gis?: string | null
     id?: string | null
   }
-
 }
 
 export interface PaginatedResult<T> {
