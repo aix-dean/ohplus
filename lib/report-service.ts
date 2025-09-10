@@ -56,6 +56,7 @@ export interface ReportData {
   installationTimeline?: string
   delayReason?: string
   delayDays?: string
+  descriptionOfWork?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -138,6 +139,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       tags: reportData.tags || [],
       created: Timestamp.now(),
       updated: Timestamp.now(),
+    }
+
+    // Add descriptionOfWork if it exists
+    if (reportData.descriptionOfWork) {
+      finalReportData.descriptionOfWork = reportData.descriptionOfWork
     }
 
     // Add optional fields only if they have values
