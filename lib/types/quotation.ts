@@ -19,6 +19,7 @@ export interface SpecsRental {
 }
 
 export interface QuotationProduct {
+  id?: string // Added missing id field
   product_id: string
   name: string
   location: string
@@ -73,8 +74,8 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  start_date: string
-  end_date: string
+  start_date?: string // Made optional
+  end_date?: string // Made optional
   total_amount: number
   duration_days: number // Overall duration for the quotation
   notes?: string
@@ -87,6 +88,7 @@ export interface Quotation {
   client_name?: string
   client_email?: string
   client_id?: string
+  client_company_id?: string // Added client company ID
   client_designation?: string // Added client designation
   client_address?: string // Added client address
   client_phone?: string // Added client phone

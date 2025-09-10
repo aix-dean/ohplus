@@ -165,6 +165,7 @@ function SalesDashboardContent() {
         designation: client.designation || "",
         targetAudience: client.targetAudience || "",
         campaignObjective: client.campaignObjective || "",
+        company_id: client.company_id || "",
       })
 
       // Update the search term to show the selected client
@@ -593,6 +594,7 @@ function SalesDashboardContent() {
       designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
+      company_id: client.company_id || "", // Ensure company_id is mapped
     })
     setDashboardClientSearchTerm(client.company || client.name || "") // Display selected client in search bar
     toast({
@@ -839,13 +841,14 @@ function SalesDashboardContent() {
           address: selectedClientForProposal!.address,
           designation: selectedClientForProposal!.designation,
           industry: selectedClientForProposal!.industry,
+          company_id: selectedClientForProposal!.company_id
         }
 
         const options = {
           startDate,
           endDate,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal!.id, // Add client's company_id
+          client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
           created_by_first_name: userData.first_name,
           created_by_last_name: userData.last_name,
@@ -1003,7 +1006,7 @@ function SalesDashboardContent() {
           startDate: undefined,
           endDate: undefined,
           company_id: userData.company_id,
-          client_company_id: selectedClientForProposal!.id, // Added client_company_id to skip dates options
+          client_company_id: selectedClientForProposal!.company_id, // Use client's company_id
           page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
         }
 

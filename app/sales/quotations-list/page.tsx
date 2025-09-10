@@ -360,8 +360,17 @@ export default function QuotationsListPage() {
         console.log("[DEBUG] Status set to RESERVED for quotation:", quotationId)
 
         // Create a booking document
-        const fullQuotationData = { id: quotationId, ...(await getDoc(quotationRef)).data() }
-        console.log("[DEBUG] Full quotation data:", fullQuotationData)
+        // First, update the quotation document with the new compliance data
+        await updateDoc(quotationRef, updateData) // Move updateDoc here
+
+        // Then, fetch the updated quotation data
+        const updatedQuotationDoc = await getDoc(quotationRef)
+        if (!updatedQuotationDoc.exists()) {
+          throw new Error("Updated quotation not found after compliance upload.")
+        }
+        const fullQuotationData = { id: quotationId, ...updatedQuotationDoc.data() }
+        
+        console.log("[DEBUG] Full quotation data (after update):", fullQuotationData)
         console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
 
         if (fullQuotationData && user?.uid && userData?.company_id) {
@@ -1230,7 +1239,7 @@ export default function QuotationsListPage() {
               </div>
 
               {/* Native Share (if supported) */}
-              {navigator.share && (
+              {typeof navigator.share === "function" && (
                 <Button
                   onClick={() => shareViaNativeAPI(selectedQuotationForShare)}
                   className="w-full"
