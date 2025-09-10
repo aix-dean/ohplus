@@ -275,7 +275,6 @@ export default function ProjectMonitoringPage() {
                 .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((product) => (
-<<<<<<< HEAD
                   <div
                     key={product.id}
                     className="bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow"
@@ -291,17 +290,8 @@ export default function ProjectMonitoringPage() {
                     }}
                   >
                     <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
-                      <span style={{ padding: '0 2px' }}>{latestJoNumbers[product.id!] || 'No JO'}</span>
+                      <span style={{ padding: '0 2px' }}>{product.id! || 'No JO'}</span>
                     </div>
-=======
-                  <div key={product.id} className="bg-white rounded-lg border border-gray-300 p-4">
-                    <button
-                      onClick={() => handleOpenDialog(product)}
-                      className="text-blue-600 font-medium text-sm mb-3 hover:text-blue-800 transition-colors"
-                    >
-                      Job Orders: {jobOrderCounts[product.id] || 0}
-                    </button>
->>>>>>> parent of 45ad6a55 (Merge pull request #219 from aix-dean/jp-sales-bulletin-report)
 
                     {/* Project Title Banner */}
                     <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>

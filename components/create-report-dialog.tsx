@@ -63,12 +63,16 @@ export function CreateReportDialog({
   const [date, setDate] = useState("")
   const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
+  const [description, setDescription] = useState("")
 
   // Installation report specific fields
   const [status, setStatus] = useState("")
   const [timeline, setTimeline] = useState("on-time")
   const [delayReason, setDelayReason] = useState("")
   const [delayDays, setDelayDays] = useState("")
+
+  // Description of Work field for completion reports
+  const [descriptionOfWork, setDescriptionOfWork] = useState("")
 
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
@@ -133,6 +137,9 @@ export function CreateReportDialog({
   const fetchProductData = async () => {
     try {
       const productData = await getProductById(siteId)
+      console.log("Fetched product data:", productData)
+      console.log("Product name:", productData?.name)
+      console.log("Product ID:", productData?.id)
       setProduct(productData)
     } catch (error) {
       console.error("Error fetching product data:", error)
@@ -369,6 +376,7 @@ export function CreateReportDialog({
       return
     }
 
+
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
     if (!hasValidAttachments) {
@@ -397,9 +405,19 @@ export function CreateReportDialog({
       const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
 
       // Build the report data
+      console.log("Building report data with product:", product)
+      console.log("Product name for siteName:", product.name)
+
+      // Use better fallback for site name
+      const siteName = product.name ||
+        product.specs_rental?.location ||
+        product.light?.location ||
+        `Site ${product.id?.slice(-4)}` ||
+        "Unknown Site"
+
       const reportData: ReportData = {
         siteId: product.id || "",
-        siteName: product.name || "Unknown Site",
+        siteName: siteName,
         companyId: userData?.company_id || projectData?.project_id || userData?.project_id || "",
         sellerId: product.seller_id || user.uid,
         client: selectedJobOrder?.clientCompany || "No Client",
@@ -430,6 +448,21 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+      }
+      console.log("Built report data with siteName:", reportData.siteName)
+
+      // Add product information
+      reportData.product = {
+        id: product.id || "",
+        name: product.name || "",
+        content_type: product.content_type,
+        specs_rental: product.specs_rental,
+        light: product.light,
+      }
+
+      // Add description of work for completion reports
+      if (reportType === "completion-report" && descriptionOfWork.trim()) {
+        reportData.descriptionOfWork = descriptionOfWork.trim()
       }
 
       // Add optional fields only if they have values
@@ -505,6 +538,8 @@ export function CreateReportDialog({
       setTimeline("on-time")
       setDelayReason("")
       setDelayDays("")
+      setDescriptionOfWork("")
+
 
       const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
@@ -598,6 +633,7 @@ export function CreateReportDialog({
                 </SelectContent>
               </Select>
             </div>
+
 
             {/* Date */}
             <div className="space-y-2">
@@ -709,6 +745,23 @@ export function CreateReportDialog({
                 ))}
               </div>
             </div>
+
+            {/* Description of Work - Only show for completion reports */}
+            {reportType === "completion-report" && (
+              <div className="space-y-2">
+                <Label htmlFor="descriptionOfWork" className="text-sm font-semibold text-gray-900">
+                  Description of Work:
+                </Label>
+                <textarea
+                  id="descriptionOfWork"
+                  value={descriptionOfWork}
+                  onChange={(e) => setDescriptionOfWork(e.target.value)}
+                  placeholder="Enter detailed description of work completed..."
+                  className="w-full h-20 p-2 border border-gray-300 rounded-md text-sm resize-y"
+                  rows={4}
+                />
+              </div>
+            )}
 
             {/* Generate Report Button */}
             <Button
