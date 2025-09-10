@@ -369,10 +369,6 @@ export function CreateReportDialog({
       return
     }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> parent of 45ad6a55 (Merge pull request #219 from aix-dean/jp-sales-bulletin-report)
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
     if (!hasValidAttachments) {
