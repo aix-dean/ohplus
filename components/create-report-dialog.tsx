@@ -376,15 +376,6 @@ export function CreateReportDialog({
       return
     }
 
-    // Check if description is provided
-    if (!description.trim()) {
-      toast({
-        title: "Error",
-        description: "Please provide a description of work",
-        variant: "destructive",
-      })
-      return
-    }
 
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
