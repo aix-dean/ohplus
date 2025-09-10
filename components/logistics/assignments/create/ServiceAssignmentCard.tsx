@@ -1,11 +1,124 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from 'lucide-react';
-import { JobOrderCard } from './JobOrderCard';
+import { Calendar, Search, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"; // Import Firestore functions
+import { db } from "@/lib/firebase"; // Import db
+import { format } from "date-fns"; // Import format
 
-export function ServiceAssignmentCard() {
+// Define a type for the Job Order data
+interface JobOrder {
+  id: string;
+  joNumber: string; // Changed from jo_number
+  joType: string; // Changed from jo_type
+  campaign_name: string;
+  deadline: string;
+  material_specs: string;
+  attachment_url: string; // This will be derived from attachments array
+  remarks: string;
+  requestedBy: { name: string }; // Changed from requested_by
+  created: Date;
+}
+
+// New component for displaying Job Order details
+function JobOrderDetailsCard({ jobOrder, onHide }: { jobOrder: JobOrder; onHide: () => void }) {
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex justify-between items-center">
+          <span className="text-2xl font-bold">JOB ORDER</span>
+          <Button variant="ghost" size="sm" onClick={onHide}>
+            <X className="h-5 w-5" />
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="flex justify-between items-center">
+          <p className="text-blue-600 font-medium">JO#: {jobOrder.joNumber}</p>
+          <p className="text-sm text-gray-500">{jobOrder.created && !isNaN(jobOrder.created.getTime()) ? format(jobOrder.created, "MMM d, yyyy") : "N/A"}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>JO Type:</Label>
+          <p className="font-medium">{jobOrder.joType}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Campaign Name:</Label>
+          <p className="font-medium">{jobOrder.campaign_name}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Deadline:</Label>
+          <p className="font-medium">{jobOrder.deadline}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Material Specs:</Label>
+          <p className="font-medium">{jobOrder.material_specs}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Attachment:</Label>
+          {jobOrder.attachment_url && (
+            <img src={jobOrder.attachment_url} alt="Attachment" className="rounded-md h-32 w-32 object-cover" />
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Remarks:</Label>
+          <p className="font-medium">{jobOrder.remarks}</p>
+        </div>
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <Label>Requested by:</Label>
+            <p className="font-medium">{jobOrder.requestedBy.name}</p>
+          </div>
+          <Button variant="link" size="sm">Change</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ServiceAssignmentCard({ companyId, productId }: { companyId: string | null; productId: string }) {
+  const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
+  const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(null); // State to hold selected job order data
+
+  const handleIdentifyJOClick = async () => {
+    try {
+      const jobOrdersRef = collection(db, "job_orders");
+      const q = query(jobOrdersRef, orderBy("created", "desc"), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        const jobOrderData = doc.data();
+        const fetchedJobOrder: JobOrder = {
+          id: doc.id,
+          joNumber: jobOrderData.joNumber || "N/A",
+          joType: jobOrderData.joType || "N/A",
+          campaign_name: jobOrderData.campaign_name || "N/A",
+          deadline: jobOrderData.deadline ? format(new Date(jobOrderData.deadline), "MMM d, yyyy") : "N/A",
+          material_specs: jobOrderData.material_specs || "N/A",
+          attachment_url: jobOrderData.attachments && jobOrderData.attachments.length > 0 ? jobOrderData.attachments[0].url : "https://via.placeholder.com/150",
+          remarks: jobOrderData.remarks || "N/A",
+          requestedBy: { name: jobOrderData.requestedBy?.name || "N/A" },
+          created: jobOrderData.created ? new Date(jobOrderData.created) : new Date(),
+        };
+        setSelectedJobOrder(fetchedJobOrder);
+        setShowJobOrderDetails(true);
+      } else {
+        alert("No job orders found.");
+      }
+    } catch (error) {
+      console.error("Error fetching job order:", error);
+      alert("Error fetching job order. Please try again.");
+    }
+  };
+
+  const handleHideJobOrderDetails = () => {
+    setShowJobOrderDetails(false);
+    setSelectedJobOrder(null);
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -72,7 +185,16 @@ export function ServiceAssignmentCard() {
 
             <div className="space-y-2">
               <Label htmlFor="materialSpecs">Material Specs</Label>
-              <p className="font-medium">Perforated Sticker</p>
+              <Select>
+                <SelectTrigger id="materialSpecs">
+                  <SelectValue placeholder="Select material" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="perforated_sticker">Perforated Sticker</SelectItem>
+                  <SelectItem value="tarpaulin">Tarpaulin</SelectItem>
+                  <SelectItem value="acrylic">Acrylic</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -108,10 +230,6 @@ export function ServiceAssignmentCard() {
               <p className="font-medium">YES</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Sales</Label>
-              <p className="font-medium">Noemi Abellanada</p>
-            </div>
 
             <div className="space-y-2">
               <Label>Logistics</Label>
@@ -120,7 +238,17 @@ export function ServiceAssignmentCard() {
           </CardContent>
         </div>
         <div className="flex flex-col gap-4 w-full lg:w-1/2">
-          <JobOrderCard />
+          {!showJobOrderDetails && (
+            <div className="flex justify-center items-center h-full">
+              <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={handleIdentifyJOClick}>
+                <Search className="h-4 w-4 mr-2" />
+                Identify JO
+              </Button>
+            </div>
+          )}
+          {showJobOrderDetails && selectedJobOrder && (
+            <JobOrderDetailsCard jobOrder={selectedJobOrder} onHide={handleHideJobOrderDetails} />
+          )}
         </div>
       </div>
     </Card>

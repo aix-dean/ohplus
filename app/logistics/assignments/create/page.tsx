@@ -654,6 +654,8 @@ export default function CreateServiceAssignmentPage() {
         onSaveAsDraft={handleSaveDraft}
         onSubmit={handleSubmit}
         loading={loading}
+        companyId={userData?.company_id || null}
+        productId={formData.projectSite} // Pass productId from formData
       />
 
       {/* Success Dialog */}
