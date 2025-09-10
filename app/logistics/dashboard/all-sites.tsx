@@ -671,11 +671,6 @@ function UnifiedSiteCard({
                   <span className="text-gray-600">None</span>
                 )}
                 {/* Debug info - remove in production */}
-                {process.env.NODE_ENV === "development" && (
-                  <span className="text-red-500 ml-2">
-                    [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
-                  </span>
-                )}
               </div>
             </div>
 
@@ -814,11 +809,6 @@ function UnifiedSiteListItem({
                   <span className="text-gray-600">None</span>
                 )}
                 {/* Debug info - remove in production */}
-                {process.env.NODE_ENV === "development" && (
-                  <span className="text-red-500 ml-2">
-                    [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
-                  </span>
-                )}
               </div>
             </div>
 

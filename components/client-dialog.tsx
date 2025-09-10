@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient, updateClient, type Client, type ClientCompany } from "@/lib/client-service"
+import { createClient, updateClient, type Client } from "@/lib/client-service"
 import { toast } from "sonner"
 import { Plus } from "lucide-react"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
@@ -22,6 +22,17 @@ interface ClientDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+interface Company {
+  id: string
+  name: string
+  address?: string
+  industry?: string
+  clientType?: string
+  partnerType?: string
+  companyLogoUrl?: string
+  created: Date
+}
+
 export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
   const { userData } = useAuth() // Get current user from auth context
   const [loading, setLoading] = useState(false)
@@ -29,7 +40,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null) // Ref for hidden file input
 
-  const [companies, setCompanies] = useState<ClientCompany[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loadingCompanies, setLoadingCompanies] = useState(false)
   const [showNewCompanyInput, setShowNewCompanyInput] = useState(false)
   const [newCompanyName, setNewCompanyName] = useState("")
@@ -46,7 +57,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     email: client?.email || "", // Contact Details Email
     address: client?.address || "", // Company Address
     companyLogoUrl: client?.companyLogoUrl || "", // Existing logo URL
-    user_company_id: client?.user_company_id || userData?.company_id || "", // New field
   })
 
   const fetchCompanies = async () => {
@@ -63,7 +73,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         partnerType: doc.data().partnerType || "", // Include partner type in fetched data
         companyLogoUrl: doc.data().companyLogoUrl || "",
         created: doc.data().created?.toDate() || new Date(),
-        user_company_id: doc.data().user_company_id || "", // Include user_company_id
       }))
       setCompanies(companiesData)
     } catch (error) {
@@ -89,7 +98,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         email: client?.email || "",
         address: client?.address || "",
         companyLogoUrl: client?.companyLogoUrl || "",
-        user_company_id: client?.user_company_id || userData?.company_id || "", // New field
       })
       setLogoFile(null) // Clear selected file
       setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
@@ -97,7 +105,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       setNewCompanyName("")
       fetchCompanies()
     }
-  }, [open, client, userData?.company_id]) // Added userData?.company_id to dependency array
+  }, [open, client])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -249,7 +257,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         zipCode: client?.zipCode || "",
         uploadedBy: client?.uploadedBy || userData?.uid || "",
         uploadedByName: client?.uploadedByName || userData?.displayName || userData?.email || "",
-        user_company_id: formData.user_company_id, // Use formData's user_company_id
+        user_company_id: userCompanyId, // Use fetched company_id instead of auth context
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
 
       let savedClient: Client
