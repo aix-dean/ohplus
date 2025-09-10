@@ -4,9 +4,10 @@ import { ArrowLeft, Search, ChevronDown, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState } from "react"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
+import { Pagination } from "@/components/ui/pagination"
 
 interface JobOrderCount {
   [productId: string]: number
@@ -27,9 +28,11 @@ interface Report {
   id: string
   joNumber: string
   date: any
+  updated: any
   category: string
   status: string
   description: string
+  descriptionOfWork?: string
   attachments?: string[]
   [key: string]: any
 }
@@ -38,19 +41,36 @@ interface ProductReports {
   [productId: string]: Report[]
 }
 
+interface Booking {
+  id: string
+  product_id?: string
+  product_owner?: string
+  client_name?: string
+  start_date?: any
+  end_date?: any
+  status?: string
+  created?: any
+  quotation_id?: string
+}
+
 export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
+  const [latestJoNumbers, setLatestJoNumbers] = useState<{ [productId: string]: string }>({})
+  const [latestJoIds, setLatestJoIds] = useState<{ [productId: string]: string }>({})
   const [productReports, setProductReports] = useState<ProductReports>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 9
+  const [itemsPerPage] = useState(15)
+  const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any])
+  const [hasMore, setHasMore] = useState(true)
 
   const fetchProductReports = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -75,9 +95,13 @@ export default function ProjectMonitoringPage() {
 
       if (joNumbers.length === 0) return
 
-      // Fetch reports for these joNumbers
+      // Fetch reports for these joNumbers and company
       const reportsRef = collection(db, "reports")
-      const reportsQuery = query(reportsRef, where("joNumber", "in", joNumbers))
+      const reportsQuery = query(
+        reportsRef,
+        where("joNumber", "in", joNumbers),
+        where("companyId", "==", userData.company_id)
+      )
       const reportsSnapshot = await getDocs(reportsQuery)
 
       // Group reports by product_id
@@ -94,11 +118,11 @@ export default function ProjectMonitoringPage() {
         }
       })
 
-      // Sort reports by date (newest first) for each product
+      // Sort reports by updated timestamp (newest first) for each product
       Object.keys(reportsByProduct).forEach((productId) => {
         reportsByProduct[productId].sort((a, b) => {
-          const aTime = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0)
-          const bTime = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0)
+          const aTime = a.updated?.toDate ? a.updated.toDate() : new Date(a.updated || a.date || 0)
+          const bTime = b.updated?.toDate ? b.updated.toDate() : new Date(b.updated || b.date || 0)
           return bTime.getTime() - aTime.getTime()
         })
       })
@@ -114,24 +138,84 @@ export default function ProjectMonitoringPage() {
 
     try {
       const counts: JobOrderCount = {}
+      const latestJoNumbersMap: { [productId: string]: string } = {}
+      const latestJoIdsMap: { [productId: string]: string } = {}
 
       // Fetch job orders for all products at once
       const jobOrdersRef = collection(db, "job_orders")
       const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
       const querySnapshot = await getDocs(q)
 
-      // Count job orders for each product
+      // Group job orders by productId
+      const jobOrdersByProduct: { [productId: string]: JobOrder[] } = {}
       querySnapshot.forEach((doc) => {
         const data = doc.data()
         const productId = data.product_id
         if (productId && productIds.includes(productId)) {
-          counts[productId] = (counts[productId] || 0) + 1
+          if (!jobOrdersByProduct[productId]) {
+            jobOrdersByProduct[productId] = []
+          }
+          jobOrdersByProduct[productId].push({ id: doc.id, ...data } as JobOrder)
         }
       })
 
+      // For each product, sort job orders by createdAt descending and get latest joNumber and ID
+      Object.keys(jobOrdersByProduct).forEach((productId) => {
+        const jobOrders = jobOrdersByProduct[productId]
+        counts[productId] = jobOrders.length
+
+        if (jobOrders.length > 0) {
+          // Sort by createdAt descending (newest first)
+          jobOrders.sort((a, b) => {
+            let aTime: Date
+            let bTime: Date
+
+            if (a.createdAt?.toDate) {
+              aTime = a.createdAt.toDate()
+            } else if (a.createdAt) {
+              aTime = new Date(a.createdAt)
+            } else {
+              aTime = new Date(0)
+            }
+
+            if (b.createdAt?.toDate) {
+              bTime = b.createdAt.toDate()
+            } else if (b.createdAt) {
+              bTime = new Date(b.createdAt)
+            } else {
+              bTime = new Date(0)
+            }
+
+            return bTime.getTime() - aTime.getTime()
+          })
+
+          // Get the latest job order
+          const latestJo = jobOrders[0]
+          latestJoNumbersMap[productId] = latestJo.joNumber || latestJo.id.slice(-6)
+          latestJoIdsMap[productId] = latestJo.id
+        }
+      })
+
+      console.log('Job Order Counts:', counts)
+      console.log('Latest JO Numbers:', latestJoNumbersMap)
+      console.log('Latest JO IDs:', latestJoIdsMap)
       setJobOrderCounts(counts)
+      setLatestJoNumbers(latestJoNumbersMap)
+      setLatestJoIds(latestJoIdsMap)
     } catch (error) {
       console.error("Error fetching job order counts:", error)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (hasMore) {
+      setCurrentPage((prevPage) => prevPage + 1)
+    }
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage((prevPage) => prevPage - 1)
     }
   }
 
@@ -191,38 +275,85 @@ export default function ProjectMonitoringPage() {
   }
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchBookings = async () => {
       if (!userData?.company_id) {
         setLoading(false)
         return
       }
 
       try {
-        const productsRef = collection(db, "products")
-        const q = query(productsRef, where("company_id", "==", userData.company_id), where("deleted", "==", false))
-        const querySnapshot = await getDocs(q)
+        setLoading(true)
+        const bookingsRef = collection(db, "booking")
+        let bookingsQuery = query(
+          bookingsRef,
+          where("company_id", "==", userData.company_id),
+          where("quotation_id", "!=", null),
+          orderBy("created", "desc"),
+          limit(itemsPerPage + 1)
+        )
 
-        const fetchedProducts: Product[] = []
-        querySnapshot.forEach((doc) => {
-          fetchedProducts.push({ id: doc.id, ...doc.data() } as Product)
+        const lastDoc = lastVisibleDocs[currentPage - 1]
+        if (lastDoc) {
+          bookingsQuery = query(
+            bookingsRef,
+            where("company_id", "==", userData.company_id),
+            where("quotation_id", "!=", null),
+            orderBy("created", "desc"),
+            startAfter(lastDoc),
+            limit(itemsPerPage + 1)
+          )
+        }
+
+        const querySnapshot = await getDocs(bookingsQuery)
+        const fetchedBookings: Booking[] = []
+        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
+
+        setHasMore(querySnapshot.docs.length > itemsPerPage)
+
+        querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
+          fetchedBookings.push({ id: doc.id, ...doc.data() })
         })
 
-        setProducts(fetchedProducts)
+        setBookings(fetchedBookings)
 
-        if (fetchedProducts.length > 0) {
-          const productIds = fetchedProducts.map((p) => p.id)
-          await fetchJobOrderCounts(productIds)
-          await fetchProductReports(productIds)
+        // Only update lastVisibleDocs if we are moving to a new page
+        if (newLastVisible && currentPage === lastVisibleDocs.length) {
+          setLastVisibleDocs((prev) => [...prev, newLastVisible])
+        }
+
+        const productIds = fetchedBookings
+          .map((booking) => booking.product_id)
+          .filter((id): id is string => Boolean(id))
+
+        const uniqueProductIds = [...new Set(productIds)]
+        const productData: { [key: string]: Product } = {}
+
+        for (const productId of uniqueProductIds) {
+          try {
+            const productDoc = await getDoc(doc(db, "products", productId))
+            if (productDoc.exists()) {
+              productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+            }
+          } catch (error) {
+            console.error(`Error fetching product ${productId}:`, error)
+          }
+        }
+
+        setProducts(Object.values(productData).filter(p => p.id))
+
+        if (uniqueProductIds.length > 0) {
+          await fetchJobOrderCounts(uniqueProductIds)
+          await fetchProductReports(uniqueProductIds)
         }
       } catch (error) {
-        console.error("Error fetching products:", error)
+        console.error("Error fetching bookings:", error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProducts()
-  }, [userData?.company_id])
+    fetchBookings()
+  }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -272,8 +403,7 @@ export default function ProjectMonitoringPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {products
-                .filter((product) => (jobOrderCounts[product.id] || 0) > 0)
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .filter((product) => latestJoNumbers[product.id!])
                 .map((product) => (
                   <div
                     key={product.id}
@@ -290,11 +420,11 @@ export default function ProjectMonitoringPage() {
                     }}
                   >
                     <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
-                      <span style={{ padding: '0 2px' }}>{product.id! || 'No JO'}</span>
+                      <span style={{ padding: '0 2px' }}>Latest JO: {latestJoNumbers[product.id!] || 'No JO'}</span>
                     </div>
 
                     {/* Project Title Banner */}
-                    <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef" }}>
+                    <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef", borderRadius: "10px" }}>
                       <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
                     </div>
 
@@ -307,9 +437,9 @@ export default function ProjectMonitoringPage() {
                     <div>
                       <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
                       <div className="space-y-1 text-sm text-gray-600">
-                        {productReports[product.id] && productReports[product.id].length > 0 ? (
-                          productReports[product.id].slice(0, 3).map((report, index) => {
-                            const reportDate = report.date?.toDate ? report.date.toDate() : new Date(report.date || 0)
+                        {productReports[product.id!] && productReports[product.id!].length > 0 ? (
+                          productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {
+                            const reportDate = report.updated?.toDate ? report.updated.toDate() : new Date(report.updated || report.date || 0)
                             const formattedDate = reportDate.toLocaleDateString("en-US", {
                               month: "numeric",
                               day: "numeric",
@@ -323,7 +453,7 @@ export default function ProjectMonitoringPage() {
 
                             return (
                               <div key={report.id}>
-                                {formattedDate}- {formattedTime}- {report.description || "No description available"}
+                                {formattedDate} {formattedTime} - {report.descriptionOfWork || report.description || "No description available"}
                               </div>
                             )
                           })
@@ -336,48 +466,17 @@ export default function ProjectMonitoringPage() {
                 ))}
             </div>
 
-            {(() => {
-              const filteredProducts = products.filter((product) => (jobOrderCounts[product.id] || 0) > 0)
-              const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-
-              if (totalPages <= 1) return null
-
-              return (
-                <div className="flex justify-center items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Previous
-                  </button>
-
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-2 border rounded-md ${
-                          currentPage === page
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              )
-            })()}
+            {/* Pagination Controls */}
+            <div className="flex justify-end mt-4">
+              <Pagination
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={products.length} // This will be inaccurate for true total, but works for current page display
+                onNextPage={handleNextPage}
+                onPreviousPage={handlePreviousPage}
+                hasMore={hasMore}
+              />
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">No products found</div>
