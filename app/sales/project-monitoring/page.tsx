@@ -28,9 +28,11 @@ interface Report {
   id: string
   joNumber: string
   date: any
+  updated: any
   category: string
   status: string
   description: string
+  descriptionOfWork?: string
   attachments?: string[]
   [key: string]: any
 }
@@ -93,9 +95,13 @@ export default function ProjectMonitoringPage() {
 
       if (joNumbers.length === 0) return
 
-      // Fetch reports for these joNumbers
+      // Fetch reports for these joNumbers and company
       const reportsRef = collection(db, "reports")
-      const reportsQuery = query(reportsRef, where("joNumber", "in", joNumbers))
+      const reportsQuery = query(
+        reportsRef,
+        where("joNumber", "in", joNumbers),
+        where("companyId", "==", userData.company_id)
+      )
       const reportsSnapshot = await getDocs(reportsQuery)
 
       // Group reports by product_id
@@ -112,11 +118,11 @@ export default function ProjectMonitoringPage() {
         }
       })
 
-      // Sort reports by date (newest first) for each product
+      // Sort reports by updated timestamp (newest first) for each product
       Object.keys(reportsByProduct).forEach((productId) => {
         reportsByProduct[productId].sort((a, b) => {
-          const aTime = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0)
-          const bTime = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0)
+          const aTime = a.updated?.toDate ? a.updated.toDate() : new Date(a.updated || a.date || 0)
+          const bTime = b.updated?.toDate ? b.updated.toDate() : new Date(b.updated || b.date || 0)
           return bTime.getTime() - aTime.getTime()
         })
       })
@@ -433,7 +439,7 @@ export default function ProjectMonitoringPage() {
                       <div className="space-y-1 text-sm text-gray-600">
                         {productReports[product.id!] && productReports[product.id!].length > 0 ? (
                           productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {
-                            const reportDate = report.date?.toDate ? report.date.toDate() : new Date(report.date || 0)
+                            const reportDate = report.updated?.toDate ? report.updated.toDate() : new Date(report.updated || report.date || 0)
                             const formattedDate = reportDate.toLocaleDateString("en-US", {
                               month: "numeric",
                               day: "numeric",
@@ -447,7 +453,7 @@ export default function ProjectMonitoringPage() {
 
                             return (
                               <div key={report.id}>
-                                {formattedDate}- {formattedTime}- {report.description || "No description available"}
+                                {formattedDate} {formattedTime} - {report.descriptionOfWork || report.description || "No description available"}
                               </div>
                             )
                           })

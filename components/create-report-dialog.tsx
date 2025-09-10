@@ -74,6 +74,7 @@ export function CreateReportDialog({
   const [newTeamName, setNewTeamName] = useState("")
   const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
+  const [description, setDescription] = useState("")
 
   // Installation report specific fields
   const [status, setStatus] = useState("")
@@ -440,6 +441,16 @@ export function CreateReportDialog({
       return
     }
 
+    // Check if description is provided
+    if (!description.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a description of work",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
     if (!hasValidAttachments) {
@@ -501,6 +512,7 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+        descriptionOfWork: description.trim(),
       }
 
       // Add optional fields only if they have values
@@ -580,6 +592,7 @@ export function CreateReportDialog({
       setTimeline("on-time")
       setDelayReason("")
       setDelayDays("")
+      setDescription("")
 
       const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
@@ -851,7 +864,21 @@ export function CreateReportDialog({
                 ))}
               </div>
             </div>
-
+ 
+            {/* Description of Work */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-900">
+                Description of work: <span className="text-red-500">*</span>
+              </Label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the work performed..."
+                className="w-full min-h-[100px] p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+ 
             {/* Generate Report Button */}
             <Button
               onClick={handleGenerateReport}
