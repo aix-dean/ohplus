@@ -512,6 +512,7 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+
         descriptionOfWork: description.trim(),
       }
 
