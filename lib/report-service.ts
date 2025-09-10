@@ -51,16 +51,6 @@ export interface ReportData {
   completionPercentage: number
   tags: string[]
   assignedTo?: string
-  // Product information
-  product?: {
-    id: string
-    name: string
-    content_type?: string
-    specs_rental?: any
-    light?: any
-  }
-  // Completion report specific field
-  descriptionOfWork?: string
   // Installation report specific fields (optional)
   installationStatus?: string
   installationTimeline?: string
@@ -150,11 +140,6 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
-    // Add product information if provided
-    if (reportData.product) {
-      finalReportData.product = reportData.product
-    }
-
     // Add optional fields only if they have values
     if (reportData.siteCode) {
       finalReportData.siteCode = reportData.siteCode
@@ -185,14 +170,13 @@ export async function createReport(reportData: ReportData): Promise<string> {
       finalReportData.delayDays = reportData.delayDays
     }
 
-    // Add description of work for completion reports
-    if (reportData.descriptionOfWork && reportData.descriptionOfWork.trim() !== "") {
-      finalReportData.descriptionOfWork = reportData.descriptionOfWork.trim()
-    }
-
     console.log("Final report data to be saved:", finalReportData)
 
-    const docRef = await addDoc(collection(db, "reports"), finalReportData)
+    // Clean the data to remove undefined values before saving
+    const cleanedReportData = cleanReportData(finalReportData)
+    console.log("Cleaned report data:", cleanedReportData)
+
+    const docRef = await addDoc(collection(db, "reports"), cleanedReportData)
     console.log("Report created with ID:", docRef.id)
 
     return docRef.id
@@ -307,16 +291,6 @@ export async function updateReport(reportId: string, updateData: Partial<ReportD
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
         }))
-    }
-
-    // Add description of work for completion reports
-    if (updateData.descriptionOfWork && updateData.descriptionOfWork.trim() !== "") {
-      cleanUpdateData.descriptionOfWork = updateData.descriptionOfWork.trim()
-    }
-
-    // Handle product information
-    if (updateData.product !== undefined) {
-      cleanUpdateData.product = updateData.product
     }
 
     // Always update the timestamp

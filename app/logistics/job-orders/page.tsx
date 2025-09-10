@@ -15,12 +15,6 @@ import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useRouter } from "next/navigation"
 
-const isValidDate = (dateString: string | number | Date | undefined): boolean => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
-};
-
 export default function JobOrdersPage() {
   const { user } = useAuth()
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
@@ -228,18 +222,17 @@ export default function JobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobOrders.map((jo) => {
-                  return (
-                    <TableRow
-                      key={jo.id}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                      onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}
-                    >
+                {filteredJobOrders.map((jo) => (
+                  <TableRow
+                    key={jo.id}
+                    className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}
+                  >
                     <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
                     <TableCell className="py-3">{jo.siteName}</TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {isValidDate(jo.dateRequested) ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
+                        {jo.dateRequested ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">
@@ -249,7 +242,7 @@ export default function JobOrdersPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {isValidDate(jo.deadline) ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
+                        {jo.deadline ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">{jo.requestedBy}</TableCell>
@@ -272,8 +265,7 @@ export default function JobOrdersPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                    );
-                })}
+                ))}
               </TableBody>
             </Table>
           </Card>

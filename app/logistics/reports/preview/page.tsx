@@ -135,17 +135,9 @@ export default function ReportPreviewPage() {
 
         console.log("Loaded preview report data:", reportData)
         console.log("Preview report attachments:", reportData.attachments)
-        console.log("Report siteName:", reportData.siteName)
-        console.log("Product data from sessionStorage:", productData)
-        console.log("Product name from sessionStorage:", productData?.name)
-        console.log("Product content_type from sessionStorage:", productData?.content_type)
-        console.log("Product data from report:", reportData.product)
-
-        // Use product data from report if available, otherwise from sessionStorage
-        const finalProductData = (reportData.product ? { ...productData, ...reportData.product } : productData) || null
 
         setReport(reportData)
-        setProduct(finalProductData)
+        setProduct(productData)
       } else {
         console.error("No preview data found in session storage")
         toast({
@@ -582,10 +574,6 @@ export default function ReportPreviewPage() {
                       <span className="text-gray-900">{getSiteName(report)}</span>
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                      <span className="font-bold text-gray-700 whitespace-nowrap">Product:</span>
-                      <span className="text-gray-900">{product?.name || "N/A"}</span>
-                    </div>
-                    <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Size:</span>
                       <span className="text-gray-900">{getSiteSize(product)}</span>
                     </div>
@@ -710,6 +698,12 @@ export default function ReportPreviewPage() {
                 </div>
               )}
 
+              {process.env.NODE_ENV === "development" && report.attachments && (
+                <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+                  <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
+                  <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-end pt-8 border-t">

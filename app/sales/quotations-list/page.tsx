@@ -241,7 +241,7 @@ export default function QuotationsListPage() {
           const collectibleData = {
             // Basic information from quotation
             client_name: quotation.client_name || fullQuotationData.client_name || "",
-            company_id: (user as any)?.company_id || user?.uid,
+            company_id: user.company_id || user.uid,
             type: "sites", // Default to sites type based on the business model
 
             // Financial data - proportional amount for this period
@@ -344,7 +344,7 @@ export default function QuotationsListPage() {
 
       // Update quotation document with compliance data
       const quotationRef = doc(db, "quotations", quotationId)
-      const updateData: { [key: string]: any } = {
+      const updateData = {
         [`projectCompliance.${complianceType}`]: {
           status: "completed",
           fileUrl: downloadURL,
@@ -354,7 +354,6 @@ export default function QuotationsListPage() {
         },
         updated: serverTimestamp(),
       }
-
       if (complianceType === "signedContract") {
         updateData.status = "reserved" // Update the main status of the quotation
         console.log("[DEBUG] Status set to RESERVED for quotation:", quotationId)
@@ -422,7 +421,14 @@ export default function QuotationsListPage() {
   const getProjectCompliance = (quotation: any) => {
     const compliance = quotation.projectCompliance || {}
 
-    const toReserveItems = [
+    const items = [
+      {
+        key: "signedQuotation",
+        name: "Signed Quotation",
+        status: compliance.signedQuotation?.status || "upload",
+        file: compliance.signedQuotation?.fileName,
+        fileUrl: compliance.signedQuotation?.fileUrl,
+      },
       {
         key: "signedContract",
         name: "Signed Contract",
@@ -431,11 +437,18 @@ export default function QuotationsListPage() {
         fileUrl: compliance.signedContract?.fileUrl,
       },
       {
-        key: "irrevocablePo",
-        name: "Irrevocable PO",
-        status: compliance.irrevocablePo?.status || "upload",
-        file: compliance.irrevocablePo?.fileName,
-        fileUrl: compliance.irrevocablePo?.fileUrl,
+        key: "poMo",
+        name: "PO/MO",
+        status: compliance.poMo?.status || "upload",
+        file: compliance.poMo?.fileName,
+        fileUrl: compliance.poMo?.fileUrl,
+      },
+      {
+        key: "finalArtwork",
+        name: "Final Artwork",
+        status: compliance.finalArtwork?.status || "upload",
+        file: compliance.finalArtwork?.fileName,
+        fileUrl: compliance.finalArtwork?.fileUrl,
       },
       {
         key: "paymentAsDeposit",
@@ -447,31 +460,8 @@ export default function QuotationsListPage() {
       },
     ]
 
-    const otherRequirementsItems = [
-      {
-        key: "finalArtwork",
-        name: "Final Artwork",
-        status: compliance.finalArtwork?.status || "upload",
-        file: compliance.finalArtwork?.fileName,
-        fileUrl: compliance.finalArtwork?.fileUrl,
-      },
-      {
-        key: "signedQuotation",
-        name: "Signed Quotation",
-        status: compliance.signedQuotation?.status || "upload",
-        file: compliance.signedQuotation?.fileName,
-        fileUrl: compliance.signedQuotation?.fileUrl,
-      },
-    ]
-
-    const allItems = [...toReserveItems, ...otherRequirementsItems]
-    const completed = allItems.filter((item) => item.status === "completed").length
-    return {
-      completed,
-      total: allItems.length,
-      toReserve: toReserveItems,
-      otherRequirements: otherRequirementsItems,
-    }
+    const completed = items.filter((item) => item.status === "completed").length
+    return { completed, total: items.length, items }
   }
 
   const toggleComplianceExpansion = (quotationId: string) => {
@@ -725,8 +715,9 @@ export default function QuotationsListPage() {
 
     // Required compliance items (excluding Payment as Deposit)
     const requiredItems = [
+      { key: "signedQuotation", name: "Signed Quotation" },
       { key: "signedContract", name: "Signed Contract" },
-      { key: "irrevocablePo", name: "Irrevocable PO" },
+      { key: "poMo", name: "PO/MO" },
       { key: "finalArtwork", name: "Final Artwork" },
     ]
 
@@ -955,80 +946,9 @@ export default function QuotationsListPage() {
                                     }`}
                                   >
                                     <div className="space-y-1 pt-1">
-                                        <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
-                                        {compliance.toReserve.map((item: any, index: number) => {
-                                          const uploadKey = `${quotation.id}-${item.key}`
-                                          const isUploading = uploadingFiles.has(uploadKey)
-
-                                          return (
-                                            <div
-                                              key={index}
-                                              className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                              style={{
-                                                animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                                animationDuration: "200ms",
-                                              }}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                {item.status === "completed" ? (
-                                                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                                    <CheckCircle className="w-3 h-3 text-white" />
-                                                  </div>
-                                                ) : (
-                                                  <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                                )}
-                                                <div className="flex flex-col">
-                                                  <span className="text-gray-700">{item.name}</span>
-                                                  {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                {item.file && item.fileUrl ? (
-                                                  <a
-                                                    href={item.fileUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    <FileText className="w-3 h-3" />
-                                                    {item.file}
-                                                  </a>
-                                                ) : item.status === "upload" ? (
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-6 px-2 text-xs bg-transparent"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation()
-                                                      triggerFileUpload(quotation.id, item.key)
-                                                    }}
-                                                    disabled={isUploading}
-                                                  >
-                                                    {isUploading ? (
-                                                      <>
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                        Uploading...
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        <Upload className="w-3 h-3 mr-1" />
-                                                        Upload
-                                                      </>
-                                                    )}
-                                                  </Button>
-                                                ) : item.status === "confirmation" ? (
-                                                  <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                                    Pending
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                            </div>
-                                          )
-                                        })}
-
-                                        <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
-                                        {compliance.otherRequirements.map((item: any, index: number) => {
+                                      {compliance.items
+                                        .filter((item) => item.key !== "signedContract")
+                                        .map((item, index) => {
                                           const uploadKey = `${quotation.id}-${item.key}`
                                           const isUploading = uploadingFiles.has(uploadKey)
 
@@ -1096,6 +1016,36 @@ export default function QuotationsListPage() {
                                           )
                                         })}
 
+                                      {(() => {
+                                        const signedContract = compliance.items.find(
+                                          (item) => item.key === "signedContract",
+                                        )
+                                        if (signedContract?.status === "completed" && signedContract?.fileUrl) {
+                                          return (
+                                            <div className="flex justify-center pt-2 animate-in fade-in-0 slide-in-from-top-1">
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 px-4 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  window.open(signedContract.fileUrl, "_blank")
+                                                }}
+                                              >
+                                                <FileText className="w-3 h-3 mr-1" />
+                                                View Signed Contract
+                                              </Button>
+                                            </div>
+                                          )
+                                        }
+                                        return null
+                                      })()}
+
+                                      {compliance.items.find((item) => item.note) && (
+                                        <div className="text-xs text-gray-500 mt-1 animate-in fade-in-0 slide-in-from-top-1">
+                                          {compliance.items.find((item) => item.note)?.note}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -1152,6 +1102,9 @@ export default function QuotationsListPage() {
                                     <DropdownMenuItem onClick={() => console.log("Cancel", quotation.id)}>
                                       Cancel
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => console.log("Set alarm for", quotation.id)}>
+                                      Set an Alarm
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handleCopyQuotation(quotation.id)}
                                       disabled={copyingQuotations.has(quotation.id)}
@@ -1175,6 +1128,12 @@ export default function QuotationsListPage() {
                     </Table>
                   </CardContent>
 
+                  <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <p className="text-xs text-gray-500 italic">
+                      A quotation is marked as "Booked" if signed quotation is uploaded. It will then be marked as
+                      "Reserved" after uploading the "Signed Contract."
+                    </p>
+                  </div>
                 </>
               ) : (
                 <CardContent className="p-6 text-center text-gray-600">

@@ -3,13 +3,12 @@ import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp
 import type { Quotation, QuotationProduct } from "./types/quotation" // Import QuotationProduct
 import type { JobOrder, JobOrderStatus } from "./types/job-order"
 import type { Product } from "./firebase-service"
-import type { Client, ClientCompany } from "./client-service" // Import ClientCompany
- 
- const QUOTATIONS_COLLECTION = "quotations"
+import type { Client } from "./client-service"
+
+const QUOTATIONS_COLLECTION = "quotations"
 const JOB_ORDERS_COLLECTION = "job_orders"
 const PRODUCTS_COLLECTION = "products"
 const CLIENTS_COLLECTION = "client_db"
-const CLIENT_COMPANIES_COLLECTION = "client_company"
 
 // Removed local QuotationItem interface, will use QuotationProduct from types/quotation.ts
 
@@ -64,9 +63,9 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
       return null
     }
     const quotation = { id: quotationDocSnap.id, ...quotationDocSnap.data() } as Quotation
-    console.log("[getQuotationDetailsForJobOrder] Fetched raw quotation:", quotation) // Log raw quotation
- 
-     const products: Product[] = []
+    console.log("[getQuotationDetailsForJobOrder] Fetched quotation:", quotation)
+
+    const products: Product[] = []
     let items: QuotationProduct[] = [] // Use QuotationProduct
 
     // Check if quotation has items array (multiple products)
@@ -113,49 +112,6 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
         console.log("[getQuotationDetailsForJobOrder] Fetched client by ID:", client)
       } else {
         console.warn(`[getQuotationDetailsForJobOrder] Client with ID ${quotation.client_id} not found.`)
-      }
-    }
-
-    // Fetch client company details if client_company_id is available
-    if (quotation.client_company_id) {
-      console.log(`[getQuotationDetailsForJobOrder] Attempting to fetch client company by ID: ${quotation.client_company_id}`)
-      const clientCompanyDocRef = doc(db, CLIENT_COMPANIES_COLLECTION, quotation.client_company_id)
-      const clientCompanyDocSnap = await getDoc(clientCompanyDocRef)
-      console.log("[getQuotationDetailsForJobOrder] clientCompanyDocSnap.exists():", clientCompanyDocSnap.exists());
-      if (clientCompanyDocSnap.exists()) {
-        const clientCompanyData = clientCompanyDocSnap.data() as ClientCompany // Cast to ClientCompany
-        // Ensure client_company_id is explicitly set on the returned quotation object
-        quotation.client_company_id = clientCompanyDocSnap.id; // Explicitly set client_company_id
-        console.log("[getQuotationDetailsForJobOrder] Explicitly set quotation.client_company_id:", quotation.client_company_id);
-
-        // Update client object with compliance URLs from client company
-        if (client) {
-          client.dti_bir_2303_url = clientCompanyData.compliance?.dti || null
-          client.gis_url = clientCompanyData.compliance?.gis || null
-          client.id_signature_url = clientCompanyData.compliance?.id || null
-          console.log("[getQuotationDetailsForJobOrder] Updated client with compliance URLs from client company:", client)
-        } else {
-          // If client wasn't found by client_id, but client_company_id exists,
-          // we can create a minimal client object with compliance info.
-          // Note: This creates a 'Client' object, not a 'ClientCompany' object,
-          // but populates it with compliance fields from the ClientCompany.
-          client = {
-            id: quotation.client_company_id,
-            name: clientCompanyData.name || "N/A",
-            email: "", // ClientCompany might not have email
-            phone: "", // ClientCompany might not have phone
-            company: clientCompanyData.name || "N/A", // Use company name for company field
-            status: "active", // Default status
-            dti_bir_2303_url: clientCompanyData.compliance?.dti || null,
-            gis_url: clientCompanyData.compliance?.gis || null,
-            id_signature_url: clientCompanyData.compliance?.id || null,
-            created: clientCompanyData.created || serverTimestamp(),
-            updated: clientCompanyData.updated || serverTimestamp(),
-          }
-          console.log("[getQuotationDetailsForJobOrder] Created client from client company with compliance URLs:", client)
-        }
-      } else {
-        console.warn(`[getQuotationDetailsForJobOrder] Client company with ID ${quotation.client_company_id} not found.`)
       }
     }
 

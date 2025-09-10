@@ -37,7 +37,7 @@ export interface QuotationProduct {
   item_total_amount?: number // Total amount for this specific item
 }
 
-export interface ClientComplianceItem {
+export interface ProjectComplianceItem {
   status: "pending" | "completed" | "uploaded"
   pdf_url?: string
   uploaded_date?: any // Firebase Timestamp
@@ -46,28 +46,12 @@ export interface ClientComplianceItem {
   notes?: string
 }
 
-export interface ClientCompliance {
-  dti_bir_2303?: ClientComplianceItem
-  gis?: ClientComplianceItem
-  id_signature?: ClientComplianceItem
-}
-
-export interface ProjectComplianceItem {
-  completed: boolean
-  fileName: string | null
-  fileUrl: string | null
-  notes: string | null
-  uploadedAt: any | null // Firebase Timestamp or ISO string
-  uploadedBy?: string | null // Optional, as it's not in all examples
-  status?: "pending" | "completed" | "uploaded" // Added status field
-}
-
 export interface ProjectCompliance {
-  finalArtwork: ProjectComplianceItem
-  paymentAsDeposit: ProjectComplianceItem
-  poMo: ProjectComplianceItem
-  signedContract: ProjectComplianceItem
-  signedQuotation: ProjectComplianceItem
+  signed_quotation: ProjectComplianceItem
+  signed_contract: ProjectComplianceItem
+  po_mo: ProjectComplianceItem // Purchase Order/Marketing Order
+  final_artwork: ProjectComplianceItem
+  payment_as_deposit: ProjectComplianceItem
 }
 
 export interface Quotation {
@@ -94,10 +78,10 @@ export interface Quotation {
   client_phone?: string // Added client phone
   campaignId?: string
   proposalId?: string
+  company_id?: string // Added company ID
   valid_until?: any // Firebase Timestamp
   seller_id?: string
   product_id?: string // Added to support legacy single product quotations
   items: QuotationProduct[] // Renamed from 'products' to 'items'
-  projectCompliance?: ProjectCompliance
-  client_compliance?: ClientCompliance // Added client compliance
+  project_compliance?: ProjectCompliance
 }

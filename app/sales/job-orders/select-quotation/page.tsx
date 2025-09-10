@@ -24,6 +24,7 @@ export default function SelectQuotationPage() {
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null)
 
   useEffect(() => {
     const fetchQuotations = async () => {
@@ -68,12 +69,11 @@ export default function SelectQuotationPage() {
     (q) =>
       q.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.items?.some(item => item.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      q.items?.some(item => item.site_code?.toLowerCase().includes(searchTerm.toLowerCase())),
+      q.product_name?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleSelect = (quotation: Quotation) => {
-    router.push(`/sales/job-orders/create?quotationId=${quotation.id}`)
+    setSelectedQuotation(quotation)
   }
 
   const getProductCount = (quotation: Quotation): number => {
@@ -84,12 +84,23 @@ export default function SelectQuotationPage() {
   }
 
   const getProductNames = (quotation: Quotation): string => {
-    if (quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0) {
-      return quotation.items.map((item: any) => item.name).join(", ")
+    if (quotation.items && Array.isArray(quotation.items)) {
+      return quotation.items.map((item: any) => item.site_code).join(", ")
     }
-    return "N/A"
+    return quotation.site_code || "N/A"
   }
 
+  const handleConfirm = () => {
+    if (selectedQuotation) {
+      router.push(`/sales/job-orders/create?quotationId=${selectedQuotation.id}`)
+    } else {
+      toast({
+        title: "No Quotation Selected",
+        description: "Please select a quotation to proceed.",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-4 md:p-6">
@@ -133,7 +144,9 @@ export default function SelectQuotationPage() {
                     key={quotation.id}
                     className={cn(
                       "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors",
-                      "hover:bg-gray-50",
+                      selectedQuotation?.id === quotation.id
+                        ? "border-blue-500 bg-blue-50 shadow-md"
+                        : "hover:bg-gray-50",
                     )}
                     onClick={() => handleSelect(quotation)}
                   >
@@ -146,6 +159,7 @@ export default function SelectQuotationPage() {
                             {productCount} Products
                           </Badge>
                         )}
+                        {selectedQuotation?.id === quotation.id && <CheckCircle className="h-5 w-5 text-blue-600" />}
                       </div>
                     </div>
                     <p className="text-sm text-gray-700 mb-1">Client: {quotation.client_name}</p>
@@ -171,8 +185,13 @@ export default function SelectQuotationPage() {
         )}
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={!selectedQuotation}>
+            <FileText className="mr-2 h-4 w-4" />
+            {selectedQuotation && getProductCount(selectedQuotation) > 1
+              ? `Create ${getProductCount(selectedQuotation)} Job Orders`
+              : "Create Job Order"}
           </Button>
         </div>
       </Card>

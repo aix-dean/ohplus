@@ -32,6 +32,7 @@ import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
+import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 function ProposalsPageContent() {
@@ -153,14 +154,7 @@ function ProposalsPageContent() {
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <div className="mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Proposals</h1>
-            <Button
-              onClick={() => router.push("/sales/dashboard?action=create-proposal")}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Proposal
-            </Button>
+            <div></div>
           </div>
 
           <Card className="border-gray-200 shadow-sm rounded-xl">
@@ -196,176 +190,197 @@ function ProposalsPageContent() {
           </Card>
         </div>
 
-        {loading ? (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Created</TableHead>
-                  <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i} className="border-b border-gray-100">
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-48 mb-1" />
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-8 w-8 rounded-full" />
-                        <div>
-                          <Skeleton className="h-5 w-28 mb-1" />
-                          <Skeleton className="h-4 w-20" />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-6 w-20" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-12 mx-auto" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell className="text-right py-3">
-                      <Skeleton className="h-8 w-8 ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        ) : filteredProposals.length === 0 ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || statusFilter !== "all" ? "No proposals found" : "No proposals yet"}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm || statusFilter !== "all"
-                  ? "Try adjusting your search or filter criteria"
-                  : "Create your first proposal to get started"}
-              </p>
-              {!searchTerm && statusFilter === "all" && (
-                <Button
-                  onClick={() => router.push("/sales/proposals/create")}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Proposal
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Created</TableHead>
-                  <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProposals.map((proposal) => {
-                  const statusConfig = getStatusConfig(proposal.status)
-                  const StatusIcon = statusConfig.icon
-
-                  return (
-                    <TableRow
-                      key={proposal.id}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                      onClick={() => handleViewProposal(proposal.id)}
-                    >
-                      <TableCell className="py-3">
-                        <div>
-                          <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
-                          <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">{proposal.client.company}</div>
-                            <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-center">
-                          <div className="font-semibold text-gray-900">{proposal.products.length}</div>
-                          <div className="text-xs text-gray-500">
-                            product{proposal.products.length !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-sm text-gray-600 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(proposal.createdAt, "MMM d, yyyy")}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="proposals">Proposals</TabsTrigger>
+            <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
+          </TabsList>
+          <TabsContent value="proposals" className="mt-4">
+            {loading ? (
+              <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 border-b border-gray-200">
+                      <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Client</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Products</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Amount</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Created</TableHead>
+                      <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
                     </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-b border-gray-100">
+                        <TableCell className="py-3">
+                          <Skeleton className="h-5 w-48 mb-1" />
+                          <Skeleton className="h-4 w-32" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-8 w-8 rounded-full" />
+                            <div>
+                              <Skeleton className="h-5 w-28 mb-1" />
+                              <Skeleton className="h-4 w-20" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-6 w-20" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-5 w-12 mx-auto" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-5 w-24" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell className="text-right py-3">
+                          <Skeleton className="h-8 w-8 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : filteredProposals.length === 0 ? (
+              <Card className="border-gray-200 shadow-sm rounded-xl">
+                <CardContent className="text-center py-12">
+                  <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <FileText className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {searchTerm || statusFilter !== "all" ? "No proposals found" : "No proposals yet"}
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {searchTerm || statusFilter !== "all"
+                      ? "Try adjusting your search or filter criteria"
+                      : "Create your first proposal to get started"}
+                  </p>
+                  {!searchTerm && statusFilter === "all" && (
+                    <Button
+                      onClick={() => router.push("/sales/proposals/create")}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Proposal
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 border-b border-gray-200">
+                      <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Client</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Products</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Amount</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Created</TableHead>
+                      <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProposals.map((proposal) => {
+                      const statusConfig = getStatusConfig(proposal.status)
+                      const StatusIcon = statusConfig.icon
+
+                      return (
+                        <TableRow
+                          key={proposal.id}
+                          className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                          onClick={() => handleViewProposal(proposal.id)}
+                        >
+                          <TableCell className="py-3">
+                            <div>
+                              <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
+                              <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                <Building2 className="h-4 w-4 text-gray-600" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{proposal.client.company}</div>
+                                <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
+                              <StatusIcon className="mr-1 h-3 w-3" />
+                              {statusConfig.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-center">
+                              <div className="font-semibold text-gray-900">{proposal.products.length}</div>
+                              <div className="text-xs text-gray-500">
+                                product{proposal.products.length !== 1 ? "s" : ""}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-sm text-gray-600 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(proposal.createdAt, "MMM d, yyyy")}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/sales/proposals/${proposal.id}/cost-estimates`)}
+                                >
+                                  <Calculator className="mr-2 h-4 w-4" />
+                                  Cost Estimates
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </TabsContent>
+          <TabsContent value="cost-estimates" className="mt-4">
+            {user?.uid ? (
+              <CostEstimatesList userId={user.uid} />
+            ) : (
+              <p className="text-center py-10">Please log in to view your cost estimates.</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
