@@ -43,6 +43,8 @@ import { JobOrderListDialog } from "@/components/job-order-list-dialog"
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
 
+import { CreateServiceAssignmentForm } from '@/components/logistics/assignments/create/CreateServiceAssignmentForm';
+
 export default function CreateServiceAssignmentPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
