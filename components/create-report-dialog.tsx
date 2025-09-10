@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
+import { Upload, ImageIcon, Eye, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -27,12 +27,6 @@ interface CreateReportDialogProps {
   preSelectedJobOrder?: string
 }
 
-interface Team {
-  id: string
-  name: string
-  members: string[]
-  createdAt: string
-}
 
 interface AttachmentData {
   note: string
@@ -67,11 +61,6 @@ export function CreateReportDialog({
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
   const [date, setDate] = useState("")
-  const [selectedTeam, setSelectedTeam] = useState("")
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loadingTeams, setLoadingTeams] = useState(false)
-  const [showNewTeamInput, setShowNewTeamInput] = useState(false)
-  const [newTeamName, setNewTeamName] = useState("")
   const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
   const [description, setDescription] = useState("")
@@ -81,6 +70,9 @@ export function CreateReportDialog({
   const [timeline, setTimeline] = useState("on-time")
   const [delayReason, setDelayReason] = useState("")
   const [delayDays, setDelayDays] = useState("")
+
+  // Description of Work field for completion reports
+  const [descriptionOfWork, setDescriptionOfWork] = useState("")
 
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
@@ -94,7 +86,6 @@ export function CreateReportDialog({
   useEffect(() => {
     if (open && siteId) {
       fetchProductData()
-      fetchTeams()
       if (!hideJobOrderSelection) {
         fetchJobOrders()
       }
@@ -146,6 +137,9 @@ export function CreateReportDialog({
   const fetchProductData = async () => {
     try {
       const productData = await getProductById(siteId)
+      console.log("Fetched product data:", productData)
+      console.log("Product name:", productData?.name)
+      console.log("Product ID:", productData?.id)
       setProduct(productData)
     } catch (error) {
       console.error("Error fetching product data:", error)
@@ -157,66 +151,7 @@ export function CreateReportDialog({
     }
   }
 
-  const fetchTeams = async () => {
-    setLoadingTeams(true)
-    try {
-      // Mock teams data - replace with actual API call
-      const mockTeams: Team[] = [
-        { id: "1", name: "Installation Team A", members: ["John Doe", "Jane Smith"], createdAt: "2024-01-01" },
-        { id: "2", name: "Installation Team B", members: ["Mike Johnson", "Sarah Wilson"], createdAt: "2024-01-02" },
-        { id: "3", name: "Installation Team C", members: ["David Brown", "Lisa Davis"], createdAt: "2024-01-03" },
-        { id: "4", name: "Maintenance Team", members: ["Tom Wilson", "Amy Chen"], createdAt: "2024-01-04" },
-      ]
-      setTeams(mockTeams)
-    } catch (error) {
-      console.error("Error fetching teams:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load teams",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingTeams(false)
-    }
-  }
 
-  const handleCreateNewTeam = async () => {
-    if (!newTeamName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a team name",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      // Mock team creation - replace with actual API call
-      const newTeam: Team = {
-        id: Date.now().toString(),
-        name: newTeamName,
-        members: [],
-        createdAt: new Date().toISOString(),
-      }
-
-      setTeams((prev) => [...prev, newTeam])
-      setSelectedTeam(newTeam.id)
-      setNewTeamName("")
-      setShowNewTeamInput(false)
-
-      toast({
-        title: "Success",
-        description: "Team created successfully",
-      })
-    } catch (error) {
-      console.error("Error creating team:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create team",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleAttachmentNoteChange = (index: number, note: string) => {
     const newAttachments = [...attachments]
@@ -479,9 +414,19 @@ export function CreateReportDialog({
       const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
 
       // Build the report data
+      console.log("Building report data with product:", product)
+      console.log("Product name for siteName:", product.name)
+
+      // Use better fallback for site name
+      const siteName = product.name ||
+        product.specs_rental?.location ||
+        product.light?.location ||
+        `Site ${product.id?.slice(-4)}` ||
+        "Unknown Site"
+
       const reportData: ReportData = {
         siteId: product.id || "",
-        siteName: product.name || "Unknown Site",
+        siteName: siteName,
         companyId: userData?.company_id || projectData?.project_id || userData?.project_id || "",
         sellerId: product.seller_id || user.uid,
         client: selectedJobOrder?.clientCompany || "No Client",
@@ -512,8 +457,21 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+      }
+      console.log("Built report data with siteName:", reportData.siteName)
 
-        descriptionOfWork: description.trim(),
+      // Add product information
+      reportData.product = {
+        id: product.id || "",
+        name: product.name || "",
+        content_type: product.content_type,
+        specs_rental: product.specs_rental,
+        light: product.light,
+      }
+
+      // Add description of work for completion reports
+      if (reportType === "completion-report" && descriptionOfWork.trim()) {
+        reportData.descriptionOfWork = descriptionOfWork.trim()
       }
 
       // Add optional fields only if they have values
@@ -525,9 +483,6 @@ export function CreateReportDialog({
         reportData.location = product.light?.location || product.specs_rental?.location
       }
 
-      if (selectedTeam) {
-        reportData.assignedTo = selectedTeam
-      }
 
       // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
@@ -586,14 +541,14 @@ export function CreateReportDialog({
       // Reset form
       setReportType("completion-report")
       setDate("")
-      setSelectedTeam("")
       setSelectedJO("")
       setAttachments([{ note: "" }, { note: "" }])
       setStatus("")
       setTimeline("on-time")
       setDelayReason("")
       setDelayDays("")
-      setDescription("")
+      setDescriptionOfWork("")
+
 
       const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
@@ -688,6 +643,7 @@ export function CreateReportDialog({
               </Select>
             </div>
 
+
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date" className="text-sm font-semibold text-gray-900">
@@ -702,73 +658,6 @@ export function CreateReportDialog({
                 className="h-9 text-sm"
               />
             </div>
-            {/* Team - Only show for installation reports */}
-            {reportType === "installation-report" && (
-              <div className="space-y-2">
-                <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
-                  Team:
-                </Label>
-                {showNewTeamInput ? (
-                  <div className="flex gap-1">
-                    <Input
-                      placeholder="Enter team name"
-                      value={newTeamName}
-                      onChange={(e) => setNewTeamName(e.target.value)}
-                      className="flex-1 h-9 text-sm"
-                    />
-                    <Button
-                      onClick={handleCreateNewTeam}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setShowNewTeamInput(false)
-                        setNewTeamName("")
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="h-9 px-3 text-xs"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue placeholder="Select team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingTeams ? (
-                        <SelectItem value="loading" disabled>
-                          Loading teams...
-                        </SelectItem>
-                      ) : (
-                        <>
-                          {teams.map((team) => (
-                            <SelectItem key={team.id} value={team.id}>
-                              {team.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem
-                            value="create-new"
-                            onSelect={() => setShowNewTeamInput(true)}
-                            className="text-blue-600 font-medium"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Plus className="h-4 w-4" />
-                              Create New Team
-                            </div>
-                          </SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
             {/* Installation Report Specific Fields */}
             {reportType === "installation-report" && (
               <>
@@ -865,21 +754,24 @@ export function CreateReportDialog({
                 ))}
               </div>
             </div>
- 
-            {/* Description of Work */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-900">
-                Description of work: <span className="text-red-500">*</span>
-              </Label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the work performed..."
-                className="w-full min-h-[100px] p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
- 
+
+            {/* Description of Work - Only show for completion reports */}
+            {reportType === "completion-report" && (
+              <div className="space-y-2">
+                <Label htmlFor="descriptionOfWork" className="text-sm font-semibold text-gray-900">
+                  Description of Work:
+                </Label>
+                <textarea
+                  id="descriptionOfWork"
+                  value={descriptionOfWork}
+                  onChange={(e) => setDescriptionOfWork(e.target.value)}
+                  placeholder="Enter detailed description of work completed..."
+                  className="w-full h-20 p-2 border border-gray-300 rounded-md text-sm resize-y"
+                  rows={4}
+                />
+              </div>
+            )}
+
             {/* Generate Report Button */}
             <Button
               onClick={handleGenerateReport}

@@ -122,7 +122,7 @@ export async function updateQuotation(
     console.log(`Quotation ${quotationId} updated successfully.`)
   } catch (error) {
     console.error("Error updating quotation:", error)
-    throw new Error("Failed to update quotation: " + error.message)
+    throw new Error("Failed to update quotation: " + (error as any).message)
   }
 }
 
@@ -827,16 +827,14 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
       quotations.push({
         id: doc.id,
         ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        startDate: data.startDate?.toDate() || new Date(),
-        endDate: data.endDate?.toDate() || new Date(),
-        validUntil: data.validUntil?.toDate(),
+        created: data.created?.toDate() || new Date(), // Changed createdAt to created
+        updated: data.updated?.toDate() || new Date(), // Changed updatedAt to updated
+        // Removed startDate, endDate, validUntil conversions as they are handled by start_date, end_date, valid_until
       } as Quotation)
     })
 
-    return quotations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  } catch (error) {
+    return quotations.sort((a, b) => b.created.getTime() - a.created.getTime()) // Changed createdAt to created
+  } catch (error: any) {
     console.error("Error fetching quotations by created_by ID:", error)
     throw error
   }
@@ -959,17 +957,17 @@ export async function createDirectQuotation(
 
     const quotationData: Omit<Quotation, "id"> = {
       quotation_number: quotationNumber,
+      client_id: clientData.id, // Added client_id
       client_name: clientData.name,
       client_email: clientData.email,
-      client_id: clientData.id, // Added client_id
-      client_company_name: clientData.company,
+      client_company_name: clientData.company, // Explicitly include client_company_name
       client_phone: clientData.phone,
       client_address: clientData.address,
       client_company_id: options.client_company_id || "", // Added client_company_id field
       status: "draft",
       created_by: userId,
       seller_id: userId,
-      company_id: options.company_id,
+      companyId: options.company_id, // Mapped options.company_id to quotation.companyId
       page_id: pageId,
       page_number: 1, // Single document gets page number 1
       created_by_first_name: options.created_by_first_name,
@@ -1047,17 +1045,17 @@ export async function createMultipleQuotations(
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
+        client_id: clientData.id,
         client_name: clientData.name,
         client_email: clientData.email,
-        client_id: clientData.id, // Added client_id
-        client_company_name: clientData.company,
+        client_company_name: clientData.company, // Explicitly include client_company_name
         client_phone: clientData.phone,
         client_address: clientData.address,
-        client_company_id: options.client_company_id || "", // Added client_company_id field
+        client_company_id: clientData.company_id || "", // Added client_company_id field
         status: "draft",
         created_by: userId,
         seller_id: userId,
-        company_id: options.company_id,
+        companyId: options.company_id, // Mapped options.company_id to quotation.companyId
         page_id: pageId, // Same page_id for all documents in the batch
         page_number: i + 1, // Sequential page numbers (1, 2, 3, etc.)
         created_by_first_name: options.created_by_first_name,
@@ -1144,21 +1142,14 @@ export async function getQuotationsByClientId(clientId: string): Promise<Quotati
       quotations.push({
         id: doc.id,
         ...data,
-        created: data.created?.toDate() || new Date(), // Use 'created' instead of 'createdAt'
-        updated: data.updated?.toDate() || new Date(), // Use 'updated' instead of 'updatedAt'
-        start_date: data.start_date || "", // Ensure start_date is a string
-        end_date: data.end_date || "", // Ensure end_date is a string
-        total_amount: data.total_amount || 0, // Ensure total_amount is a number
-        duration_days: data.duration_days || 0, // Ensure duration_days is a number
-        quotation_number: data.quotation_number || "", // Ensure quotation_number is a string
-        status: data.status || "draft", // Ensure status is a valid type
-        valid_until: data.valid_until?.toDate(),
-        items: data.items || [], // Ensure items is an array
+        created: data.created?.toDate() || new Date(), // Changed createdAt to created
+        updated: data.updated?.toDate() || new Date(), // Changed updatedAt to updated
+        // Removed startDate, endDate, validUntil conversions as they are handled by start_date, end_date, valid_until
       } as Quotation)
     })
 
-    return quotations.sort((a, b) => (b.created?.getTime() || 0) - (a.created?.getTime() || 0))
-  } catch (error) {
+    return quotations.sort((a, b) => b.created.getTime() - a.created.getTime()) // Changed createdAt to created
+  } catch (error: any) {
     console.error("Error fetching quotations by client ID:", error)
     throw error
   }
@@ -1231,7 +1222,7 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
-      const hasMatchingCompany = quotation.company_id === companyId
+      const hasMatchingCompany = quotation.companyId === companyId
 
       if (hasMatchingProduct && hasMatchingCompany) {
         quotations.push(quotation)

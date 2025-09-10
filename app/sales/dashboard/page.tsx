@@ -165,6 +165,7 @@ function SalesDashboardContent() {
         designation: client.designation || "",
         targetAudience: client.targetAudience || "",
         campaignObjective: client.campaignObjective || "",
+        company_id: client.company_id || "",
       })
 
       // Update the search term to show the selected client
@@ -572,7 +573,7 @@ function SalesDashboardContent() {
       designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
-      company_id: client.company_id || "", // Add company_id here
+      company_id: client.company_id || "", // Ensure company_id is mapped
     })
     setDashboardClientSearchTerm(client.company || client.name || "") // Display selected client in search bar
     toast({
@@ -843,6 +844,7 @@ function SalesDashboardContent() {
           address: selectedClientForProposal!.address,
           designation: selectedClientForProposal!.designation,
           industry: selectedClientForProposal!.industry,
+          company_id: selectedClientForProposal!.company_id
         }
 
         const options = {

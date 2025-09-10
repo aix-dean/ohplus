@@ -51,6 +51,16 @@ export interface ReportData {
   completionPercentage: number
   tags: string[]
   assignedTo?: string
+  // Product information
+  product?: {
+    id: string
+    name: string
+    content_type?: string
+    specs_rental?: any
+    light?: any
+  }
+  // Completion report specific field
+  descriptionOfWork?: string
   // Installation report specific fields (optional)
   installationStatus?: string
   installationTimeline?: string
@@ -141,9 +151,9 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
-    // Add descriptionOfWork if it exists
-    if (reportData.descriptionOfWork) {
-      finalReportData.descriptionOfWork = reportData.descriptionOfWork
+    // Add product information if provided
+    if (reportData.product) {
+      finalReportData.product = reportData.product
     }
 
     // Add optional fields only if they have values
@@ -174,6 +184,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
 
     if (reportData.delayDays && reportData.delayDays.trim() !== "") {
       finalReportData.delayDays = reportData.delayDays
+    }
+
+    // Add description of work for completion reports
+    if (reportData.descriptionOfWork && reportData.descriptionOfWork.trim() !== "") {
+      finalReportData.descriptionOfWork = reportData.descriptionOfWork.trim()
     }
 
     console.log("Final report data to be saved:", finalReportData)
@@ -293,6 +308,16 @@ export async function updateReport(reportId: string, updateData: Partial<ReportD
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
         }))
+    }
+
+    // Add description of work for completion reports
+    if (updateData.descriptionOfWork && updateData.descriptionOfWork.trim() !== "") {
+      cleanUpdateData.descriptionOfWork = updateData.descriptionOfWork.trim()
+    }
+
+    // Handle product information
+    if (updateData.product !== undefined) {
+      cleanUpdateData.product = updateData.product
     }
 
     // Always update the timestamp

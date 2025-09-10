@@ -10,7 +10,7 @@ export type ProposalClient = {
   campaignObjective?: string
   designation?: string // Added new field
   companyLogoUrl?: string // Added new field
-  company_id?: string // Add company_id field
+  company_id?: string // Added new field
 }
 
 export type ProductSpecsRental = {

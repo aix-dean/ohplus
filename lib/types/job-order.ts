@@ -15,6 +15,8 @@ export interface JobOrder {
   deadline: string | Date
   jobDescription?: string
   message?: string
+  attachments: { url: string; name: string; type: string }[] // Changed to array of objects
+  materialSpecs?: string // Added materialSpecs
   attachments: string[]
   status: JobOrderStatus | string
   created?: Date | Timestamp
