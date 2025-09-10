@@ -66,7 +66,6 @@ export interface ReportData {
   installationTimeline?: string
   delayReason?: string
   delayDays?: string
-  descriptionOfWork?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -193,7 +192,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
 
     console.log("Final report data to be saved:", finalReportData)
 
-    const docRef = await addDoc(collection(db, "reports"), finalReportData)
+    // Clean the data to remove undefined values before saving
+    const cleanedReportData = cleanReportData(finalReportData)
+    console.log("Cleaned report data:", cleanedReportData)
+
+    const docRef = await addDoc(collection(db, "reports"), cleanedReportData)
     console.log("Report created with ID:", docRef.id)
 
     return docRef.id
