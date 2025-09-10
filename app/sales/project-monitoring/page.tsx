@@ -420,7 +420,7 @@ export default function ProjectMonitoringPage() {
                     }}
                   >
                     <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
-                      <span style={{ padding: '0 2px' }}>Latest JO: {latestJoNumbers[product.id!] || 'No JO'}</span>
+                      <span style={{ padding: '0 2px' }}>{latestJoNumbers[product.id!] || 'No JO'}</span>
                     </div>
 
                     {/* Project Title Banner */}
