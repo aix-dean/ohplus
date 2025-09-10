@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore"
+import type { ProjectCompliance } from "@/lib/types/quotation" // Import ProjectCompliance
 
 export type JobOrderType = "Installation" | "Maintenance" | "Repair" | "Dismantling" | "Other"
 export type JobOrderStatus = "draft" | "pending" | "approved" | "rejected" | "completed" | "cancelled"
@@ -9,6 +10,7 @@ export interface JobOrder {
   siteName: string
   siteLocation?: string
   joType: JobOrderType | string
+  campaignName?: string // Added campaignName
   requestedBy: string
   assignTo: string
   dateRequested: string | Date
@@ -19,8 +21,8 @@ export interface JobOrder {
   materialSpecs?: string // Added materialSpecs
   attachments: string[]
   status: JobOrderStatus | string
-  created?: Date | Timestamp
-  updated?: Date | Timestamp
+  createdAt?: Date | Timestamp
+  updatedAt?: Date | Timestamp
   created_by: string
   company_id: string
   quotation_id?: string
@@ -33,22 +35,11 @@ export interface JobOrder {
   contractPeriodStart?: string | Date
   leaseRatePerMonth?: number
   missingCompliance?: Record<string, any>
-  poMo?: boolean
-  projectFa?: boolean
-  signedQuotation?: boolean
-  poMoUrl?: string | null
-  product_id?: string
-  projectFaUrl?: string | null
   quotationNumber?: string
   remarks?: string
-  signedQuotationUrl?: string | null
-  siteCode?: string
-  siteIllumination?: string
-  siteImageUrl?: string
-  siteSize?: string
-  siteType?: string
-  totalAmount?: number
-  totalLease?: number
-  totalMonths?: number
-  vatAmount?: number
+  product_id?: string
+  projectCompliance?: ProjectCompliance // Added project compliance object
+  dtiBirUrl?: string | null // Added client compliance URL
+  gisUrl?: string | null // Added client compliance URL
+  idSignatureUrl?: string | null // Added client compliance URL
 }

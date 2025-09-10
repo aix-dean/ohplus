@@ -1,15 +1,16 @@
 "use client"
 
 import type React from "react"
+import Image from "next/image"
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 
 import { Loader2, ArrowLeft } from "lucide-react"
 
-
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
+import type { JobOrder } from "@/lib/types/job-order" // Import JobOrder type
 import { teamsService } from "@/lib/teams-service"
 import type { Team } from "@/lib/types/team"
 import {
@@ -30,17 +31,23 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
+import { JobOrderListDialog } from "@/components/job-order-list-dialog"
+
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
+
+import { CreateServiceAssignmentForm } from '@/components/logistics/assignments/create/CreateServiceAssignmentForm';
 
 export default function CreateServiceAssignmentPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialProjectSite = searchParams.get("projectSite")
+  const jobOrderId = searchParams.get("jobOrderId") // Get jobOrderId from query params
 
   const [loading, setLoading] = useState(false)
   const [fetchingProducts, setFetchingProducts] = useState(false)
@@ -51,10 +58,14 @@ export default function CreateServiceAssignmentPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [isEditingDraft, setIsEditingDraft] = useState(false)
   const [draftId, setDraftId] = useState<string | null>(null)
+  const [isJobOrderListDialogOpen, setIsJobOrderListDialogOpen] = useState(false) // State for JobOrderListDialog
+  const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
 
   const [teams, setTeams] = useState<Team[]>([])
+
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [isNewTeamDialogOpen, setIsNewTeamDialogOpen] = useState(false)
+
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -211,6 +222,43 @@ export default function CreateServiceAssignmentPage() {
 
     loadDraft()
   }, [searchParams])
+
+  // Fetch job order data if jobOrderId is present
+  useEffect(() => {
+    const fetchJobOrder = async () => {
+      if (jobOrderId) {
+        try {
+          const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
+          if (jobOrderDoc.exists()) {
+            const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
+            setJobOrderData(fetchedJobOrder)
+
+            // Pre-fill form fields from job order
+            setFormData((prev) => ({
+              ...prev,
+              projectSite: fetchedJobOrder.product_id || "",
+              serviceType: fetchedJobOrder.joType || "",
+              remarks: fetchedJobOrder.remarks || "",
+              message: fetchedJobOrder.message || "",
+              startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
+              endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
+              // You might want to pre-fill other fields like assignedTo, crew, etc.
+            }))
+
+            if (fetchedJobOrder.dateRequested) {
+              setStartDateInput(format(new Date(fetchedJobOrder.dateRequested), "yyyy-MM-dd"))
+            }
+            if (fetchedJobOrder.deadline) {
+              setEndDateInput(format(new Date(fetchedJobOrder.deadline), "yyyy-MM-dd"))
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching job order for pre-fill:", error)
+        }
+      }
+    }
+    fetchJobOrder()
+  }, [jobOrderId]) // Rerun when jobOrderId changes
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
@@ -604,14 +652,8 @@ export default function CreateServiceAssignmentPage() {
       }
 
       if (action === "print") {
-        // Check if browser supports printing
-        if (window.print) {
-          // Generate PDF and open in new window for printing
-          await generateServiceAssignmentPDF(serviceAssignmentData, false)
-        } else {
-          // Fallback to download if print not supported
-          await generateServiceAssignmentPDF(serviceAssignmentData, false)
-        }
+        // Generate PDF and open in new window for printing
+        await generateServiceAssignmentPDF(serviceAssignmentData, false)
       } else {
         // Download PDF
         await generateServiceAssignmentPDF(serviceAssignmentData, false)
@@ -644,7 +686,7 @@ export default function CreateServiceAssignmentPage() {
   }
 
   return (
-    <div className="container mx-auto py-4 space-y-4">
+<section className="p-8 bg-white">
       {/* Header */}
 
       <div className="flex items-center gap-2">
@@ -666,7 +708,6 @@ export default function CreateServiceAssignmentPage() {
       />
 
 
-
       {/* Success Dialog */}
       <ServiceAssignmentSuccessDialog
         open={showSuccessDialog}
@@ -686,11 +727,9 @@ export default function CreateServiceAssignmentPage() {
             // Create team object for local state
             const newTeam = {
               id: teamId,
-              name: teamData.name,
-              teamType: teamData.teamType,
               status: "active" as const,
               members: [],
-              ...teamData,
+              ...teamData, // Spread teamData first
               createdAt: new Date(),
               updatedAt: new Date(),
               createdBy: "logistics-admin",
@@ -708,6 +747,6 @@ export default function CreateServiceAssignmentPage() {
           }
         }}
       />
-    </div>
+    </section>
   )
 }

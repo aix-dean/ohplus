@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   MoreVertical,
   FileText,
@@ -28,35 +28,35 @@ import {
   Calculator,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getProposalsByUserId } from "@/lib/proposal-service"
-import type { Proposal } from "@/lib/types/proposal"
+import { getCostEstimatesByCreatedBy } from "@/lib/cost-estimate-service" // Import CostEstimate service
+import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
 import { useResponsive } from "@/hooks/use-responsive"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
 
-function ProposalsPageContent() {
-  const [proposals, setProposals] = useState<Proposal[]>([])
-  const [filteredProposals, setFilteredProposals] = useState<Proposal[]>([])
+function CostEstimatesPageContent() {
+  const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
+  const [filteredCostEstimates, setFilteredCostEstimates] = useState<CostEstimate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false) // Assuming this might be used for CE
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
-  const [activeTab, setActiveTab] = useState("proposals")
 
   useEffect(() => {
     if (user?.uid) {
-      loadProposals()
+      loadCostEstimates()
     }
   }, [user])
 
   useEffect(() => {
-    filterProposals()
-  }, [proposals, searchTerm, statusFilter])
+    filterCostEstimates()
+  }, [costEstimates, searchTerm, statusFilter])
 
+  // Assuming a success dialog might be relevant for cost estimates too
   useEffect(() => {
     const success = searchParams.get("success")
     if (success === "email-sent") {
@@ -67,39 +67,39 @@ function ProposalsPageContent() {
     }
   }, [searchParams])
 
-  const loadProposals = async () => {
+  const loadCostEstimates = async () => {
     if (!user?.uid) return
 
     setLoading(true)
     try {
-      const userProposals = await getProposalsByUserId(user.uid)
-      setProposals(userProposals)
+      const userCostEstimates = await getCostEstimatesByCreatedBy(user.uid)
+      setCostEstimates(userCostEstimates)
     } catch (error) {
-      console.error("Error loading proposals:", error)
+      console.error("Error loading cost estimates:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const filterProposals = () => {
-    let filtered = proposals
+  const filterCostEstimates = () => {
+    let filtered = costEstimates
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (proposal) =>
-          proposal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          proposal.client.company.toLowerCase().includes(searchTerm.toLowerCase()),
+        (costEstimate) =>
+          costEstimate.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          costEstimate.client.company.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((proposal) => proposal.status === statusFilter)
+      filtered = filtered.filter((costEstimate) => costEstimate.status === statusFilter)
     }
 
-    setFilteredProposals(filtered)
+    setFilteredCostEstimates(filtered)
   }
 
-  const getStatusConfig = (status: Proposal["status"]) => {
+  const getStatusConfig = (status: CostEstimate["status"]) => {
     switch (status) {
       case "draft":
         return {
@@ -140,12 +140,12 @@ function ProposalsPageContent() {
     }
   }
 
-  const handleViewProposal = (proposalId: string) => {
-    router.push(`/sales/proposals/${proposalId}`)
+  const handleViewCostEstimate = (costEstimateId: string) => {
+    router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
-  const handleDownloadPDF = (proposal: Proposal) => {
-    console.log("Download PDF for proposal:", proposal.id)
+  const handleDownloadPDF = (costEstimate: CostEstimate) => {
+    console.log("Download PDF for cost estimate:", costEstimate.id)
   }
 
   return (
@@ -153,13 +153,13 @@ function ProposalsPageContent() {
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <div className="mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Proposals</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Cost Estimates</h1>
             <Button
-              onClick={() => router.push("/sales/dashboard?action=create-proposal")}
+              onClick={() => router.push("/sales/dashboard?action=create-cost-estimate")}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Create Proposal
+              Create Cost Estimate
             </Button>
           </div>
 
@@ -169,7 +169,7 @@ function ProposalsPageContent() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Search proposals or clients..."
+                    placeholder="Search cost estimates or clients..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
@@ -201,10 +201,10 @@ function ProposalsPageContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Cost Estimate</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Items</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
                   <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
@@ -246,27 +246,27 @@ function ProposalsPageContent() {
               </TableBody>
             </Table>
           </Card>
-        ) : filteredProposals.length === 0 ? (
+        ) : filteredCostEstimates.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || statusFilter !== "all" ? "No proposals found" : "No proposals yet"}
+                {searchTerm || statusFilter !== "all" ? "No cost estimates found" : "No cost estimates yet"}
               </h3>
               <p className="text-gray-600 mb-6">
                 {searchTerm || statusFilter !== "all"
                   ? "Try adjusting your search or filter criteria"
-                  : "Create your first proposal to get started"}
+                  : "Create your first cost estimate to get started"}
               </p>
               {!searchTerm && statusFilter === "all" && (
                 <Button
-                  onClick={() => router.push("/sales/proposals/create")}
+                  onClick={() => router.push("/sales/cost-estimates/compose/new")}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Proposal
+                  Create Cost Estimate
                 </Button>
               )}
             </CardContent>
@@ -276,30 +276,30 @@ function ProposalsPageContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Cost Estimate</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Items</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
                   <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProposals.map((proposal) => {
-                  const statusConfig = getStatusConfig(proposal.status)
+                {filteredCostEstimates.map((costEstimate) => {
+                  const statusConfig = getStatusConfig(costEstimate.status)
                   const StatusIcon = statusConfig.icon
 
                   return (
                     <TableRow
-                      key={proposal.id}
+                      key={costEstimate.id}
                       className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                      onClick={() => handleViewProposal(proposal.id)}
+                      onClick={() => handleViewCostEstimate(costEstimate.id)}
                     >
                       <TableCell className="py-3">
                         <div>
-                          <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
-                          <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
+                          <div className="font-semibold text-gray-900 mb-1">{costEstimate.title}</div>
+                          <div className="text-sm text-gray-500">ID: {costEstimate.id.slice(0, 8)}...</div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
@@ -308,8 +308,8 @@ function ProposalsPageContent() {
                             <Building2 className="h-4 w-4 text-gray-600" />
                           </div>
                           <div>
-                            <div className="font-medium text-gray-900">{proposal.client.company}</div>
-                            <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
+                            <div className="font-medium text-gray-900">{costEstimate.client.company}</div>
+                            <div className="text-sm text-gray-500">{costEstimate.client.contactPerson}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -321,19 +321,19 @@ function ProposalsPageContent() {
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-center">
-                          <div className="font-semibold text-gray-900">{proposal.products.length}</div>
+                          <div className="font-semibold text-gray-900">{costEstimate.lineItems.length}</div>
                           <div className="text-xs text-gray-500">
-                            product{proposal.products.length !== 1 ? "s" : ""}
+                            item{costEstimate.lineItems.length !== 1 ? "s" : ""}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
+                        <div className="font-bold text-gray-900">₱{costEstimate.totalAmount.toLocaleString()}</div>
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(proposal.createdAt, "MMM d, yyyy")}
+                          {format(costEstimate.createdAt, "MMM d, yyyy")}
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
@@ -348,11 +348,11 @@ function ProposalsPageContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
+                            <DropdownMenuItem onClick={() => handleViewCostEstimate(costEstimate.id)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
+                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate)}>
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
@@ -372,11 +372,11 @@ function ProposalsPageContent() {
         <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
           <div className="py-6">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Congratulations!</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Success!</h2>
               <div className="flex justify-center mb-4">
                 <div className="text-6xl">🎉</div>
               </div>
-              <p className="text-gray-600">You have successfully sent a proposal!</p>
+              <p className="text-gray-600">Your cost estimate has been sent successfully!</p>
             </div>
           </div>
         </DialogContent>
@@ -385,6 +385,6 @@ function ProposalsPageContent() {
   )
 }
 
-export default function ProposalsPage() {
-  return <ProposalsPageContent />
+export default function CostEstimatesPage() {
+  return <CostEstimatesPageContent />
 }
