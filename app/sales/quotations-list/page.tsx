@@ -49,10 +49,11 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
+import { bookingService } from "@/lib/booking-service"
 
 export default function QuotationsListPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [allQuotations, setAllQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -320,6 +321,7 @@ export default function QuotationsListPage() {
   const handleFileUpload = async (quotationId: string, complianceType: string, file: File) => {
     const uploadKey = `${quotationId}-${complianceType}`
     setUploadingFiles((prev) => new Set(prev).add(uploadKey))
+    console.log("[DEBUG] handleFileUpload called for quotationId:", quotationId, "complianceType:", complianceType)
 
     try {
       // Validate file type (PDF only)
@@ -354,7 +356,33 @@ export default function QuotationsListPage() {
       }
 
       if (complianceType === "signedContract") {
-        updateData.status = "booked" // Update the main status of the quotation
+        updateData.status = "reserved" // Update the main status of the quotation
+        console.log("[DEBUG] Status set to RESERVED for quotation:", quotationId)
+
+        // Create a booking document
+        const fullQuotationData = { id: quotationId, ...(await getDoc(quotationRef)).data() }
+        console.log("[DEBUG] Full quotation data:", fullQuotationData)
+        console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
+
+        if (fullQuotationData && user?.uid && userData?.company_id) {
+          try {
+            const bookingId = await bookingService.createBooking(fullQuotationData, user.uid, userData.company_id)
+            console.log("[DEBUG] Booking created with ID:", bookingId)
+            toast({
+              title: "Booking Created",
+              description: `A new booking document has been created with ID: ${bookingId}.`,
+            })
+          } catch (bookingError) {
+            console.error("[DEBUG] Error creating booking:", bookingError)
+            toast({
+              title: "Booking Creation Failed",
+              description: "Failed to create booking document. Please check console for details.",
+              variant: "destructive",
+            })
+          }
+        } else {
+          console.warn("[DEBUG] Booking not created: Missing fullQuotationData, user UID, or user company ID.")
+        }
       }
 
       await updateDoc(quotationRef, updateData)
