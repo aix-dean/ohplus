@@ -50,7 +50,6 @@ export async function createProposal(
 
     // Clean the client data to ensure no undefined values
     const cleanClient: ProposalClient = {
-      id: client.id, // Include the client ID
       company: client.company || "",
       contactPerson: client.contactPerson || "",
       email: client.email || "",
@@ -62,8 +61,6 @@ export async function createProposal(
       designation: client.designation || "", // Include designation
       company_id: options.client_company_id || "", // Add client_company_id to client field map
     }
-
-    console.log("[DEBUG] Proposal Client ID:", cleanClient.id);
 
     // Clean the products data to ensure no undefined values
     const cleanProducts: ProposalProduct[] = products.map((product) => ({
