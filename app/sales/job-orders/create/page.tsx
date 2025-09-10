@@ -914,7 +914,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    DTI/BIR 2303.pdf
+                    JMCL Media2303.pdf
                   </a>
                 ) : (
                   <input
@@ -982,7 +982,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    GIS.pdf
+                    JMCL GIS.pdf
                   </a>
                 ) : (
                   <input
@@ -1050,7 +1050,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    ID_with_Signature.pdf
+                    Jalvin_Castro_PRC.pdf
                   </a>
                 ) : (
                   <input

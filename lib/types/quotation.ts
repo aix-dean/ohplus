@@ -87,11 +87,14 @@ export interface Quotation {
   client_name?: string
   client_email?: string
   client_id?: string
+  client_company_id?: string // Added client company ID
+  client_company_name?: string // Added client company name
   client_designation?: string // Added client designation
   client_address?: string // Added client address
   client_phone?: string // Added client phone
   campaignId?: string
   proposalId?: string
+  company_id?: string // Added company ID
   valid_until?: any // Firebase Timestamp
   seller_id?: string
   product_id?: string // Added to support legacy single product quotations

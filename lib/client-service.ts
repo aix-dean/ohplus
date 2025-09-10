@@ -38,7 +38,6 @@ export interface Client {
   uploadedByName?: string
   created: any
   updated: any
-
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field
@@ -63,7 +62,6 @@ export interface ClientCompany {
     gis?: string | null
     id?: string | null
   }
-
 }
 
 export interface PaginatedResult<T> {
@@ -110,6 +108,9 @@ export async function createClient(clientData: Omit<Client, "id" | "created" | "
       companyLogoUrl: clientData.companyLogoUrl || "",
       uploadedBy: clientData.uploadedBy || "",
       uploadedByName: clientData.uploadedByName || "",
+      clientType: clientData.clientType || "", // New field
+      partnerType: clientData.partnerType || "", // New field
+      user_company_id: clientData.user_company_id || "", // New field
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
@@ -136,8 +137,8 @@ export async function updateClient(clientId: string, clientData: Partial<Client>
 
     // Remove undefined values to avoid Firestore errors
     Object.keys(updateData).forEach((key) => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
+      if ((updateData as { [key: string]: any })[key] === undefined) {
+        delete (updateData as { [key: string]: any })[key]
       }
     })
 
@@ -163,42 +164,39 @@ export async function deleteClient(clientId: string): Promise<void> {
 
 // Get paginated clients
 export async function getPaginatedClients(
-  itemsPerPage = 10,
+  itemsPerPage = 20,
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
   searchTerm = "",
   statusFilter: string | null = null,
   uploadedByFilter: string | null = null, // New filter parameter
+  companyIdFilter?: string, // New filter parameter
 ): Promise<PaginatedResult<Client>> {
   try {
-    console.log("Getting paginated clients:", {
-      itemsPerPage,
-      lastDoc: !!lastDoc,
-      searchTerm,
-      statusFilter,
-      uploadedByFilter,
-    })
     const clientsRef = collection(db, "client_db")
-
+    
     // Start with base query
-    let baseQuery = query(clientsRef, orderBy("name", "asc"))
-
+    // let baseQuery = query(clientsRef, orderBy("name", "asc"))
+    // console.log("Base query initialized", baseQuery)
     // Add status filter if provided
-    if (statusFilter) {
-      baseQuery = query(baseQuery, where("status", "==", statusFilter))
-    }
+    // if (statusFilter) {
+    //   baseQuery = query(baseQuery, where("status", "==", statusFilter))
+    // }
 
     // Add uploadedBy filter if provided
-    if (uploadedByFilter) {
-      baseQuery = query(baseQuery, where("uploadedBy", "==", uploadedByFilter))
-    }
+    // if (uploadedByFilter) {
+    //   baseQuery = query(baseQuery, where("uploadedBy", "==", uploadedByFilter))
+    // }
 
+    // Add companyId filter if provided
+ 
+      const baseQuery = query(clientsRef, where("user_company_id", "==", companyIdFilter))
+    
     // Add pagination
     const paginatedQuery = lastDoc
       ? query(baseQuery, startAfter(lastDoc), limit(itemsPerPage))
       : query(baseQuery, limit(itemsPerPage))
 
     const querySnapshot = await getDocs(paginatedQuery)
-    console.log("Query returned documents:", querySnapshot.docs.length)
 
     // Get the last visible document for next pagination
     const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null

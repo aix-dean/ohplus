@@ -233,9 +233,9 @@ export default function SalesReportPreviewPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
     })
   }
 
@@ -447,7 +447,7 @@ export default function SalesReportPreviewPage() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
+    <div className="min-h-screen bg-gray-50">
       <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -458,33 +458,33 @@ export default function SalesReportPreviewPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="bg-[#38b6ff] text-white px-4 py-2 rounded-full text-[27.7px] font-medium">Lilo & Stitch</div>
-          {report.joNumber && <span className="text-lg font-bold text-[25.1px] text-[#0f76ff] bg-blue-100 px-3 py-1 rounded-md">{report.joNumber}</span>}
+          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">Lilo & Stitch</div>
+          {report.joNumber && <span className="text-lg font-medium text-gray-900">{report.joNumber}</span>}
         </div>
 
         <div className="ml-auto"></div>
       </div>
 
       <div className="relative">
-        <div className="absolute left-2 top-6 z-10">
+        <div className="absolute left-4 top-6 z-10">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                size="lg"
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                size="sm"
               >
-                <Download className="h-6 w-6" />
+                <Download className="h-5 w-5" />
               </Button>
               <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
             </div>
           </div>
         </div>
 
-        <div className="mx-32 mb-8 bg-white shadow-lg rounded-lg overflow-y-auto overflow-x-hidden h-[calc(100vh-12rem)]">
+        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
           <div className="w-full relative">
-            <div className="relative h-16">
+            <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
               <div
                 className="absolute top-0 right-0 h-full bg-cyan-400"
@@ -499,7 +499,7 @@ export default function SalesReportPreviewPage() {
             </div>
           </div>
 
-          <div className="w-2xl mx-auto p-6 space-y-6">
+          <div className="max-w-6xl mx-auto p-6 space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex flex-col">
                 <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
@@ -626,11 +626,11 @@ export default function SalesReportPreviewPage() {
               </div>
 
               {report.attachments && report.attachments.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {report.attachments.slice(0, 2).map((attachment, index) => (
                     <div key={index} className="space-y-2">
                       <div
-                        className="bg-white-200 rounded-lg h-96 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-white-300 transition-colors relative group"
+                        className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
                         onClick={() => attachment.fileUrl && openFullScreen(attachment)}
                       >
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center z-10">
@@ -641,7 +641,7 @@ export default function SalesReportPreviewPage() {
                           <img
                             src={attachment.fileUrl || "/placeholder.svg"}
                             alt={attachment.fileName}
-                            className="max-w-full max-h-full object-cover rounded"
+                            className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => handleImageError(attachment.fileUrl, attachment.fileName)}
                           />
                         ) : (
@@ -651,23 +651,46 @@ export default function SalesReportPreviewPage() {
                           </div>
                         )}
                       </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <div>
+                          <span className="font-semibold">Date:</span> {formatDate(report.date)}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Time:</span>{" "}
+                          {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Location:</span> {getSiteLocation(product)}
+                        </div>
+                        {attachment.note && (
+                          <div>
+                            <span className="font-semibold">Note:</span> {attachment.note}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
+              {process.env.NODE_ENV === "development" && report.attachments && (
+                <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+                  <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
+                  <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-between items-start pt-8 border-t">
+            <div className="flex justify-between items-end pt-8 border-t">
               <div>
                 <h3 className="font-semibold mb-2">Prepared by:</h3>
-                <div className="text-sm text-black font-medium">
+                <div className="text-sm text-gray-600">
                   <div>{preparedByName || "Loading..."}</div>
                   <div>SALES</div>
                   <div>{formatDate(report.date)}</div>
                 </div>
               </div>
-              <div className="text-right text-sm text-black italic">
+              <div className="text-right text-sm text-gray-500 italic">
                 "All data are based on the latest available records as of{" "}
                 {formatDate(new Date().toISOString().split("T")[0])}."
               </div>
@@ -675,7 +698,7 @@ export default function SalesReportPreviewPage() {
           </div>
 
           <div className="w-full relative">
-            <div className="relative h-16">
+            <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-cyan-400"></div>
               <div
                 className="absolute top-0 right-0 h-full bg-blue-900"
@@ -709,8 +732,8 @@ export default function SalesReportPreviewPage() {
         <Button
           onClick={handleSendReport}
           disabled={posting}
-          className="text-white px-10 py-5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
-          style={{ backgroundColor: "#00bf63", minWidth: "140px", minHeight: "64px" }}
+          className="text-white px-8 py-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
+          style={{ backgroundColor: "#00bf63", minWidth: "120px", minHeight: "56px" }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#00a855")}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#00bf63")}
         >
@@ -768,7 +791,7 @@ export default function SalesReportPreviewPage() {
               </div>
             </div>
 
-            <div className="flex-1 pt-16 pb-16">
+            <div className="flex-1 overflow-auto pt-16 pb-16">
               <div className="min-h-full flex items-center justify-center p-6">
                 {fullScreenAttachment?.fileUrl ? (
                   <div className="w-full max-w-full flex items-center justify-center">
