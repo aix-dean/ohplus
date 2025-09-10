@@ -23,6 +23,7 @@ import { Pagination } from "@/components/ui/pagination"
 
 interface Booking {
   id: string
+  product_name?: string
   product_id?: string
   product_owner?: string
   client_name?: string
@@ -415,7 +416,7 @@ export default function ReservationsPage() {
 
                   return (
                     <TableRow key={booking.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{siteCode || booking.product_owner || "-"}</TableCell>
+                      <TableCell className="font-medium">{booking.product_name || "-"}</TableCell>
                       <TableCell>{booking.client_name || "N/A"}</TableCell>
                       <TableCell>{formatDate(booking.start_date)}</TableCell>
                       <TableCell>{formatDate(booking.end_date)}</TableCell>
