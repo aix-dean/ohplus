@@ -11,6 +11,7 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore"
+import type { ProjectCompliance } from "@/lib/types/quotation" // Import ProjectCompliance
 
 export interface Booking {
   id: string
@@ -44,6 +45,7 @@ export interface Booking {
     quotation_id: string
     rated: boolean
   }
+  projectCompliance?: ProjectCompliance // Added projectCompliance field
   requirements?: {
     description: string
     fileName: string
@@ -148,20 +150,20 @@ export class BookingService {
         cancel_reason: "",
         category_id: quotation.category_id || "",
         client: {
-          company_id: quotation.client_company_id || companyId,
+          company_id: quotation.client_company_id || "",
           id: quotation.client_id || "",
         },
         company_id: companyId,
         contract: quotation.contract || "",
-        cost: quotation.total_cost || 0,
+        cost: quotation.items?.price || quotation.total_cost || 0,
         costDetails: {
-          basePrice: quotation.base_price || 0,
-          days: quotation.duration_days || 0,
+          basePrice: quotation.items?.price || 0,
+          days: quotation.items?.duration_days || 0,
           discount: quotation.discount || 0,
           months: quotation.months || 0,
           otherFees: quotation.other_fees || 0,
-          pricePerMonth: quotation.price_per_month || 0,
-          total: quotation.total_cost || 0,
+          pricePerMonth: quotation.items?.price || 0,
+          total: quotation.items?.item_total_amount || quotation.total_cost || 0,
           vatAmount: quotation.vat_amount || 0,
           vatRate: quotation.vat_rate || 0,
         },
@@ -169,14 +171,15 @@ export class BookingService {
         end_date: quotation.end_date || "",
         media_order: quotation.media_order || [],
         payment_method: quotation.payment_method || "Manual Payment",
-        product_id: quotation.product_id || "",
+        product_id: quotation.items?.product_id || "",
         product_owner: quotation.product_owner || "",
         promos: quotation.promos || {},
+        projectCompliance: quotation.projectCompliance || undefined, // Copy projectCompliance from quotation
         requirements: quotation.requirements || [],
         seller_id: quotation.seller_id || "",
         start_date: quotation.start_date || "",
         status: "RESERVED", // Initial status for a new booking
-        total_cost: quotation.total_cost || 0,
+        total_cost: quotation.items?.item_total_amount || 0,
         type: quotation.type || "RENTAL",
         updated: serverTimestamp(),
         user_id: userId,
@@ -327,7 +330,7 @@ export class BookingService {
 
       const lastSnapshot = await getDocs(lastQuery)
       const lastDoc = lastSnapshot.docs[lastSnapshot.docs.length - 1]
-
+      
       return {
         data: salesRecords,
         totalCount,
