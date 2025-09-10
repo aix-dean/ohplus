@@ -1,6 +1,6 @@
 import type { ProposalClient } from "./proposal"
 
-export type CostEstimateStatus = "draft" | "sent" | "accepted" | "declined" | "revised"
+export type CostEstimateStatus = "draft" | "sent" | "viewed" | "accepted" | "declined" | "revised"
 
 export type CostEstimateClient = ProposalClient
 

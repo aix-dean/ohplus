@@ -10,6 +10,7 @@ export interface JobOrder {
   siteName: string
   siteLocation?: string
   joType: JobOrderType | string
+  campaignName?: string // Added campaignName
   requestedBy: string
   assignTo: string
   dateRequested: string | Date
@@ -17,9 +18,11 @@ export interface JobOrder {
   jobDescription?: string
   message?: string
   attachments: { url: string; name: string; type: string }[] // Changed to array of objects
+  materialSpecs?: string // Added materialSpecs
+  attachments: string[]
   status: JobOrderStatus | string
-  created?: Date | Timestamp
-  updated?: Date | Timestamp
+  createdAt?: Date | Timestamp
+  updatedAt?: Date | Timestamp
   created_by: string
   company_id: string
   quotation_id?: string
