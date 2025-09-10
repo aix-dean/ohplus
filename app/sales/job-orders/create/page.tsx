@@ -38,7 +38,7 @@ import { updateQuotation } from "@/lib/quotation-service" // Import updateQuotat
 import type { QuotationProduct } from "@/lib/types/quotation" // Corrected import for QuotationProduct
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
-import type { Quotation } from "@/lib/types/quotation"
+import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
 import type { Product } from "@/lib/firebase-service"
 import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn } from "@/lib/utils"
@@ -94,6 +94,7 @@ export default function CreateJobOrderPage() {
   const [idSignatureUrl, setIdSignatureUrl] = useState<string | null>(null)
   const [uploadingIdSignature, setUploadingIdSignature] = useState(false)
   const [idSignatureError, setIdSignatureError] = useState<string | null>(null)
+
 
   // Project Compliance states
   const [signedQuotationFile, setSignedQuotationFile] = useState<File | null>(null)
@@ -285,45 +286,50 @@ export default function CreateJobOrderPage() {
             complianceFieldKey = "id"
           }
 
-          if (complianceFieldKey) {
+           if (complianceFieldKey) {
             // Construct the current compliance state from the client object (which holds merged data)
             const currentClientCompliance: Partial<ClientCompany["compliance"]> = {
-              dti: quotationData.client?.compliance?.dti || undefined,
-              gis: quotationData.client?.compliance?.gis || undefined,
-              id: quotationData.client?.compliance?.id || undefined,
+              dti: quotationData.client?.compliance?.dti || null,
+              gis: quotationData.client?.compliance?.gis || null,
+              id: quotationData.client?.compliance?.id || null,
             }
-
-            await updateClientCompany(quotationData.quotation.client_company_id, {
-              compliance: {
-                ...currentClientCompliance, // Preserve existing compliance fields
-                [complianceFieldKey]: downloadURL, // Update the specific field
-              },
-            })
-            toast({
-              title: "Client Company Document Updated",
-              description: `Client company's ${fieldToUpdate} updated successfully.`,
-            })
-          } else {
-            console.warn(`Unknown compliance field to update: ${fieldToUpdate}`)
-            toast({
-              title: "Update Failed",
-              description: `Could not update client company compliance for unknown field: ${fieldToUpdate}.`,
-              variant: "destructive",
-            })
-          }
-          toast({
-            title: "Client Company Document Updated",
-            description: `Client company's ${fieldToUpdate} updated successfully.`,
-          })
-        } else if (quotationId && fieldToUpdate) {
-          // Handle project compliance updates for the quotation document
-          let projectComplianceFieldKey:
-            | "signedQuotation"
-            | "signedContract"
-            | "poMo"
-            | "finalArtwork"
-            | "paymentAsDeposit"
-            | undefined
+ 
+             try {
+              await updateClientCompany(quotationData.quotation.client_company_id, {
+                compliance: {
+                  ...currentClientCompliance, // Preserve existing compliance fields
+                  [complianceFieldKey]: downloadURL, // Update the specific field
+                },
+              })
+              toast({
+                title: "Client Company Document Updated",
+                description: `Client company's ${fieldToUpdate} updated successfully.`,
+              })
+            } catch (updateError: any) {
+              console.error("Error during updateClientCompany:", updateError);
+              toast({
+                title: "Update Failed",
+                description: `Failed to update client company compliance: ${updateError.message || "Unknown error"}.`,
+                variant: "destructive",
+              })
+            }
+           } else {
+             console.warn(`Unknown compliance field to update: ${fieldToUpdate}`)
+             toast({
+               title: "Update Failed",
+               description: `Could not update client company compliance for unknown field: ${fieldToUpdate}.`,
+               variant: "destructive",
+             })
+           }
+         } else if (quotationId && fieldToUpdate) {
+           // Handle project compliance updates for the quotation document
+           let projectComplianceFieldKey:
+             | "signedQuotation"
+             | "signedContract"
+             | "poMo"
+             | "finalArtwork"
+             | "paymentAsDeposit"
+             | undefined
 
           if (fieldToUpdate === "signedQuotation") {
             projectComplianceFieldKey = "signedQuotation"
@@ -666,15 +672,12 @@ export default function CreateJobOrderPage() {
       setLoading(true)
       try {
         const data = await getQuotationDetailsForJobOrder(quotationId)
-        console.log(`Fetched Quotation Data: ${JSON.stringify(data?.quotation.projectCompliance, null, 2)}`)
         if (data) {
           setQuotationData(data)
-
           // Fetch the client_company document using the client_company_id from the quotation
           if (data.quotation.client_company_id) {
             const clientCompanyDoc = await getClientCompanyById(data.quotation.client_company_id)
             if (clientCompanyDoc) {
-              console.log("Client Company Document:", JSON.stringify(clientCompanyDoc, null, 2))
               // Use clientCompanyDoc data to set compliance URLs
               if (clientCompanyDoc.compliance?.dti) {
                 setDtiBirUrl(clientCompanyDoc.compliance.dti)
@@ -687,27 +690,31 @@ export default function CreateJobOrderPage() {
               }
             } else {
               console.warn(`Client company with ID ${data.quotation.client_company_id} not found.`)
-              // Fallback to data.client if clientCompanyDoc is not found
-              if (data.client?.compliance?.dti) {
-                setDtiBirUrl(data.client.compliance.dti)
-              }
-              if (data.client?.compliance?.gis) {
-                setGisUrl(data.client.compliance.gis)
-              }
-              if (data.client?.compliance?.id) {
-                setIdSignatureUrl(data.client.compliance.id)
+              // If clientCompanyDoc is not found, and data.client exists, try to set from data.client's direct compliance fields
+              if (data.client) {
+                if (data.client.dti_bir_2303_url) {
+                  setDtiBirUrl(data.client.dti_bir_2303_url)
+                }
+                if (data.client.gis_url) {
+                  setGisUrl(data.client.gis_url)
+                }
+                if (data.client.id_signature_url) {
+                  setIdSignatureUrl(data.client.id_signature_url)
+                }
               }
             }
           } else {
-            // If no client_company_id, still try to set from data.client (which might have compliance from client_db)
-            if (data.client?.compliance?.dti) {
-              setDtiBirUrl(data.client.compliance.dti)
-            }
-            if (data.client?.compliance?.gis) {
-              setGisUrl(data.client.compliance.gis)
-            }
-            if (data.client?.compliance?.id) {
-              setIdSignatureUrl(data.client.compliance.id)
+            // If no client_company_id, and data.client exists, try to set from data.client's direct compliance fields
+            if (data.client) {
+              if (data.client.dti_bir_2303_url) {
+                setDtiBirUrl(data.client.dti_bir_2303_url)
+              }
+              if (data.client.gis_url) {
+                setGisUrl(data.client.gis_url)
+              }
+              if (data.client.id_signature_url) {
+                setIdSignatureUrl(data.client.id_signature_url)
+              }
             }
           }
 
@@ -907,7 +914,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    JMCL Media2303.pdf
+                    DTI/BIR 2303.pdf
                   </a>
                 ) : (
                   <input
@@ -925,7 +932,7 @@ export default function CreateJobOrderPage() {
                           setUploadingDtiBir,
                           setDtiBirError,
                           "documents/client-compliance/dti-bir/",
-                          client?.id, // Pass client ID
+                          quotationData.client?.id, // Pass client company ID
                           "dti_bir_2303_url", // Field to update
                         )
                       }
@@ -975,7 +982,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    JMCL GIS.pdf
+                    GIS.pdf
                   </a>
                 ) : (
                   <input
@@ -993,7 +1000,7 @@ export default function CreateJobOrderPage() {
                           setUploadingGis,
                           setGisError,
                           "documents/client-compliance/gis/",
-                          client?.id, // Pass client ID
+                          quotationData.client?.id, // Pass client company ID
                           "gis_url", // Field to update
                         )
                       }
@@ -1043,7 +1050,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    Jalvin_Castro_PRC.pdf
+                    ID_with_Signature.pdf
                   </a>
                 ) : (
                   <input
@@ -1061,7 +1068,7 @@ export default function CreateJobOrderPage() {
                           setUploadingIdSignature,
                           setIdSignatureError,
                           "documents/client-compliance/id-signature/",
-                          client?.id, // Pass client ID
+                          quotationData.client?.id, // Pass client company ID
                           "id_signature_url", // Field to update
                         )
                       }
@@ -1086,6 +1093,7 @@ export default function CreateJobOrderPage() {
                 )}
                 {idSignatureError && <span className="text-xs text-red-500 ml-2">{idSignatureError}</span>}
               </div>
+
             </div>
 
             {/* Project Compliance Documents */}

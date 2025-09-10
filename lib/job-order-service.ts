@@ -3,9 +3,9 @@ import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp
 import type { Quotation, QuotationProduct } from "./types/quotation" // Import QuotationProduct
 import type { JobOrder, JobOrderStatus } from "./types/job-order"
 import type { Product } from "./firebase-service"
-import type { Client } from "./client-service"
-
-const QUOTATIONS_COLLECTION = "quotations"
+import type { Client, ClientCompany } from "./client-service" // Import ClientCompany
+ 
+ const QUOTATIONS_COLLECTION = "quotations"
 const JOB_ORDERS_COLLECTION = "job_orders"
 const PRODUCTS_COLLECTION = "products"
 const CLIENTS_COLLECTION = "client_db"
@@ -64,9 +64,9 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
       return null
     }
     const quotation = { id: quotationDocSnap.id, ...quotationDocSnap.data() } as Quotation
-    console.log("[getQuotationDetailsForJobOrder] Fetched quotation:", quotation)
-
-    const products: Product[] = []
+    console.log("[getQuotationDetailsForJobOrder] Fetched raw quotation:", quotation) // Log raw quotation
+ 
+     const products: Product[] = []
     let items: QuotationProduct[] = [] // Use QuotationProduct
 
     // Check if quotation has items array (multiple products)
@@ -121,8 +121,13 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
       console.log(`[getQuotationDetailsForJobOrder] Attempting to fetch client company by ID: ${quotation.client_company_id}`)
       const clientCompanyDocRef = doc(db, CLIENT_COMPANIES_COLLECTION, quotation.client_company_id)
       const clientCompanyDocSnap = await getDoc(clientCompanyDocRef)
+      console.log("[getQuotationDetailsForJobOrder] clientCompanyDocSnap.exists():", clientCompanyDocSnap.exists());
       if (clientCompanyDocSnap.exists()) {
         const clientCompanyData = clientCompanyDocSnap.data() as ClientCompany // Cast to ClientCompany
+        // Ensure client_company_id is explicitly set on the returned quotation object
+        quotation.client_company_id = clientCompanyDocSnap.id; // Explicitly set client_company_id
+        console.log("[getQuotationDetailsForJobOrder] Explicitly set quotation.client_company_id:", quotation.client_company_id);
+
         // Update client object with compliance URLs from client company
         if (client) {
           client.dti_bir_2303_url = clientCompanyData.compliance?.dti || null

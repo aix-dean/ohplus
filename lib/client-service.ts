@@ -41,9 +41,9 @@ export interface Client {
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field
-  dti_bir_2303_url?: string // Added for client compliance
-  gis_url?: string // Added for client compliance
-  id_signature_url?: string // Added for client compliance
+  dti_bir_2303_url?: string | null // Added for client compliance
+  gis_url?: string | null // Added for client compliance
+  id_signature_url?: string | null // Added for client compliance
 }
 
 export interface ClientCompany {
@@ -55,11 +55,12 @@ export interface ClientCompany {
   partnerType?: string
   companyLogoUrl?: string
   created: Date
+  updated?: any // Added for consistency with Client interface
   user_company_id?: string // Added
   compliance?: { // Added nested compliance object
-    dti?: string
-    gis?: string
-    id?: string
+    dti?: string | null
+    gis?: string | null
+    id?: string | null
   }
 }
 

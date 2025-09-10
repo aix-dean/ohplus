@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore"
+import type { ProjectCompliance } from "@/lib/types/quotation" // Import ProjectCompliance
 
 export type JobOrderType = "Installation" | "Maintenance" | "Repair" | "Dismantling" | "Other"
 export type JobOrderStatus = "draft" | "pending" | "approved" | "rejected" | "completed" | "cancelled"
