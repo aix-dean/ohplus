@@ -270,13 +270,15 @@ export default function JobOrderDetailsPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
-        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm font-medium">
+        <Badge variant="default" className="bg-blue-500 text-white px-3 py-1 text-sm font-medium" style={{ fontSize: '27.7px', fontWeight: '700', borderRadius: '10px' }}>
           Lilo & Stitch
         </Badge>
 
-        <span className="text-lg font-medium text-gray-900">
-          {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
-        </span>
+        <div style={{ borderRadius: '10px', padding: '0 10px', backgroundColor: '#efefef' }}>
+          <span className="text-lg font-medium text-gray-900" style={{ fontSize: '25.1px', color: '#0f76ff', fontWeight: '650' }}>
+            {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
+          </span>
+        </div>
       </div>
 
       <div className="flex justify-start">
