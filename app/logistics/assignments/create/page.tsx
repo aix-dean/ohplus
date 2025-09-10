@@ -5,12 +5,9 @@ import Image from "next/image"
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download, PlusCircle, X, Calendar } from "lucide-react"
+
+import { Loader2, ArrowLeft } from "lucide-react"
+
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order" // Import JobOrder type
@@ -42,6 +39,8 @@ import { JobOrderListDialog } from "@/components/job-order-list-dialog"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
+
+import { CreateServiceAssignmentForm } from '@/components/logistics/assignments/create/CreateServiceAssignmentForm';
 
 export default function CreateServiceAssignmentPage() {
   const { user, userData } = useAuth()
@@ -653,6 +652,7 @@ export default function CreateServiceAssignmentPage() {
       }
 
       if (action === "print") {
+
         // Generate PDF and open in new window for printing
         await generateServiceAssignmentPDF(serviceAssignmentData, false)
       } else {
@@ -689,441 +689,25 @@ export default function CreateServiceAssignmentPage() {
   return (
 <section className="p-8 bg-white">
       {/* Header */}
-      <div className="flex items-center mb-6">
-        <Link href="/logistics/assignments" className="text-gray-800 hover:text-gray-600">
-          <ArrowLeft className="h-6 w-6" />
+
+      <div className="flex items-center gap-2">
+        <Link href="/logistics/assignments" className="inline-flex items-center text-gray-600 hover:text-gray-800">
+          <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-lg font-bold ml-3">Create Service Assignment</h1>
+        <h1 className="text-xl font-semibold text-gray-800">
+          {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
+        </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Service Assignment Details Card */}
-        <Card className="shadow-sm border-none p-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold text-gray-800 uppercase">SERVICE ASSIGNMENT</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5 text-xs">
-            {/* SA Number and Dates */}
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-blue-600">SA#: {saNumber}</span>
-              <span className="text-blue-600">
-                {format(new Date(), "MMM d, yyyy")}
-              </span>
-            </div>
+      {/* Form Card */}
+      <CreateServiceAssignmentForm
+        onSaveAsDraft={handleSaveDraft}
+        onSubmit={handleSubmit}
+        loading={loading}
+        companyId={userData?.company_id || null}
+        productId={formData.projectSite} // Pass productId from formData
+      />
 
-            {/* Project Site (Product) */}
-            <div className="flex items-center gap-4 border border-gray-200 rounded-md p-3 bg-gray-50">
-              <div className="relative h-16 w-16 flex-shrink-0">
-                <Image
-                  src="/images/placeholder.png"
-                  alt="Product"
-                  fill
-                  className="rounded-md object-cover"
-                />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">NAN20011</p>
-                <p className="font-semibold text-gray-800">Petplans NB</p>
-              </div>
-            </div>
-
-            {/* JO# and Date */}
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-blue-600">JO#: {jobOrderData?.joNumber || "00372"}</span>
-              <span className="text-blue-600">
-                {jobOrderData?.dateRequested ? format(new Date(jobOrderData.dateRequested), "MMM d, yyyy") : "Sep 5, 2025"}
-              </span>
-            </div>
-
-            {/* Fields */}
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Service Type:</span>
-                <span className="text-gray-600">{formData.serviceType || "Roll Up"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Campaign Name:</span>
-                <span className="text-gray-600">{jobOrderData?.campaignName || "Fantastic 4"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Service Start Date:</span>
-                <div className="relative w-44">
-                  <Input
-                    type="date"
-                    value={startDateInput}
-                    onChange={(e) => handleDateInputChange("start", e.target.value)}
-                    className="bg-green-50 pr-8 text-gray-700"
-                  />
-                  <Calendar className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Service End Date:</span>
-                <div className="relative w-44">
-                  <Input
-                    type="date"
-                    value={endDateInput}
-                    onChange={(e) => handleDateInputChange("end", e.target.value)}
-                    className="bg-green-50 pr-8 text-gray-700"
-                  />
-                  <Calendar className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Service Duration:</span>
-                <Input
-                  value={formData.serviceDuration}
-                  onChange={(e) => handleInputChange("serviceDuration", e.target.value)}
-                  placeholder="Total Days"
-                  className="w-44 text-gray-700"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Material Specs:</span>
-                <Input
-                  value={formData.materialSpecs}
-                  onChange={(e) => handleInputChange("materialSpecs", e.target.value)}
-                  placeholder="Perforated Sticker"
-                  className="w-44 text-gray-700"
-                />
-              </div>
-              <div className="flex items-start justify-between">
-                <span className="font-semibold text-gray-700">Attachment:</span>
-                <div>
-                  {formData.attachments.length > 0 && formData.attachments.file ? (
-                    <Image src={URL.createObjectURL(formData.attachments.file as Blob)} alt="attachment" width={60} height={60} className="rounded" />
-                  ) : (
-                    <span className="text-gray-400">No file</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Remarks:</span>
-                <Input value={formData.remarks} onChange={(e) => handleInputChange("remarks", e.target.value)} placeholder="Remarks" className="w-44 bg-green-50 text-gray-700"/>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Crew:</span>
-                <Select value={formData.crew} onValueChange={handleCrewChange}>
-                  <SelectTrigger className="w-44 bg-green-50 text-gray-700">
-                    <SelectValue placeholder="Choose a Crew" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Illumination/Nits:</span>
-                <Input value={formData.illuminationNits} onChange={(e) => handleInputChange("illuminationNits", e.target.value)} placeholder="10PCS of 1000W metal halide" className="w-44 text-gray-700"/>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Gondola:</span>
-                <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
-                  <SelectTrigger className="w-44 text-gray-700">
-                    <SelectValue placeholder="Select option" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="yes">YES</SelectItem>
-                    <SelectItem value="no">NO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Sales:</span>
-                <Input value={formData.sales} onChange={(e) => handleInputChange("sales", e.target.value)} placeholder="Noemi Abellanada" className="w-44 text-gray-700"/>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Logistics:</span>
-                <Input value="May Tuyan" readOnly className="w-44 bg-gray-100 text-gray-700"/>
-              </div>
-            </div>
-
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-
-
-            
-          </CardContent>
-        </Card>
-
-        {/* Job Order Card */}
-        <Card className="shadow-sm border border-gray-200 p-6 bg-gray-50">
-          <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-200">
-            <CardTitle className="text-sm font-bold text-gray-800 uppercase">JOB ORDER</CardTitle>
-            <button type="button" className="text-gray-500 hover:text-gray-700">
-              <X className="h-4 w-4" />
-            </button>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-4">
-            {jobOrderData ? (
-              <div className="text-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-600">JO#: {jobOrderData.joNumber}</span>
-                  <span className="text-blue-600">{formatDateForDisplay(new Date(jobOrderData.dateRequested))}</span>
-                </div>
-                <div><span className="font-bold text-gray-700">JO Type:</span> <span className="text-gray-600">{jobOrderData.joType}</span></div>
-                <div><span className="font-bold text-gray-700">Campaign Name:</span> <span className="text-gray-600">{jobOrderData.campaignName || "N/A"}</span></div>
-                <div><span className="font-bold text-gray-700">Deadline:</span> <span className="text-gray-600">{jobOrderData.deadline ? formatDateForDisplay(new Date(jobOrderData.deadline)) : "N/A"}</span></div>
-                <div><span className="font-bold text-gray-700">Material Specs:</span> <span className="text-gray-600">{jobOrderData.materialSpecs || "N/A"}</span></div>
-                <div>
-                  <p className="font-bold text-gray-700">Attachment:</p>
-                  {jobOrderData.attachments && jobOrderData.attachments.length > 0 ? (
-                    <div className="relative w-24 h-24 rounded-md overflow-hidden border border-gray-200">
-                      <Image
-                        src={jobOrderData.attachments}
-                        alt="Job Order Attachment"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-24 w-24 border rounded-md bg-gray-50 mt-1">
-                      <FileText className="h-8 w-8 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                <div><span className="font-bold text-gray-700">Remarks:</span> <span className="text-gray-600">{jobOrderData.remarks || "N/A"}</span></div>
-                <div className="flex items-center justify-between">
-                  <span><span className="font-bold text-gray-700">Requested by:</span> <span className="text-gray-600">{jobOrderData.requestedBy || "N/A"}</span></span>
-                  <button type="button" className="text-blue-600 text-sm hover:underline">Change</button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-500">No Job Order selected.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Service Expense Card */}
-        <Card className="shadow-sm border-none p-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold text-gray-800">
-              Service Expense <span className="text-xs text-gray-500 font-normal">(Optional)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            {/* Main service cost fields */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="crewFee" className="text-xs font-medium text-gray-700">Crew Fee</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    id="crewFee"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.serviceCost.crewFee}
-                    onChange={(e) => handleServiceCostChange("crewFee", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleServiceCostChange("crewFee", "")} // Clear the field
-                    className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="overtimeFee" className="text-xs font-medium text-gray-700">Overtime Fee</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    id="overtimeFee"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.serviceCost.overtimeFee}
-                    onChange={(e) => handleServiceCostChange("overtimeFee", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleServiceCostChange("overtimeFee", "")}
-                    className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="transpo" className="text-xs font-medium text-gray-700">Transpo</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    id="transpo"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.serviceCost.transpo}
-                    onChange={(e) => handleServiceCostChange("transpo", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleServiceCostChange("transpo", "")}
-                    className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="tollFee" className="text-xs font-medium text-gray-700">Toll Fee</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    id="tollFee"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.serviceCost.tollFee}
-                    onChange={(e) => handleServiceCostChange("tollFee", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleServiceCostChange("tollFee", "")}
-                    className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mealAllowance" className="text-xs font-medium text-gray-700">Meal Allowance</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    id="mealAllowance"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.serviceCost.mealAllowance}
-                    onChange={(e) => handleServiceCostChange("mealAllowance", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleServiceCostChange("mealAllowance", "")}
-                    className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Other fees */}
-            {formData.serviceCost.otherFees.map((fee, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <Input
-                  value={fee.name}
-                  onChange={(e) => updateOtherFee(index, "name", e.target.value)}
-                  placeholder="Other Fee"
-                  className="flex-1 mr-2 text-gray-700"
-                />
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={fee.amount}
-                    onChange={(e) => updateOtherFee(index, "amount", e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-green-50 text-gray-700"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeOtherFee(index)}
-                  className="h-6 w-6 text-gray-500 hover:bg-gray-100 bg-gray-100 ml-2"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-
-            {/* Add Other button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={addOtherFee}
-              className="text-blue-600 hover:text-blue-700 px-0 bg-transparent"
-            >
-              + Other
-            </Button>
-
-            {/* Total */}
-            <div className="border-t border-gray-200 pt-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-gray-700">Total:</Label>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">P</span>
-                  <span className="font-semibold bg-purple-100 text-purple-800 px-2 py-1 rounded-md text-sm">{calculateServiceCostTotal().toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 italic">You can edit this later on!</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Action Buttons (Below all columns) */}
-      <div className="flex justify-center gap-4 mt-8">
-        <Button variant="outline" onClick={handleSaveDraft} disabled={loading} type="button" className="px-6 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">
-          Save as Draft
-        </Button>
-        <Button onClick={handleSubmit} disabled={loading} type="button" className="px-6 py-2 rounded-md font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-md">
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            "Submit SA"
-          )}
-        </Button>
-      </div>
 
       {/* Success Dialog */}
       <ServiceAssignmentSuccessDialog
