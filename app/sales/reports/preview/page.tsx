@@ -199,6 +199,16 @@ export default function SalesReportPreviewPage() {
 
       const reportId = await postReport(finalReportData)
 
+      // Fetch the actual saved report data from database
+      const { getReportById } = await import("@/lib/report-service")
+      const savedReport = await getReportById(reportId)
+
+      if (savedReport) {
+        // Update the report state with the actual saved report data
+        setReport(savedReport)
+        console.log("Updated report state with saved report data:", savedReport)
+      }
+
       sessionStorage.setItem("lastPostedReportId", reportId)
 
       sessionStorage.removeItem("previewReportData")

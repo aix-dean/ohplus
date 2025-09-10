@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { postReport, type ReportData } from "@/lib/report-service"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -466,17 +467,21 @@ export function CreateReportDialog({
       // Find the selected job order data
       const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
 
-      // Build the report data for preview (without saving to Firebase)
-      const reportData: any = {
-        id: `preview-${Date.now()}`, // Temporary ID for preview
-        siteId: product.id,
+      // Build the report data
+      const reportData: ReportData = {
+        siteId: product.id || "",
         siteName: product.name || "Unknown Site",
-        companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
+        companyId: userData?.company_id || projectData?.project_id || userData?.project_id || "",
         sellerId: product.seller_id || user.uid,
         client: selectedJobOrder?.clientCompany || "No Client",
         clientId: selectedJobOrder?.clientName || "no-client-id",
-        joNumber: selectedJO === "none" ? null : selectedJO,
+        joNumber: selectedJO === "none" ? undefined : selectedJO,
         joType: selectedJobOrder?.joType || "General",
+        bookingDates: {
+          start: date,
+          end: date,
+        },
+        breakdate: date,
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
@@ -486,9 +491,9 @@ export function CreateReportDialog({
             note: att.note,
             fileName: att.fileName || "",
             fileType: att.fileType || att.file?.type || "",
-            fileUrl: att.fileUrl, // This is the crucial field for the report display
+            fileUrl: att.fileUrl!, // This is guaranteed to exist due to filter
           })),
-        status: "draft",
+        status: module === "sales" ? "posted" : "draft", // Save as posted for sales, draft for logistics
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
         category: module,
@@ -496,8 +501,6 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
-        created: new Date(), // Use current date for preview
-        isPreview: true, // Flag to indicate this is a preview
       }
 
       // Add optional fields only if they have values
@@ -536,13 +539,34 @@ export function CreateReportDialog({
 
       console.log("Generated report data with attachments:", reportData.attachments)
 
+      let finalReportData = reportData
+
+      // For sales module, save the report to database immediately
+      if (module === "sales") {
+        console.log("Saving report to database for sales module")
+        const reportId = await postReport(reportData)
+
+        // Fetch the actual saved report data from database
+        const { getReportById } = await import("@/lib/report-service")
+        const savedReport = await getReportById(reportId)
+
+        if (savedReport) {
+          finalReportData = savedReport
+          console.log("Retrieved saved report data:", savedReport)
+        } else {
+          throw new Error("Failed to retrieve saved report")
+        }
+      }
+
       // Store the report data in sessionStorage for the preview page
-      sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
+      sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
       sessionStorage.setItem("previewProductData", JSON.stringify(product))
 
       toast({
         title: "Success",
-        description: "Service Report Generated Successfully!",
+        description: module === "sales"
+          ? "Service Report Created and Posted Successfully!"
+          : "Service Report Generated Successfully!",
       })
 
       onOpenChange(false)
@@ -560,10 +584,10 @@ export function CreateReportDialog({
       const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
     } catch (error) {
-      console.error("Error generating report preview:", error)
+      console.error("Error generating report:", error)
       toast({
         title: "Error",
-        description: "Failed to generate report preview",
+        description: "Failed to generate report",
         variant: "destructive",
       })
     } finally {
