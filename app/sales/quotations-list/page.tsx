@@ -369,7 +369,7 @@ export default function QuotationsListPage() {
           throw new Error("Updated quotation not found after compliance upload.")
         }
         const fullQuotationData = { id: quotationId, ...updatedQuotationDoc.data() }
-        
+
         console.log("[DEBUG] Full quotation data (after update):", fullQuotationData)
         console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
 
@@ -395,6 +395,30 @@ export default function QuotationsListPage() {
       }
 
       await updateDoc(quotationRef, updateData)
+
+      // Update booking documents that have this quotation_id
+      try {
+        const bookingsRef = collection(db, "booking")
+        const bookingsQuery = query(
+          bookingsRef,
+          where("quotation_id", "==", quotationId),
+          where("company_id", "==", userData?.company_id)
+        )
+        const bookingsSnapshot = await getDocs(bookingsQuery)
+
+        if (!bookingsSnapshot.empty) {
+          const bookingUpdatePromises = bookingsSnapshot.docs.map(async (bookingDoc) => {
+            const bookingRef = doc(db, "booking", bookingDoc.id)
+            return updateDoc(bookingRef, updateData)
+          })
+
+          await Promise.all(bookingUpdatePromises)
+          console.log(`Updated ${bookingsSnapshot.docs.length} booking document(s) with compliance data`)
+        }
+      } catch (bookingUpdateError) {
+        console.error("Error updating booking documents:", bookingUpdateError)
+        // Don't fail the entire operation if booking update fails
+      }
 
       // Refresh quotations list
       await fetchAllQuotations()

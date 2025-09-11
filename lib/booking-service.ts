@@ -55,6 +55,7 @@ export interface Booking {
     type: string
     uploadStatus: string
   }[]
+  reservation_id: string // Generated reservation ID with format "RV-" + currentmillis
   seller_id: string
   start_date: string
   status: string
@@ -162,8 +163,8 @@ export class BookingService {
           discount: quotation.discount || 0,
           months: quotation.months || 0,
           otherFees: quotation.other_fees || 0,
-          pricePerMonth: quotation.items?.price || 0,
-          total: quotation.items?.item_total_amount || quotation.total_cost || 0,
+          pricePerMonth: quotation.items[0]?.price || 0,
+          total: quotation.items[0]?.item_total_amount || quotation.total_cost || 0,
           vatAmount: quotation.vat_amount || 0,
           vatRate: quotation.vat_rate || 0,
         },
@@ -177,6 +178,7 @@ export class BookingService {
         promos: quotation.promos || {},
         projectCompliance: quotation.projectCompliance || undefined, // Copy projectCompliance from quotation
         requirements: quotation.requirements || [],
+        reservation_id: `RV-${Date.now()}`, // Generate reservation ID with format "RV-" + currentmillis
         seller_id: quotation.seller_id || "",
         start_date: quotation.start_date || "",
         status: "RESERVED", // Initial status for a new booking
