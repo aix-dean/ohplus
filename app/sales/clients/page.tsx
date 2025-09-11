@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns"
 import { Toaster } from "sonner"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, getDocs, query, where, deleteDoc, doc } from "firebase/firestore"
+import { collection, getDocs, query, where, deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 
@@ -25,6 +25,7 @@ interface Company {
   companyLogoUrl?: string
   created: Date
   user_company_id?: string
+  deleted?: boolean
 }
 
 export default function ClientsPage() {
@@ -52,7 +53,11 @@ export default function ClientsPage() {
     setLoading(true)
     try {
       const companiesRef = collection(db, "client_company")
-      const q = query(companiesRef, where("user_company_id", "==", userData?.company_id || ""))
+      const q = query(
+        companiesRef,
+        where("user_company_id", "==", userData?.company_id || ""),
+        where("deleted", "!=", true)
+      )
       const snapshot = await getDocs(q)
 
       const companiesData = snapshot.docs.map((doc) => ({
@@ -65,6 +70,7 @@ export default function ClientsPage() {
         companyLogoUrl: doc.data().companyLogoUrl || "",
         created: doc.data().created?.toDate() || new Date(),
         user_company_id: doc.data().user_company_id || "",
+        deleted: doc.data().deleted || false,
       }))
 
       setCompanies(companiesData)
@@ -80,7 +86,10 @@ export default function ClientsPage() {
   const handleDeleteCompany = async (company: Company) => {
     if (confirm(`Are you sure you want to delete ${company.name}?`)) {
       try {
-        await deleteDoc(doc(db, "client_company", company.id))
+        await updateDoc(doc(db, "client_company", company.id), {
+          deleted: true,
+          updated: new Date()
+        })
         toast.success("Company deleted successfully")
         loadCompanies()
       } catch (error) {
