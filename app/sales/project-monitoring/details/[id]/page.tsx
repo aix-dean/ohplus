@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore"
 
 interface JobOrder {
   id: string
@@ -78,6 +78,7 @@ interface Report {
   joNumber: string
   date: string
   created: any
+  updated: any
   category: string
   subcategory: string
   status: string
@@ -100,8 +101,53 @@ export default function JobOrderDetailsPage() {
   const [seller, setSeller] = useState<Seller | null>(null) // Added seller state
   const [reports, setReports] = useState<Report[]>([]) // Added reports state
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(15)
+  const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any])
+  const [hasMore, setHasMore] = useState(true)
 
   const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
+
+  const fetchReports = async (joNumber: string, page: number = 1) => {
+    try {
+      const reportsRef = collection(db, "reports")
+      let reportsQuery = query(
+        reportsRef,
+        where("joNumber", "==", joNumber),
+        orderBy("updated", "desc"),
+        limit(itemsPerPage + 1)
+      )
+
+      const lastDoc = lastVisibleDocs[page - 1]
+      if (lastDoc && page > 1) {
+        reportsQuery = query(
+          reportsRef,
+          where("joNumber", "==", joNumber),
+          orderBy("updated", "desc"),
+          startAfter(lastDoc),
+          limit(itemsPerPage + 1)
+        )
+      }
+
+      const reportsSnapshot = await getDocs(reportsQuery)
+      const reportsData = reportsSnapshot.docs.slice(0, itemsPerPage).map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Report[]
+
+      const newLastVisible = reportsSnapshot.docs[reportsSnapshot.docs.length - 1]
+      setHasMore(reportsSnapshot.docs.length > itemsPerPage)
+
+      if (newLastVisible && page === lastVisibleDocs.length) {
+        setLastVisibleDocs((prev) => [...prev, newLastVisible])
+      }
+
+      setReports(reportsData)
+    } catch (error) {
+      console.error("Error fetching reports:", error)
+      setReports([])
+    }
+  }
 
   useEffect(() => {
     const fetchJobOrder = async () => {
@@ -120,22 +166,7 @@ export default function JobOrderDetailsPage() {
           setJobOrder(jobOrderData)
 
           if (jobOrderData.joNumber) {
-            const reportsQuery = query(collection(db, "reports"), where("joNumber", "==", jobOrderData.joNumber))
-            const reportsSnapshot = await getDocs(reportsQuery)
-
-            const reportsData = reportsSnapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            })) as Report[]
-
-            // Sort reports by date (newest first)
-            reportsData.sort((a, b) => {
-              const dateA = a.created?.toDate?.() || new Date(a.date || a.created)
-              const dateB = b.created?.toDate?.() || new Date(b.date || b.created)
-              return dateB.getTime() - dateA.getTime()
-            })
-
-            setReports(reportsData)
+            await fetchReports(jobOrderData.joNumber, 1)
           }
 
           if (jobOrderData.product_id) {
@@ -184,6 +215,24 @@ export default function JobOrderDetailsPage() {
 
     fetchJobOrder()
   }, [params.id])
+
+  useEffect(() => {
+    if (jobOrder?.joNumber && currentPage > 1) {
+      fetchReports(jobOrder.joNumber, currentPage)
+    }
+  }, [currentPage, jobOrder?.joNumber])
+
+  const handleNextPage = () => {
+    if (hasMore) {
+      setCurrentPage((prevPage) => prevPage + 1)
+    }
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage((prevPage) => prevPage - 1)
+    }
+  }
 
   const formatDate = (dateField: any) => {
     if (!dateField) return "Not specified"
@@ -270,13 +319,15 @@ export default function JobOrderDetailsPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
-        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm font-medium">
+        <Badge variant="default" className="bg-blue-500 text-white px-3 py-1 text-sm font-medium" style={{ fontSize: '27.7px', fontWeight: '700', borderRadius: '10px' }}>
           Lilo & Stitch
         </Badge>
 
-        <span className="text-lg font-medium text-gray-900">
-          {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
-        </span>
+        <div style={{ borderRadius: '10px', padding: '0 10px', backgroundColor: '#efefef' }}>
+          <span className="text-lg font-medium text-gray-900" style={{ fontSize: '25.1px', color: '#0f76ff', fontWeight: '650' }}>
+            {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
+          </span>
+        </div>
       </div>
 
       <div className="flex justify-start">
@@ -320,8 +371,8 @@ export default function JobOrderDetailsPage() {
           <h2 className="text-lg font-semibold">Project Monitoring</h2>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-b-lg overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white border border-gray-200 rounded-b-lg overflow-x-auto max-h-96 overflow-y-auto">
+          <table className="w-full min-w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Date</th>
@@ -347,8 +398,8 @@ export default function JobOrderDetailsPage() {
               ) : (
                 reports.map((report) => (
                   <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatDate(report.created || report.date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatTime(report.created)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatDate(report.updated || report.created || report.date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatTime(report.updated || report.created)}</td>
                     <td className="px-4 py-3">{getTeamBadge(report.category)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{getUpdateText(report)}</td>
                     <td className="px-4 py-3">
@@ -369,6 +420,29 @@ export default function JobOrderDetailsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {reports.length > 0 && (
+          <div className="flex justify-between items-center mt-4 px-4">
+            <button
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage}
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={!hasMore}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-6 right-6 z-50">
