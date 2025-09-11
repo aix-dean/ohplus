@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot, serverTimestamp, updateDoc } from "firebase/firestore"
+import { db, storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { format } from "date-fns"
-import { Search, MoreHorizontal, FileText, Calculator } from "lucide-react"
+import { Search, MoreHorizontal, FileText, Calculator, ChevronDown, ChevronRight, Upload, Loader2, CheckCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -32,6 +33,14 @@ interface Booking {
   status?: string
   created?: any
   quotation_id?: string
+  reservation_id?: string // Generated reservation ID with format "RV-" + currentmillis
+  projectCompliance?: {
+    signedContract?: { status: string; fileUrl?: string; fileName?: string };
+    irrevocablePo?: { status: string; fileUrl?: string; fileName?: string };
+    paymentAsDeposit?: { status: string; note?: string; fileUrl?: string; fileName?: string };
+    finalArtwork?: { status: string; fileUrl?: string; fileName?: string };
+    signedQuotation?: { status: string; fileUrl?: string; fileName?: string };
+  };
 }
 
 interface Product {
@@ -74,6 +83,8 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState<{ [key: string]: Product }>({})
   const [isSearchingAlgolia, setIsSearchingAlgolia] = useState(false)
+  const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -244,6 +255,73 @@ export default function ReservationsPage() {
     setCreateReportDialogOpen(true)
   }
 
+  const getProjectCompliance = (booking: Booking) => {
+    const compliance = booking.projectCompliance || {}
+
+    const toReserveItems = [
+      {
+        key: "signedContract",
+        name: "Signed Contract",
+        status: compliance.signedContract?.status || "upload",
+        file: compliance.signedContract?.fileName,
+        fileUrl: compliance.signedContract?.fileUrl,
+      },
+      {
+        key: "irrevocablePo",
+        name: "Irrevocable PO",
+        status: compliance.irrevocablePo?.status || "upload",
+        file: compliance.irrevocablePo?.fileName,
+        fileUrl: compliance.irrevocablePo?.fileUrl,
+      },
+      {
+        key: "paymentAsDeposit",
+        name: "Payment as Deposit",
+        status: compliance.paymentAsDeposit?.status || "confirmation",
+        note: "For Treasury's confirmation",
+        file: compliance.paymentAsDeposit?.fileName,
+        fileUrl: compliance.paymentAsDeposit?.fileUrl,
+      },
+    ]
+
+    const otherRequirementsItems = [
+      {
+        key: "finalArtwork",
+        name: "Final Artwork",
+        status: compliance.finalArtwork?.status || "upload",
+        file: compliance.finalArtwork?.fileName,
+        fileUrl: compliance.finalArtwork?.fileUrl,
+      },
+      {
+        key: "signedQuotation",
+        name: "Signed Quotation",
+        status: compliance.signedQuotation?.status || "upload",
+        file: compliance.signedQuotation?.fileName,
+        fileUrl: compliance.signedQuotation?.fileUrl,
+      },
+    ]
+
+    const allItems = [...toReserveItems, ...otherRequirementsItems]
+    const completed = allItems.filter((item) => item.status === "completed").length
+    return {
+      completed,
+      total: allItems.length,
+      toReserve: toReserveItems,
+      otherRequirements: otherRequirementsItems,
+    }
+  }
+
+  const toggleComplianceExpansion = (bookingId: string) => {
+    setExpandedCompliance((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(bookingId)) {
+        newSet.delete(bookingId)
+      } else {
+        newSet.add(bookingId)
+      }
+      return newSet
+    })
+  }
+
   const handleCreateJobOrder = async (booking: Booking) => {
     if (!user?.uid || !userData?.company_id || !booking.quotation_id) {
       toast({
@@ -313,6 +391,109 @@ export default function ReservationsPage() {
     }
   };
 
+  const handleFileUpload = async (bookingId: string, complianceType: string, file: File) => {
+    const uploadKey = `${bookingId}-${complianceType}`
+    setUploadingFiles((prev) => new Set(prev).add(uploadKey))
+
+    try {
+      if (file.type !== "application/pdf") {
+        throw new Error("Only PDF files are allowed")
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error("File size must be less than 10MB")
+      }
+
+      const fileName = `${Date.now()}-${file.name}`
+      const storageRef = ref(storage, `bookings/${bookingId}/compliance/${complianceType}/${fileName}`)
+
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+
+      // Find the booking to get the quotation_id
+      const currentBooking = bookings.find(b => b.id === bookingId)
+      const quotationId = currentBooking?.quotation_id
+
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}`]: {
+          status: "completed",
+          fileUrl: downloadURL,
+          fileName: file.name,
+          uploadedAt: serverTimestamp(),
+          uploadedBy: user?.uid,
+        },
+        updated: serverTimestamp(),
+      }
+
+      // Update booking document
+      const bookingRef = doc(db, "booking", bookingId)
+      await updateDoc(bookingRef, updateData)
+
+      // Update quotation document if quotation_id exists
+      if (quotationId) {
+        try {
+          const quotationRef = doc(db, "quotations", quotationId)
+          await updateDoc(quotationRef, updateData)
+          console.log(`Updated quotation ${quotationId} with compliance data`)
+        } catch (quotationError) {
+          console.error("Error updating quotation:", quotationError)
+          // Don't fail the entire operation if quotation update fails
+        }
+      }
+
+      setBookings((prevBookings) =>
+        prevBookings.map((b) =>
+          b.id === bookingId
+            ? {
+                ...b,
+                projectCompliance: {
+                  ...b.projectCompliance,
+                  [complianceType]: {
+                    status: "completed",
+                    fileUrl: downloadURL,
+                    fileName: file.name,
+                    uploadedAt: new Date().toISOString(), // Placeholder, actual timestamp is server-side
+                    uploadedBy: user?.uid,
+                  },
+                },
+              }
+            : b,
+        ),
+      )
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} uploaded successfully`,
+      })
+    } catch (error: any) {
+      console.error("Error uploading file:", error)
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingFiles((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(uploadKey)
+        return newSet
+      })
+    }
+  }
+
+  const triggerFileUpload = (bookingId: string, complianceType: string) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".pdf"
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        handleFileUpload(bookingId, complianceType, file)
+      }
+    }
+    input.click()
+  }
+
   const displayedReservations = getFilteredBookings()
 
   const handleNextPage = () => {
@@ -365,12 +546,14 @@ export default function ReservationsPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                <TableHead className="font-semibold text-gray-900">Reservation ID</TableHead>
                 <TableHead className="font-semibold text-gray-900">Site</TableHead>
                 <TableHead className="font-semibold text-gray-900">Client</TableHead>
                 <TableHead className="font-semibold text-gray-900">From</TableHead>
                 <TableHead className="font-semibold text-gray-900">To</TableHead>
                 <TableHead className="font-semibold text-gray-900">Total</TableHead>
                 <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                <TableHead className="font-semibold text-gray-900">Project Compliance</TableHead>
                 <TableHead className="font-semibold text-gray-900">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -380,6 +563,9 @@ export default function ReservationsPage() {
                   .fill(0)
                   .map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-28" />
+                      </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
@@ -399,13 +585,16 @@ export default function ReservationsPage() {
                         <Skeleton className="h-4 w-16" />
                       </TableCell>
                       <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-8" />
                       </TableCell>
                     </TableRow>
                   ))
               ) : displayedReservations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                     No reservations found
                   </TableCell>
                 </TableRow>
@@ -413,9 +602,16 @@ export default function ReservationsPage() {
                 displayedReservations.map((booking: Booking) => {
                   const product = booking.product_id ? products[booking.product_id] : null
                   const siteCode = getSiteCode(product)
+                  const compliance = getProjectCompliance(booking)
+                  const isExpanded = expandedCompliance.has(booking.id)
 
                   return (
-                    <TableRow key={booking.id} className="hover:bg-gray-50">
+                    <TableRow
+                      key={booking.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/sales/reservation/${booking.id}`)}
+                    >
+                      <TableCell className="font-medium text-sm font-mono">{booking.reservation_id || "N/A"}</TableCell>
                       <TableCell className="font-medium">{booking.product_name || "-"}</TableCell>
                       <TableCell>{booking.client_name || "N/A"}</TableCell>
                       <TableCell>{formatDate(booking.start_date)}</TableCell>
@@ -426,12 +622,182 @@ export default function ReservationsPage() {
                           variant={booking.status?.toLowerCase() === "confirmed" ? "default" : "secondary"}
                           className={
                             booking.status?.toLowerCase() === "confirmed"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                : "bg-blue-100 text-blue-800 hover:bg-blue-100"
                           }
                         >
                           {booking.status?.toUpperCase() || "PENDING"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-gray-700">
+                        <div className="space-y-2">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                            onClick={() => toggleComplianceExpansion(booking.id)}
+                          >
+                            <span className="font-medium">
+                              {compliance.completed}/{compliance.total}
+                            </span>
+                            <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                            <div className="transition-transform duration-200 ease-in-out">
+                              {isExpanded ? (
+                                <ChevronDown className="w-3 h-3 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-3 h-3 text-gray-400" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                            }`}
+                          >
+                            <div className="space-y-1 pt-1">
+                                <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
+                                {compliance.toReserve.map((item: any, index: number) => {
+                                  const uploadKey = `${booking.id}-${item.key}`
+                                  const isUploading = uploadingFiles.has(uploadKey)
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                      style={{
+                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                        animationDuration: "200ms",
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {item.status === "completed" ? (
+                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                            <CheckCircle className="w-3 h-3 text-white" />
+                                          </div>
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                        )}
+                                        <div className="flex flex-col">
+                                          <span className="text-gray-700">{item.name}</span>
+                                          {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {item.file && item.fileUrl ? (
+                                          <a
+                                            href={item.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <FileText className="w-3 h-3" />
+                                            {item.file}
+                                          </a>
+                                        ) : item.status === "upload" ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs bg-transparent"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              triggerFileUpload(booking.id, item.key)
+                                            }}
+                                            disabled={isUploading}
+                                          >
+                                            {isUploading ? (
+                                              <>
+                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                Uploading...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Upload className="w-3 h-3 mr-1" />
+                                                Upload
+                                              </>
+                                            )}
+                                          </Button>
+                                        ) : item.status === "confirmation" ? (
+                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                            Pending
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+
+                                <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
+                                {compliance.otherRequirements.map((item: any, index: number) => {
+                                  const uploadKey = `${booking.id}-${item.key}`
+                                  const isUploading = uploadingFiles.has(uploadKey)
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                      style={{
+                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                        animationDuration: "200ms",
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {item.status === "completed" ? (
+                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                            <CheckCircle className="w-3 h-3 text-white" />
+                                          </div>
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                        )}
+                                        <span className="text-gray-700">{item.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {item.file && item.fileUrl ? (
+                                          <a
+                                            href={item.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <FileText className="w-3 h-3" />
+                                            {item.file}
+                                          </a>
+                                        ) : item.status === "upload" ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs bg-transparent"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              triggerFileUpload(booking.id, item.key)
+                                            }}
+                                            disabled={isUploading}
+                                          >
+                                            {isUploading ? (
+                                              <>
+                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                Uploading...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Upload className="w-3 h-3 mr-1" />
+                                                Upload
+                                              </>
+                                            )}
+                                          </Button>
+                                        ) : item.status === "confirmation" ? (
+                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                            Pending
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+
+                            </div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
