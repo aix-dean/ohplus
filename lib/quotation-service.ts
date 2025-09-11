@@ -957,20 +957,19 @@ export async function createDirectQuotation(
 
     const quotationData: Omit<Quotation, "id"> = {
       quotation_number: quotationNumber,
-      client_id: clientData.id, // Added client_id
+
       client_name: clientData.name,
       client_email: clientData.email,
-      client_id: clientData.id, // Added client_id
+      client_id: clientData.id,
       client_company_name: clientData.company,
       client_phone: clientData.phone,
       client_address: clientData.address,
-      client_company_id: options.client_company_id || "", // Added client_company_id field
+      client_company_id: options.client_company_id || "",
       status: "draft",
+      created: serverTimestamp(),
       created_by: userId,
       seller_id: userId,
-      companyId: options.company_id, // Mapped options.company_id to quotation.companyId
-      page_id: pageId,
-      page_number: 1, // Single document gets page number 1
+      company_id: options.company_id,
       created_by_first_name: options.created_by_first_name,
       created_by_last_name: options.created_by_last_name,
       start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
@@ -988,6 +987,9 @@ export async function createDirectQuotation(
           duration_days: durationDays,
           item_total_amount: totalAmount,
           media_url: site.image,
+          height: site.height,
+          width: site.width,
+          content_type: site.content_type,
         },
       ],
       projectCompliance: {
@@ -1046,20 +1048,18 @@ export async function createMultipleQuotations(
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
-        client_id: clientData.id,
         client_name: clientData.name,
         client_email: clientData.email,
-        client_id: clientData.id, // Added client_id
+        client_id: clientData.id,
         client_company_name: clientData.company,
         client_phone: clientData.phone,
         client_address: clientData.address,
-        client_company_id: clientData.company_id || "", // Added client_company_id field
+        client_company_id: clientData.company_id || "",
         status: "draft",
+        created: serverTimestamp(),
         created_by: userId,
         seller_id: userId,
-        companyId: options.company_id, // Mapped options.company_id to quotation.companyId
-        page_id: pageId, // Same page_id for all documents in the batch
-        page_number: i + 1, // Sequential page numbers (1, 2, 3, etc.)
+        company_id: options.company_id,
         created_by_first_name: options.created_by_first_name,
         created_by_last_name: options.created_by_last_name,
         start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
@@ -1077,6 +1077,9 @@ export async function createMultipleQuotations(
             duration_days: durationDays,
             item_total_amount: totalAmount,
             media_url: site.image,
+            height: site.height,
+            width: site.width,
+            content_type: site.content_type,
           },
         ],
         projectCompliance: {
@@ -1231,7 +1234,7 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
-      const hasMatchingCompany = quotation.companyId === companyId
+      const hasMatchingCompany = quotation.company_id === companyId
 
       if (hasMatchingProduct && hasMatchingCompany) {
         quotations.push(quotation)

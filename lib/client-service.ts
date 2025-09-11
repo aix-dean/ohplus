@@ -400,3 +400,37 @@ export async function getClientCompanyById(clientCompanyId: string): Promise<Cli
     return null
   }
 }
+
+export interface Notification {
+  company_id: string
+  created: any
+  department_from: string
+  department_to: string
+  description: string
+  navigate_to: string
+  title: string
+  type: string
+  uid_to: string | null
+  viewed: boolean
+}
+
+export async function createNotifications(notifications: Omit<Notification, "created" | "viewed">[]): Promise<void> {
+  try {
+    console.log("Creating notifications:", notifications.length)
+    const batch = []
+
+    for (const notification of notifications) {
+      const docRef = await addDoc(collection(db, "notifications"), {
+        ...notification,
+        created: serverTimestamp(),
+        viewed: false,
+      })
+      batch.push(docRef)
+    }
+
+    console.log("Notifications created successfully:", batch.length)
+  } catch (error) {
+    console.error("Error creating notifications:", error)
+    throw error
+  }
+}
