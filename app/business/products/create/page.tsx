@@ -54,19 +54,28 @@ interface Category {
 }
 
 // Step definitions
-const getSteps = (contentType: string) => [
-  { id: 1, title: "Site Data", description: "Basic product information and type" },
-  {
-    id: 2,
-    title: contentType === "Static" ? "Static Settings" : "Dynamic Settings",
-    description:
-      contentType === "Static"
-        ? "Configure illumination and static content settings"
-        : "Configure dynamic content settings",
-  },
-  { id: 3, title: "Location Information", description: "Site location and audience details" },
-  { id: 4, title: "Media", description: "Upload product media files" },
-]
+const getSteps = (contentType: string) => {
+  const baseSteps = [
+    { id: 1, title: "Site Data", description: "Basic product information and type" },
+  ]
+
+  // Only add Settings step for Dynamic content type
+  if (contentType === "Dynamic") {
+    baseSteps.push({
+      id: 2,
+      title: "Settings",
+      description: "Configure dynamic content settings",
+    })
+  }
+
+  // Add remaining steps
+  const remainingSteps = [
+    { id: contentType === "Dynamic" ? 3 : 2, title: "Location Information", description: "Site location and audience details" },
+    { id: contentType === "Dynamic" ? 4 : 3, title: "Media", description: "Upload product media files" },
+  ]
+
+  return [...baseSteps, ...remainingSteps]
+}
 
 export default function BusinessProductCreatePage() {
   const router = useRouter()
@@ -780,699 +789,14 @@ export default function BusinessProductCreatePage() {
                 </div>
               </div>
             </div>
-
-            {/* Structure Details */}
-            <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Structure Details</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.site_orientation">Site Orientation</Label>
-                  <Select
-                    value={formData.specs_rental.site_orientation || ""}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        specs_rental: {
-                          ...prev.specs_rental,
-                          site_orientation: value,
-                        },
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select site orientation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="North">North</SelectItem>
-                      <SelectItem value="South">South</SelectItem>
-                      <SelectItem value="East">East</SelectItem>
-                      <SelectItem value="West">West</SelectItem>
-                      <SelectItem value="Northeast">Northeast</SelectItem>
-                      <SelectItem value="Northwest">Northwest</SelectItem>
-                      <SelectItem value="Southeast">Southeast</SelectItem>
-                      <SelectItem value="Southwest">Southwest</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.land_owner">Land Owner</Label>
-                  <Input
-                    id="specs_rental.land_owner"
-                    name="specs_rental.land_owner"
-                    type="text"
-                    value={formData.specs_rental.land_owner || ""}
-                    onChange={handleInputChange}
-                    placeholder="Enter land owner name"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.structure_color">Structure Color</Label>
-                  <Input
-                    id="specs_rental.structure_color"
-                    name="specs_rental.structure_color"
-                    type="text"
-                    value={formData.specs_rental.structure_color || ""}
-                    onChange={handleInputChange}
-                    placeholder="Enter structure color"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.structure_contractor">Structure Contractor</Label>
-                  <Input
-                    id="specs_rental.structure_contractor"
-                    name="specs_rental.structure_contractor"
-                    type="text"
-                    value={formData.specs_rental.structure_contractor || ""}
-                    onChange={handleInputChange}
-                    placeholder="Enter contractor name"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.structure_condition">Structure Condition</Label>
-                  <Select
-                    value={formData.specs_rental.structure_condition || ""}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        specs_rental: {
-                          ...prev.specs_rental,
-                          structure_condition: value,
-                        },
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select structure condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Excellent">Excellent</SelectItem>
-                      <SelectItem value="Good">Good</SelectItem>
-                      <SelectItem value="Fair">Fair</SelectItem>
-                      <SelectItem value="Poor">Poor</SelectItem>
-                      <SelectItem value="Needs Repair">Needs Repair</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.structure_last_maintenance">Last Maintenance Date</Label>
-                  <Input
-                    id="specs_rental.structure_last_maintenance"
-                    name="specs_rental.structure_last_maintenance"
-                    type="date"
-                    value={formData.specs_rental.structure_last_maintenance || ""}
-                    onChange={handleInputChange}
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Crew Information */}
-            <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Crew Information</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.security">Security</Label>
-                  <Input
-                    id="specs_rental.security"
-                    name="specs_rental.security"
-                    type="text"
-                    value={formData.specs_rental.security || ""}
-                    onChange={handleInputChange}
-                    placeholder="Enter security personnel name"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.caretaker">Caretaker</Label>
-                  <Input
-                    id="specs_rental.caretaker"
-                    name="specs_rental.caretaker"
-                    type="text"
-                    value={formData.specs_rental.caretaker || ""}
-                    onChange={handleInputChange}
-                    placeholder="Enter caretaker name"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         )
 
-      case 2: // Static/Dynamic Settings
-        if (formData.content_type === "Static") {
+      case 2: // Settings (Dynamic) or Location Information (Static)
+        if (formData.content_type === "Dynamic") {
           return (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Static Content Settings</h3>
-
-              {/* Lights On Time Setting */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-800">Operating Schedule</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="lights_on_time">Lights ON Time</Label>
-                    <Input
-                      id="lights_on_time"
-                      name="specs_rental.lights_on_time"
-                      type="time"
-                      value={formData.specs_rental.lights_on_time || ""}
-                      onChange={handleInputChange}
-                      placeholder="Select time when lights turn on"
-                      disabled={loading}
-                    />
-                    <p className="text-xs text-gray-500">Set the time when illumination lights turn on everyday</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Illumination Setup - moved from Site Data */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-800">Display Configuration</h4>
-
-                {/* Quadrant Selection */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Display Layout Configuration</Label>
-
-                  {/* Row and Column Inputs */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="display-rows" className="text-xs text-gray-600">
-                        Rows:
-                      </Label>
-                      <Input
-                        id="display-rows"
-                        type="number"
-                        min="1"
-                        max="9"
-                        value={formData.specs_rental.display_rows || "2"}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              display_rows: e.target.value,
-                              quadrant_layout: `${e.target.value}x${prev.specs_rental.display_cols || "2"}`,
-                            },
-                          }))
-                        }
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="display-cols" className="text-xs text-gray-600">
-                        Columns:
-                      </Label>
-                      <Input
-                        id="display-cols"
-                        type="number"
-                        min="1"
-                        max="9"
-                        value={formData.specs_rental.display_cols || "2"}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              display_cols: e.target.value,
-                              quadrant_layout: `${prev.specs_rental.display_rows || "2"}x${e.target.value}`,
-                            },
-                          }))
-                        }
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Display Preview */}
-                  {formData.specs_rental.display_rows && formData.specs_rental.display_cols && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
-                      <div className="flex justify-center">
-                        <div className="relative">
-                          {/* Scrollable container for large grids */}
-                          <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
-                            {/* Dynamic preview based on rows and columns */}
-                            <div
-                              className="bg-gray-300 p-2 rounded"
-                              style={{
-                                width: `${Math.min(Number(formData.specs_rental.display_cols) * 48, 432)}px`,
-                                height: `${Number(formData.specs_rental.display_rows) * 48}px`,
-                                display: "grid",
-                                gridTemplateColumns: `repeat(${formData.specs_rental.display_cols}, 1fr)`,
-                                gridTemplateRows: `repeat(${formData.specs_rental.display_rows}, 1fr)`,
-                                gap: "4px",
-                              }}
-                            >
-                              {Array.from({
-                                length:
-                                  Number(formData.specs_rental.display_rows) *
-                                  Number(formData.specs_rental.display_cols),
-                              }).map((_, i) => (
-                                <div key={i} className="bg-white rounded flex items-center justify-center min-h-[40px]">
-                                  <span className="text-xs font-medium text-gray-600">Q{i + 1}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Illumination indicators around the preview - using absolute positioning for precise placement */}
-                          {/* Upper Metal Halides */}
-                          {Array.from({
-                            length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
-                          }).map((_, i) => {
-                            const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
-                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
-                            const spacing = totalCount > 1 ? gridWidth / (totalCount + 1) : gridWidth / 2
-                            const leftPosition = totalCount === 1 ? gridWidth / 2 : spacing * (i + 1)
-
-                            return (
-                              <div
-                                key={`upper-${i}`}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                style={{
-                                  top: "-20px",
-                                  left: `${leftPosition}px`,
-                                  transform: "translateX(-50%)",
-                                }}
-                              >
-                                <span className="text-[9px] text-white font-bold">U{i + 1}</span>
-                              </div>
-                            )
-                          })}
-
-                          {/* Left Metal Halides */}
-                          {Array.from({
-                            length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
-                          }).map((_, i) => {
-                            const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
-                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
-                            const spacing = totalCount > 1 ? gridHeight / (totalCount + 1) : gridHeight / 2
-                            const topPosition = totalCount === 1 ? gridHeight / 2 : spacing * (i + 1)
-
-                            return (
-                              <div
-                                key={`left-${i}`}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                style={{
-                                  top: `${topPosition}px`,
-                                  left: "-20px",
-                                  transform: "translateY(-50%)",
-                                }}
-                              >
-                                <span className="text-[9px] text-white font-bold">L{i + 1}</span>
-                              </div>
-                            )
-                          })}
-
-                          {/* Right Metal Halides */}
-                          {Array.from({
-                            length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
-                          }).map((_, i) => {
-                            const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
-                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
-                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
-                            const spacing = totalCount > 1 ? gridHeight / (totalCount + 1) : gridHeight / 2
-                            const topPosition = totalCount === 1 ? gridHeight / 2 : spacing * (i + 1)
-
-                            return (
-                              <div
-                                key={`right-${i}`}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                style={{
-                                  top: `${topPosition}px`,
-                                  right: "-20px",
-                                  transform: "translateY(-50%)",
-                                }}
-                              >
-                                <span className="text-[9px] text-white font-bold">R{i + 1}</span>
-                              </div>
-                            )
-                          })}
-
-                          {/* Bottom Metal Halides */}
-                          {Array.from({
-                            length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
-                          }).map((_, i) => {
-                            const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
-                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
-                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
-                            const spacing = totalCount > 1 ? gridWidth / (totalCount + 1) : gridWidth / 2
-                            const leftPosition = totalCount === 1 ? gridWidth / 2 : spacing * (i + 1)
-
-                            return (
-                              <div
-                                key={`bottom-${i}`}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                style={{
-                                  bottom: "-20px",
-                                  left: `${leftPosition}px`,
-                                  transform: "translateX(-50%)",
-                                }}
-                              >
-                                <span className="text-[9px] text-white font-bold">B{i + 1}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Layout Info */}
-                      <div className="mt-4 text-center">
-                        <p className="text-sm text-gray-600 font-medium">
-                          Layout: {formData.specs_rental.display_rows}x{formData.specs_rental.display_cols} (
-                          {Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols)}{" "}
-                          quadrants)
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {Number(formData.specs_rental.display_rows) > Number(formData.specs_rental.display_cols)
-                            ? "Vertical Rectangle"
-                            : Number(formData.specs_rental.display_cols) > Number(formData.specs_rental.display_rows)
-                              ? "Horizontal Rectangle"
-                              : "Square"}
-                        </p>
-                        {Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols) >
-                          20 && (
-                          <p className="text-xs text-blue-600 mt-1">ⓘ Large grid - scroll to view all quadrants</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
-
-                {/* Upper Metal Halides */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-4 items-end">
-                    <div className="col-span-3">
-                      <Label className="text-sm font-medium text-gray-700">Upper Metal Halides</Label>
-                    </div>
-                    <div className="col-span-7">
-                      <Label htmlFor="upper-lighting-specs" className="text-xs text-gray-600">
-                        Lighting Specs:
-                      </Label>
-                      <Input
-                        id="upper-lighting-specs"
-                        type="text"
-                        value={formData.specs_rental.illumination_upper_lighting_specs || ""}
-                        onChange={(e) => {
-                          const specs = e.target.value
-                          const count = Number.parseInt(formData.specs_rental.illumination_upper_count || "0")
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_upper_lighting_specs:
-                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
-                            },
-                          }))
-                        }}
-                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                        className="h-8 text-sm"
-                        disabled={
-                          loading || Number.parseInt(formData.specs_rental.illumination_upper_count || "0") === 0
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="upper-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="upper-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_upper_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_upper_count: count.toString(),
-                              // Also update the lighting specs to include the count
-                              illumination_upper_lighting_specs:
-                                count > 0
-                                  ? `${count} ${prev.specs_rental.illumination_upper_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
-                                  : "",
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Left Metal Halides */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-4 items-end">
-                    <div className="col-span-3">
-                      <Label className="text-sm font-medium text-gray-700">Left Metal Halides</Label>
-                    </div>
-                    <div className="col-span-7">
-                      <Label htmlFor="left-lighting-specs" className="text-xs text-gray-600">
-                        Lighting Specs:
-                      </Label>
-                      <Input
-                        id="left-lighting-specs"
-                        type="text"
-                        value={formData.specs_rental.illumination_left_lighting_specs || ""}
-                        onChange={(e) => {
-                          const specs = e.target.value
-                          const count = Number.parseInt(formData.specs_rental.illumination_left_count || "0")
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_left_lighting_specs:
-                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
-                            },
-                          }))
-                        }}
-                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                        className="h-8 text-sm"
-                        disabled={
-                          loading || Number.parseInt(formData.specs_rental.illumination_left_count || "0") === 0
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="left-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="left-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_left_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_left_count: count.toString(),
-                              illumination_left_lighting_specs:
-                                count > 0
-                                  ? `${count} ${prev.specs_rental.illumination_left_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
-                                  : "",
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Metal Halides */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-4 items-end">
-                    <div className="col-span-3">
-                      <Label className="text-sm font-medium text-gray-700">Bottom Metal Halides</Label>
-                    </div>
-                    <div className="col-span-7">
-                      <Label htmlFor="bottom-lighting-specs" className="text-xs text-gray-600">
-                        Lighting Specs:
-                      </Label>
-                      <Input
-                        id="bottom-lighting-specs"
-                        type="text"
-                        value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
-                        onChange={(e) => {
-                          const specs = e.target.value
-                          const count = Number.parseInt(formData.specs_rental.illumination_bottom_count || "0")
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_bottom_lighting_specs:
-                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
-                            },
-                          }))
-                        }}
-                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                        className="h-8 text-sm"
-                        disabled={
-                          loading || Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") === 0
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="bottom-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="bottom-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_bottom_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_bottom_count: count.toString(),
-                              illumination_bottom_lighting_specs:
-                                count > 0
-                                  ? `${count} ${prev.specs_rental.illumination_bottom_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
-                                  : "",
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Metal Halides */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-4 items-end">
-                    <div className="col-span-3">
-                      <Label className="text-sm font-medium text-gray-700">Right Metal Halides</Label>
-                    </div>
-                    <div className="col-span-7">
-                      <Label htmlFor="right-lighting-specs" className="text-xs text-gray-600">
-                        Lighting Specs:
-                      </Label>
-                      <Input
-                        id="right-lighting-specs"
-                        type="text"
-                        value={formData.specs_rental.illumination_right_lighting_specs || ""}
-                        onChange={(e) => {
-                          const specs = e.target.value
-                          const count = Number.parseInt(formData.specs_rental.illumination_right_count || "0")
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_right_lighting_specs:
-                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
-                            },
-                          }))
-                        }}
-                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                        className="h-8 text-sm"
-                        disabled={
-                          loading || Number.parseInt(formData.specs_rental.illumination_right_count || "0") === 0
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="right-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="right-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_right_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_right_count: count.toString(),
-                              illumination_right_lighting_specs:
-                                count > 0
-                                  ? `${count} ${prev.specs_rental.illumination_right_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
-                                  : "",
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Illumination Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="power_consumption_monthly">Power Consumption (Monthly)</Label>
-                    <Input
-                      id="power_consumption_monthly"
-                      name="specs_rental.power_consumption_monthly"
-                      type="number"
-                      value={formData.specs_rental.power_consumption_monthly || ""}
-                      onChange={handleInputChange}
-                      placeholder="Enter monthly power consumption (kWh/month)"
-                      disabled={loading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="average_power_consumption_3months">Ave. Power Consumption (3 Months)</Label>
-                    <Input
-                      id="average_power_consumption_3months"
-                      name="specs_rental.average_power_consumption_3months"
-                      type="number"
-                      value={formData.specs_rental.average_power_consumption_3months || ""}
-                      onChange={handleInputChange}
-                      placeholder="Enter average power consumption (kWh/over last 3 months)"
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        } else {
-          // Dynamic Settings (existing code)
-          return (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Dynamic Content Settings</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Content Settings</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1543,9 +867,175 @@ export default function BusinessProductCreatePage() {
               )}
             </div>
           )
+        } else {
+          // Static content type - Location Information
+          return (
+            <div className="space-y-6">
+              <h3 className="text-xl font-semibold text-gray-800">Location Information</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="specs_rental.location">
+                  Location <span className="text-red-500">*</span>
+                </Label>
+                <GooglePlacesAutocomplete
+                  value={formData.specs_rental.location}
+                  onChange={handleLocationChange}
+                  placeholder="Enter site location"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between bg-transparent"
+                    onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
+                    disabled={loading}
+                  >
+                    <span>
+                      {selectedAudienceTypes.length > 0
+                        ? `${selectedAudienceTypes.length} audience types selected`
+                        : "Select audience types"}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-180" : "rotate-0"}`}
+                    />
+                  </Button>
+                  {showAudienceDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {AUDIENCE_TYPES.map((type) => (
+                        <div
+                          key={type}
+                          className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => toggleAudienceType(type)}
+                        >
+                          <div className="flex-1">{type}</div>
+                          {selectedAudienceTypes.includes(type) ? <Check className="h-4 w-4 text-green-500" /> : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedAudienceTypes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedAudienceTypes.map((type) => (
+                      <Badge key={type} variant="secondary" className="flex items-center gap-1 pr-1">
+                        {type}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0 hover:bg-transparent"
+                          onClick={() => removeAudienceType(type)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
+                  <Input
+                    id="specs_rental.traffic_count"
+                    name="specs_rental.traffic_count"
+                    type="number"
+                    value={formData.specs_rental.traffic_count || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter average daily traffic count"
+                    min="0"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
+                  <Input
+                    id="specs_rental.elevation"
+                    name="specs_rental.elevation"
+                    type="number"
+                    value={formData.specs_rental.elevation || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter elevation from ground level in feet"
+                    min="0"
+                    step="0.01"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.height">Height (ft)</Label>
+                  <Input
+                    id="specs_rental.height"
+                    name="specs_rental.height"
+                    type="number"
+                    value={formData.specs_rental.height || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter height in feet"
+                    min="0"
+                    step="0.01"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.width">Width (ft)</Label>
+                  <Input
+                    id="specs_rental.width"
+                    name="specs_rental.width"
+                    type="number"
+                    value={formData.specs_rental.width || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter width in feet"
+                    min="0"
+                    step="0.01"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitude</Label>
+                  <Input
+                    id="latitude"
+                    type="number"
+                    value={formData.specs_rental.geopoint[0]}
+                    onChange={(e) => handleGeopointChange(e, 0)}
+                    placeholder="Enter latitude"
+                    step="0.000001"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitude</Label>
+                  <Input
+                    id="longitude"
+                    type="number"
+                    value={formData.specs_rental.geopoint[1]}
+                    onChange={(e) => handleGeopointChange(e, 1)}
+                    placeholder="Enter longitude"
+                    step="0.000001"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+          )
         }
 
-      case 3: // Location Information
+      case 3: // Location Information (Dynamic) or Media (Static)
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-800">Location Information</h3>

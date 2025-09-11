@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 })
-  }
+  // Use environment variable or fallback to provided key
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || "AIzaSyDeLrUgnPTRk36Gwq9V2RlDJEyhUO5fwO8"
 
   return NextResponse.json({ apiKey })
 }
