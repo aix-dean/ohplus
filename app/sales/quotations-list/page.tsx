@@ -15,6 +15,8 @@ import {
   getDoc,
   updateDoc,
   Timestamp,
+  limit,
+  startAfter,
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "@/lib/firebase"
@@ -60,6 +62,10 @@ export default function QuotationsListPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
+  const [lastDoc, setLastDoc] = useState<any>(null)
+  const [pageLastDocs, setPageLastDocs] = useState<{ [page: number]: any }>({})
+  const [hasMorePages, setHasMorePages] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
   const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
@@ -71,38 +77,10 @@ export default function QuotationsListPage() {
   const pageSize = 10
   const { toast } = useToast()
 
-  const filteredQuotations = useMemo(() => {
-    let filtered = allQuotations
+  // Note: Filtering is now handled server-side or removed for server-side pagination
+  // We'll focus on pagination controls for now
 
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (quotation) =>
-          quotation.client_name?.toLowerCase().includes(searchLower) ||
-          quotation.client_phone?.toLowerCase().includes(searchLower) ||
-          quotation.quotation_number?.toLowerCase().includes(searchLower) ||
-          quotation.client_address?.toLowerCase().includes(searchLower),
-      )
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((quotation) => quotation.status?.toLowerCase() === statusFilter)
-    }
-
-    return filtered
-  }, [allQuotations, searchTerm, statusFilter])
-
-  const paginatedQuotations = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredQuotations.slice(startIndex, endIndex)
-  }, [filteredQuotations, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredQuotations.length / pageSize)
-
-  const fetchAllQuotations = async () => {
+  const fetchQuotations = async (page: number = 1, reset: boolean = false) => {
     if (!user?.uid) {
       setLoading(false)
       return
@@ -112,7 +90,20 @@ export default function QuotationsListPage() {
 
     try {
       const quotationsRef = collection(db, "quotations")
-      const q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"))
+      let q = query(
+        quotationsRef,
+        where("seller_id", "==", user.uid),
+        orderBy("created", "desc"),
+        limit(pageSize + 1) // Fetch one extra to check if there are more pages
+      )
+
+      // If not the first page, start after the last document of the previous page
+      if (page > 1 && !reset) {
+        const prevPageLastDoc = pageLastDocs[page - 1]
+        if (prevPageLastDoc) {
+          q = query(q, startAfter(prevPageLastDoc))
+        }
+      }
 
       const querySnapshot = await getDocs(q)
       const fetchedQuotations: any[] = []
@@ -121,7 +112,24 @@ export default function QuotationsListPage() {
         fetchedQuotations.push({ id: doc.id, ...doc.data() })
       })
 
-      setAllQuotations(fetchedQuotations)
+      // Check if there are more pages
+      const hasMore = fetchedQuotations.length > pageSize
+      const currentPageData = hasMore ? fetchedQuotations.slice(0, pageSize) : fetchedQuotations
+
+      // Store the last document for this page
+      const pageLastDoc = hasMore ? querySnapshot.docs[pageSize - 1] : querySnapshot.docs[querySnapshot.docs.length - 1]
+
+      if (pageLastDoc) {
+        setPageLastDocs(prev => ({
+          ...prev,
+          [page]: pageLastDoc
+        }))
+      }
+
+      setAllQuotations(currentPageData)
+      setLastDoc(pageLastDoc)
+      setHasMorePages(hasMore)
+      setQuotations(currentPageData)
     } catch (error) {
       console.error("Error fetching quotations:", error)
     } finally {
@@ -131,22 +139,37 @@ export default function QuotationsListPage() {
 
   useEffect(() => {
     if (user?.uid) {
-      fetchAllQuotations()
+      fetchQuotations(1, true)
     }
   }, [user?.uid])
 
   useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, statusFilter])
+    const resetPagination = async () => {
+      setCurrentPage(1)
+      setLastDoc(null)
+      setPageLastDocs({})
+      setHasMorePages(true)
+      await fetchQuotations(1, true)
+    }
 
-  const handlePageChange = (page: number) => {
+    if (user?.uid) {
+      resetPagination()
+    }
+  }, [searchTerm, statusFilter, user?.uid])
+
+  const handlePageChange = async (page: number) => {
     setCurrentPage(page)
+    await fetchQuotations(page, false)
   }
 
-  const clearFilters = () => {
+  const clearFilters = async () => {
     setSearchTerm("")
     setStatusFilter("all")
     setCurrentPage(1)
+    setLastDoc(null)
+    setPageLastDocs({})
+    setHasMorePages(true)
+    await fetchQuotations(1, true)
   }
 
   const formatDate = (date: any) => {
@@ -421,7 +444,7 @@ export default function QuotationsListPage() {
       }
 
       // Refresh quotations list
-      await fetchAllQuotations()
+      await fetchQuotations(1, true)
 
       toast({
         title: "Success",
@@ -551,7 +574,7 @@ export default function QuotationsListPage() {
 
       console.log("[v0] Refreshing quotations list...")
       // Refresh the quotations list to show the new copied quotation
-      await fetchAllQuotations()
+      await fetchQuotations(1, true)
       console.log("[v0] Quotations list refreshed, total quotations:", allQuotations.length)
     } catch (error: any) {
       console.error("Error copying quotation:", error)
@@ -858,9 +881,8 @@ export default function QuotationsListPage() {
 
                 {!loading && (
                   <div className="text-sm text-gray-600 mt-2">
-                    Showing {paginatedQuotations.length} of {filteredQuotations.length} quotations
-                    {filteredQuotations.length !== allQuotations.length &&
-                      ` (filtered from ${allQuotations.length} total)`}
+                    Showing {quotations.length} quotations
+                    {hasMorePages && " (more available)"}
                   </div>
                 )}
               </CardHeader>
@@ -912,7 +934,7 @@ export default function QuotationsListPage() {
                       ))}
                   </TableBody>
                 </Table>
-              ) : paginatedQuotations.length > 0 ? (
+              ) : quotations.length > 0 ? (
                 <>
                   <CardContent className="p-0">
                     <Table>
@@ -929,7 +951,7 @@ export default function QuotationsListPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paginatedQuotations.map((quotation) => {
+                        {quotations.map((quotation: any) => {
                           const compliance = getProjectCompliance(quotation)
                           const isExpanded = expandedCompliance.has(quotation.id)
 
@@ -1198,6 +1220,31 @@ export default function QuotationsListPage() {
                       </TableBody>
                     </Table>
                   </CardContent>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1 || loading}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={!hasMorePages || loading}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
 
                 </>
               ) : (

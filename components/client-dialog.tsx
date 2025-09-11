@@ -53,11 +53,12 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     company: client?.company || "",
     industry: client?.industry || "",
     website: client?.website || "",
-    phone: client?.phone || "",
+    companyPhone: "", // Separate field for company phone
     address: client?.address || "",
     companyLogoUrl: client?.companyLogoUrl || "",
     name: client?.name || "", // Contact Person Name
     designation: client?.designation || "", // New field
+    contactPhone: client?.phone || "", // Separate field for contact phone
     email: client?.email || "", // Contact Details Email
     user_company_id: client?.user_company_id || userData?.company_id || "", // New field
   })
@@ -105,11 +106,12 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company: client?.company || "",
         industry: client?.industry || "",
         website: (client as any)?.website || "",
-        phone: client?.phone || "",
+        companyPhone: "",
         address: client?.address || "",
         companyLogoUrl: client?.companyLogoUrl || "",
         name: client?.name || "",
         designation: client?.designation || "",
+        contactPhone: client?.phone || "",
         email: client?.email || "",
         user_company_id: client?.user_company_id || userData?.company_id || "", // New field
       })
@@ -162,7 +164,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           clientType: selectedCompany.clientType || "",
           partnerType: selectedCompany.partnerType || "",
           website: (selectedCompany as any).website || "",
-          phone: (selectedCompany as any).phone || "",
           companyLogoUrl: selectedCompany.companyLogoUrl || "",
           name: "",
           designation: "",
@@ -207,7 +208,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         clientType: formData.clientType,
         partnerType: formData.partnerType || "",
         website: formData.website,
-        phone: formData.phone,
+        phone: formData.companyPhone,
         companyLogoUrl: "", // Will be updated after logo upload if needed
         created: new Date(),
         user_company_id: userData?.company_id || "",
@@ -315,7 +316,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
         name: formData.name || "",
         email: formData.email || "",
-        phone: formData.phone || "",
+        phone: formData.contactPhone || "",
         industry: formData.industry || "",
         address: formData.address || "",
         designation: formData.designation || "",
@@ -487,9 +488,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                 <div className="space-y-2">
                   <Label htmlFor="phone">Company Phone #:</Label>
                   <Input
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
+                    id="companyPhone"
+                    name="companyPhone"
+                    value={formData.companyPhone}
                     onChange={handleChange}
                     placeholder="Company Phone #"
                     className="h-10"
@@ -588,9 +589,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
             <div className="space-y-2 md:col-span-2">
               <Label>Contact Details:</Label>
               <Input
-                id="phone"
-                name="phone"
-                value={formData.phone}
+                id="contactPhone"
+                name="contactPhone"
+                value={formData.contactPhone}
                 onChange={handleChange}
                 placeholder="Phone Number"
                 required

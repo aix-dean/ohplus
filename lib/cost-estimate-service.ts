@@ -545,6 +545,65 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
   }
 }
 
+// Get paginated cost estimates by createdBy ID
+export async function getPaginatedCostEstimatesByCreatedBy(
+  userId: string,
+  limitCount: number,
+  lastDocId: string | null = null,
+): Promise<{ items: CostEstimate[]; lastVisible: string | null; hasMore: boolean }> {
+  try {
+    let q = query(
+      collection(db, COST_ESTIMATES_COLLECTION),
+      where("createdBy", "==", userId),
+      orderBy("createdAt", "desc"),
+      limit(limitCount + 1) // Fetch one extra to check if there are more pages
+    )
+
+    if (lastDocId) {
+      const lastDoc = await getDoc(doc(db, COST_ESTIMATES_COLLECTION, lastDocId))
+      if (lastDoc.exists()) {
+        q = query(q, startAfter(lastDoc))
+      }
+    }
+
+    const querySnapshot = await getDocs(q)
+    const items: CostEstimate[] = querySnapshot.docs.slice(0, limitCount).map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+    })
+
+    const hasMore = querySnapshot.docs.length > limitCount
+    const lastVisibleDoc = querySnapshot.docs[limitCount - 1]
+    const newLastDocId = lastVisibleDoc ? lastVisibleDoc.id : null
+
+    return { items, lastVisible: newLastDocId, hasMore }
+  } catch (error) {
+    console.error("Error fetching paginated cost estimates by createdBy ID:", error)
+    return { items: [], lastVisible: null, hasMore: false }
+  }
+}
+
 // Create multiple cost estimates for multiple sites
 export async function createMultipleCostEstimates(
   clientData: CostEstimateClientData,
