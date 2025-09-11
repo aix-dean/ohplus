@@ -15,7 +15,7 @@ import { ArrowLeft, Upload, Plus, MoreHorizontal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Toaster } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, getDocs, addDoc, updateDoc, doc } from "firebase/firestore"
+import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { createClient } from "@/lib/client-service"
@@ -99,7 +99,8 @@ export default function AddClientPage() {
     setLoadingCompanies(true)
     try {
       const companiesRef = collection(db, "client_company")
-      const snapshot = await getDocs(companiesRef)
+      const q = query(companiesRef, where("deleted", "!=", true))
+      const snapshot = await getDocs(q)
       const companiesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         name: doc.data().name,
@@ -196,6 +197,7 @@ export default function AddClientPage() {
         companyLogoUrl: "",
         created: new Date(),
         user_company_id: userData?.company_id || "",
+        deleted: false,
       })
       return docRef.id
     } catch (error) {
@@ -265,7 +267,8 @@ export default function AddClientPage() {
       if (!userData?.uid) return ""
 
       const companiesRef = collection(db, "client_company")
-      const snapshot = await getDocs(companiesRef)
+      const q = query(companiesRef, where("deleted", "!=", true))
+      const snapshot = await getDocs(q)
 
       const userCompany = snapshot.docs.find((doc) => {
         const data = doc.data()
@@ -389,7 +392,7 @@ export default function AddClientPage() {
           email: contact.email,
           address: formData.address || "",
           companyLogoUrl: finalCompanyLogoUrl,
-          status: "lead",
+          status: "lead" as const,
           notes: contact.remarks,
           city: "",
           state: "",
@@ -397,6 +400,7 @@ export default function AddClientPage() {
           uploadedBy: userData?.uid || "",
           uploadedByName: userData?.displayName || userData?.email || "",
           user_company_id: userCompanyId,
+          deleted: false,
           compliance: {
             dti: complianceUrls.dti,
             gis: complianceUrls.gis,
@@ -477,11 +481,20 @@ export default function AddClientPage() {
                       <SelectValue placeholder="-Choose an Industry-" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="automotive">Automotive</SelectItem>
+                      <SelectItem value="banking">Banking & Financial Services</SelectItem>
+                      <SelectItem value="beverages">Beverages</SelectItem>
+                      <SelectItem value="fast_food">Fast Food & QSR</SelectItem>
+                      <SelectItem value="retail">Retail & Shopping</SelectItem>
+                      <SelectItem value="telecom">Telecommunications</SelectItem>
+                      <SelectItem value="pharmaceuticals">Pharmaceuticals</SelectItem>
+                      <SelectItem value="real_estate">Real Estate</SelectItem>
+                      <SelectItem value="government">Government & Public Services</SelectItem>
+                      <SelectItem value="fmcg">FMCG</SelectItem>
                       <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                      <SelectItem value="entertainment">Entertainment & Media</SelectItem>
+                      <SelectItem value="travel">Travel & Tourism</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>

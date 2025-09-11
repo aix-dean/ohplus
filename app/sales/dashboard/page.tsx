@@ -202,7 +202,7 @@ function SalesDashboardContent() {
         try {
           const itemsPerPage = debouncedDashboardClientSearchTerm.trim() ? 10000 : 100; // 1. Adjust itemsPerPage for initial load to 100. 2. If search term is not empty, fetch all clients (10000).
           const lastDocForSearch = debouncedDashboardClientSearchTerm.trim() ? null : null; // Ensure lastDoc is null for full client fetch when searching.
-          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id);
+          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id || undefined, false);
           setDashboardClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients for dashboard:", error)

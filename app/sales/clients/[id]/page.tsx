@@ -5,9 +5,10 @@ import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Edit, Search, Printer, Plus, FileText, Upload, X, Check } from "lucide-react"
+import { ArrowLeft, Edit, Search, Printer, Plus, FileText, Upload, X, Check, Trash2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore" // Import updateDoc, collection, query, where, getDocs
+import { doc, getDoc, updateDoc, deleteDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore" // Import updateDoc, collection, query, where, getDocs
 import { db } from "@/lib/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
@@ -155,7 +156,27 @@ interface Quotation {
    const [activeTab, setActiveTab] = useState("proposals")
    const [searchTerm, setSearchTerm] = useState("")
    const [showComplianceDialog, setShowComplianceDialog] = useState(false)
+   const [showContactsDialog, setShowContactsDialog] = useState(false)
    const [uploadingDocument, setUploadingDocument] = useState<string | null>(null) // To track which document is being uploaded
+   const [companyContacts, setCompanyContacts] = useState<any[]>([])
+   const [loadingContacts, setLoadingContacts] = useState(false)
+   const [editingContact, setEditingContact] = useState<any | null>(null)
+   const [showEditContactDialog, setShowEditContactDialog] = useState(false)
+   const [showDeleteContactDialog, setShowDeleteContactDialog] = useState(false)
+   const [contactToDelete, setContactToDelete] = useState<any | null>(null)
+   const [editFormData, setEditFormData] = useState({
+     name: "",
+     designation: "",
+     phone: "",
+     email: "",
+   })
+   const [showAddContactDialog, setShowAddContactDialog] = useState(false)
+   const [addContactFormData, setAddContactFormData] = useState({
+     name: "",
+     designation: "",
+     phone: "",
+     email: "",
+   })
 
   // Refs for hidden file inputs
   const dtiBirFileInputRef = useRef<HTMLInputElement>(null)
@@ -322,7 +343,7 @@ interface Quotation {
       const bookingsCollectionRef = collection(db, "booking")
       const q = query(bookingsCollectionRef, where("client.company_id", "==", clientId))
       const querySnapshot = await getDocs(q)
- 
+
       const fetchedBookings: Booking[] = querySnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
@@ -380,6 +401,172 @@ interface Quotation {
       toast.error("Failed to load bookings")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCompanyContacts = async () => {
+    if (!company) return
+
+    setLoadingContacts(true)
+    try {
+      const clientsCollectionRef = collection(db, "client_db")
+      // Query for contacts that belong to this company and are not soft-deleted
+      const q = query(
+        clientsCollectionRef,
+        where("company_id", "==", clientId),
+        where("deleted", "==", false)
+      )
+      const querySnapshot = await getDocs(q)
+
+      const fetchedContacts: any[] = querySnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          designation: data.designation || "",
+          status: data.status || "",
+          created: data.created ? data.created.toDate() : new Date(),
+        }
+      })
+
+      setCompanyContacts(fetchedContacts)
+      setShowContactsDialog(true)
+    } catch (error) {
+      console.error("Error loading company contacts:", error)
+      toast.error("Failed to load company contacts")
+    } finally {
+      setLoadingContacts(false)
+    }
+  }
+
+  const handleEditContact = (contact: any) => {
+    setEditingContact(contact)
+    setEditFormData({
+      name: contact.name || "",
+      designation: contact.designation || "",
+      phone: contact.phone || "",
+      email: contact.email || "",
+    })
+    setShowEditContactDialog(true)
+  }
+
+  const handleDeleteContact = (contact: any) => {
+    setContactToDelete(contact)
+    setShowDeleteContactDialog(true)
+  }
+
+  const handleSaveContactEdit = async () => {
+    if (!editingContact) return
+
+    try {
+      const contactRef = doc(db, "client_db", editingContact.id)
+      await updateDoc(contactRef, {
+        name: editFormData.name,
+        designation: editFormData.designation,
+        phone: editFormData.phone,
+        email: editFormData.email,
+        updated: new Date(),
+      })
+
+      // Update the local state
+      setCompanyContacts(prev =>
+        prev.map(contact =>
+          contact.id === editingContact.id
+            ? { ...contact, ...editFormData }
+            : contact
+        )
+      )
+
+      setShowEditContactDialog(false)
+      setEditingContact(null)
+      toast.success("Contact updated successfully")
+    } catch (error) {
+      console.error("Error updating contact:", error)
+      toast.error("Failed to update contact")
+    }
+  }
+
+  const handleConfirmDeleteContact = async () => {
+    if (!contactToDelete) return
+
+    try {
+      // Soft delete - update the deleted field instead of permanently deleting
+      const contactRef = doc(db, "client_db", contactToDelete.id)
+      await updateDoc(contactRef, {
+        deleted: true,
+        updated: new Date(),
+      })
+
+      // Update the local state to remove the contact from the UI
+      setCompanyContacts(prev =>
+        prev.filter(contact => contact.id !== contactToDelete.id)
+      )
+
+      setShowDeleteContactDialog(false)
+      setContactToDelete(null)
+      toast.success("Contact deleted successfully")
+    } catch (error) {
+      console.error("Error deleting contact:", error)
+      toast.error("Failed to delete contact")
+    }
+  }
+
+  const handleAddContact = () => {
+    setAddContactFormData({
+      name: "",
+      designation: "",
+      phone: "",
+      email: "",
+    })
+    setShowAddContactDialog(true)
+  }
+
+  const handleSaveNewContact = async () => {
+    if (!company) return
+
+    // Basic validation
+    if (!addContactFormData.name.trim() || !addContactFormData.email.trim()) {
+      toast.error("Name and email are required")
+      return
+    }
+
+    try {
+      const newContactData = {
+        name: addContactFormData.name,
+        designation: addContactFormData.designation,
+        phone: addContactFormData.phone,
+        email: addContactFormData.email,
+        company: company.name,
+        company_id: company.id,
+        status: "lead",
+        notes: "",
+        city: "",
+        state: "",
+        zipCode: "",
+        uploadedBy: userData?.uid || "",
+        uploadedByName: userData?.displayName || userData?.email || "",
+        user_company_id: userData?.company_id || "",
+        deleted: false, // Ensure new contacts are not marked as deleted
+        created: new Date(),
+        updated: new Date(),
+      }
+
+      const docRef = await addDoc(collection(db, "client_db"), newContactData)
+
+      // Add to local state
+      const newContact = {
+        id: docRef.id,
+        ...newContactData,
+      }
+
+      setCompanyContacts(prev => [...prev, newContact])
+      setShowAddContactDialog(false)
+      toast.success("Contact added successfully")
+    } catch (error) {
+      console.error("Error adding contact:", error)
+      toast.error("Failed to add contact")
     }
   }
  
@@ -568,7 +755,12 @@ interface Quotation {
                  </div>
                </div>
              </div>
-             <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowComplianceDialog(true)}>Corporate Compliance Docs</Button>
+             <div className="flex flex-col gap-2">
+               <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowComplianceDialog(true)}>Corporate Compliance Docs</Button>
+               <Button variant="outline" onClick={loadCompanyContacts} disabled={loadingContacts}>
+                 {loadingContacts ? "Loading..." : "View Contacts"}
+               </Button>
+             </div>
            </div>
          </CardContent>
        </Card>
@@ -692,7 +884,284 @@ interface Quotation {
            />
          </DialogContent>
        </Dialog>
- 
+
+       {/* View Contacts Dialog */}
+       <Dialog open={showContactsDialog} onOpenChange={setShowContactsDialog}>
+         <DialogContent className="sm:max-w-[800px]">
+           <DialogHeader>
+             <DialogTitle className="text-xl font-bold text-gray-900">Company Contacts</DialogTitle>
+             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+               <X className="h-4 w-4" />
+               <span className="sr-only">Close</span>
+             </DialogClose>
+           </DialogHeader>
+
+           <div className="py-4">
+             <div className="flex items-center justify-between mb-4">
+               <h3 className="text-lg font-medium text-gray-900">{company?.name} - Contacts</h3>
+               <div className="flex items-center gap-3">
+                 <Badge variant="outline" className="text-sm">
+                   Total: {companyContacts.length}
+                 </Badge>
+                 <Button onClick={handleAddContact} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                   <Plus className="h-4 w-4 mr-2" />
+                   Add Contact
+                 </Button>
+               </div>
+             </div>
+
+             {companyContacts.length > 0 ? (
+               <div className="border rounded-lg overflow-hidden">
+                 <Table>
+                   <TableHeader>
+                     <TableRow className="bg-gray-50">
+                       <TableHead className="font-medium text-gray-700">Name</TableHead>
+                       <TableHead className="font-medium text-gray-700">Designation</TableHead>
+                       <TableHead className="font-medium text-gray-700">Contact Details</TableHead>
+                       <TableHead className="font-medium text-gray-700">Status</TableHead>
+                       <TableHead className="font-medium text-gray-700">Created</TableHead>
+                       <TableHead className="font-medium text-gray-700">Actions</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {companyContacts.map((contact) => (
+                       <TableRow key={contact.id}>
+                         <TableCell className="font-medium text-gray-900">{contact.name}</TableCell>
+                         <TableCell className="text-gray-700">{contact.designation || "N/A"}</TableCell>
+                         <TableCell className="text-gray-700">
+                           <div className="space-y-1">
+                             <div className="text-sm">{contact.email}</div>
+                             <div className="text-sm text-gray-500">{contact.phone}</div>
+                           </div>
+                         </TableCell>
+                         <TableCell>
+                           <Badge
+                             variant="outline"
+                             className={`${
+                               contact.status === "active"
+                                 ? "bg-green-100 text-green-800"
+                                 : contact.status === "inactive"
+                                 ? "bg-red-100 text-red-800"
+                                 : "bg-gray-100 text-gray-800"
+                             }`}
+                           >
+                             {contact.status || "lead"}
+                           </Badge>
+                         </TableCell>
+                         <TableCell className="text-sm text-gray-500">
+                           {new Date(contact.created).toLocaleDateString("en-US", {
+                             year: "numeric",
+                             month: "short",
+                             day: "numeric",
+                           })}
+                         </TableCell>
+                         <TableCell>
+                           <div className="flex items-center space-x-2">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => handleEditContact(contact)}
+                               className="h-8 w-8 p-0"
+                             >
+                               <Edit className="h-4 w-4" />
+                             </Button>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => handleDeleteContact(contact)}
+                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                             >
+                               <Trash2 className="h-4 w-4" />
+                             </Button>
+                           </div>
+                         </TableCell>
+                       </TableRow>
+                     ))}
+                   </TableBody>
+                 </Table>
+               </div>
+             ) : (
+               <div className="text-center py-8 text-gray-500">
+                 <p>No contacts found for this company.</p>
+               </div>
+             )}
+           </div>
+
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowContactsDialog(false)}>
+               Close
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* Edit Contact Dialog */}
+       <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
+         <DialogContent className="sm:max-w-[500px]">
+           <DialogHeader>
+             <DialogTitle className="text-xl font-bold text-gray-900">Edit Contact</DialogTitle>
+             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+               <X className="h-4 w-4" />
+               <span className="sr-only">Close</span>
+             </DialogClose>
+           </DialogHeader>
+
+           <div className="py-4">
+             <div className="grid grid-cols-1 gap-4">
+               <div className="space-y-2">
+                 <Label htmlFor="edit-name">Name</Label>
+                 <Input
+                   id="edit-name"
+                   value={editFormData.name}
+                   onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                   placeholder="Contact name"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-designation">Designation</Label>
+                 <Input
+                   id="edit-designation"
+                   value={editFormData.designation}
+                   onChange={(e) => setEditFormData({ ...editFormData, designation: e.target.value })}
+                   placeholder="Job title/designation"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-phone">Phone</Label>
+                 <Input
+                   id="edit-phone"
+                   value={editFormData.phone}
+                   onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                   placeholder="Phone number"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-email">Email</Label>
+                 <Input
+                   id="edit-email"
+                   type="email"
+                   value={editFormData.email}
+                   onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                   placeholder="Email address"
+                 />
+               </div>
+             </div>
+           </div>
+
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowEditContactDialog(false)}>
+               Cancel
+             </Button>
+             <Button onClick={handleSaveContactEdit} className="bg-blue-600 hover:bg-blue-700">
+               Save Changes
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* Delete Contact Confirmation Dialog */}
+       <Dialog open={showDeleteContactDialog} onOpenChange={setShowDeleteContactDialog}>
+         <DialogContent className="sm:max-w-[400px]">
+           <DialogHeader>
+             <DialogTitle className="text-xl font-bold text-gray-900">Delete Contact</DialogTitle>
+           </DialogHeader>
+
+           <div className="py-4">
+             <p className="text-gray-700">
+               Are you sure you want to delete the contact{" "}
+               <span className="font-semibold text-gray-900">
+                 {contactToDelete?.name}
+               </span>
+               ? This action cannot be undone.
+             </p>
+           </div>
+
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowDeleteContactDialog(false)}>
+               Cancel
+             </Button>
+             <Button
+               onClick={handleConfirmDeleteContact}
+               className="bg-red-600 hover:bg-red-700 text-white"
+             >
+               Delete Contact
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* Add Contact Dialog */}
+       <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
+         <DialogContent className="sm:max-w-[500px]">
+           <DialogHeader>
+             <DialogTitle className="text-xl font-bold text-gray-900">Add New Contact</DialogTitle>
+             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+               <X className="h-4 w-4" />
+               <span className="sr-only">Close</span>
+             </DialogClose>
+           </DialogHeader>
+
+           <div className="py-4">
+             <div className="grid grid-cols-1 gap-4">
+               <div className="space-y-2">
+                 <Label htmlFor="add-name">Name *</Label>
+                 <Input
+                   id="add-name"
+                   value={addContactFormData.name}
+                   onChange={(e) => setAddContactFormData({ ...addContactFormData, name: e.target.value })}
+                   placeholder="Contact name"
+                   required
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="add-designation">Designation</Label>
+                 <Input
+                   id="add-designation"
+                   value={addContactFormData.designation}
+                   onChange={(e) => setAddContactFormData({ ...addContactFormData, designation: e.target.value })}
+                   placeholder="Job title/designation"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="add-phone">Phone</Label>
+                 <Input
+                   id="add-phone"
+                   value={addContactFormData.phone}
+                   onChange={(e) => setAddContactFormData({ ...addContactFormData, phone: e.target.value })}
+                   placeholder="Phone number"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="add-email">Email *</Label>
+                 <Input
+                   id="add-email"
+                   type="email"
+                   value={addContactFormData.email}
+                   onChange={(e) => setAddContactFormData({ ...addContactFormData, email: e.target.value })}
+                   placeholder="Email address"
+                   required
+                 />
+               </div>
+             </div>
+           </div>
+
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowAddContactDialog(false)}>
+               Cancel
+             </Button>
+             <Button onClick={handleSaveNewContact} className="bg-blue-600 hover:bg-blue-700">
+               Add Contact
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
        {/* Tabs */}
        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
          <TabsList className="grid w-full grid-cols-4">
