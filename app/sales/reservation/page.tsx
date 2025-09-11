@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot, serverTimestamp, updateDoc } from "firebase/firestore"
+import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot, serverTimestamp, updateDoc, getCountFromServer } from "firebase/firestore"
 import { db, storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { format } from "date-fns"
-import { Search, MoreHorizontal, FileText, Calculator, ChevronDown, ChevronRight, Upload, Loader2, CheckCircle } from "lucide-react"
+import { Search, MoreHorizontal, FileText, Calculator, ChevronDown, ChevronRight, Upload, Loader2, CheckCircle, ChevronLeft } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -88,88 +88,110 @@ export default function ReservationsPage() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(15)
-  const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any]) // Stores last visible doc for each page
+  const [itemsPerPage] = useState(10)
+  const [lastDoc, setLastDoc] = useState<any>(null)
+  const [pageLastDocs, setPageLastDocs] = useState<{ [page: number]: any }>({})
   const [hasMore, setHasMore] = useState(true)
 
   const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
   const [selectedProductForReport, setSelectedProductForReport] = useState<string>("")
   const [isCreatingJobOrder, setIsCreatingJobOrder] = useState(false)
   const [isCreatingReport, setIsCreatingReport] = useState(false)
+  const [totalReservationsCount, setTotalReservationsCount] = useState<number>(0)
+
+  const fetchTotalReservationsCount = async () => {
+    if (!user?.uid || !userData?.company_id) return
+
+    try {
+      const bookingsRef = collection(db, "booking")
+      const countQuery = query(
+        bookingsRef,
+        where("company_id", "==", userData.company_id)
+      )
+
+      const snapshot = await getCountFromServer(countQuery)
+      setTotalReservationsCount(snapshot.data().count)
+    } catch (error) {
+      console.error("Error fetching total reservations count:", error)
+    }
+  }
+
+  const fetchBookings = async (page: number = 1, reset: boolean = false) => {
+    if (!user?.uid || !userData?.company_id) return
+
+    try {
+      setLoading(true)
+      const bookingsRef = collection(db, "booking")
+      let bookingsQuery = query(
+        bookingsRef,
+        where("company_id", "==", userData.company_id),
+        orderBy("created", "desc"),
+        limit(itemsPerPage + 1) // Fetch one extra to check if there's a next page
+      )
+
+      // If not the first page, start after the last document of the previous page
+      if (page > 1 && !reset) {
+        const prevPageLastDoc = pageLastDocs[page - 1]
+        if (prevPageLastDoc) {
+          bookingsQuery = query(bookingsQuery, startAfter(prevPageLastDoc))
+        }
+      }
+
+      const querySnapshot = await getDocs(bookingsQuery)
+      const fetchedBookings: Booking[] = []
+
+      querySnapshot.forEach((doc) => {
+        fetchedBookings.push({ id: doc.id, ...doc.data() })
+      })
+
+      // Check if there are more pages
+      const hasMore = fetchedBookings.length > itemsPerPage
+      const currentPageData = hasMore ? fetchedBookings.slice(0, itemsPerPage) : fetchedBookings
+
+      // Store the last document for this page
+      const pageLastDoc = hasMore ? querySnapshot.docs[itemsPerPage - 1] : querySnapshot.docs[querySnapshot.docs.length - 1]
+
+      if (pageLastDoc) {
+        setPageLastDocs(prev => ({
+          ...prev,
+          [page]: pageLastDoc
+        }))
+      }
+
+      setBookings(currentPageData)
+      setLastDoc(pageLastDoc)
+      setHasMore(hasMore)
+
+      const productIds = currentPageData
+        .map((booking) => booking.product_id)
+        .filter((id): id is string => Boolean(id))
+
+      const uniqueProductIds = [...new Set(productIds)]
+      const productData: { [key: string]: Product } = {}
+
+      for (const productId of uniqueProductIds) {
+        try {
+          const productDoc = await getDoc(doc(db, "products", productId))
+          if (productDoc.exists()) {
+            productData[productId] = { id: productDoc.id, ...productDoc.data() }
+          }
+        } catch (error) {
+          console.error(`Error fetching product ${productId}:`, error)
+        }
+      }
+
+      setProducts(productData)
+    } catch (error) {
+      console.error("Error fetching bookings:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      if (!user?.uid || !userData?.company_id) return
-
-      try {
-        setLoading(true)
-        const bookingsRef = collection(db, "booking")
-        let bookingsQuery = query(
-          bookingsRef,
-          where("company_id", "==", userData.company_id),
-          where("quotation_id", "!=", null), // Add this line to filter by quotation_id being set
-          orderBy("created", "desc"),
-          limit(itemsPerPage + 1) // Fetch one more to check if there's a next page
-        )
-
-        const lastDoc = lastVisibleDocs[currentPage - 1]
-        if (lastDoc) {
-          bookingsQuery = query(
-            bookingsRef,
-            where("company_id", "==", userData.company_id),
-            where("quotation_id", "!=", null), // Add this line to filter by quotation_id being set
-            orderBy("created", "desc"),
-            startAfter(lastDoc),
-            limit(itemsPerPage + 1)
-          )
-        }
-
-        const querySnapshot = await getDocs(bookingsQuery)
-        const fetchedBookings: Booking[] = []
-        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-
-        setHasMore(querySnapshot.docs.length > itemsPerPage)
-
-        querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
-          fetchedBookings.push({ id: doc.id, ...doc.data() })
-        })
-
-        setBookings(fetchedBookings)
-
-        // Only update lastVisibleDocs if we are moving to a new page (i.e., currentPage is the last index)
-        if (newLastVisible && currentPage === lastVisibleDocs.length) {
-          setLastVisibleDocs((prev) => [...prev, newLastVisible])
-        }
-
-
-        const productIds = fetchedBookings
-          .map((booking) => booking.product_id)
-          .filter((id): id is string => Boolean(id))
-
-        const uniqueProductIds = [...new Set(productIds)]
-        const productData: { [key: string]: Product } = {}
-
-        for (const productId of uniqueProductIds) {
-          try {
-            const productDoc = await getDoc(doc(db, "products", productId))
-            if (productDoc.exists()) {
-              productData[productId] = { id: productDoc.id, ...productDoc.data() }
-            }
-          } catch (error) {
-            console.error(`Error fetching product ${productId}:`, error)
-          }
-        }
-
-        setProducts(productData)
-      } catch (error) {
-        console.error("Error fetching bookings:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchBookings()
-  }, [user, userData, currentPage, itemsPerPage, lastVisibleDocs.length])
+    fetchBookings(1, true)
+    fetchTotalReservationsCount()
+  }, [user, userData])
 
   const formatDate = (date: any) => {
     if (!date) return "N/A"
@@ -496,15 +518,19 @@ export default function ReservationsPage() {
 
   const displayedReservations = getFilteredBookings()
 
-  const handleNextPage = () => {
+  const handleNextPage = async () => {
     if (hasMore) {
-      setCurrentPage((prevPage) => prevPage + 1)
+      const nextPage = currentPage + 1
+      setCurrentPage(nextPage)
+      await fetchBookings(nextPage, false)
     }
   }
 
-  const handlePreviousPage = () => {
+  const handlePreviousPage = async () => {
     if (currentPage > 1) {
-      setCurrentPage((prevPage) => prevPage - 1)
+      const prevPage = currentPage - 1
+      setCurrentPage(prevPage)
+      await fetchBookings(prevPage, false)
     }
   }
 
@@ -530,7 +556,7 @@ export default function ReservationsPage() {
 
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">
-              Total Reservations: {loading || isSearchingAlgolia ? "..." : displayedReservations.length}
+              Total Reservations: {loading ? "..." : totalReservationsCount}
             </span>
             <Button
               variant="outline"
@@ -827,14 +853,50 @@ export default function ReservationsPage() {
 
         {/* Pagination Controls */}
         <div className="flex justify-end mt-4">
-          <Pagination
-            currentPage={currentPage}
-            itemsPerPage={itemsPerPage}
-            totalItems={displayedReservations.length} // This will be inaccurate for true total, but works for current page display
-            onNextPage={handleNextPage}
-            onPreviousPage={handlePreviousPage}
-            hasMore={hasMore}
-          />
+          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+            <div className="flex flex-1 justify-between sm:hidden">
+              <Button onClick={handlePreviousPage} disabled={currentPage === 1 || loading} variant="outline" size="sm">
+                Previous
+              </Button>
+              <Button onClick={handleNextPage} disabled={!hasMore || loading} variant="outline" size="sm">
+                Next
+              </Button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                  <span className="font-medium">{(currentPage - 1) * itemsPerPage + bookings.length}</span> of{" "}
+                  <span className="font-medium">{totalReservationsCount}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                  <Button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1 || loading}
+                    variant="outline"
+                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  </Button>
+                  <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
+                    {currentPage}
+                  </span>
+                  <Button
+                    onClick={handleNextPage}
+                    disabled={!hasMore || loading}
+                    variant="outline"
+                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                  >
+                    <span className="sr-only">Next</span>
+                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  </Button>
+                </nav>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
