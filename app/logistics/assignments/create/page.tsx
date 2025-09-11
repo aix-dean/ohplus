@@ -38,7 +38,7 @@ import { JobOrderListDialog } from "@/components/job-order-list-dialog"
 
 
 // Service types as provided
-const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
+const SERVICE_TYPES = ["Roll Up", "Roll Down", "Monitoring", "Change Material", "Maintenance"]
 
 import { CreateServiceAssignmentForm } from '@/components/logistics/assignments/create/CreateServiceAssignmentForm';
 
