@@ -10,6 +10,7 @@ import {
   type DocumentSnapshot,
   addDoc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore"
 import type { ProjectCompliance } from "@/lib/types/quotation" // Import ProjectCompliance
 
@@ -20,6 +21,8 @@ export interface Booking {
   client: {
     company_id: string
     id: string
+    name: string
+    company_name: string
   }
   company_id: string // This seems redundant with client.company_id, but keeping for now as per screenshot
   contract?: string
@@ -36,7 +39,7 @@ export interface Booking {
     vatRate: number
   }
   created: any // Firestore timestamp
-  end_date: string
+  end_date: Timestamp | null
   media_order?: string[]
   payment_method: string
   product_id: string
@@ -57,7 +60,7 @@ export interface Booking {
   }[]
   reservation_id: string // Generated reservation ID with format "RV-" + currentmillis
   seller_id: string
-  start_date: string
+  start_date: Timestamp | null
   status: string
   total_cost: number
   type: string
@@ -144,6 +147,31 @@ export class BookingService {
     }
   }
 
+  private convertToTimestamp(dateValue: any): Timestamp {
+    if (!dateValue) return Timestamp.now()
+
+    // If it's already a Firestore Timestamp, return it as-is
+    if (dateValue && typeof dateValue.toDate === 'function') {
+      return dateValue
+    }
+
+    // If it's a string, try to parse it
+    if (typeof dateValue === 'string') {
+      const parsedDate = new Date(dateValue)
+      if (!isNaN(parsedDate.getTime())) {
+        return Timestamp.fromDate(parsedDate)
+      }
+    }
+
+    // If it's a Date object, convert it
+    if (dateValue instanceof Date) {
+      return Timestamp.fromDate(dateValue)
+    }
+
+    // Fallback to current timestamp
+    return Timestamp.now()
+  }
+
   async createBooking(quotation: any, userId: string, companyId: string): Promise<string> {
     console.log("[DEBUG] createBooking called with:", { quotation, userId, companyId })
     try {
@@ -153,6 +181,8 @@ export class BookingService {
         client: {
           company_id: quotation.client_company_id || "",
           id: quotation.client_id || "",
+          name: quotation.client_name || "",
+          company_name: quotation.client_company_name || "",
         },
         company_id: companyId,
         contract: quotation.contract || "",
@@ -169,7 +199,7 @@ export class BookingService {
           vatRate: quotation.vat_rate || 0,
         },
         created: serverTimestamp(),
-        end_date: quotation.end_date || "",
+        end_date: quotation.end_date ? this.convertToTimestamp(quotation.end_date) : null,
         media_order: quotation.media_order || [],
         payment_method: quotation.payment_method || "Manual Payment",
         product_name: quotation.items[0]?.name,
@@ -180,7 +210,7 @@ export class BookingService {
         requirements: quotation.requirements || [],
         reservation_id: `RV-${Date.now()}`, // Generate reservation ID with format "RV-" + currentmillis
         seller_id: quotation.seller_id || "",
-        start_date: quotation.start_date || "",
+        start_date: quotation.start_date ? this.convertToTimestamp(quotation.start_date) : null,
         status: "RESERVED", // Initial status for a new booking
         total_cost: quotation.items?.item_total_amount || 0,
         type: quotation.type || "RENTAL",
@@ -264,7 +294,7 @@ export class BookingService {
       date,
       serviceInvoice: `SI-${booking.id.slice(-6)}`,
       bsNumber: `BS-${booking.id.slice(-4)}`,
-      clients: booking.client?.id || "Unknown Client", // Using client.id as a placeholder for client name
+      clients: booking.client?.name || booking.client?.id || "Unknown Client", // Using client name if available, fallback to ID
       tin: "", // Not available in booking data
       description: `${booking.type} - ${booking.product_owner}`,
       netSales,

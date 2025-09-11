@@ -398,7 +398,14 @@ export default function QuotationsListPage() {
 
         if (fullQuotationData && user?.uid && userData?.company_id) {
           try {
-            const bookingId = await bookingService.createBooking(fullQuotationData, user.uid, userData.company_id)
+            // Pass quotation dates directly to booking - the booking service will handle them properly
+            const bookingData = {
+              ...fullQuotationData,
+              start_date: fullQuotationData.start_date,
+              end_date: fullQuotationData.end_date,
+            }
+
+            const bookingId = await bookingService.createBooking(bookingData, user.uid, userData.company_id)
             console.log("[DEBUG] Booking created with ID:", bookingId)
             toast({
               title: "Booking Created",

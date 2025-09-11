@@ -76,8 +76,8 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  start_date?: string // Made optional
-  end_date?: string // Made optional
+  start_date?: string | any // Made optional - supports both string and Timestamp
+  end_date?: string | any // Made optional - supports both string and Timestamp
   total_amount: number
   duration_days: number // Overall duration for the quotation
   notes?: string

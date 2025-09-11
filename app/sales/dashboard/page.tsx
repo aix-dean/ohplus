@@ -249,13 +249,17 @@ function SalesDashboardContent() {
           const product = products.find((p) => p.id === productId)
           if (product?.type?.toLowerCase() !== "rental") continue
 
-          const q = query(bookingsRef, where("product_id", "==", productId), where("status", "==", "CONFIRMED"))
-
-          const querySnapshot = await getDocs(q)
+          // Check for bookings with status "RESERVED" (case insensitive)
+          const reservedStatuses = ["RESERVED", "reserved", "Reserved"]
+          const bookingPromises = reservedStatuses.map(status =>
+            getDocs(query(bookingsRef, where("product_id", "==", productId), where("status", "==", status)))
+          )
+          const bookingSnapshots = await Promise.all(bookingPromises)
+          const allBookingDocs = bookingSnapshots.flatMap(snapshot => snapshot.docs)
 
           // Check if any booking is ongoing (current date is between start_date and end_date)
           let hasOngoingBooking = false
-          querySnapshot.forEach((doc) => {
+          allBookingDocs.forEach((doc) => {
             const booking = doc.data() as Booking
             const startDate =
               booking.start_date instanceof Timestamp ? booking.start_date.toDate() : new Date(booking.start_date)

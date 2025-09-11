@@ -20,6 +20,11 @@ interface Booking {
   product_id?: string
   product_owner?: string
   client_name?: string
+  client_company_name?: string
+  client?: {
+    name?: string
+    company_name?: string
+  }
   start_date?: any
   end_date?: any
   status?: string
@@ -291,7 +296,21 @@ export default function BookingDetailPage() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Client</label>
-                      <p className="text-base text-gray-900">{booking.client_name || "N/A"}</p>
+                      <p className="text-base text-gray-900">
+                        {(() => {
+                          const companyName = booking.client_company_name || booking.client?.company_name || "";
+                          const clientName = booking.client_name || booking.client?.name || "";
+                          if (companyName && clientName) {
+                            return `${companyName} - ${clientName}`;
+                          } else if (companyName) {
+                            return companyName;
+                          } else if (clientName) {
+                            return clientName;
+                          } else {
+                            return "N/A";
+                          }
+                        })()}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Start Date</label>
