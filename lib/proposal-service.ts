@@ -50,6 +50,7 @@ export async function createProposal(
 
     // Clean the client data to ensure no undefined values
     const cleanClient: ProposalClient = {
+      id: client.id || "", // Include id field
       company: client.company || "",
       contactPerson: client.contactPerson || "",
       email: client.email || "",
@@ -568,6 +569,114 @@ export async function getPaginatedProposals(
   } catch (error) {
     console.error("Error fetching paginated proposals:", error)
     return { items: [], lastDoc: null, hasMore: false }
+  }
+}
+
+export async function getPaginatedProposalsByUserId(
+  userId: string,
+  itemsPerPage: number,
+  lastDoc: any | null,
+  searchTerm = "",
+  statusFilter: string | null = null,
+): Promise<{ items: Proposal[]; lastDoc: any | null; hasMore: boolean }> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    let q = query(collection(db, "proposals"), where("createdBy", "==", userId), orderBy("createdAt", "desc"))
+
+    if (statusFilter && statusFilter !== "all") {
+      q = query(q, where("status", "==", statusFilter))
+    }
+
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    q = query(q, limit(itemsPerPage + 1)) // Fetch one more to check if there are more items
+
+    const querySnapshot = await getDocs(q)
+    const proposals: Proposal[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      proposals.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
+      } as Proposal)
+    })
+
+    let filteredItems = proposals
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      filteredItems = proposals.filter(
+        (proposal) =>
+          proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+          proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+          (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm)),
+      )
+    }
+
+    const hasMore = filteredItems.length > itemsPerPage
+    const itemsToReturn = filteredItems.slice(0, itemsPerPage)
+    const newLastDoc = querySnapshot.docs[itemsToReturn.length] || null
+
+    return { items: itemsToReturn, lastDoc: newLastDoc, hasMore }
+  } catch (error) {
+    console.error("Error fetching paginated proposals by user:", error)
+    return { items: [], lastDoc: null, hasMore: false }
+  }
+}
+
+export async function getProposalsCountByUserId(
+  userId: string,
+  searchTerm = "",
+  statusFilter: string | null = null,
+): Promise<number> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    let q = query(collection(db, "proposals"), where("createdBy", "==", userId))
+
+    if (statusFilter && statusFilter !== "all") {
+      q = query(q, where("status", "==", statusFilter))
+    }
+
+    // If there's a search term, we need to fetch all and filter client-side
+    if (searchTerm) {
+      const allProposalsSnapshot = await getDocs(q)
+      const allProposals: Proposal[] = []
+      allProposalsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        allProposals.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+          validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
+        } as Proposal)
+      })
+
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      const filteredProposals = allProposals.filter(
+        (proposal) =>
+          proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+          proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+          (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm)),
+      )
+      return filteredProposals.length
+    }
+
+    const snapshot = await getCountFromServer(q)
+    return snapshot.data().count
+  } catch (error) {
+    console.error("Error getting proposals count by user:", error)
+    return 0
   }
 }
 
