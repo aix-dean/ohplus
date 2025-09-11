@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product, uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { postReport, type ReportData } from "@/lib/report-service"
 
@@ -47,6 +47,7 @@ interface JobOrder {
   joType: string
   siteName: string
   product_id: string
+  siteImageUrl?: string
 }
 
 export function CreateReportDialog({
@@ -81,6 +82,7 @@ export function CreateReportDialog({
   const [selectedJO, setSelectedJO] = useState("")
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [loadingJOs, setLoadingJOs] = useState(false)
+  const [selectedJobOrderDetails, setSelectedJobOrderDetails] = useState<JobOrder | null>(null)
 
   // Fetch product data when dialog opens
   useEffect(() => {
@@ -94,9 +96,21 @@ export function CreateReportDialog({
 
       if (preSelectedJobOrder) {
         setSelectedJO(preSelectedJobOrder)
+        if (!hideJobOrderSelection) {
+          fetchSelectedJobOrderDetails(preSelectedJobOrder)
+        }
       }
     }
   }, [open, siteId, hideJobOrderSelection, preSelectedJobOrder])
+
+  // Fetch job order details when selection changes
+  useEffect(() => {
+    if (selectedJO && selectedJO !== "none" && !hideJobOrderSelection) {
+      fetchSelectedJobOrderDetails(selectedJO)
+    } else {
+      setSelectedJobOrderDetails(null)
+    }
+  }, [selectedJO, hideJobOrderSelection])
 
   const fetchJobOrders = async () => {
     setLoadingJOs(true)
@@ -118,6 +132,7 @@ export function CreateReportDialog({
           joType: data.joType || "General",
           siteName: data.siteName || "Unknown Site",
           product_id: data.product_id || "",
+          siteImageUrl: data.siteImageUrl || null,
         })
       })
 
@@ -141,6 +156,12 @@ export function CreateReportDialog({
       console.log("Product name:", productData?.name)
       console.log("Product ID:", productData?.id)
       setProduct(productData)
+
+      // If no job order is pre-selected and job order selection is not hidden,
+      // try to find associated job orders for this product to get siteImageUrl
+      if (!preSelectedJobOrder && !hideJobOrderSelection) {
+        await fetchJobOrdersForProduct()
+      }
     } catch (error) {
       console.error("Error fetching product data:", error)
       toast({
@@ -148,6 +169,82 @@ export function CreateReportDialog({
         description: "Failed to load site information",
         variant: "destructive",
       })
+    }
+  }
+
+  const fetchJobOrdersForProduct = async () => {
+    try {
+      // Query job orders for this specific product to get siteImageUrl
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("product_id", "==", siteId), limit(1)) // Get just one to get siteImageUrl
+      const querySnapshot = await getDocs(q)
+
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const data = doc.data()
+        const siteImageUrl = data.siteImageUrl
+
+        if (siteImageUrl) {
+          console.log("Found siteImageUrl from associated job order for product:", siteImageUrl)
+          // Store this in a way that can be used when creating the report
+          setSelectedJobOrderDetails({
+            id: doc.id,
+            joNumber: data.joNumber || "N/A",
+            clientName: data.clientName || "Unknown Client",
+            clientCompany: data.clientCompany || "",
+            status: data.status || "unknown",
+            joType: data.joType || "General",
+            siteName: data.siteName || "Unknown Site",
+            product_id: data.product_id || "",
+            siteImageUrl: siteImageUrl,
+          })
+        } else {
+          console.log("No siteImageUrl found in associated job order for product")
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching job orders for product:", error)
+      // Don't show error toast for this as it's not critical
+    }
+  }
+
+  const fetchSelectedJobOrderDetails = async (joNumber: string) => {
+    try {
+      // Find the job order from the list first
+      const jobOrderFromList = jobOrders.find((jo) => jo.joNumber === joNumber)
+      if (jobOrderFromList) {
+        // If we have it in the list and it has siteImageUrl, use it
+        if (jobOrderFromList.siteImageUrl) {
+          setSelectedJobOrderDetails(jobOrderFromList)
+          return
+        }
+      }
+
+      // If not found in list or no siteImageUrl, fetch individual job order details
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("joNumber", "==", joNumber))
+      const querySnapshot = await getDocs(q)
+
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const data = doc.data()
+        const detailedJobOrder: JobOrder = {
+          id: doc.id,
+          joNumber: data.joNumber || "N/A",
+          clientName: data.clientName || "Unknown Client",
+          clientCompany: data.clientCompany || "",
+          status: data.status || "unknown",
+          joType: data.joType || "General",
+          siteName: data.siteName || "Unknown Site",
+          product_id: data.product_id || "",
+          siteImageUrl: data.siteImageUrl || undefined,
+        }
+        setSelectedJobOrderDetails(detailedJobOrder)
+        console.log("Fetched detailed job order:", detailedJobOrder)
+        console.log("Job order siteImageUrl:", detailedJobOrder.siteImageUrl)
+      }
+    } catch (error) {
+      console.error("Error fetching job order details:", error)
     }
   }
 
@@ -279,6 +376,20 @@ export function CreateReportDialog({
     e.preventDefault()
     e.stopPropagation()
 
+    // Get the effective job order (selected or product-associated)
+    const effectiveJobOrder = selectedJobOrderDetails ||
+      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+
+    // If we have a job order with siteImageUrl, show it
+    if (effectiveJobOrder?.siteImageUrl) {
+      setPreviewModal({
+        open: true,
+        preview: effectiveJobOrder.siteImageUrl,
+      })
+      return
+    }
+
+    // Fallback to uploaded file
     if (!attachment.file) return
 
     // Handle images - show in full screen modal
@@ -292,6 +403,74 @@ export function CreateReportDialog({
   }
 
   const renderFilePreview = (attachment: AttachmentData, index: number) => {
+    // Get the effective job order (selected or product-associated)
+    const effectiveJobOrder = selectedJobOrderDetails ||
+      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+
+    // If we have a job order with siteImageUrl, use it for the preview
+    if (effectiveJobOrder?.siteImageUrl) {
+      return (
+        <div className="relative w-full h-full group">
+          <div className="w-full h-full">
+            <img
+              src={effectiveJobOrder.siteImageUrl}
+              alt="Site Image"
+              className="w-full h-full object-cover rounded"
+              onError={(e) => {
+                console.error("Site image failed to load:", effectiveJobOrder.siteImageUrl)
+                // Fallback to uploaded file if site image fails
+                if (attachment.preview) {
+                  e.currentTarget.src = attachment.preview
+                }
+              }}
+            />
+          </div>
+
+          {/* Upload overlay when no file is uploaded yet */}
+          {!attachment.file && (
+            <label
+              htmlFor={`file-${index}`}
+              className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity"
+            >
+              <Upload className="h-6 w-6 text-white" />
+              <span className="text-xs text-white mt-1">Replace</span>
+            </label>
+          )}
+
+          {/* Preview Button */}
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              // Show site image in modal
+              setPreviewModal({
+                open: true,
+                preview: effectiveJobOrder.siteImageUrl,
+              })
+            }}
+            className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Preview site image"
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+
+          {/* Success indicator when uploaded */}
+          {attachment.fileUrl && !attachment.uploading && (
+            <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Fallback to original behavior if no siteImageUrl
     if (attachment.uploading) {
       return (
         <div className="flex flex-col items-center justify-center h-full space-y-1">
@@ -401,8 +580,12 @@ export function CreateReportDialog({
 
     setLoading(true)
     try {
-      // Find the selected job order data
-      const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
+      // Use the detailed job order data if available, otherwise fall back to list data
+      const selectedJobOrder = selectedJobOrderDetails ||
+        (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+
+      // If no job order is selected but we have product-associated job order data, use that
+      const effectiveJobOrder = selectedJobOrder || selectedJobOrderDetails
 
       // Build the report data
       console.log("Building report data with product:", product)
@@ -420,10 +603,10 @@ export function CreateReportDialog({
         siteName: siteName,
         companyId: userData?.company_id || projectData?.project_id || userData?.project_id || "",
         sellerId: product.seller_id || user.uid,
-        client: selectedJobOrder?.clientCompany || "No Client",
-        clientId: selectedJobOrder?.clientName || "no-client-id",
-        joNumber: selectedJO === "none" ? undefined : selectedJO,
-        joType: selectedJobOrder?.joType || "General",
+        client: effectiveJobOrder?.clientCompany || "No Client",
+        clientId: effectiveJobOrder?.clientName || "no-client-id",
+        joNumber: selectedJO === "none" ? (effectiveJobOrder?.joNumber || undefined) : selectedJO,
+        joType: effectiveJobOrder?.joType || "General",
         bookingDates: {
           start: date,
           end: date,
@@ -448,8 +631,13 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+        siteImageUrl: effectiveJobOrder?.siteImageUrl || undefined,
       }
       console.log("Built report data with siteName:", reportData.siteName)
+      console.log("Report siteImageUrl:", reportData.siteImageUrl)
+      console.log("Selected job order:", selectedJobOrder)
+      console.log("Effective job order:", effectiveJobOrder)
+      console.log("Selected job order details:", selectedJobOrderDetails)
 
       // Add product information
       reportData.product = {
@@ -790,7 +978,7 @@ export function CreateReportDialog({
               <X className="h-6 w-6" />
             </button>
 
-            {previewModal.file && previewModal.file.type.startsWith("image/") && previewModal.preview && (
+            {previewModal.preview && (
               <img
                 src={previewModal.preview || "/placeholder.svg"}
                 alt="Preview"
