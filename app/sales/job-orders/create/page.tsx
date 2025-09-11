@@ -274,62 +274,20 @@ export default function CreateJobOrderPage() {
         setUrlState(downloadURL)
         setFileState(file)
 
-        // If client_company_id is available, update the client_company document
-        if (quotationData?.quotation?.client_company_id && fieldToUpdate) {
-          let complianceFieldKey: "dti" | "gis" | "id" | undefined
-
-          if (fieldToUpdate === "dti_bir_2303_url") {
-            complianceFieldKey = "dti"
-          } else if (fieldToUpdate === "gis_url") {
-            complianceFieldKey = "gis"
-          } else if (fieldToUpdate === "id_signature_url") {
-            complianceFieldKey = "id"
-          }
-
-           if (complianceFieldKey) {
-            // Construct the current compliance state from the client object (which holds merged data)
-            const currentClientCompliance: Partial<ClientCompany["compliance"]> = {
-              dti: quotationData.client?.compliance?.dti || null,
-              gis: quotationData.client?.compliance?.gis || null,
-              id: quotationData.client?.compliance?.id || null,
-            }
- 
-             try {
-              await updateClientCompany(quotationData.quotation.client_company_id, {
-                compliance: {
-                  ...currentClientCompliance, // Preserve existing compliance fields
-                  [complianceFieldKey]: downloadURL, // Update the specific field
-                },
-              })
-              toast({
-                title: "Client Company Document Updated",
-                description: `Client company's ${fieldToUpdate} updated successfully.`,
-              })
-            } catch (updateError: any) {
-              console.error("Error during updateClientCompany:", updateError);
-              toast({
-                title: "Update Failed",
-                description: `Failed to update client company compliance: ${updateError.message || "Unknown error"}.`,
-                variant: "destructive",
-              })
-            }
-           } else {
-             console.warn(`Unknown compliance field to update: ${fieldToUpdate}`)
-             toast({
-               title: "Update Failed",
-               description: `Could not update client company compliance for unknown field: ${fieldToUpdate}.`,
-               variant: "destructive",
-             })
-           }
-         } else if (quotationId && fieldToUpdate) {
-           // Handle project compliance updates for the quotation document
-           let projectComplianceFieldKey:
-             | "signedQuotation"
-             | "signedContract"
-             | "poMo"
-             | "finalArtwork"
-             | "paymentAsDeposit"
-             | undefined
+        // Prioritize updating client company compliance if clientId and a recognized fieldToUpdate are present
+        // Handle project compliance updates for quotation documents
+        if (quotationId && fieldToUpdate && (fieldToUpdate === "signedQuotation" || fieldToUpdate === "signedContract" || fieldToUpdate === "poMo" || fieldToUpdate === "finalArtwork" || fieldToUpdate === "paymentAsDeposit" )) {
+          console.log("handleFileUpload: Attempting to update project compliance for quotation.");
+          console.log("handleFileUpload: quotationId:", quotationId);
+          console.log("handleFileUpload: fieldToUpdate:", fieldToUpdate);
+          // Handle project compliance updates for the quotation document
+          let projectComplianceFieldKey:
+            | "signedQuotation"
+            | "signedContract"
+            | "poMo"
+            | "finalArtwork"
+            | "paymentAsDeposit"
+            | undefined;
 
           if (fieldToUpdate === "signedQuotation") {
             projectComplianceFieldKey = "signedQuotation"
@@ -344,15 +302,58 @@ export default function CreateJobOrderPage() {
           }
 
           if (projectComplianceFieldKey) {
-            const defaultProjectComplianceItem: ProjectComplianceItem = { completed: false, fileName: null, fileUrl: null, notes: null, uploadedAt: null, uploadedBy: null, status: "pending" }
-
-            const currentProjectCompliance: Quotation["projectCompliance"] = {
-              finalArtwork: quotationData?.quotation?.projectCompliance?.finalArtwork || defaultProjectComplianceItem,
-              paymentAsDeposit: quotationData?.quotation?.projectCompliance?.paymentAsDeposit || defaultProjectComplianceItem,
-              poMo: quotationData?.quotation?.projectCompliance?.poMo || defaultProjectComplianceItem,
-              signedContract: quotationData?.quotation?.projectCompliance?.signedContract || defaultProjectComplianceItem,
-              signedQuotation: quotationData?.quotation?.projectCompliance?.signedQuotation || defaultProjectComplianceItem,
+            // Get the current project compliance from quotation data or use empty object with proper typing
+            const currentProjectCompliance = quotationData?.quotation?.projectCompliance || {
+              finalArtwork: {
+                completed: false,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: null,
+                uploadedBy: null,
+                status: "pending"
+              },
+              paymentAsDeposit: {
+                completed: false,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: null,
+                uploadedBy: null,
+                status: "pending"
+              },
+              poMo: {
+                completed: false,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: null,
+                uploadedBy: null,
+                status: "pending"
+              },
+              signedContract: {
+                completed: false,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: null,
+                uploadedBy: null,
+                status: "pending"
+              },
+              signedQuotation: {
+                completed: false,
+                fileName: null,
+                fileUrl: null,
+                notes: null,
+                uploadedAt: null,
+                uploadedBy: null,
+                status: "pending"
+              },
             }
+
+            // Get the existing field data with proper type safety
+            const existingField = currentProjectCompliance[projectComplianceFieldKey]
+            const existingFieldData = existingField
 
             await updateQuotation(
               quotationId,
@@ -360,7 +361,16 @@ export default function CreateJobOrderPage() {
                 projectCompliance: {
                   ...currentProjectCompliance, // Spread the fully initialized object
                   [projectComplianceFieldKey]: {
-                    ...(currentProjectCompliance[projectComplianceFieldKey as keyof Quotation["projectCompliance"]] as ProjectComplianceItem), // Now this will always be an object
+                    // Preserve existing field data if it exists, otherwise create new object with defaults
+                    ...(existingFieldData || {
+                      completed: false,
+                      fileName: null,
+                      fileUrl: null,
+                      notes: null,
+                      uploadedAt: null,
+                      uploadedBy: null,
+                      status: "pending"
+                    }),
                     completed: true,
                     fileName: file.name,
                     fileUrl: downloadURL,
@@ -384,6 +394,51 @@ export default function CreateJobOrderPage() {
               description: `Could not update project compliance for unknown field: ${fieldToUpdate}.`,
               variant: "destructive",
             })
+          }
+        } else if (clientId && (fieldToUpdate === "dti_bir_2303_url" || fieldToUpdate === "gis_url" || fieldToUpdate === "id_signature_url")) {
+          // Handle client company compliance updates
+          const clientCompanyId = clientId; // Use the clientId passed as a parameter
+          const existingClientCompany = await getClientCompanyById(clientCompanyId);
+          console.log("Existing client company document:", existingClientCompany);
+          const existingCompliance = existingClientCompany?.compliance || {};
+          console.log("Existing compliance:", existingCompliance);
+ 
+          let complianceFieldKey: "dti" | "gis" | "id" | undefined;
+
+          if (fieldToUpdate === "dti_bir_2303_url") {
+            complianceFieldKey = "dti";
+          } else if (fieldToUpdate === "gis_url") {
+            complianceFieldKey = "gis";
+          } else if (fieldToUpdate === "id_signature_url") {
+            complianceFieldKey = "id";
+          }
+
+          if (complianceFieldKey) {
+            const updatedCompliance = {
+              ...existingCompliance, // Preserve existing compliance fields from the fetched document
+              [complianceFieldKey]: downloadURL, // Update the specific field
+            };
+            console.log("Updated compliance object:", updatedCompliance);
+            console.log("client company ID used for update:", clientCompanyId);
+            try {
+              await updateClientCompany(clientCompanyId, { // Use clientCompanyId here
+                compliance: updatedCompliance,
+              });
+              toast({
+                title: "Client Company Document Updated",
+                description: `Client company's ${fieldToUpdate} updated successfully.`,
+              });
+            } catch (updateError: any) {
+              console.error("Error during updateClientCompany:", updateError);
+              toast({
+                title: "Update Failed",
+                description: `Failed to update client company compliance: ${updateError.message || "Unknown error"}.`,
+                variant: "destructive",
+              });
+            }
+          } else {
+            // This else block should ideally not be reached if the outer if condition is met
+            console.warn(`handleFileUpload: Unexpected: complianceFieldKey not identified for fieldToUpdate: ${fieldToUpdate}`);
           }
         } else if (clientId && fieldToUpdate) {
           // Fallback to updating the individual client document if no client_company_id
@@ -410,7 +465,7 @@ export default function CreateJobOrderPage() {
         setUploadingState(false)
       }
     },
-    [toast],
+    [quotationData, quotationId, toast, user?.uid, userData?.first_name],
   )
 
   const handleFormUpdate = useCallback((productIndex: number, field: keyof JobOrderFormData, value: any) => {
@@ -574,7 +629,7 @@ export default function CreateJobOrderPage() {
                 notes: null,
                 uploadedAt: signedQuotationUrl ? new Date().toISOString() : null,
                 uploadedBy: user?.uid || null,
-                status: signedQuotationUrl ? "completed" : "pending",
+                status: (signedQuotationUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               signedContract: {
                 completed: !!signedContractUrl,
@@ -583,7 +638,7 @@ export default function CreateJobOrderPage() {
                 notes: null,
                 uploadedAt: signedContractUrl ? new Date().toISOString() : null,
                 uploadedBy: user?.uid || null,
-                status: signedContractUrl ? "completed" : "pending",
+                status: (signedContractUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               poMo: {
                 completed: !!poMoUrl,
@@ -592,7 +647,7 @@ export default function CreateJobOrderPage() {
                 notes: null,
                 uploadedAt: poMoUrl ? new Date().toISOString() : null,
                 uploadedBy: user?.uid || null,
-                status: poMoUrl ? "completed" : "pending",
+                status: (poMoUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               finalArtwork: {
                 completed: !!finalArtworkUrl,
@@ -601,7 +656,7 @@ export default function CreateJobOrderPage() {
                 notes: null,
                 uploadedAt: finalArtworkUrl ? new Date().toISOString() : null,
                 uploadedBy: user?.uid || null,
-                status: finalArtworkUrl ? "completed" : "pending",
+                status: (finalArtworkUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               paymentAsDeposit: {
                 completed: paymentAdvanceConfirmed,
@@ -610,7 +665,7 @@ export default function CreateJobOrderPage() {
                 notes: null,
                 uploadedAt: paymentAdvanceConfirmed ? new Date().toISOString() : null,
                 uploadedBy: user?.uid || null,
-                status: paymentAdvanceConfirmed ? "completed" : "pending",
+                status: (paymentAdvanceConfirmed ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
             },
           },
@@ -674,9 +729,13 @@ export default function CreateJobOrderPage() {
         const data = await getQuotationDetailsForJobOrder(quotationId)
         if (data) {
           setQuotationData(data)
-          // Fetch the client_company document using the client_company_id from the quotation
-          if (data.quotation.client_company_id) {
-            const clientCompanyDoc = await getClientCompanyById(data.quotation.client_company_id)
+          console.log("Fetched quotation data:", data);
+          console.log("quotationData.quotation.client_company_id:", data.quotation.client_company_id);
+          console.log("quotationData.client?.id (expected client id):", data.client?.id);
+
+          // Fetch the client_company document using the client id from the client object
+          if (data.quotation.client_company_id) { // Use data.client?.id here
+            const clientCompanyDoc = await getClientCompanyById(data.quotation.client_company_id) // Use data.client.id here
             if (clientCompanyDoc) {
               // Use clientCompanyDoc data to set compliance URLs
               if (clientCompanyDoc.compliance?.dti) {
@@ -689,7 +748,7 @@ export default function CreateJobOrderPage() {
                 setIdSignatureUrl(clientCompanyDoc.compliance.id)
               }
             } else {
-              console.warn(`Client company with ID ${data.quotation.client_company_id} not found.`)
+              console.warn(`Client company with ID ${data.quotation.client_company_id} not found.`) // Use data.client.id here
               // If clientCompanyDoc is not found, and data.client exists, try to set from data.client's direct compliance fields
               if (data.client) {
                 if (data.client.dti_bir_2303_url) {
@@ -704,7 +763,7 @@ export default function CreateJobOrderPage() {
               }
             }
           } else {
-            // If no client_company_id, and data.client exists, try to set from data.client's direct compliance fields
+            // If no client id from data.client, and data.client exists, try to set from data.client's direct compliance fields
             if (data.client) {
               if (data.client.dti_bir_2303_url) {
                 setDtiBirUrl(data.client.dti_bir_2303_url)
@@ -914,7 +973,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    DTI/BIR 2303.pdf
+                    DTI/BIR 2303
                   </a>
                 ) : (
                   <input
@@ -924,17 +983,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setDtiBirFile,
-                          setDtiBirUrl,
-                          setUploadingDtiBir,
-                          setDtiBirError,
-                          "documents/client-compliance/dti-bir/",
-                          quotationData.client?.id, // Pass client company ID
-                          "dti_bir_2303_url", // Field to update
-                        )
+                        if (quotationData?.quotation.client_company_id) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setDtiBirFile,
+                            setDtiBirUrl,
+                            setUploadingDtiBir,
+                            setDtiBirError,
+                            "documents/client-compliance/dti-bir/",
+                            quotationData.quotation.client_company_id, // Pass client ID
+                            "dti_bir_2303_url", // Field to update
+                          )
+                        }
                       }
                     }}
                   />
@@ -982,7 +1043,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    GIS.pdf
+                    JMCL GIS.pdf
                   </a>
                 ) : (
                   <input
@@ -992,17 +1053,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setGisFile,
-                          setGisUrl,
-                          setUploadingGis,
-                          setGisError,
-                          "documents/client-compliance/gis/",
-                          quotationData.client?.id, // Pass client company ID
-                          "gis_url", // Field to update
-                        )
+                        if (quotationData?.quotation.client_company_id) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setGisFile,
+                            setGisUrl,
+                            setUploadingGis,
+                            setGisError,
+                            "documents/client-compliance/gis/",
+                            quotationData.quotation.client_company_id, // Pass client ID
+                            "gis_url", // Field to update
+                          )
+                        }
                       }
                     }}
                   />
@@ -1050,7 +1113,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    ID_with_Signature.pdf
+                    Jalvin_Castro_PRC.pdf
                   </a>
                 ) : (
                   <input
@@ -1060,17 +1123,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setIdSignatureFile,
-                          setIdSignatureUrl,
-                          setUploadingIdSignature,
-                          setIdSignatureError,
-                          "documents/client-compliance/id-signature/",
-                          quotationData.client?.id, // Pass client company ID
-                          "id_signature_url", // Field to update
-                        )
+                        if (quotationData?.quotation.client_company_id) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setIdSignatureFile,
+                            setIdSignatureUrl,
+                            setUploadingIdSignature,
+                            setIdSignatureError,
+                            "documents/client-compliance/id-signature/",
+                            quotationData.quotation.client_company_id, // Pass client ID
+                            "id_signature_url", // Field to update
+                          )
+                        }
                       }
                     }}
                   />
@@ -1123,7 +1188,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    Quotation_Fairyskin.jpeg
+                    Signed_Quotation
                   </a>
                 ) : (
                   <input
@@ -1133,15 +1198,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setSignedQuotationFile,
-                          setSignedQuotationUrl,
-                          setUploadingSignedQuotation,
-                          setSignedQuotationError,
-                          "documents/signed-quotations/",
-                        )
+                        if (quotationId) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setSignedQuotationFile,
+                            setSignedQuotationUrl,
+                            setUploadingSignedQuotation,
+                            setSignedQuotationError,
+                            "documents/signed-quotations/",
+                            quotationId,
+                            "signedQuotation",
+                          )
+                        }
                       }
                     }}
                   />
@@ -1183,7 +1252,14 @@ export default function CreateJobOrderPage() {
                   Signed Contract
                 </Label>
                 {signedContractUrl && (
-                  <span className="text-xs text-gray-600 truncate max-w-[150px]">SignedContract.pdf</span>
+                  <a
+                    href={signedContractUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
+                  >
+                    Signed_Contract
+                  </a>
                 )}
                 <input
                   type="file"
@@ -1192,15 +1268,19 @@ export default function CreateJobOrderPage() {
                   className="hidden"
                   onChange={(event) => {
                     if (event.target.files && event.target.files[0]) {
-                      handleFileUpload(
-                        event.target.files[0],
-                        "document",
-                        setSignedContractFile,
-                        setSignedContractUrl,
-                        setUploadingSignedContract,
-                        setSignedContractError,
-                        "documents/signed-contracts/",
-                      )
+                      if (quotationId) {
+                        handleFileUpload(
+                          event.target.files[0],
+                          "document",
+                          setSignedContractFile,
+                          setSignedContractUrl,
+                          setUploadingSignedContract,
+                          setSignedContractError,
+                          "documents/signed-contracts/",
+                          quotationId,
+                          "signedContract",
+                        )
+                      }
                     }
                   }}
                 />
@@ -1247,7 +1327,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    PO_MO.pdf
+                    PO_MO
                   </a>
                 ) : (
                   <input
@@ -1257,15 +1337,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setPoMoFile,
-                          setPoMoUrl,
-                          setUploadingPoMo,
-                          setPoMoError,
-                          "documents/po-mo/",
-                        )
+                        if (quotationId) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setPoMoFile,
+                            setPoMoUrl,
+                            setUploadingPoMo,
+                            setPoMoError,
+                            "documents/po-mo/",
+                            quotationId,
+                            "poMo",
+                          )
+                        }
                       }
                     }}
                   />
@@ -1313,7 +1397,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    FinalArtwork.jpeg
+                    FinalArtwork
                   </a>
                 ) : (
                   <input
@@ -1323,15 +1407,19 @@ export default function CreateJobOrderPage() {
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setFinalArtworkFile,
-                          setFinalArtworkUrl,
-                          setUploadingFinalArtwork,
-                          setFinalArtworkError,
-                          "documents/final-artwork/",
-                        )
+                        if (quotationId) {
+                          handleFileUpload(
+                            event.target.files[0],
+                            "document",
+                            setFinalArtworkFile,
+                            setFinalArtworkUrl,
+                            setUploadingFinalArtwork,
+                            setFinalArtworkError,
+                            "documents/final-artwork/",
+                            quotationId,
+                            "finalArtwork",
+                          )
+                        }
                       }
                     }}
                   />
@@ -1374,6 +1462,7 @@ export default function CreateJobOrderPage() {
                 </Label>
                 <span className="text-xs text-gray-500">For Treasury's confirmation</span>
               </div>
+
             </div>
           </div>
         </div>
