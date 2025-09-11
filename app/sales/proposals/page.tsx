@@ -28,11 +28,12 @@ import {
   Calculator,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getProposalsByUserId } from "@/lib/proposal-service"
+import { getPaginatedProposalsByUserId, getProposalsCountByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Pagination } from "@/components/ui/pagination"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -41,6 +42,11 @@ function ProposalsPageContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lastDoc, setLastDoc] = useState<any>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const itemsPerPage = 10
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -49,13 +55,15 @@ function ProposalsPageContent() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadProposals()
+      loadProposals(1, true) // Reset to first page when user changes
     }
   }, [user])
 
   useEffect(() => {
-    filterProposals()
-  }, [proposals, searchTerm, statusFilter])
+    if (user?.uid) {
+      loadProposals(1, true) // Reset to first page when search/filter changes
+    }
+  }, [searchTerm, statusFilter])
 
   useEffect(() => {
     const success = searchParams.get("success")
@@ -67,13 +75,33 @@ function ProposalsPageContent() {
     }
   }, [searchParams])
 
-  const loadProposals = async () => {
+  const loadProposals = async (page = 1, resetLastDoc = true) => {
     if (!user?.uid) return
 
     setLoading(true)
     try {
-      const userProposals = await getProposalsByUserId(user.uid)
-      setProposals(userProposals)
+      const lastDocToUse = resetLastDoc ? null : lastDoc
+      const result = await getPaginatedProposalsByUserId(
+        user.uid,
+        itemsPerPage,
+        lastDocToUse,
+        searchTerm,
+        statusFilter === "all" ? null : statusFilter
+      )
+
+      setProposals(result.items)
+      setFilteredProposals(result.items)
+      setLastDoc(result.lastDoc)
+      setHasMore(result.hasMore)
+      setCurrentPage(page)
+
+      // Get total count for display
+      const count = await getProposalsCountByUserId(
+        user.uid,
+        searchTerm,
+        statusFilter === "all" ? null : statusFilter
+      )
+      setTotalCount(count)
     } catch (error) {
       console.error("Error loading proposals:", error)
     } finally {
@@ -81,22 +109,19 @@ function ProposalsPageContent() {
     }
   }
 
-  const filterProposals = () => {
-    let filtered = proposals
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (proposal) =>
-          proposal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          proposal.client.company.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+  const handleNextPage = () => {
+    if (hasMore) {
+      loadProposals(currentPage + 1, false)
     }
+  }
 
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((proposal) => proposal.status === statusFilter)
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      // For previous page, we need to reset and load from the beginning
+      // This is a limitation of Firestore cursor-based pagination
+      setLastDoc(null)
+      loadProposals(currentPage - 1, true)
     }
-
-    setFilteredProposals(filtered)
   }
 
   const getStatusConfig = (status: Proposal["status"]) => {
@@ -365,6 +390,18 @@ function ProposalsPageContent() {
               </TableBody>
             </Table>
           </Card>
+        )}
+
+        {/* Pagination */}
+        {!loading && filteredProposals.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={filteredProposals.length}
+            onNextPage={handleNextPage}
+            onPreviousPage={handlePreviousPage}
+            hasMore={hasMore}
+          />
         )}
       </div>
 
