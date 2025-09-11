@@ -28,6 +28,11 @@ interface Booking {
   product_id?: string
   product_owner?: string
   client_name?: string
+  client_company_name?: string
+  client?: {
+    name?: string
+    company_name?: string
+  }
   start_date?: any
   end_date?: any
   status?: string
@@ -267,6 +272,9 @@ export default function ReservationsPage() {
       return (
         siteCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         booking.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        booking.client_company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        booking.client?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        booking.client?.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         booking.status?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     })
@@ -639,7 +647,21 @@ export default function ReservationsPage() {
                     >
                       <TableCell className="font-medium text-sm font-mono">{booking.reservation_id || "N/A"}</TableCell>
                       <TableCell className="font-medium">{booking.product_name || "-"}</TableCell>
-                      <TableCell>{booking.client_name || "N/A"}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const companyName = booking.client_company_name || booking.client?.company_name || "";
+                          const clientName = booking.client_name || booking.client?.name || "";
+                          if (companyName && clientName) {
+                            return `${companyName} - ${clientName}`;
+                          } else if (companyName) {
+                            return companyName;
+                          } else if (clientName) {
+                            return clientName;
+                          } else {
+                            return "N/A";
+                          }
+                        })()}
+                      </TableCell>
                       <TableCell>{formatDate(booking.start_date)}</TableCell>
                       <TableCell>{formatDate(booking.end_date)}</TableCell>
                       <TableCell>{calculateDuration(booking.start_date, booking.end_date)}</TableCell>
@@ -659,7 +681,10 @@ export default function ReservationsPage() {
                         <div className="space-y-2">
                           <div
                             className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => toggleComplianceExpansion(booking.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleComplianceExpansion(booking.id);
+                            }}
                           >
                             <span className="font-medium">
                               {compliance.completed}/{compliance.total}
@@ -725,8 +750,8 @@ export default function ReservationsPage() {
                                             variant="outline"
                                             className="h-6 px-2 text-xs bg-transparent"
                                             onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(booking.id, item.key)
+                                              e.stopPropagation();
+                                              triggerFileUpload(booking.id, item.key);
                                             }}
                                             disabled={isUploading}
                                           >
@@ -833,13 +858,30 @@ export default function ReservationsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleCreateJobOrder(booking)} disabled={isCreatingJobOrder}>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCreateJobOrder(booking);
+                              }}
+                              disabled={isCreatingJobOrder}
+                            >
                               {isCreatingJobOrder ? "Creating JO..." : "Create JO"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCreateReport(booking.product_id || "")} disabled={isCreatingReport}>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCreateReport(booking.product_id || "");
+                              }}
+                              disabled={isCreatingReport}
+                            >
                               {isCreatingReport ? "Creating Report..." : "Create Report"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Cancel
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

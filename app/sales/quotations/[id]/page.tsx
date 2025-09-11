@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, use } from "react"
 import type React from "react"
 
 import { useRouter } from "next/navigation"
@@ -12,7 +12,7 @@ import {
   updateQuotation,
   getQuotationsByProductIdAndCompanyId,
 } from "@/lib/quotation-service"
-import type { Quotation, QuotationLineItem } from "@/lib/types/quotation"
+import type { Quotation, QuotationProduct } from "@/lib/types/quotation"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -152,8 +152,8 @@ const formatCurrency = (amount: number | string | undefined | null) => {
   return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export default function QuotationPage({ params }: { params: { id: string } }) {
-  const { id: quotationId } = params
+export default function QuotationPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: quotationId } = use(params)
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
@@ -281,12 +281,12 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
   }
 
   const fetchQuotationHistory = useCallback(async () => {
-    if (!quotation?.items?.[0]?.id || !quotation?.items?.[0]?.company_id) return
+    if (!quotation?.items?.[0]?.id || !quotation?.company_id) return
 
     setLoadingHistory(true)
     try {
       const productId = quotation.items[0].id
-      const companyId = quotation.items[0].company_id
+      const companyId = quotation.company_id
       const history = await getQuotationsByProductIdAndCompanyId(productId, companyId)
       // Filter out current quotation from history
       const filteredHistory = history.filter((q) => q.id !== quotation.id)
@@ -296,7 +296,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
     } finally {
       setLoadingHistory(false)
     }
-  }, [quotation?.items?.[0]?.id, quotation?.items?.[0]?.company_id, quotation?.id])
+  }, [quotation?.items?.[0]?.id, quotation?.company_id, quotation?.id])
 
   const fetchCompanyData = useCallback(async () => {
     if (!user || !userData) {
@@ -343,18 +343,7 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
           setQuotation(q)
           setEditableQuotation({ ...q }) // Create proper deep copy
 
-          console.log("[v0] Current quotation page_id:", q.page_id)
-
-          if (q.page_id) {
-            const relatedQs = await getQuotationsByPageId(q.page_id)
-            console.log("[v0] Related quotations found:", relatedQs.length, relatedQs)
-            setRelatedQuotations(relatedQs)
-            const currentIndex = relatedQs.findIndex((rq) => rq.id === q.id)
-            console.log("[v0] Current page index:", currentIndex)
-            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
-          } else {
-            console.log("[v0] No page_id found for this quotation")
-          }
+          console.log("[v0] Current quotation proposalId:", q.proposalId)
 
           if (q.proposalId) {
             const linkedProposal = await getProposal(q.proposalId)
@@ -401,9 +390,9 @@ export default function QuotationPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {
-      setEmailSubject(`Quotation: ${quotation.title || "Custom Quotation"} - OH Plus`) // Updated subject
+      setEmailSubject(`Quotation: ${quotation.quotation_number || "Custom Quotation"} - OH Plus`) // Updated subject
       setEmailBody(
-        `Dear ${quotation.client?.contactPerson || quotation.client?.company || "Valued Client"},
+        `Dear ${quotation.client_name || "Valued Client"},
 
 We are pleased to provide you with a detailed quotation for your advertising campaign. Please find the full quotation attached and accessible via the link below.
 
@@ -461,7 +450,7 @@ The OH Plus Team`,
       console.log("[v0] Saving changes:", editableQuotation)
 
       await updateQuotation(
-        editableQuotation.id,
+        editableQuotation.id!,
         editableQuotation,
         editableQuotation.created_by || "system",
         `${editableQuotation.created_by_first_name || "User"} ${editableQuotation.created_by_last_name || ""}`,
@@ -625,7 +614,7 @@ The OH Plus Team`,
     }
   }
 
-  const renderQuotationBlock = (siteName: string, items: QuotationLineItem[], pageNumber: number) => {
+  const renderQuotationBlock = (siteName: string, items: QuotationProduct[], pageNumber: number) => {
     const currentQuotation = editableQuotation || quotation
     if (!currentQuotation) return null
 
@@ -680,30 +669,7 @@ The OH Plus Team`,
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Size</span>
             <span className="text-gray-700">: </span>
-            {isEditing && editingField === "size" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="text"
-                  value={tempValues.size || ""}
-                  onChange={(e) => updateTempValues("size", e.target.value)}
-                  className="w-48 h-6 text-sm"
-                  placeholder={currentQuotation?.size || "100ft (H) x 60ft (W)"}
-                />
-              </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("size", currentQuotation?.size || "")}
-                title={isEditing ? "Click to edit size" : ""}
-              >
-                {currentQuotation?.size || "100ft (H) x 60ft (W)"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
+            <span className="text-gray-700">100ft (H) x 60ft (W)</span>
           </div>
 
           <div className="flex items-center">
@@ -773,9 +739,9 @@ The OH Plus Team`,
                 }
                 title={isEditing ? "Click to edit contract period" : ""}
               >
-                {currentQuotation?.start_date ? format(new Date(currentQuotation.start_date), "MMMM d, yyyy") : ""}
+                {currentQuotation?.start_date ? formatDate(currentQuotation.start_date) : ""}
                 {currentQuotation?.start_date && currentQuotation?.end_date ? " - " : ""}
-                {currentQuotation?.end_date ? format(new Date(currentQuotation.end_date), "MMMM d, yyyy") : ""}
+                {currentQuotation?.end_date ? formatDate(currentQuotation.end_date) : ""}
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
@@ -891,68 +857,15 @@ The OH Plus Team`,
         <div className="grid grid-cols-2 gap-8 mb-8">
           <div className="text-left">
             <p className="mb-16">Very truly yours,</p>
-            {isEditing && (editingField === "signature_name" || editingField === "signature_position") ? (
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  value={tempValues.signature_first_name || ""}
-                  onChange={(e) => updateTempValues("signature_first_name", e.target.value)}
-                  className="w-48 h-6 text-sm"
-                  placeholder={
-                    currentQuotation?.signature_first_name || currentQuotation?.created_by_first_name || "AIX"
-                  }
-                />
-                <Input
-                  type="text"
-                  value={tempValues.signature_last_name || ""}
-                  onChange={(e) => updateTempValues("signature_last_name", e.target.value)}
-                  className="w-48 h-6 text-sm"
-                  placeholder={
-                    currentQuotation?.signature_last_name || currentQuotation?.created_by_last_name || "Xymbiosis"
-                  }
-                />
-                <Input
-                  type="text"
-                  value={tempValues.signature_position || ""}
-                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
-                  className="w-48 h-6 text-sm"
-                  placeholder={currentQuotation?.signature_position || currentQuotation?.position || "Position"}
-                />
-              </div>
-            ) : (
-              <div>
-                <div className="border-b border-gray-400 w-48 mb-2"></div>
-                <p
-                  className={`font-medium ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                      : ""
-                  }`}
-                  onClick={() => isEditing && handleFieldEdit("signature_name", currentQuotation?.signature_name || "")}
-                  title={isEditing ? "Click to edit name" : ""}
-                >
-                  {currentQuotation?.signature_first_name && currentQuotation?.signature_last_name
-                    ? `${currentQuotation.signature_first_name} ${currentQuotation.signature_last_name}`
-                    : currentQuotation?.signature_name ||
-                      `${currentQuotation?.created_by_first_name || "AIX"} ${currentQuotation?.created_by_last_name || "Xymbiosis"}`}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
-                <p
-                  className={`text-sm ${
-                    isEditing
-                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")
-                  }
-                  title={isEditing ? "Click to edit position" : ""}
-                >
-                  {currentQuotation?.signature_position || currentQuotation?.position || "Position"}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
-              </div>
-            )}
+            <div>
+              <div className="border-b border-gray-400 w-48 mb-2"></div>
+              <p className="font-medium">
+                {currentQuotation?.created_by_first_name && currentQuotation?.created_by_last_name
+                  ? `${currentQuotation.created_by_first_name} ${currentQuotation.created_by_last_name}`
+                  : "AIX Xymbiosis"}
+              </p>
+              <p className="text-sm">Position</p>
+            </div>
           </div>
           <div className="text-left">
             <p className="mb-16">Conforme:</p>
@@ -1026,7 +939,7 @@ The OH Plus Team`,
   const handleEmailClick = () => {
     setIsSendOptionsDialogOpen(false)
     // Navigate to compose email page like the current implementation
-    router.push(`/sales/quotations/${params.id}/compose-email`)
+    router.push(`/sales/quotations/${quotationId}/compose-email`)
   }
 
   return (
@@ -1180,7 +1093,7 @@ The OH Plus Team`,
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
-                      {historyItem.quotation_number || historyItem.id.slice(-8)}
+                      {historyItem.quotation_number || historyItem.id?.slice(-8) || "N/A"}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
                       PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)}
@@ -1330,7 +1243,11 @@ The OH Plus Team`,
             <DialogTitle>Quotation Activity Timeline</DialogTitle>
             <DialogDescription>Track all activities and changes for this quotation.</DialogDescription>
           </DialogHeader>
-          <ProposalActivityTimeline activities={activities} />
+          <ProposalActivityTimeline
+            proposalId={quotationId}
+            currentUserId={user?.uid || ""}
+            currentUserName={`${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || "User"}
+          />
         </DialogContent>
       </Dialog>
 
@@ -1438,9 +1355,9 @@ The OH Plus Team`,
 
       {/* Quotation Sent Success Dialog */}
       <QuotationSentSuccessDialog
-        open={showSuccessDialog}
-        onOpenChange={setShowSuccessDialog}
-        clientName={quotation?.client?.name || "Client"}
+        isOpen={showSuccessDialog}
+        onClose={() => setShowSuccessDialog(false)}
+        clientName={quotation?.client_name || "Client"}
       />
     </div>
   )

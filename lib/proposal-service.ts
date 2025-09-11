@@ -489,7 +489,7 @@ export function generateProposalPDFData(proposal: Proposal) {
 export async function getProposal(id: string) {
   // Implementation for getting a proposal
   console.log("Getting proposal:", id)
-  return { id: id, title: "Fake Proposal", description: "This is a fake proposal." }
+  return await getProposalById(id)
 }
 
 // Removed the old placeholder updateProposal
