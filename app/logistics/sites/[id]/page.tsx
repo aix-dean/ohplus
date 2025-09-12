@@ -1,6 +1,6 @@
 "use client"
 
-import { getProductById, uploadFileToFirebaseStorage, updateProduct } from "@/lib/firebase-service"
+import { getProductById, uploadFileToFirebaseStorage, updateProduct, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 
 // Global type declarations for Google Maps
 declare global {
@@ -42,6 +42,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { collection, query, where, orderBy, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
@@ -214,8 +215,12 @@ interface ServiceAssignment {
   message: string
   coveredDateStart: any
   coveredDateEnd: any
+  alarmDate: any
+  alarmTime: string
+  attachments: { name: string; type: string }[]
   status: string
   created: any
+  updated: any
 }
 
 export default function SiteDetailsPage({ params }: Props) {
@@ -245,6 +250,9 @@ export default function SiteDetailsPage({ params }: Props) {
     contractor: '',
     condition: ''
   })
+  const [maintenanceHistoryDialogOpen, setMaintenanceHistoryDialogOpen] = useState(false)
+  const [maintenanceHistory, setMaintenanceHistory] = useState<ServiceAssignment[]>([])
+  const [maintenanceHistoryLoading, setMaintenanceHistoryLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
@@ -454,6 +462,26 @@ export default function SiteDetailsPage({ params }: Props) {
     }
   }
 
+  const fetchMaintenanceHistory = async () => {
+    if (!product?.id) return
+
+    setMaintenanceHistoryLoading(true)
+    try {
+      const assignments = await getServiceAssignmentsByProductId(product.id)
+      setMaintenanceHistory(assignments)
+    } catch (error) {
+      console.error('Error fetching maintenance history:', error)
+      setMaintenanceHistory([])
+    } finally {
+      setMaintenanceHistoryLoading(false)
+    }
+  }
+
+  const handleViewHistory = () => {
+    setMaintenanceHistoryDialogOpen(true)
+    fetchMaintenanceHistory()
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto py-4">
@@ -540,7 +568,19 @@ export default function SiteDetailsPage({ params }: Props) {
               <Link href="/logistics/dashboard" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mr-2">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
-              <h2 className="text-lg font-semibold">Site Information</h2>
+              <h2
+                className="text-lg"
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 600,
+                  fontSize: '24px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#000000'
+                }}
+              >
+                Site Information
+              </h2>
             </div>
             {/* Site Image and Map */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
@@ -567,7 +607,18 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Site Details */}
             <div className="space-y-2">
               <h2 className="text-gray-500 text-sm">{product.site_code || product.id}</h2>
-              <h3 className="font-bold text-xl">{product.name}</h3>
+              <h3
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 700,
+                  fontSize: '28px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#000000'
+                }}
+              >
+                {product.name}
+              </h3>
               <Button variant="outline" className="mt-2 w-[440px] h-[47px]">
                 <Calendar className="mr-2 h-4 w-4" />
                 Site Calendar
@@ -575,29 +626,212 @@ export default function SiteDetailsPage({ params }: Props) {
 
               <div className="space-y-2 text-sm mt-4">
                 <div>
-                  <span className="font-bold">Type:</span> {isStatic ? "Static" : "Dynamic"} - Billboard
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Type:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {isStatic ? "Static" : "Dynamic"} - Billboard
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Dimension:</span> {dimension}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Dimension:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {dimension}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Location:</span> {location}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Location:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {location}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Geopoint:</span> {geopoint}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Geopoint:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {geopoint}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Site Orientation:</span>{" "}
-                  {product.specs_rental?.site_orientation || ""}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Site Orientation:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {product.specs_rental?.site_orientation || ""}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Site Owner:</span> {product.site_owner || ""}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Site Owner:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {product.site_owner || ""}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Land Owner:</span> {product.specs_rental?.land_owner || ""}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Land Owner:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {product.specs_rental?.land_owner || ""}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-bold">Partner:</span> {product.partner || ""}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#000000'
+                    }}
+                  >
+                    Partner:
+                  </span>{" "}
+                  <span
+                    style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      lineHeight: '120%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}
+                  >
+                    {product.partner || ""}
+                  </span>
                 </div>
               </div>
             </div>
@@ -606,10 +840,31 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Action Buttons */}
             <div className="border-t pt-4 space-y-2">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleCreateServiceAssignment}>
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={handleCreateServiceAssignment}
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 600,
+                  fontSize: '16px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#FFFFFF'
+                }}
+              >
                 Create Service Assignment
               </Button>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700">
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 600,
+                  fontSize: '16px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#FFFFFF'
+                }}
+              >
                 Create Report
               </Button>
             </div>
@@ -620,7 +875,19 @@ export default function SiteDetailsPage({ params }: Props) {
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Job Orders</CardTitle>
+              <CardTitle
+                className="text-lg"
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 600,
+                  fontSize: '22px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#000000'
+                }}
+              >
+                Job Orders
+              </CardTitle>
               <Button variant="outline" size="sm">
                 See All
               </Button>
@@ -657,7 +924,17 @@ export default function SiteDetailsPage({ params }: Props) {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center">
+              <CardTitle
+                className="text-lg flex items-center"
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 600,
+                  fontSize: '22px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#000000'
+                }}
+              >
                 <Sun className="h-4 w-4 mr-2" />
                 Illumination
               </CardTitle>
@@ -892,7 +1169,17 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Compliance - Always show */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center font-semibold text-[20px] leading-none tracking-normal">
+                <CardTitle
+                  className="text-base flex items-center"
+                  style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '22px',
+                    lineHeight: '120%',
+                    letterSpacing: '0%',
+                    color: '#000000'
+                  }}
+                >
                   <Shield className="h-4 w-4 mr-2" />
                   Compliance{" "}
                 </CardTitle>
@@ -901,19 +1188,63 @@ export default function SiteDetailsPage({ params }: Props) {
                 <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
                   <div className="flex items-center space-x-2">
                     <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
-                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Lease Agreement</label>
+                    <label
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '18px',
+                        lineHeight: '132%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Lease Agreement
+                    </label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
-                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Mayor’s Permit</label>
+                    <label
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '18px',
+                        lineHeight: '132%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Mayor's Permit
+                    </label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
-                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">BIR Registration</label>
+                    <label
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '18px',
+                        lineHeight: '132%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      BIR Registration
+                    </label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
-                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Structural Approval</label>
+                    <label
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '18px',
+                        lineHeight: '132%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Structural Approval
+                    </label>
                   </div>
                 </div>
               </CardContent>
@@ -952,50 +1283,93 @@ export default function SiteDetailsPage({ params }: Props) {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="space-y-4" style={{ transform: 'translateY(-30px)' }}>
+                <div className="space-y-4" style={{ transform: 'translateY(-30px) translateX(15px)' }}>
                   <div style={{
                     fontFamily: 'Inter',
                     fontWeight: 600,
-                    fontSize: '20px',
+                    fontSize: '18px',
                     lineHeight: '132%',
-                    letterSpacing: '0%'
+                    letterSpacing: '0%',
+                    color: '#000000'
                   }}>
-                    <span>Color:</span> {product.structure?.color || "Not Available"}
+                    <span>Color:</span>{" "}
+                    <span style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '18px',
+                      lineHeight: '132%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}>
+                      {product.structure?.color || "Not Available"}
+                    </span>
                   </div>
                   <div style={{
                     fontFamily: 'Inter',
                     fontWeight: 600,
-                    fontSize: '20px',
+                    fontSize: '18px',
                     lineHeight: '132%',
-                    letterSpacing: '0%'
+                    letterSpacing: '0%',
+                    color: '#000000'
                   }}>
-                    <span>Contractor:</span> {product.structure?.contractor || "Not Available"}
+                    <span>Contractor:</span>{" "}
+                    <span style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '18px',
+                      lineHeight: '132%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}>
+                      {product.structure?.contractor || "Not Available"}
+                    </span>
                   </div>
                   <div style={{
                     fontFamily: 'Inter',
                     fontWeight: 600,
-                    fontSize: '20px',
+                    fontSize: '18px',
                     lineHeight: '132%',
-                    letterSpacing: '0%'
+                    letterSpacing: '0%',
+                    color: '#000000'
                   }}>
-                    <span>Condition:</span> {product.structure?.condition || "Not Available"}
+                    <span>Condition:</span>{" "}
+                    <span style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '18px',
+                      lineHeight: '132%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}>
+                      {product.structure?.condition || "Not Available"}
+                    </span>
                   </div>
                   <div style={{
                     fontFamily: 'Inter',
                     fontWeight: 600,
-                    fontSize: '20px',
+                    fontSize: '18px',
                     lineHeight: '132%',
-                    letterSpacing: '0%'
+                    letterSpacing: '0%',
+                    color: '#000000'
                   }}>
                     <span>Last Maintenance:</span>{" "}
-                    {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
+                    <span style={{
+                      fontFamily: 'Inter',
+                      fontWeight: 400,
+                      fontSize: '18px',
+                      lineHeight: '132%',
+                      letterSpacing: '0%',
+                      color: '#333333'
+                    }}>
+                      {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
+                    </span>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setBlueprintDialogOpen(true)}>
                     View Blueprint
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={handleViewHistory}>
                     <History className="h-4 w-4 mr-2" />
                     View History
                   </Button>
@@ -1009,7 +1383,17 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Content */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
+                <CardTitle
+                  className="text-base flex items-center"
+                  style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '22px',
+                    lineHeight: '120%',
+                    letterSpacing: '0%',
+                    color: '#000000'
+                  }}
+                >
                   <Play className="h-4 w-4 mr-2" />
                   Content
                 </CardTitle>
@@ -1055,7 +1439,17 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Crew */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
+                <CardTitle
+                  className="text-base flex items-center"
+                  style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '22px',
+                    lineHeight: '120%',
+                    letterSpacing: '0%',
+                    color: '#000000'
+                  }}
+                >
                   <Users className="h-4 w-4 mr-2" />
                   Personnel
                 </CardTitle>
@@ -1076,10 +1470,56 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent className="p-4">
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Security:</span> {product.specs_rental?.security || ""}
+                    <span
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '16px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Security:
+                    </span>{" "}
+                    <span
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 400,
+                        fontSize: '16px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#333333'
+                      }}
+                    >
+                      {product.specs_rental?.security || ""}
+                    </span>
                   </div>
                   <div>
-                    <span className="font-medium">Caretaker:</span> {product.specs_rental?.caretaker || ""}
+                    <span
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '16px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Caretaker:
+                    </span>{" "}
+                    <span
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 400,
+                        fontSize: '16px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#333333'
+                      }}
+                    >
+                      {product.specs_rental?.caretaker || ""}
+                    </span>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="mt-3 bg-transparent">
@@ -1412,6 +1852,217 @@ export default function SiteDetailsPage({ params }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+    {/* Maintenance History Dialog */}
+    <Dialog open={maintenanceHistoryDialogOpen} onOpenChange={setMaintenanceHistoryDialogOpen}>
+      <DialogContent className="max-w-3xl mx-auto max-h-[80vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle
+            style={{
+              fontFamily: 'Inter',
+              fontWeight: 600,
+              fontSize: '18px',
+              lineHeight: '120%',
+              letterSpacing: '0%',
+              color: '#000000'
+            }}
+          >
+            Maintenance History
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {maintenanceHistoryLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p
+                style={{
+                  fontFamily: 'Inter',
+                  fontWeight: 400,
+                  fontSize: '14px',
+                  lineHeight: '120%',
+                  letterSpacing: '0%',
+                  color: '#666666'
+                }}
+              >
+                Loading maintenance history...
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-auto max-h-96 border rounded-md">
+              <Table>
+                <TableHeader className="bg-gray-50">
+                  <TableRow>
+                    <TableHead
+                      className="w-1/4"
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Date
+                    </TableHead>
+                    <TableHead
+                      className="w-1/4"
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      SA Type
+                    </TableHead>
+                    <TableHead
+                      className="w-1/4"
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      SA No.
+                    </TableHead>
+                    <TableHead
+                      className="w-1/4"
+                      style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        lineHeight: '120%',
+                        letterSpacing: '0%',
+                        color: '#000000'
+                      }}
+                    >
+                      Report
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {maintenanceHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        <p
+                          style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            lineHeight: '120%',
+                            letterSpacing: '0%',
+                            color: '#666666'
+                          }}
+                        >
+                          No maintenance history found for this site.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    maintenanceHistory.map((assignment) => (
+                      <TableRow key={assignment.id} className="hover:bg-gray-50">
+                        <TableCell
+                          style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            lineHeight: '120%',
+                            letterSpacing: '0%',
+                            color: '#000000'
+                          }}
+                        >
+                          {formatFirebaseDate(assignment.created)}
+                        </TableCell>
+                        <TableCell
+                          style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: '120%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}
+                        >
+                          {assignment.serviceType || "N/A"}
+                        </TableCell>
+                        <TableCell
+                          style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: '120%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}
+                        >
+                          {assignment.saNumber || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.attachments && assignment.attachments.length > 0 ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              style={{
+                                fontFamily: 'Inter',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                lineHeight: '120%',
+                                letterSpacing: '0%',
+                                color: '#000000'
+                              }}
+                            >
+                              View Report
+                            </Button>
+                          ) : (
+                            <span
+                              style={{
+                                fontFamily: 'Inter',
+                                fontWeight: 500,
+                                fontSize: '14px',
+                                lineHeight: '120%',
+                                letterSpacing: '0%',
+                                color: '#666666'
+                              }}
+                            >
+                              N/A
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button
+            onClick={() => setMaintenanceHistoryDialogOpen(false)}
+            className="w-32"
+            style={{
+              fontFamily: 'Inter',
+              fontWeight: 600,
+              fontSize: '14px',
+              lineHeight: '120%',
+              letterSpacing: '0%',
+              color: '#FFFFFF'
+            }}
+          >
+            OK
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     </div>
   )
 }
