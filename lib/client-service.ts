@@ -31,6 +31,7 @@ export interface Client {
   state?: string
   zipCode?: string
   industry?: string // Make this optional to match the form
+  website?: string // Added website field
   notes?: string
   status: "active" | "inactive" | "lead"
   companyLogoUrl?: string
@@ -41,6 +42,7 @@ export interface Client {
   clientType?: string // New field
   partnerType?: string // New field
   user_company_id?: string // New field
+  deleted?: boolean // Added for soft delete functionality
 
 }
 
@@ -52,6 +54,8 @@ export interface ClientCompany {
   clientType?: string
   partnerType?: string
   companyLogoUrl?: string
+  website?: string // Added website field
+  phone?: string // Added phone field
   created: Date
   updated?: any // Added for consistency with Client interface
   user_company_id?: string // Added
@@ -59,6 +63,8 @@ export interface ClientCompany {
     dti?: string | null
     gis?: string | null
     id?: string | null
+    uploadedAt?: Date
+    uploadedBy?: string
   }
 }
 
@@ -109,6 +115,7 @@ export async function createClient(clientData: Omit<Client, "id" | "created" | "
       clientType: clientData.clientType || "", // New field
       partnerType: clientData.partnerType || "", // New field
       user_company_id: clientData.user_company_id || "", // New field
+      deleted: false, // Ensure new clients are not marked as deleted
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
@@ -168,6 +175,7 @@ export async function getPaginatedClients(
   statusFilter: string | null = null,
   uploadedByFilter: string | null = null, // New filter parameter
   companyIdFilter?: string, // New filter parameter
+  deletedFilter: boolean | null = null, // New filter parameter for soft delete
 ): Promise<PaginatedResult<Client>> {
   try {
     const clientsRef = collection(db, "client_db")
@@ -186,8 +194,14 @@ export async function getPaginatedClients(
     // }
 
     // Add companyId filter if provided
- 
-      const baseQuery = query(clientsRef, where("user_company_id", "==", companyIdFilter))
+    let baseQuery = companyIdFilter
+      ? query(clientsRef, where("user_company_id", "==", companyIdFilter))
+      : query(clientsRef)
+
+    // Add deleted filter if provided
+    if (deletedFilter !== null) {
+      baseQuery = query(baseQuery, where("deleted", "==", deletedFilter))
+    }
     
     // Add pagination
     const paginatedQuery = lastDoc
@@ -244,6 +258,7 @@ export async function getClientsCount(
   searchTerm = "",
   statusFilter: string | null = null,
   uploadedByFilter: string | null = null, // New filter parameter
+  deletedFilter: boolean | null = null, // New filter parameter for soft delete
 ): Promise<number> {
   try {
     console.log("Getting clients count:", { searchTerm, statusFilter, uploadedByFilter })
@@ -260,6 +275,11 @@ export async function getClientsCount(
     // Add uploadedBy filter if provided
     if (uploadedByFilter) {
       baseQuery = query(baseQuery, where("uploadedBy", "==", uploadedByFilter))
+    }
+
+    // Add deleted filter if provided
+    if (deletedFilter !== null) {
+      baseQuery = query(baseQuery, where("deleted", "==", deletedFilter))
     }
 
     // If there's a search term, we need to fetch all documents and filter client-side
@@ -378,5 +398,39 @@ export async function getClientCompanyById(clientCompanyId: string): Promise<Cli
   } catch (error) {
     console.error("Error fetching client company:", error)
     return null
+  }
+}
+
+export interface Notification {
+  company_id: string
+  created: any
+  department_from: string
+  department_to: string
+  description: string
+  navigate_to: string
+  title: string
+  type: string
+  uid_to: string | null
+  viewed: boolean
+}
+
+export async function createNotifications(notifications: Omit<Notification, "created" | "viewed">[]): Promise<void> {
+  try {
+    console.log("Creating notifications:", notifications.length)
+    const batch = []
+
+    for (const notification of notifications) {
+      const docRef = await addDoc(collection(db, "notifications"), {
+        ...notification,
+        created: serverTimestamp(),
+        viewed: false,
+      })
+      batch.push(docRef)
+    }
+
+    console.log("Notifications created successfully:", batch.length)
+  } catch (error) {
+    console.error("Error creating notifications:", error)
+    throw error
   }
 }

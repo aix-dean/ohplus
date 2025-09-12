@@ -11,10 +11,8 @@ export interface SpecsRental {
   audience_type?: string
   audience_types?: string[] // e.g., ["General Public"]
   elevation?: number
-  height?: number
   location?: string // e.g., "manila"
   traffic_count?: number
-  width?: number
   type?: string // e.g., "RENTAL"
 }
 
@@ -35,6 +33,10 @@ export interface QuotationProduct {
   media_url?: string // Added to match image exactly
   duration_days?: number // Duration specific to this item (if different from overall)
   item_total_amount?: number // Total amount for this specific item
+  height?: number
+  width?: number
+  content_type?: string
+  site_type?: string
 }
 
 export interface ClientComplianceItem {
@@ -74,8 +76,8 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  start_date?: string // Made optional
-  end_date?: string // Made optional
+  start_date?: string | any // Made optional - supports both string and Timestamp
+  end_date?: string | any // Made optional - supports both string and Timestamp
   total_amount: number
   duration_days: number // Overall duration for the quotation
   notes?: string

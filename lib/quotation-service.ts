@@ -13,6 +13,7 @@ import {
   startAfter,
   type DocumentData,
   type QueryDocumentSnapshot,
+  Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
@@ -28,14 +29,43 @@ export async function createQuotation(quotationData: Omit<Quotation, "id">): Pro
   try {
     console.log("Creating quotation with data:", quotationData)
 
-    const newQuotation = {
+    // Ensure all required fields have proper values and no undefined values
+    const sanitizedData = {
       ...quotationData,
+      quotation_number: quotationData.quotation_number || "",
+      client_name: quotationData.client_name || "",
+      client_email: quotationData.client_email || "",
+      client_id: quotationData.client_id || "",
+      client_company_name: quotationData.client_company_name || "",
+      client_phone: quotationData.client_phone || "",
+      client_address: quotationData.client_address || "",
+      client_company_id: quotationData.client_company_id || "",
+      status: quotationData.status || "draft",
+      created_by: quotationData.created_by || "",
+      seller_id: quotationData.seller_id || "",
+      company_id: quotationData.company_id || "",
+      created_by_first_name: quotationData.created_by_first_name || "",
+      created_by_last_name: quotationData.created_by_last_name || "",
+      start_date: quotationData.start_date || "",
+      end_date: quotationData.end_date || "",
+      duration_days: quotationData.duration_days || 0,
+      total_amount: quotationData.total_amount || 0,
+      valid_until: quotationData.valid_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      items: quotationData.items || [],
+      projectCompliance: quotationData.projectCompliance || {
+        signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+      },
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
-    console.log("New quotation data being sent to Firestore:", newQuotation);
 
-    const docRef = await addDoc(collection(db, "quotations"), newQuotation)
+    console.log("New quotation data being sent to Firestore:", sanitizedData);
+
+    const docRef = await addDoc(collection(db, "quotations"), sanitizedData)
     console.log("Quotation created with ID:", docRef.id)
 
     // If there's a campaign ID, add this quotation to the campaign
@@ -890,7 +920,7 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
       ...originalQuotation,
       quotation_number: generateQuotationNumber(),
       status: "draft", // Reset status to draft
-      created_by: userName,
+      created_by: userName || "",
       seller_id: userId,
       // Reset project compliance to initial state
       projectCompliance: {
@@ -957,37 +987,39 @@ export async function createDirectQuotation(
 
     const quotationData: Omit<Quotation, "id"> = {
       quotation_number: quotationNumber,
-      client_id: clientData.id, // Added client_id
-      client_name: clientData.name,
-      client_email: clientData.email,
-      client_id: clientData.id, // Added client_id
-      client_company_name: clientData.company,
-      client_phone: clientData.phone,
-      client_address: clientData.address,
-      client_company_id: options.client_company_id || "", // Added client_company_id field
+
+      client_name: clientData.name || "",
+      client_email: clientData.email || "",
+      client_id: clientData.id || "",
+      client_company_name: clientData.company || "",
+      client_phone: clientData.phone || "",
+      client_address: clientData.address || "",
+      client_company_id: options.client_company_id || "",
       status: "draft",
+      created: serverTimestamp(),
       created_by: userId,
       seller_id: userId,
-      companyId: options.company_id, // Mapped options.company_id to quotation.companyId
-      page_id: pageId,
-      page_number: 1, // Single document gets page number 1
-      created_by_first_name: options.created_by_first_name,
-      created_by_last_name: options.created_by_last_name,
-      start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
-      end_date: options.endDate ? options.endDate.toISOString().split("T")[0] : "",
+      company_id: options.company_id,
+      created_by_first_name: options.created_by_first_name || "",
+      created_by_last_name: options.created_by_last_name || "",
+      start_date: options.startDate ? Timestamp.fromDate(options.startDate) : null,
+      end_date: options.endDate ? Timestamp.fromDate(options.endDate) : null,
       duration_days: durationDays,
       total_amount: totalAmount,
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       items: [
         {
-          product_id: site.id, // This serves as the product_id
-          name: site.name,
-          location: site.location,
+          product_id: site.id || "", // This serves as the product_id
+          name: site.name || "",
+          location: site.location || "",
           price: site.price || 0,
-          type: site.type,
+          type: site.type || "",
           duration_days: durationDays,
           item_total_amount: totalAmount,
-          media_url: site.image,
+          media_url: site.image || "",
+          height: site.height || 0,
+          width: site.width || 0,
+          content_type: site.content_type || "",
         },
       ],
       projectCompliance: {
@@ -1046,37 +1078,38 @@ export async function createMultipleQuotations(
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,
-        client_id: clientData.id,
-        client_name: clientData.name,
-        client_email: clientData.email,
-        client_id: clientData.id, // Added client_id
-        client_company_name: clientData.company,
-        client_phone: clientData.phone,
-        client_address: clientData.address,
-        client_company_id: clientData.company_id || "", // Added client_company_id field
+        client_name: clientData.name || "",
+        client_email: clientData.email || "",
+        client_id: clientData.id || "",
+        client_company_name: clientData.company || "",
+        client_phone: clientData.phone || "",
+        client_address: clientData.address || "",
+        client_company_id: clientData.company_id || "",
         status: "draft",
+        created: serverTimestamp(),
         created_by: userId,
         seller_id: userId,
-        companyId: options.company_id, // Mapped options.company_id to quotation.companyId
-        page_id: pageId, // Same page_id for all documents in the batch
-        page_number: i + 1, // Sequential page numbers (1, 2, 3, etc.)
-        created_by_first_name: options.created_by_first_name,
-        created_by_last_name: options.created_by_last_name,
-        start_date: options.startDate ? options.startDate.toISOString().split("T")[0] : "",
-        end_date: options.endDate ? options.endDate.toISOString().split("T")[0] : "",
+        company_id: options.company_id,
+        created_by_first_name: options.created_by_first_name || "",
+        created_by_last_name: options.created_by_last_name || "",
+        start_date: options.startDate ? Timestamp.fromDate(options.startDate) : null,
+        end_date: options.endDate ? Timestamp.fromDate(options.endDate) : null,
         duration_days: durationDays,
         total_amount: totalAmount,
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         items: [
           {
-            product_id: site.id, // This serves as the product_id
-            name: site.name,
-            location: site.location,
+            product_id: site.id || "", // This serves as the product_id
+            name: site.name || "",
+            location: site.location || "",
             price: site.price || 0,
-            type: site.type,
+            type: site.type || "",
             duration_days: durationDays,
             item_total_amount: totalAmount,
-            media_url: site.image,
+            media_url: site.image || "",
+            height: site.height || 0,
+            width: site.width || 0,
+            content_type: site.content_type || "",
           },
         ],
         projectCompliance: {
@@ -1231,7 +1264,7 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
       const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
-      const hasMatchingCompany = quotation.companyId === companyId
+      const hasMatchingCompany = quotation.company_id === companyId
 
       if (hasMatchingProduct && hasMatchingCompany) {
         quotations.push(quotation)

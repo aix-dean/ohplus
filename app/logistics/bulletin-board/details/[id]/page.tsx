@@ -9,51 +9,68 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore"
 
-interface ServiceAssignment {
+interface JobOrder {
   id: string
-  saNumber: string
-  projectSiteId: string
-  projectSiteName: string
-  projectSiteLocation: string
-  serviceType: string
-  assignedTo: string
-  crew?: string
-  message: string
-  coveredDateStart: any
-  coveredDateEnd: any
-  alarmDate?: any
-  alarmTime?: string
+  joNumber: string
+  clientCompany: string
+  clientName: string
+  siteName: string
+  siteCode: string
+  contractPeriodStart: string
+  contractPeriodEnd: string
+  leaseRatePerMonth: number
+  totalAmount: number
   status: string
-  created: any
-  updated?: any
-  attachments?: Array<{
-    name: string
+  joType: string
+  assignTo: string
+  product_id?: string
+  // Add other fields as needed
+}
+
+interface Seller {
+  id: string
+  first_name?: string
+  last_name?: string
+  uid: string
+  // Add other fields as needed
+}
+
+interface Product {
+  id: string
+  name?: string
+  location?: string
+  site_owner?: string
+  seller_name?: string
+  seller_id?: string // Added seller_id field
+  price?: number
+  status?: string
+  media?: Array<{
+    distance: string
+    isVideo: boolean
     type: string
+    url: string
   }>
-  requestedBy: {
-    id: string
-    name: string
-    department: string
+  specs_rental?: {
+    location?: string
+    caretaker?: string
+    land_owner?: string
+    site_orientation?: string
+    structure_condition?: string
   }
-  remarks?: string
-  materialSpecs?: string
-  illuminationNits?: string
-  gondola?: string
-  technology?: string
-  sales?: string
-  serviceCost?: {
-    crewFee: string
-    mealAllowance: string
-    overtimeFee: string
-    tollFee: string
-    transpo: string
-    total: number
-    otherFees?: any[]
-  }
-  serviceDuration?: string
-  equipmentRequired?: string
-  priority?: string
-  project_key?: string
+  created?: any
+  updated?: any
+}
+
+interface Booking {
+  id: string
+  start_date: any
+  end_date: any
+  product_id: string
+  status: string
+  cost: number
+  total_cost: number
+  type: string
+  // Add other fields as needed
 }
 
 interface Report {
@@ -72,13 +89,17 @@ interface Report {
     fileUrl: string
     note?: string
   }>
+  // Add other fields as needed
 }
 
-export default function ServiceAssignmentDetailsPage() {
+export default function JobOrderDetailsPage() {
   const params = useParams()
   const router = useRouter()
-  const [assignment, setAssignment] = useState<ServiceAssignment | null>(null)
-  const [reports, setReports] = useState<Report[]>([])
+  const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [seller, setSeller] = useState<Seller | null>(null) // Added seller state
+  const [reports, setReports] = useState<Report[]>([]) // Added reports state
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(15)
@@ -87,12 +108,12 @@ export default function ServiceAssignmentDetailsPage() {
 
   const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
 
-  const fetchReports = async (saNumber: string, page: number = 1) => {
+  const fetchReports = async (joNumber: string, page: number = 1) => {
     try {
       const reportsRef = collection(db, "reports")
       let reportsQuery = query(
         reportsRef,
-        where("joNumber", "==", saNumber),
+        where("joNumber", "==", joNumber),
         orderBy("updated", "desc"),
         limit(itemsPerPage + 1)
       )
@@ -101,7 +122,7 @@ export default function ServiceAssignmentDetailsPage() {
       if (lastDoc && page > 1) {
         reportsQuery = query(
           reportsRef,
-          where("joNumber", "==", saNumber),
+          where("joNumber", "==", joNumber),
           orderBy("updated", "desc"),
           startAfter(lastDoc),
           limit(itemsPerPage + 1)
@@ -129,40 +150,77 @@ export default function ServiceAssignmentDetailsPage() {
   }
 
   useEffect(() => {
-    const fetchServiceAssignment = async () => {
+    const fetchJobOrder = async () => {
       if (!params.id) return
 
       try {
-        const docRef = doc(db, "service_assignments", params.id as string)
+        const docRef = doc(db, "job_orders", params.id as string)
         const docSnap = await getDoc(docRef)
 
         if (docSnap.exists()) {
-          const assignmentData = {
+          const jobOrderData = {
             id: docSnap.id,
             ...docSnap.data(),
-          } as ServiceAssignment
+          } as JobOrder
 
-          setAssignment(assignmentData)
+          setJobOrder(jobOrderData)
 
-          if (assignmentData.saNumber) {
-            await fetchReports(assignmentData.saNumber, 1)
+          if (jobOrderData.joNumber) {
+            await fetchReports(jobOrderData.joNumber, 1)
+          }
+
+          if (jobOrderData.product_id) {
+            const productRef = doc(db, "products", jobOrderData.product_id)
+            const productSnap = await getDoc(productRef)
+
+            if (productSnap.exists()) {
+              const productData = {
+                id: productSnap.id,
+                ...productSnap.data(),
+              } as Product
+
+              setProduct(productData)
+
+              if (productData.seller_id) {
+                const sellerRef = doc(db, "iboard_users", productData.seller_id)
+                const sellerSnap = await getDoc(sellerRef)
+
+                if (sellerSnap.exists()) {
+                  setSeller({
+                    id: sellerSnap.id,
+                    ...sellerSnap.data(),
+                  } as Seller)
+                }
+              }
+            }
+
+            const bookingQuery = query(collection(db, "booking"), where("product_id", "==", jobOrderData.product_id))
+            const bookingSnapshot = await getDocs(bookingQuery)
+
+            if (!bookingSnapshot.empty) {
+              const bookingDoc = bookingSnapshot.docs[0]
+              setBooking({
+                id: bookingDoc.id,
+                ...bookingDoc.data(),
+              } as Booking)
+            }
           }
         }
       } catch (error) {
-        console.error("Error fetching service assignment:", error)
+        console.error("Error fetching job order, product, booking, seller, or reports:", error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchServiceAssignment()
+    fetchJobOrder()
   }, [params.id])
 
   useEffect(() => {
-    if (assignment?.saNumber && currentPage > 1) {
-      fetchReports(assignment.saNumber, currentPage)
+    if (jobOrder?.joNumber && currentPage > 1) {
+      fetchReports(jobOrder.joNumber, currentPage)
     }
-  }, [currentPage, assignment?.saNumber])
+  }, [currentPage, jobOrder?.joNumber])
 
   const handleNextPage = () => {
     if (hasMore) {
@@ -232,23 +290,23 @@ export default function ServiceAssignmentDetailsPage() {
   }
 
   const getSiteData = () => {
-    if (assignment) {
+    if (jobOrder) {
       return {
-        site: assignment.projectSiteName || assignment.projectSiteId || "Not specified",
-        client: assignment.requestedBy?.name || "Not specified",
-        serviceDates:
-          assignment.coveredDateStart && assignment.coveredDateEnd
-            ? `${formatDate(assignment.coveredDateStart)} to ${formatDate(assignment.coveredDateEnd)}`
+        site: jobOrder.siteName || jobOrder.siteCode || "Not specified",
+        client: jobOrder.clientName || "Not specified",
+        bookingDates:
+          booking?.start_date && booking?.end_date
+            ? `${formatDate(booking.start_date)} to ${formatDate(booking.end_date)}`
             : "Not specified",
-        assignedTo: assignment.assignedTo || "Not specified",
+        seller: seller?.first_name && seller?.last_name ? `${seller.first_name} ${seller.last_name}` : "Not specified",
       }
     }
 
     return {
       site: "Not specified",
       client: "Not specified",
-      serviceDates: "Not specified",
-      assignedTo: "Not specified",
+      bookingDates: "Not specified",
+      seller: "Not specified", // Added seller fallback
     }
   }
 
@@ -262,23 +320,23 @@ export default function ServiceAssignmentDetailsPage() {
         </Button>
 
         <Badge variant="default" className="bg-blue-500 text-white px-3 py-1 text-sm font-medium" style={{ fontSize: '27.7px', fontWeight: '700', borderRadius: '10px' }}>
-          {assignment?.projectSiteName || 'Project Site'}
+          Lilo & Stitch
         </Badge>
 
         <div style={{ borderRadius: '10px', padding: '0 10px', backgroundColor: '#efefef' }}>
           <span className="text-lg font-medium text-gray-900" style={{ fontSize: '25.1px', color: '#0f76ff', fontWeight: '650' }}>
-            {loading ? "Loading..." : assignment?.saNumber || "Service Assignment Not Found"}
+            {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
           </span>
         </div>
       </div>
 
       <div className="flex justify-start">
         <div className="flex items-start gap-6 max-w-2xl">
-          {/* Service assignment image placeholder */}
+          {/* Product image placeholder */}
           <div className="flex-shrink-0">
             <img
-              src="/lilo-and-stitch-product-box.png"
-              alt="Service Assignment"
+              src={product?.media?.[0]?.url || "/lilo-and-stitch-product-box.png"}
+              alt="Product"
               className="w-32 h-32 object-cover rounded-md border"
             />
           </div>
@@ -291,18 +349,18 @@ export default function ServiceAssignmentDetailsPage() {
             </div>
 
             <div>
-              <span className="font-semibold text-gray-900">Requested By: </span>
+              <span className="font-semibold text-gray-900">Client: </span>
               <span className="text-gray-700">{loading ? "Loading..." : siteData.client}</span>
             </div>
 
             <div>
-              <span className="font-semibold text-gray-900">Service Dates: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.serviceDates}</span>
+              <span className="font-semibold text-gray-900">Booking Dates: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
             </div>
 
             <div>
-              <span className="font-semibold text-gray-900">Assigned To: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.assignedTo}</span>
+              <span className="font-semibold text-gray-900">Seller: </span>
+              <span className="text-gray-700">{loading ? "Loading..." : siteData.seller}</span>
             </div>
           </div>
         </div>
@@ -310,7 +368,7 @@ export default function ServiceAssignmentDetailsPage() {
 
       <div className="mt-8">
         <div className="bg-gradient-to-r from-blue-600 to-teal-400 text-white px-4 py-3 rounded-t-lg">
-          <h2 className="text-lg font-semibold">Service Assignment Monitoring</h2>
+          <h2 className="text-lg font-semibold">Project Monitoring</h2>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-b-lg overflow-x-auto max-h-96 overflow-y-auto">
@@ -328,13 +386,13 @@ export default function ServiceAssignmentDetailsPage() {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    Loading service assignment monitoring data...
+                    Loading project monitoring data...
                   </td>
                 </tr>
               ) : reports.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    No service assignment monitoring data available for this assignment.
+                    No project monitoring data available for this job order.
                   </td>
                 </tr>
               ) : (
@@ -391,10 +449,10 @@ export default function ServiceAssignmentDetailsPage() {
         <Button
           className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-lg px-4 py-2 flex items-center gap-2"
           onClick={() => {
-            if (assignment?.projectSiteId) {
+            if (jobOrder?.product_id) {
               setCreateReportDialogOpen(true)
             } else {
-              console.log("No project site ID available for creating report")
+              console.log("No product ID available for creating report")
             }
           }}
         >
@@ -403,14 +461,14 @@ export default function ServiceAssignmentDetailsPage() {
         </Button>
       </div>
 
-      {assignment?.projectSiteId && (
+      {jobOrder?.product_id && (
         <CreateReportDialog
           open={createReportDialogOpen}
           onOpenChange={setCreateReportDialogOpen}
-          siteId={assignment.projectSiteId}
-          module="logistics"
+          siteId={jobOrder.product_id}
+          module="sales"
           hideJobOrderSelection={true}
-          preSelectedJobOrder={assignment.saNumber}
+          preSelectedJobOrder={jobOrder.joNumber}
         />
       )}
     </div>

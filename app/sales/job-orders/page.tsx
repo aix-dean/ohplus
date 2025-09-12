@@ -93,8 +93,8 @@ export default function JobOrdersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="bg-gray-50">
+        <div className="max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
           <h1 className="text-3xl font-bold mb-6">Job Orders</h1>
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -107,7 +107,8 @@ export default function JobOrdersPage() {
             />
           </div>
           <Card className="border-gray-200 shadow-sm rounded-xl">
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 py-3">JO #</TableHead>
@@ -152,7 +153,8 @@ export default function JobOrdersPage() {
                     </TableRow>
                   ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </Card>
         </div>
       </div>
@@ -161,39 +163,49 @@ export default function JobOrdersPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] text-red-500">
+      <div className="flex flex-col items-center justify-center min-h-full text-red-500 p-2 sm:p-4 lg:p-6">
         <p>{error}</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="bg-gray-50">
+      <div className="max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Job Orders</h1>
         </div>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            type="text"
-            placeholder="Search job orders..."
-            className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
+        <div className="flex items-center justify-between mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Input
+              type="text"
+              placeholder="Search job orders..."
+              className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
+                onClick={() => setSearchTerm("")}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Clear search</span>
+              </Button>
+            )}
+          </div>
+          <Button
+            onClick={() => router.push("/sales/job-orders/select-quotation")}
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create JO
+          </Button>
         </div>
 
         {filteredJobOrders.length === 0 ? (
@@ -222,7 +234,7 @@ export default function JobOrdersPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+          <Card className="border-gray-200 shadow-sm rounded-xl">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -289,14 +301,6 @@ export default function JobOrdersPage() {
             </Table>
           </Card>
         )}
-
-   
-          <Button
-             onClick={() => router.push("/sales/job-orders/select-quotation")}
-           size="lg" className="rounded-full shadow-lg px-6 py-3 text-lg">
-            <Plus className="mr-2 h-5 w-5" />
-            Create JO
-          </Button>
       </div>
     </div>
   )

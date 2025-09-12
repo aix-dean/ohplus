@@ -647,7 +647,14 @@ export default function SalesReportPreviewPage() {
                           <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                         </div>
 
-                        {attachment.fileUrl && isImageFile(attachment.fileName) ? (
+                        {report.siteImageUrl && isImageFile(attachment.fileName) ? (
+                          <img
+                            src={report.siteImageUrl || "/placeholder.svg"}
+                            alt={attachment.fileName}
+                            className="max-w-full max-h-full object-cover rounded"
+                            onError={(e) => handleImageError(report.siteImageUrl || "", attachment.fileName)}
+                          />
+                        ) : attachment.fileUrl && isImageFile(attachment.fileName) ? (
                           <img
                             src={attachment.fileUrl || "/placeholder.svg"}
                             alt={attachment.fileName}

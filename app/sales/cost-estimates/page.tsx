@@ -28,7 +28,7 @@ import {
   Calculator,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getCostEstimatesByCreatedBy } from "@/lib/cost-estimate-service" // Import CostEstimate service
+import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy } from "@/lib/cost-estimate-service" // Import CostEstimate service
 import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -41,6 +41,13 @@ function CostEstimatesPageContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false) // Assuming this might be used for CE
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lastDocId, setLastDocId] = useState<string | null>(null)
+  const [hasMorePages, setHasMorePages] = useState(true)
+  const itemsPerPage = 10
+
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -48,13 +55,19 @@ function CostEstimatesPageContent() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadCostEstimates()
+      loadCostEstimates(1, true)
     }
   }, [user])
 
   useEffect(() => {
-    filterCostEstimates()
-  }, [costEstimates, searchTerm, statusFilter])
+    // Reset pagination when filters change
+    if (user?.uid) {
+      setCurrentPage(1)
+      setLastDocId(null)
+      setHasMorePages(true)
+      loadCostEstimates(1, true)
+    }
+  }, [searchTerm, statusFilter])
 
   // Assuming a success dialog might be relevant for cost estimates too
   useEffect(() => {
@@ -67,13 +80,27 @@ function CostEstimatesPageContent() {
     }
   }, [searchParams])
 
-  const loadCostEstimates = async () => {
+  const loadCostEstimates = async (page: number = 1, reset: boolean = false) => {
     if (!user?.uid) return
 
     setLoading(true)
     try {
-      const userCostEstimates = await getCostEstimatesByCreatedBy(user.uid)
-      setCostEstimates(userCostEstimates)
+      const result = await getPaginatedCostEstimatesByCreatedBy(
+        user.uid,
+        itemsPerPage,
+        reset ? null : lastDocId
+      )
+
+      if (reset) {
+        setCostEstimates(result.items)
+        setLastDocId(result.lastVisible)
+        setCurrentPage(1)
+      } else {
+        setCostEstimates(result.items)
+        setLastDocId(result.lastVisible)
+      }
+
+      setHasMorePages(result.hasMore)
     } catch (error) {
       console.error("Error loading cost estimates:", error)
     } finally {
@@ -81,23 +108,8 @@ function CostEstimatesPageContent() {
     }
   }
 
-  const filterCostEstimates = () => {
-    let filtered = costEstimates
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (costEstimate) =>
-          costEstimate.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          costEstimate.client.company.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((costEstimate) => costEstimate.status === statusFilter)
-    }
-
-    setFilteredCostEstimates(filtered)
-  }
+  // Note: Filtering is now handled server-side or simplified for server-side pagination
+  // For now, we'll use the costEstimates directly
 
   const getStatusConfig = (status: CostEstimate["status"]) => {
     switch (status) {
@@ -246,7 +258,7 @@ function CostEstimatesPageContent() {
               </TableBody>
             </Table>
           </Card>
-        ) : filteredCostEstimates.length === 0 ? (
+        ) : costEstimates.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -286,7 +298,7 @@ function CostEstimatesPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCostEstimates.map((costEstimate) => {
+                {costEstimates.map((costEstimate) => {
                   const statusConfig = getStatusConfig(costEstimate.status)
                   const StatusIcon = statusConfig.icon
 
@@ -365,6 +377,43 @@ function CostEstimatesPageContent() {
               </TableBody>
             </Table>
           </Card>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && costEstimates.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-xl">
+            <div className="text-sm text-gray-600">
+              Page {currentPage}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (currentPage > 1) {
+                    setCurrentPage(currentPage - 1)
+                    loadCostEstimates(currentPage - 1, false)
+                  }
+                }}
+                disabled={currentPage === 1 || loading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (hasMorePages) {
+                    setCurrentPage(currentPage + 1)
+                    loadCostEstimates(currentPage + 1, false)
+                  }
+                }}
+                disabled={!hasMorePages || loading}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

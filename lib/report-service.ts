@@ -66,6 +66,8 @@ export interface ReportData {
   installationTimeline?: string
   delayReason?: string
   delayDays?: string
+  // Site image URL
+  siteImageUrl?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
