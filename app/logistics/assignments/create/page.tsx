@@ -35,6 +35,7 @@ import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderListDialog } from "@/components/job-order-list-dialog"
+import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
 
 
 // Service types as provided
@@ -62,6 +63,7 @@ export default function CreateServiceAssignmentPage() {
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [isProductSelectionDialogOpen, setIsProductSelectionDialogOpen] = useState(false) // State for ProductSelectionDialog
 
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [isNewTeamDialogOpen, setIsNewTeamDialogOpen] = useState(false)
@@ -72,7 +74,7 @@ export default function CreateServiceAssignmentPage() {
     projectSite: initialProjectSite || "",
     serviceType: "",
     assignedTo: "",
-    serviceDuration: "",
+    serviceDuration: 0,
     priority: "",
     equipmentRequired: "",
     materialSpecs: "",
@@ -100,10 +102,13 @@ export default function CreateServiceAssignmentPage() {
     },
   })
 
-  // Date input strings for direct input
-  const [startDateInput, setStartDateInput] = useState("")
-  const [endDateInput, setEndDateInput] = useState("")
-  const [alarmDateInput, setAlarmDateInput] = useState("")
+  // Auto-set sales field to current user's full name
+  useEffect(() => {
+    if (userData?.first_name && userData?.last_name && !formData.sales) {
+      setFormData(prev => ({ ...prev, sales: `${userData.first_name} ${userData.last_name}` }));
+    }
+  }, [userData, formData.sales]);
+
 
   // Generate a random SA number on mount
   useEffect(() => {
@@ -135,6 +140,42 @@ export default function CreateServiceAssignmentPage() {
 
     fetchProducts()
   }, [])
+
+  // Auto-select product when projectSite parameter is present
+  useEffect(() => {
+    const autoSelectProduct = async () => {
+      if (initialProjectSite && !formData.projectSite && userData?.company_id) {
+        try {
+          // First check if the product is already in the loaded products
+          const existingProduct = products.find(p => p.id === initialProjectSite)
+          if (existingProduct) {
+            setFormData(prev => ({ ...prev, projectSite: initialProjectSite }))
+            return
+          }
+
+          // If not found in loaded products, fetch the specific product document
+          const productDoc = await getDoc(doc(db, "products", initialProjectSite))
+          if (productDoc.exists()) {
+            const productData = { id: productDoc.id, ...productDoc.data() } as Product
+            // Add the product to the products array if it's not already there
+            setProducts(prev => {
+              const exists = prev.find(p => p.id === productData.id)
+              if (!exists) {
+                return [...prev, productData]
+              }
+              return prev
+            })
+            // Set the projectSite in form data
+            setFormData(prev => ({ ...prev, projectSite: initialProjectSite }))
+          }
+        } catch (error) {
+          console.error("Error fetching product for auto-selection:", error)
+        }
+      }
+    }
+
+    autoSelectProduct()
+  }, [initialProjectSite, formData.projectSite, userData?.company_id, products])
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -202,16 +243,7 @@ export default function CreateServiceAssignmentPage() {
             // Set the SA number from draft
             setSaNumber(draftData.saNumber || "")
 
-            // Set date inputs
-            if (draftData.coveredDateStart) {
-              setStartDateInput(format(draftData.coveredDateStart.toDate(), "yyyy-MM-dd"))
-            }
-            if (draftData.coveredDateEnd) {
-              setEndDateInput(format(draftData.coveredDateEnd.toDate(), "yyyy-MM-dd"))
-            }
-            if (draftData.alarmDate) {
-              setAlarmDateInput(format(draftData.alarmDate.toDate(), "yyyy-MM-dd"))
-            }
+            // Date inputs are now handled directly as Date objects
           }
         } catch (error) {
           console.error("Error loading draft:", error)
@@ -233,23 +265,21 @@ export default function CreateServiceAssignmentPage() {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
 
-            // Pre-fill form fields from job order
-            setFormData((prev) => ({
-              ...prev,
-              projectSite: fetchedJobOrder.product_id || "",
-              serviceType: fetchedJobOrder.joType || "",
-              remarks: fetchedJobOrder.remarks || "",
-              message: fetchedJobOrder.message || "",
-              startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
-              endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
-              // You might want to pre-fill other fields like assignedTo, crew, etc.
-            }))
+            // Only pre-fill form fields if projectSite parameter is provided or if it's explicitly allowed
+            // If no projectSite parameter, keep fields empty as requested
+            if (initialProjectSite) {
+              setFormData((prev) => ({
+                ...prev,
+                projectSite: fetchedJobOrder.product_id || "",
+                serviceType: fetchedJobOrder.joType || "",
+                remarks: fetchedJobOrder.remarks || "",
+                message: fetchedJobOrder.message || "",
+                startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
+                endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
+                // You might want to pre-fill other fields like assignedTo, crew, etc.
+              }))
 
-            if (fetchedJobOrder.dateRequested) {
-              setStartDateInput(format(new Date(fetchedJobOrder.dateRequested), "yyyy-MM-dd"))
-            }
-            if (fetchedJobOrder.deadline) {
-              setEndDateInput(format(new Date(fetchedJobOrder.deadline), "yyyy-MM-dd"))
+              // Date inputs are now handled directly as Date objects
             }
           }
         } catch (error) {
@@ -258,50 +288,13 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId]) // Rerun when jobOrderId changes
+  }, [jobOrderId, initialProjectSite]) // Rerun when jobOrderId or initialProjectSite changes
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Handle date input changes and convert to Date objects
-  const handleDateInputChange = (type: "start" | "end" | "alarm", value: string) => {
-    try {
-      // Only attempt to parse if we have a value
-      if (value) {
-        const date = new Date(value)
-
-        // Check if date is valid
-        if (!isNaN(date.getTime())) {
-          if (type === "start") {
-            setStartDateInput(value)
-            handleInputChange("startDate", date)
-          } else if (type === "end") {
-            setEndDateInput(value)
-            handleInputChange("endDate", date)
-          } else if (type === "alarm") {
-            setAlarmDateInput(value)
-            handleInputChange("alarmDate", date)
-          }
-        }
-      } else {
-        // If input is cleared, clear the date
-        if (type === "start") {
-          setStartDateInput("")
-          handleInputChange("startDate", null)
-        } else if (type === "end") {
-          setEndDateInput("")
-          handleInputChange("endDate", null)
-        } else if (type === "alarm") {
-          setAlarmDateInput("")
-          handleInputChange("alarmDate", null)
-        }
-      }
-    } catch (error) {
-      console.error(`Error parsing date for ${type}:`, error)
-    }
-  }
 
   // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,7 +362,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
         assignedTo: formData.assignedTo,
-        serviceDuration: formData.serviceDuration,
+        serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
@@ -433,7 +426,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
         assignedTo: formData.assignedTo,
-        serviceDuration: formData.serviceDuration,
+        serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
@@ -573,7 +566,7 @@ export default function CreateServiceAssignmentPage() {
       projectSite: "",
       serviceType: "",
       assignedTo: "",
-      serviceDuration: "",
+      serviceDuration: 0,
       priority: "",
       equipmentRequired: "",
       materialSpecs: "",
@@ -599,9 +592,6 @@ export default function CreateServiceAssignmentPage() {
         total: 0,
       },
     })
-    setStartDateInput("")
-    setEndDateInput("")
-    setAlarmDateInput("")
 
     // Generate new SA number
     const randomNum = Math.floor(100000 + Math.random() * 900000)
@@ -649,6 +639,7 @@ export default function CreateServiceAssignmentPage() {
         },
         status: "Draft",
         created: new Date(),
+        serviceDuration: `${formData.serviceDuration} days`,
       }
 
       if (action === "print") {
@@ -672,6 +663,11 @@ export default function CreateServiceAssignmentPage() {
     } else {
       handleInputChange("crew", value)
     }
+  }
+
+  // Handle product selection
+  const handleProductSelect = (product: Product) => {
+    handleInputChange("projectSite", product.id || "")
   }
 
   if (fetchingProducts) {
@@ -704,7 +700,19 @@ export default function CreateServiceAssignmentPage() {
         onSubmit={handleSubmit}
         loading={loading}
         companyId={userData?.company_id || null}
-        productId={formData.projectSite} // Pass productId from formData
+        productId={formData.projectSite}
+        formData={formData}
+        handleInputChange={handleInputChange}
+        products={products}
+        teams={teams}
+        saNumber={saNumber}
+        jobOrderData={jobOrderData}
+        handleServiceCostChange={handleServiceCostChange}
+        addOtherFee={addOtherFee}
+        removeOtherFee={removeOtherFee}
+        updateOtherFee={updateOtherFee}
+        calculateServiceCostTotal={calculateServiceCostTotal}
+        onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
       />
 
 
@@ -746,6 +754,12 @@ export default function CreateServiceAssignmentPage() {
             // Handle error appropriately
           }
         }}
+      />
+
+      <ProductSelectionDialog
+        open={isProductSelectionDialogOpen}
+        onOpenChange={setIsProductSelectionDialogOpen}
+        onSelectProduct={handleProductSelect}
       />
     </section>
   )
