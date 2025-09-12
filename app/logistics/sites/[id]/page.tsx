@@ -1,6 +1,6 @@
 "use client"
 
-import { getProductById } from "@/lib/firebase-service"
+import { getProductById, uploadFileToFirebaseStorage, updateProduct } from "@/lib/firebase-service"
 
 // Global type declarations for Google Maps
 declare global {
@@ -32,12 +32,17 @@ import {
 } from "lucide-react"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { useRef, useState, useEffect } from "react"
+import { Document, Page, pdfjs } from "react-pdf"
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { collection, query, where, orderBy, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
 import Link from "next/link"
@@ -46,6 +51,7 @@ import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 import type { JobOrder } from "@/lib/types/job-order" // Import the JobOrder type
+import { useAuth } from "@/contexts/auth-context"
 
 // Google Map Component
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
@@ -221,9 +227,29 @@ export default function SiteDetailsPage({ params }: Props) {
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
   const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
   const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
+  const [blueprintDialogOpen, setBlueprintDialogOpen] = useState(false)
+  const [selectedBlueprintFile, setSelectedBlueprintFile] = useState<File | null>(null)
+  const [blueprintPreviewUrl, setBlueprintPreviewUrl] = useState<string | null>(null)
+  const [isUploadingBlueprint, setIsUploadingBlueprint] = useState(false)
+  const [blueprintSuccessDialogOpen, setBlueprintSuccessDialogOpen] = useState(false)
+  const [pdfNumPages, setPdfNumPages] = useState<number | null>(null)
+  const [pdfPageNumber, setPdfPageNumber] = useState(1)
+  const [isPdfLoading, setIsPdfLoading] = useState(false)
+  const [fullscreenBlueprint, setFullscreenBlueprint] = useState<{blueprint: string, uploaded_by: string, created: any} | null>(null)
+  const [fullscreenDialogOpen, setFullscreenDialogOpen] = useState(false)
+  const [fullscreenPdfPageNumber, setFullscreenPdfPageNumber] = useState(1)
+  const [fullscreenPdfNumPages, setFullscreenPdfNumPages] = useState<number | null>(null)
+  const [structureUpdateDialogOpen, setStructureUpdateDialogOpen] = useState(false)
+  const [structureForm, setStructureForm] = useState({
+    color: '',
+    contractor: '',
+    condition: ''
+  })
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { userData } = useAuth()
 
   const [illuminationOn, setIlluminationOn] = useState(false)
   const [illuminationMode, setIlluminationMode] = useState("Manual")
@@ -278,6 +304,154 @@ export default function SiteDetailsPage({ params }: Props) {
 
   const handleCreateServiceAssignment = () => {
     router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+  }
+
+  const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      // Check if file is image or PDF
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        alert('Please select an image or PDF file')
+        return
+      }
+
+      setSelectedBlueprintFile(file)
+      setPdfNumPages(null)
+      setPdfPageNumber(1)
+      setIsPdfLoading(true)
+
+      // Create preview URL for both images and PDFs
+      const previewUrl = URL.createObjectURL(file)
+      setBlueprintPreviewUrl(previewUrl)
+    }
+  }
+
+  const handleBlueprintUpload = async () => {
+    if (!selectedBlueprintFile || !product || !userData) return
+
+    setIsUploadingBlueprint(true)
+    try {
+      // Upload to Firebase Storage
+      const downloadURL = await uploadFileToFirebaseStorage(selectedBlueprintFile, `blueprints/${product.id}/`)
+
+      // Create new blueprint entry
+      const blueprintKey = Date.now().toString() // Use timestamp as unique key
+      const uploaderName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email || 'Unknown User'
+
+      const newBlueprintEntry = {
+        blueprint: downloadURL,
+        uploaded_by: uploaderName,
+        created: new Date()
+      }
+
+      // Get existing blueprints or create empty array
+      // Handle both old format (object) and new format (array)
+      let existingBlueprints: Array<{blueprint: string, uploaded_by: string, created: any}> = []
+
+      if (product.blueprints) {
+        if (Array.isArray(product.blueprints)) {
+          // New format - already an array
+          existingBlueprints = product.blueprints
+        } else {
+          // Old format - convert object to array
+          existingBlueprints = Object.values(product.blueprints)
+        }
+
+        // Convert old format blueprints to new format and sort by created timestamp (most recent first)
+        existingBlueprints = existingBlueprints.map((bp: any) => ({
+          blueprint: bp.blueprint,
+          uploaded_by: bp.uploaded_by || bp.uploaded || 'Unknown User', // Handle both old and new formats
+          created: bp.created
+        }))
+
+        existingBlueprints.sort((a: {created: any}, b: {created: any}) => {
+          const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+          const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+          return timeB - timeA
+        })
+      }
+
+      // Add new blueprint to the array
+      const updatedBlueprints = [...existingBlueprints, newBlueprintEntry]
+
+      // Update product with new blueprints map
+      await updateProduct(product.id, { blueprints: updatedBlueprints })
+
+      // Update local product state
+      setProduct({ ...product, blueprints: updatedBlueprints })
+
+      // Reset states
+      setSelectedBlueprintFile(null)
+      setBlueprintPreviewUrl(null)
+
+      // Close blueprint dialog and show success dialog
+      setBlueprintDialogOpen(false)
+      setBlueprintSuccessDialogOpen(true)
+    } catch (error) {
+      console.error('Error uploading blueprint:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to upload blueprint: ${errorMessage}. Please try again.`)
+    } finally {
+      setIsUploadingBlueprint(false)
+    }
+  }
+
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const onPdfLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setPdfNumPages(numPages)
+    setIsPdfLoading(false)
+  }
+
+  const onPdfLoadError = (error: Error) => {
+    console.error('Error loading PDF:', error)
+    setIsPdfLoading(false)
+  }
+
+  const isPdfFile = (url: string) => {
+    return url.toLowerCase().endsWith('.pdf')
+  }
+
+  const handleBlueprintClick = (blueprint: {blueprint: string, uploaded_by: string, created: any}) => {
+    setFullscreenBlueprint(blueprint)
+    setFullscreenDialogOpen(true)
+    setFullscreenPdfPageNumber(1)
+    setFullscreenPdfNumPages(null)
+  }
+
+  const onFullscreenPdfLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setFullscreenPdfNumPages(numPages)
+  }
+
+  const handleStructureEdit = () => {
+    // Pre-populate form with existing structure data
+    setStructureForm({
+      color: product.structure?.color || '',
+      contractor: product.structure?.contractor || '',
+      condition: product.structure?.condition || ''
+    })
+    setStructureUpdateDialogOpen(true)
+  }
+
+  const handleStructureUpdate = async () => {
+    try {
+      const updatedStructure = {
+        ...structureForm,
+        last_maintenance: new Date() // Update last maintenance to current date
+      }
+
+      await updateProduct(product.id, { structure: updatedStructure })
+
+      // Update local product state
+      setProduct({ ...product, structure: updatedStructure })
+
+      setStructureUpdateDialogOpen(false)
+    } catch (error) {
+      console.error('Error updating structure:', error)
+      alert('Failed to update structure. Please try again.')
+    }
   }
 
   if (loading) {
@@ -593,7 +767,7 @@ export default function SiteDetailsPage({ params }: Props) {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="space-y-4">
+                <div className="space-y-4 -mt-2">
                   {/* Date and Time Section */}
                   <div className="text-sm">
                     <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
@@ -748,9 +922,17 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Structure - Always show */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Structure
+                <CardTitle>
+                  <span style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '20px',
+                    lineHeight: '100%',
+                    letterSpacing: '0%',
+                    transform: 'translate(0px, 0px)' // Add transform for position control
+                  }}>
+                    Structure
+                  </span>
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <Bell className="h-4 w-4 text-gray-500" />
@@ -761,7 +943,7 @@ export default function SiteDetailsPage({ params }: Props) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => console.log("Edit structure clicked")}>
+                      <DropdownMenuItem onClick={handleStructureEdit}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
@@ -770,23 +952,47 @@ export default function SiteDetailsPage({ params }: Props) {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium">Color:</span> {product.specs_rental?.structure_color || ""}
+                <div className="space-y-4" style={{ transform: 'translateY(-30px)' }}>
+                  <div style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '20px',
+                    lineHeight: '132%',
+                    letterSpacing: '0%'
+                  }}>
+                    <span>Color:</span> {product.structure?.color || "Not Available"}
                   </div>
-                  <div>
-                    <span className="font-medium">Contractor:</span> {product.specs_rental?.structure_contractor || ""}
+                  <div style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '20px',
+                    lineHeight: '132%',
+                    letterSpacing: '0%'
+                  }}>
+                    <span>Contractor:</span> {product.structure?.contractor || "Not Available"}
                   </div>
-                  <div>
-                    <span className="font-medium">Condition:</span> {product.specs_rental?.structure_condition || ""}
+                  <div style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '20px',
+                    lineHeight: '132%',
+                    letterSpacing: '0%'
+                  }}>
+                    <span>Condition:</span> {product.structure?.condition || "Not Available"}
                   </div>
-                  <div>
-                    <span className="font-medium">Last Maintenance:</span>{" "}
-                    {formatFirebaseDate(product.specs_rental?.structure_last_maintenance)}
+                  <div style={{
+                    fontFamily: 'Inter',
+                    fontWeight: 600,
+                    fontSize: '20px',
+                    lineHeight: '132%',
+                    letterSpacing: '0%'
+                  }}>
+                    <span>Last Maintenance:</span>{" "}
+                    {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setBlueprintDialogOpen(true)}>
                     View Blueprint
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1 bg-transparent">
@@ -912,6 +1118,300 @@ export default function SiteDetailsPage({ params }: Props) {
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
       />
+
+      {/* Blueprint Dialog */}
+      <Dialog open={blueprintDialogOpen} onOpenChange={setBlueprintDialogOpen}>
+        <DialogContent className="max-w-2xl mx-auto max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Blueprints</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Upload Preview (when selecting a new file) */}
+            {blueprintPreviewUrl && (
+              <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+                {selectedBlueprintFile?.type === 'application/pdf' ? (
+                  <div className="w-full h-full">
+                    <Document
+                      file={blueprintPreviewUrl}
+                      onLoadSuccess={onPdfLoadSuccess}
+                      onLoadError={onPdfLoadError}
+                      loading={
+                        <div className="flex items-center justify-center h-full">
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        </div>
+                      }
+                    >
+                      <Page
+                        pageNumber={pdfPageNumber}
+                        width={200}
+                      />
+                    </Document>
+                  </div>
+                ) : (
+                  <img
+                    src={blueprintPreviewUrl}
+                    alt="New blueprint preview"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Blueprints List */}
+            <div className="max-h-96 overflow-y-auto space-y-3">
+              {(() => {
+                // Get all blueprints (handle both old and new formats)
+                let blueprints: Array<{blueprint: string, uploaded_by: string, created: any}> = []
+
+                if (product?.blueprints) {
+                  if (Array.isArray(product.blueprints)) {
+                    // New format - already an array
+                    blueprints = product.blueprints
+                  } else {
+                    // Old format - convert object to array
+                    blueprints = Object.values(product.blueprints)
+                  }
+                }
+
+                if (blueprints && blueprints.length > 0) {
+                  // Sort by created timestamp (most recent first)
+                  const sortedBlueprints = [...blueprints].sort((a: {created: any}, b: {created: any}) => {
+                    const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                    const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                    return timeB - timeA
+                  })
+
+                  return sortedBlueprints.map((blueprint: {blueprint: string, uploaded_by: string, created: any}, index: number) => (
+                    <div key={index} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg bg-white">
+                      {/* Left side - Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900">{blueprint.uploaded_by}</div>
+                        <div className="text-xs text-gray-500">
+                          {formatFirebaseDate(blueprint.created)}
+                        </div>
+                      </div>
+
+                      {/* Right side - Blueprint Preview */}
+                      <div
+                        className="w-20 h-20 bg-gray-100 rounded border overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleBlueprintClick(blueprint)}
+                      >
+                        {isPdfFile(blueprint.blueprint) ? (
+                          <div className="w-full h-full">
+                            <Document
+                              file={blueprint.blueprint}
+                              loading={
+                                <div className="flex items-center justify-center h-full">
+                                  <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                </div>
+                              }
+                            >
+                              <Page
+                                pageNumber={1}
+                                width={80}
+                                height={80}
+                              />
+                            </Document>
+                          </div>
+                        ) : (
+                          <img
+                            src={blueprint.blueprint}
+                            alt="Blueprint"
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))
+                } else {
+                  return (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-sm">No blueprints uploaded yet</div>
+                    </div>
+                  )
+                }
+              })()}
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              onChange={handleBlueprintFileSelect}
+              className="hidden"
+            />
+
+            {/* Upload Button */}
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={handleUploadButtonClick}
+                disabled={isUploadingBlueprint}
+              >
+                {selectedBlueprintFile ? 'Change File' : 'Add New Blueprints'}
+              </Button>
+              {selectedBlueprintFile && (
+                <Button
+                  className="flex-1"
+                  onClick={handleBlueprintUpload}
+                  disabled={isUploadingBlueprint}
+                >
+                  {isUploadingBlueprint ? 'Uploading...' : 'Upload Blueprint'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Blueprint Success Dialog */}
+      <Dialog open={blueprintSuccessDialogOpen} onOpenChange={setBlueprintSuccessDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">Success</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <div className="text-green-600 text-lg font-semibold mb-2">✓</div>
+            <p className="text-gray-700">Blueprint uploaded successfully!</p>
+          </div>
+          <div className="flex justify-center">
+            <Button onClick={() => setBlueprintSuccessDialogOpen(false)} className="w-full">
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fullscreen Blueprint Dialog */}
+      <Dialog open={fullscreenDialogOpen} onOpenChange={setFullscreenDialogOpen}>
+        <DialogContent className="max-w-6xl mx-auto max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>
+              {fullscreenBlueprint && (
+                <div className="text-left">
+                  <div className="font-medium">{fullscreenBlueprint.uploaded_by}</div>
+                  <div className="text-sm text-gray-500">
+                    {formatFirebaseDate(fullscreenBlueprint.created)}
+                  </div>
+                </div>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {fullscreenBlueprint && (
+              <div className="w-full h-full min-h-[60vh] bg-gray-100 rounded-lg overflow-hidden">
+                {isPdfFile(fullscreenBlueprint.blueprint) ? (
+                  <div className="w-full h-full relative">
+                    <Document
+                      file={fullscreenBlueprint.blueprint}
+                      onLoadSuccess={onFullscreenPdfLoadSuccess}
+                      loading={
+                        <div className="flex items-center justify-center h-full">
+                          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                        </div>
+                      }
+                    >
+                      <Page
+                        pageNumber={fullscreenPdfPageNumber}
+                        width={800}
+                        className="mx-auto"
+                      />
+                    </Document>
+                    {fullscreenPdfNumPages && fullscreenPdfNumPages > 1 && (
+                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFullscreenPdfPageNumber(Math.max(1, fullscreenPdfPageNumber - 1))}
+                          disabled={fullscreenPdfPageNumber <= 1}
+                          className="text-white hover:bg-white hover:text-black"
+                        >
+                          ‹
+                        </Button>
+                        <span className="text-sm">
+                          Page {fullscreenPdfPageNumber} of {fullscreenPdfNumPages}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFullscreenPdfPageNumber(Math.min(fullscreenPdfNumPages, fullscreenPdfPageNumber + 1))}
+                          disabled={fullscreenPdfPageNumber >= fullscreenPdfNumPages}
+                          className="text-white hover:bg-white hover:text-black"
+                        >
+                          ›
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <img
+                    src={fullscreenBlueprint.blueprint}
+                    alt="Fullscreen blueprint"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Structure Update Dialog */}
+      <Dialog open={structureUpdateDialogOpen} onOpenChange={setStructureUpdateDialogOpen}>
+        <DialogContent className="max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Structure</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Color</label>
+              <input
+                type="text"
+                value={structureForm.color}
+                onChange={(e) => setStructureForm({ ...structureForm, color: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter structure color"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Contractor</label>
+              <input
+                type="text"
+                value={structureForm.contractor}
+                onChange={(e) => setStructureForm({ ...structureForm, contractor: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter contractor name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Condition</label>
+              <input
+                type="text"
+                value={structureForm.condition}
+                onChange={(e) => setStructureForm({ ...structureForm, condition: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter structure condition"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setStructureUpdateDialogOpen(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStructureUpdate}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              Apply
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
