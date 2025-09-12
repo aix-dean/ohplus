@@ -62,34 +62,7 @@ export interface Product {
     elevation?: number | null
     height?: number | null
     width?: number | null
-    average_power_consumption_3months?: string
-    caretaker?: string
-    display_cols?: string
-    display_rows?: string
-    illumination_bottom_count?: string
-    illumination_bottom_lighting_specs?: string
-    illumination_left_count?: string
-    illumination_left_lighting_specs?: string
-    illumination_right_count?: string
-    illumination_right_lighting_specs?: string
-    illumination_upper_count?: string
-    illumination_upper_lighting_specs?: string
-    land_owner?: string
-    lights_on_time?: string
-    power_consumption_monthly?: string
-    quadrant_layout?: string
-    security?: string
-    site_orientation?: string
-    structure_color?: string
-    structure_condition?: string
-    structure_contractor?: string
-    structure_last_maintenance?: any
-  }
-  structure?: {
-    color: string
-    contractor: string
-    condition: string
-    last_maintenance: Date
+    illumination?: string
   }
   type?: string
   status?: string

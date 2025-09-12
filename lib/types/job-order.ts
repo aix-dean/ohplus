@@ -40,4 +40,6 @@ export interface JobOrder {
   gisUrl?: string | null // Added client compliance URL
   idSignatureUrl?: string | null // Added client compliance URL
   siteImageUrl?: string | null // Added site image URL
+  materialSpec?: string // Material specification for the job order
+  illumination?: string // Illumination specification for the job order
 }
