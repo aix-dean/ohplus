@@ -1,6 +1,13 @@
 "use client"
 
 import { getProductById } from "@/lib/firebase-service"
+
+// Global type declarations for Google Maps
+declare global {
+  interface Window {
+    google: any
+  }
+}
 import { notFound, useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
@@ -20,13 +27,16 @@ import {
   Bell,
   Sun,
   Play,
+  ChevronDown,
+  Loader2,
 } from "lucide-react"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
+import { useRef, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { useState, useEffect } from "react"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
@@ -36,6 +46,111 @@ import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 import type { JobOrder } from "@/lib/types/job-order" // Import the JobOrder type
+
+// Google Map Component
+const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState(false)
+
+  useEffect(() => {
+    const initializeMaps = async () => {
+      try {
+        await loadGoogleMaps()
+        await initializeMap()
+      } catch (error) {
+        console.error("Error loading Google Maps:", error)
+        setMapError(true)
+      }
+    }
+
+    const initializeMap = async () => {
+      if (!mapRef.current || !window.google) return
+
+      try {
+        const geocoder = new window.google.maps.Geocoder()
+
+        // Geocode the location
+        geocoder.geocode({ address: location }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
+          if (status === "OK" && results && results[0]) {
+            const map = new window.google.maps.Map(mapRef.current!, {
+              center: results[0].geometry.location,
+              zoom: 15,
+              disableDefaultUI: true,
+              gestureHandling: "none",
+              zoomControl: false,
+              mapTypeControl: false,
+              scaleControl: false,
+              streetViewControl: false,
+              rotateControl: false,
+              fullscreenControl: false,
+              styles: [
+                {
+                  featureType: "poi",
+                  elementType: "labels",
+                  stylers: [{ visibility: "off" }],
+                },
+              ],
+            })
+
+            // Add marker
+            new window.google.maps.Marker({
+              position: results[0].geometry.location,
+              map: map,
+              title: location,
+              icon: {
+                url:
+                  "data:image/svg+xml;charset=UTF-8," +
+                  encodeURIComponent(`
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#ef4444"/>
+                  </svg>
+                `),
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 32),
+              },
+            })
+
+            setMapLoaded(true)
+          } else {
+            console.error("Geocoding failed:", status)
+            setMapError(true)
+          }
+        })
+      } catch (error) {
+        console.error("Error initializing map:", error)
+        setMapError(true)
+      }
+    }
+
+    initializeMaps()
+  }, [location])
+
+  if (mapError) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <div className="text-center text-gray-500">
+          <p className="text-sm">Map unavailable</p>
+          <p className="text-xs mt-1">{location}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <div ref={mapRef} className="w-full h-full rounded-lg" />
+      {!mapLoaded && (
+        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Loading map...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Helper function to convert Firebase timestamp to readable date
 export const formatFirebaseDate = (timestamp: any): string => {
@@ -109,6 +224,9 @@ export default function SiteDetailsPage({ params }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
+
+  const [illuminationOn, setIlluminationOn] = useState(false)
+  const [illuminationMode, setIlluminationMode] = useState("Manual")
 
   // Fetch product data and job orders
   useEffect(() => {
@@ -250,25 +368,33 @@ export default function SiteDetailsPage({ params }: Props) {
               </Link>
               <h2 className="text-lg font-semibold">Site Information</h2>
             </div>
-            {/* Site Image */}
-            <div className="relative aspect-square w-full">
-              <Image
-                src={thumbnailUrl || "/placeholder.svg"}
-                alt={product.name}
-                fill
-                className="object-cover rounded-md"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
-                }}
-              />
+            {/* Site Image and Map */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+              {/* Site Image - Left Side */}
+              <div className="relative aspect-square w-full">
+                <Image
+                  src={thumbnailUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  className="object-cover rounded-md"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
+                  }}
+                />
+              </div>
+
+              {/* Google Map - Right Side */}
+              <div className="relative aspect-square w-full bg-gray-100 rounded-md overflow-hidden">
+                <GoogleMap location={location} className="w-full h-full" />
+              </div>
             </div>
 
             {/* Site Details */}
             <div className="space-y-2">
               <h2 className="text-gray-500 text-sm">{product.site_code || product.id}</h2>
               <h3 className="font-bold text-xl">{product.name}</h3>
-              <Button variant="outline" className="mt-2">
+              <Button variant="outline" className="mt-2 w-[440px] h-[47px]">
                 <Calendar className="mr-2 h-4 w-4" />
                 Site Calendar
               </Button>
@@ -318,11 +444,6 @@ export default function SiteDetailsPage({ params }: Props) {
 
         {/* Right Column - Site Data and Details */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex justify-end mb-4">
-            <Button variant="outline" size="sm">
-              Site Expenses
-            </Button>
-          </div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Job Orders</CardTitle>
@@ -350,13 +471,87 @@ export default function SiteDetailsPage({ params }: Props) {
                           JO#{jobOrder.joNumber} from SALES_{jobOrder.requestedBy}.
                         </p>
                         <p className="text-gray-600 text-xs">
-                          Sent on {formatFirebaseDate(jobOrder.createdAt)}
+                          Sent on {formatFirebaseDate(jobOrder.created)}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center">
+                <Sun className="h-4 w-4 mr-2" />
+                Illumination
+              </CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardHeader>
+            <CardContent className="pl-4 pb-4 grid grid-cols-2 gap-4">
+              <div className="w-[264px] h-[116px] bg-[#B7B7B71A] rounded-[15px]">
+                <div className="flex flex-col space-y-4">
+                  <div className="pt-4 bg-transparent">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-[120px] h-[24px] justify-between border-none bg-transparent text-[16px] font-normal leading-none tracking-normal">
+                          <span className="text-left">{illuminationMode}</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setIlluminationMode("Manual")}>Manual</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIlluminationMode("Automatic")}>Automatic</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div className="flex justify-center mt-4 pt-1">
+                    <div className="flex items-center space-x-8">
+                      <span className={`text-[20px] font-bold leading-none tracking-normal ${illuminationOn ? 'text-gray-600' : 'text-black'}`}>Off</span>
+                      <Switch
+                        checked={illuminationOn}
+                        onCheckedChange={setIlluminationOn}
+                        className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-400"
+                        style={{ transform: 'scale(2.0)' }}
+                      />
+                      <span className={`text-[20px] font-bold leading-none tracking-normal ${illuminationOn ? 'text-black' : 'text-gray-600'}`}>On</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4" style={{ transform: 'translateX(-115px)' }}>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <p><span className="font-semibold text-[16px] leading-[132%] tracking-normal">Upper:</span> {product.specs_rental?.illumination_upper_lighting_specs || "N/A"}</p>
+                  <p><span className="font-semibold text-[16px] leading-[132%] tracking-normal">Bottom:</span> {product.specs_rental?.illumination_bottom_lighting_specs || "N/A"}</p>
+                  <p><span className="font-semibold text-[16px] leading-[132%] tracking-normal">Side (Left):</span> {product.specs_rental?.illumination_left_lighting_specs || "N/A"}</p>
+                  <p><span className="font-semibold text-[16px] leading-[132%] tracking-normal">Side (Right):</span> {product.specs_rental?.illumination_right_lighting_specs || "N/A"}</p>
+                </div>
+
+                <hr className="my-3 border-gray-200 w-[500px]" />
+
+                <p className="text-gray-500 font-semibold text-[16px] leading-none tracking-normal whitespace-nowrap">
+                  Average Monthly Electrical Consumption: <span className="font-normal text-gray-700 text-[16px] leading-none tracking-normal">{product.specs_rental?.power_consumption_monthly || "N/A"} kWh / month</span>
+                </p>
+
+              <div className="col-span-2 flex justify-end mt-4" style={{ transform: 'translateX(85px)' }}>
+                <button className="w-[203px] h-[47px] bg-white border rounded-[5px] shadow-sm font-medium text-[20px] leading-none tracking-normal text-center hover:bg-gray-50">
+                  Index Card
+                </button>
+              </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -523,48 +718,30 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Compliance - Always show */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
+                <CardTitle className="text-base flex items-center font-semibold text-[20px] leading-none tracking-normal">
                   <Shield className="h-4 w-4 mr-2" />
                   Compliance{" "}
-                  <Badge variant="secondary" className="ml-2">
-                    3/5
-                  </Badge>
                 </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Bell className="h-4 w-4 text-gray-500" />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => console.log("Edit compliance clicked")}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="space-y-1 text-sm">
-                  {product.compliance && product.compliance.length > 0 ? (
-                    product.compliance.map((item: { name: string; status: string }, index: number) => (
-                      <div className="flex items-center justify-between" key={index}>
-                        <span>{item.name}</span>
-                        <span className={item.status === "Done" ? "text-green-600" : "text-red-600"}>
-                          {item.status === "Done" ? "Done" : "X"}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div>No compliance data available.</div>
-                  )}
+                <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
+                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Lease Agreement</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
+                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Mayor’s Permit</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
+                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">BIR Registration</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
+                    <label className="font-semibold text-[20px] leading-[132%] tracking-normal text-black">Structural Approval</label>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
-                  See All
-                </Button>
               </CardContent>
             </Card>
 
@@ -674,7 +851,7 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
                   <Users className="h-4 w-4 mr-2" />
-                  Crew
+                  Personnel
                 </CardTitle>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -707,73 +884,6 @@ export default function SiteDetailsPage({ params }: Props) {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Issues */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Issues
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log("Edit issues clicked")}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">Issue</th>
-                        <th className="text-left py-2">Content</th>
-                        <th className="text-left py-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2">06/25/25 Stretching</td>
-                        <td className="py-2">Lilo & Stitch</td>
-                        <td className="py-2 text-green-600">Done</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2">03/17/25 Busted Light</td>
-                        <td className="py-2">Lilo & Stitch</td>
-                        <td className="py-2 text-green-600">Done</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2">01/05/25 Busted Light</td>
-                        <td className="py-2">Wolverine</td>
-                        <td className="py-2 text-green-600">Done</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
-                  <History className="h-4 w-4 mr-2" />
-                  View History
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Automation */}
-            <Button
-              className="w-full bg-purple-100 text-black hover:bg-purple-200 flex items-center justify-start p-4 rounded-lg"
-              onClick={() => console.log("Automation button clicked")}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              <span className="text-base font-semibold">Automation</span>
-            </Button>
-          </div>
         </div>
       </div>
 
