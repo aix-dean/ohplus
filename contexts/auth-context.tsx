@@ -437,6 +437,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onboarding: true, // New users need to complete onboarding
       }
 
+      // For new organizations, set company_id to the user's uid
+      if (!orgCode) {
+        userData.company_id = firebaseUser.uid
+      }
+
       await setDoc(userDocRef, userData)
       console.log("User document created in iboard_users collection")
 
@@ -449,9 +454,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Don't fail registration if role assignment fails
       }
 
-      // Create project if not joining an organization
+      // Create project and company if not joining an organization
       if (!orgCode) {
-        console.log("Creating new project for new organization")
+        console.log("Creating new project and company for new organization")
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
@@ -461,6 +466,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           created: serverTimestamp(),
           updated: serverTimestamp(),
         })
+
+        // Create company document with the same ID as the project
+        const companyDocRef = doc(db, "companies", firebaseUser.uid)
+        await setDoc(companyDocRef, {
+          name: companyInfo.company_name,
+          address: {
+            city: "",
+            province: "",
+            street: companyInfo.company_location,
+          },
+          business_type: "",
+          position: "",
+          website: "",
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+          created_by: firebaseUser.uid,
+          updated_by: firebaseUser.uid,
+        })
+
+        // Update user document to set company_id
+        companyId = firebaseUser.uid
+        await setDoc(userDocRef, { company_id: companyId }, { merge: true })
       }
 
       // Set the user and fetch data
