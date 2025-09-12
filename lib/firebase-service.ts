@@ -62,6 +62,25 @@ export interface Product {
     elevation?: number | null
     height?: number | null
     width?: number | null
+    site_orientation?: string | null
+    caretaker?: string | null
+    structure:{
+      color?: string | null
+      condition?: string | null
+      contractor?: string | null
+      last_maintenance?: Date | null
+    }
+    illumination:{
+      bottom_count?: number | null
+      bottom_lighting_specs?: string | null
+      left_count?: number | null
+      left_lighting_specs?: string | null
+      right_count?: number | null
+      right_lighting_specs?: string | null
+      upper_count?: number | null
+      upper_lighting_specs?: string | null
+      power_consumption_monthly?: number | null
+    }
   }
   type?: string
   status?: string

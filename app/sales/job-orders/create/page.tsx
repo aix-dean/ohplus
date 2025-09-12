@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
+import { serverTimestamp, Timestamp } from "firebase/firestore"
 
 
 interface JobOrderFormData {
@@ -246,23 +247,32 @@ export default function CreateJobOrderPage() {
     return `₱${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }, [])
 
-  const formatPeriod = useCallback((startDate: string | undefined, endDate: string | undefined) => {
-    if (!startDate || !endDate) return "N/A"
-    try {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const startMonth = format(start, "MMMM")
-      const startDay = format(start, "dd")
-      const startYear = format(start, "yyyy")
-      const endMonth = format(end, "MMMM")
-      const endYear = format(end, "yyyy")
 
-      return `${startMonth} ${startDay}, ${startYear} to ${endMonth} ${endYear}`
-    } catch (e) {
-      console.error("Error formatting period:", e)
-      return "Invalid Dates"
-    }
-  }, [])
+  const formatPeriod = useCallback(
+    (startDate?: Date | Timestamp | null, endDate?: Date | Timestamp | null) => {
+      if (!startDate || !endDate) return "N/A"
+
+      const start = startDate instanceof Timestamp
+        ? startDate.toDate()
+        : startDate instanceof Date
+          ? startDate
+          : new Date(startDate)
+
+      const end = endDate instanceof Timestamp
+        ? endDate.toDate()
+        : endDate instanceof Date
+          ? endDate
+          : new Date(endDate)
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn("Invalid date inputs:", startDate, endDate)
+        return "Invalid Dates"
+      }
+
+      return `${format(start, "MMM dd, yyyy")} to ${format(end, "MMM dd, yyyy")}`
+    },
+    []
+  )
 
   const isImageFile = useCallback((fileName: string | null, fileUrl: string | null) => {
     if (!fileName && !fileUrl) return false;
@@ -700,7 +710,7 @@ export default function CreateJobOrderPage() {
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
                 : 0, // Corrected monthlyRate
-            totalMonths: totalDays/30, // This might still be relevant for other calculations, but not for totalLease directly
+            totalMonths: totalDays / 30, // This might still be relevant for other calculations, but not for totalLease directly
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
@@ -716,7 +726,7 @@ export default function CreateJobOrderPage() {
                 fileName: signedQuotationFile?.name || null,
                 fileUrl: signedQuotationUrl,
                 notes: null,
-                uploadedAt: signedQuotationUrl ? new Date().toISOString() : null,
+                uploadedAt: signedQuotationUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (signedQuotationUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -725,7 +735,7 @@ export default function CreateJobOrderPage() {
                 fileName: signedContractFile?.name || null,
                 fileUrl: signedContractUrl,
                 notes: null,
-                uploadedAt: signedContractUrl ? new Date().toISOString() : null,
+                uploadedAt: signedContractUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (signedContractUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -734,7 +744,7 @@ export default function CreateJobOrderPage() {
                 fileName: poMoFile?.name || null,
                 fileUrl: poMoUrl,
                 notes: null,
-                uploadedAt: poMoUrl ? new Date().toISOString() : null,
+                uploadedAt: poMoUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (poMoUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -743,7 +753,7 @@ export default function CreateJobOrderPage() {
                 fileName: finalArtworkFile?.name || null,
                 fileUrl: finalArtworkUrl,
                 notes: null,
-                uploadedAt: finalArtworkUrl ? new Date().toISOString() : null,
+                uploadedAt: finalArtworkUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (finalArtworkUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -752,7 +762,7 @@ export default function CreateJobOrderPage() {
                 fileName: null,
                 fileUrl: null,
                 notes: null,
-                uploadedAt: paymentAdvanceConfirmed ? new Date().toISOString() : null,
+                uploadedAt: paymentAdvanceConfirmed ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (paymentAdvanceConfirmed ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -1832,7 +1842,7 @@ export default function CreateJobOrderPage() {
                           />
                           <Button
                             variant="outline"
-                            className="w-14 h-14 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                            className="w-[100px] h-[100px] relative flex flex-col items-center justify-center text-white border-2 border-gray-300 bg-gray-300 hover:bg-gray-200"
                             onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}
                             disabled={jobOrderForms[0]?.uploadingMaterialSpecAttachment}
                           >
@@ -1840,13 +1850,13 @@ export default function CreateJobOrderPage() {
                             {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Plus className="h-4 w-4" />
+                              <Upload className="h-20 w-20" />
                             )}
                             <div className="absolute inset-0 flex items-start justify-start rounded-md">
                               <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
                             </div>
                             <span className="text-xs mt-1">
-                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : "Upload"}
+                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
                             </span>
                           </Button>
                         </>
