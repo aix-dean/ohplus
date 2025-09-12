@@ -106,6 +106,12 @@ export interface Product {
     uploaded_by: string
     created: any
   }>
+  compliance?: {
+    lease_agreement?: string
+    mayors_permit?: string
+    bir_registration?: string
+    structural_approval?: string
+  }
 }
 
 // ServiceAssignment interface

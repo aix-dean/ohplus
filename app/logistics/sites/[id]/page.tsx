@@ -1187,7 +1187,7 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
                   <div className="flex items-center space-x-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.lease_agreement ? '✅' : '☐'}</span>
                     <label
                       style={{
                         fontFamily: 'Inter',
@@ -1202,7 +1202,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     </label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.mayors_permit ? '✅' : '☐'}</span>
                     <label
                       style={{
                         fontFamily: 'Inter',
@@ -1217,7 +1217,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     </label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-lg">{true ? '✅' : '☐'}</span>
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.bir_registration ? '✅' : '☐'}</span>
                     <label
                       style={{
                         fontFamily: 'Inter',
@@ -1232,7 +1232,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     </label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-lg">{false ? '✅' : '☐'}</span>
+                    <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.structural_approval ? '✅' : '☐'}</span>
                     <label
                       style={{
                         fontFamily: 'Inter',
