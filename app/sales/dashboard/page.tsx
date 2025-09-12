@@ -202,7 +202,7 @@ function SalesDashboardContent() {
         try {
           const itemsPerPage = debouncedDashboardClientSearchTerm.trim() ? 10000 : 100; // 1. Adjust itemsPerPage for initial load to 100. 2. If search term is not empty, fetch all clients (10000).
           const lastDocForSearch = debouncedDashboardClientSearchTerm.trim() ? null : null; // Ensure lastDoc is null for full client fetch when searching.
-          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id);
+          const result = await getPaginatedClients(itemsPerPage, lastDocForSearch, debouncedDashboardClientSearchTerm.trim(), null, null, userData?.company_id || undefined, false);
           setDashboardClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients for dashboard:", error)
@@ -249,13 +249,17 @@ function SalesDashboardContent() {
           const product = products.find((p) => p.id === productId)
           if (product?.type?.toLowerCase() !== "rental") continue
 
-          const q = query(bookingsRef, where("product_id", "==", productId), where("status", "==", "CONFIRMED"))
-
-          const querySnapshot = await getDocs(q)
+          // Check for bookings with status "RESERVED" (case insensitive)
+          const reservedStatuses = ["RESERVED", "reserved", "Reserved"]
+          const bookingPromises = reservedStatuses.map(status =>
+            getDocs(query(bookingsRef, where("product_id", "==", productId), where("status", "==", status)))
+          )
+          const bookingSnapshots = await Promise.all(bookingPromises)
+          const allBookingDocs = bookingSnapshots.flatMap(snapshot => snapshot.docs)
 
           // Check if any booking is ongoing (current date is between start_date and end_date)
           let hasOngoingBooking = false
-          querySnapshot.forEach((doc) => {
+          allBookingDocs.forEach((doc) => {
             const booking = doc.data() as Booking
             const startDate =
               booking.start_date instanceof Timestamp ? booking.start_date.toDate() : new Date(booking.start_date)

@@ -5,7 +5,7 @@ let loadPromise: Promise<void> | null = null
 declare global {
   interface Window {
     google: any
-    initGoogleMapsGlobal: () => void
+    initGoogleMapsGlobal?: () => void
   }
 }
 
@@ -46,6 +46,12 @@ export function loadGoogleMaps(): Promise<void> {
   loadPromise = new Promise(async (resolve, reject) => {
     try {
       const response = await fetch("/api/maps-config")
+
+      if (!response.ok) {
+        reject(new Error("Google Maps API key not configured"))
+        return
+      }
+
       const config = await response.json()
 
       if (!config.apiKey) {

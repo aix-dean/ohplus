@@ -237,7 +237,7 @@ export default function PublicQuotationPage({ params }: { params: { id: string }
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Size</span>
-            <span className="text-gray-700">: {quotation?.size || "100ft (H) x 60ft (W)"}</span>
+            <span className="text-gray-700">: {(item?.width && item?.height) ? `${item.width}ft (W) x ${item.height}ft (H)` : "N/A"}</span>
           </div>
 
           <div className="flex items-center">

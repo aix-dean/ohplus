@@ -1,17 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, List, Grid3X3, X } from "lucide-react"
-import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import AllSitesTab from "./all-sites"
 import { useAuth } from "@/contexts/auth-context"
 import { RouteProtection } from "@/components/route-protection"
 
 export default function LogisticsDashboardPage() {
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [contentTypeFilter, setContentTypeFilter] = useState("All")
@@ -34,7 +34,7 @@ export default function LogisticsDashboardPage() {
                   : "Dashboard"}
               </h1>
               <Button
-                onClick={() => setDialogOpen(true)}
+                onClick={() => router.push("/logistics/assignments/create")}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
               >
                 Service Assignment
@@ -104,14 +104,6 @@ export default function LogisticsDashboardPage() {
           </div>
         </main>
 
-        {/* Service Assignment Dialog */}
-        <ServiceAssignmentDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSuccess={() => {
-            // You could add a success toast notification here
-          }}
-        />
       </div>
     </RouteProtection>
   )

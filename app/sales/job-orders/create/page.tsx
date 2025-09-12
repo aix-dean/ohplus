@@ -14,7 +14,9 @@ import {
   ImageIcon,
   XCircle,
   Package,
-  CircleCheck 
+  CircleCheck,
+  Upload,
+  ArrowRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,10 +46,11 @@ import { type Client, updateClient, updateClientCompany, type ClientCompany, get
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
+import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 
-const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
 interface JobOrderFormData {
+  joNumber: string
   joType: JobOrderType | ""
   dateRequested: Date | undefined
   deadline: Date | undefined
@@ -57,6 +60,11 @@ interface JobOrderFormData {
   attachmentUrl: string | null
   uploadingAttachment: boolean
   attachmentError: string | null
+  materialSpec: string
+  materialSpecAttachmentFile: File | null
+  materialSpecAttachmentUrl: string | null
+  uploadingMaterialSpecAttachment: boolean
+  materialSpecAttachmentError: string | null
   joTypeError: boolean
   dateRequestedError: boolean
 }
@@ -128,6 +136,10 @@ export default function CreateJobOrderPage() {
 
   // Coming soon dialog state
   const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
+
+  // Compliance confirmation dialog state
+  const [showComplianceDialog, setShowComplianceDialog] = useState(false)
+  const [pendingJobOrderStatus, setPendingJobOrderStatus] = useState<JobOrderStatus | null>(null)
 
 
   // Calculate derived values using useMemo - these will always be called
@@ -201,9 +213,36 @@ export default function CreateJobOrderPage() {
     return productTotals.reduce((sum, product) => sum + product.total, 0)
   }, [productTotals])
 
+  // Extract content_type from quotation data
+  const contentType = useMemo(() => {
+    return quotationData?.quotation?.items?.[0]?.content_type || "static"
+  }, [quotationData])
+
+  // Dynamic JO type options based on content_type
+  const joTypeOptions = useMemo(() => {
+    if (contentType === "static") {
+      return ["Roll down", "Roll up", "Change Material", "Monitoring", "Other"]
+    } else if (contentType === "dynamic") {
+      return ["Publish", "Change Material", "Monitoring", "Other"]
+    } else {
+      return ["Roll down", "Roll up", "Change Material", "Monitoring", "Other"]
+    }
+  }, [contentType])
+
+  // Dynamic material spec options based on content_type
+  const materialSpecOptions = useMemo(() => {
+    if (contentType === "static") {
+      return ["Tarpaulin", "Sticker", "Other"]
+    } else if (contentType === "dynamic") {
+      return ["Digital File"]
+    } else {
+      return ["Tarpaulin", "Sticker", "Other"]
+    }
+  }, [contentType])
+  console.log("product totals :", productTotals)
   // All useCallback hooks
   const formatCurrency = useCallback((amount: number | undefined) => {
-    if (amount === undefined || amount === null) return "₱0.00"
+    if (amount === undefined || amount === null || amount === 0) return "N/A"
     return `₱${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }, [])
 
@@ -224,6 +263,25 @@ export default function CreateJobOrderPage() {
       return "Invalid Dates"
     }
   }, [])
+
+  const isImageFile = useCallback((fileName: string | null, fileUrl: string | null) => {
+    if (!fileName && !fileUrl) return false;
+
+    // Pick fileName if provided, otherwise extract from URL
+    let name = fileName || "";
+
+    if (!name && fileUrl) {
+      // Remove query params (?alt=...)
+      const cleanUrl = fileUrl.split("?")[0];
+      // Decode %20 etc.
+      const decodedUrl = decodeURIComponent(cleanUrl);
+      // Get the last part after /
+      name = decodedUrl.split("/").pop() || "";
+    }
+
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"];
+    return imageExtensions.some(ext => name.toLowerCase().endsWith(ext));
+  }, []);
 
   const handleFileUpload = useCallback(
     async (
@@ -276,7 +334,7 @@ export default function CreateJobOrderPage() {
 
         // Prioritize updating client company compliance if clientId and a recognized fieldToUpdate are present
         // Handle project compliance updates for quotation documents
-        if (quotationId && fieldToUpdate && (fieldToUpdate === "signedQuotation" || fieldToUpdate === "signedContract" || fieldToUpdate === "poMo" || fieldToUpdate === "finalArtwork" || fieldToUpdate === "paymentAsDeposit" )) {
+        if (quotationId && fieldToUpdate && (fieldToUpdate === "signedQuotation" || fieldToUpdate === "signedContract" || fieldToUpdate === "poMo" || fieldToUpdate === "finalArtwork" || fieldToUpdate === "paymentAsDeposit")) {
           console.log("handleFileUpload: Attempting to update project compliance for quotation.");
           console.log("handleFileUpload: quotationId:", quotationId);
           console.log("handleFileUpload: fieldToUpdate:", fieldToUpdate);
@@ -402,7 +460,7 @@ export default function CreateJobOrderPage() {
           console.log("Existing client company document:", existingClientCompany);
           const existingCompliance = existingClientCompany?.compliance || {};
           console.log("Existing compliance:", existingCompliance);
- 
+
           let complianceFieldKey: "dti" | "gis" | "id" | undefined;
 
           if (fieldToUpdate === "dti_bir_2303_url") {
@@ -507,15 +565,49 @@ export default function CreateJobOrderPage() {
     [handleFormUpdate, toast],
   )
 
+  const handleMaterialSpecAttachmentUpload = useCallback(
+    async (productIndex: number, file: File) => {
+      handleFormUpdate(productIndex, "uploadingMaterialSpecAttachment", true)
+      handleFormUpdate(productIndex, "materialSpecAttachmentError", null)
+      handleFormUpdate(productIndex, "materialSpecAttachmentUrl", null)
+
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(file, `attachments/job-orders/material-spec-${productIndex}/`)
+        handleFormUpdate(productIndex, "materialSpecAttachmentUrl", downloadURL)
+        handleFormUpdate(productIndex, "materialSpecAttachmentFile", file)
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} uploaded successfully.`,
+        })
+      } catch (error: any) {
+        console.error("Upload failed:", error)
+        handleFormUpdate(productIndex, "materialSpecAttachmentError", `Upload failed: ${error.message || "Unknown error"}`)
+        toast({
+          title: "Upload Failed",
+          description: `Could not upload ${file.name}. ${error.message || "Please try again."}`,
+          variant: "destructive",
+        })
+      } finally {
+        handleFormUpdate(productIndex, "uploadingMaterialSpecAttachment", false)
+      }
+    },
+    [handleFormUpdate, toast],
+  )
+
   const validateForms = useCallback((): boolean => {
     let hasError = false
 
     jobOrderForms.forEach((form, index) => {
-      if (!form.joType) {
+      if (!form.joType || !joTypeOptions.includes(form.joType)) {
         handleFormUpdate(index, "joTypeError", true)
         hasError = true
       } else {
         handleFormUpdate(index, "joTypeError", false)
+      }
+
+      // Check and reset materialSpec if invalid
+      if (form.materialSpec && !materialSpecOptions.includes(form.materialSpec)) {
+        handleFormUpdate(index, "materialSpec", "")
       }
 
       if (!form.dateRequested) {
@@ -531,9 +623,9 @@ export default function CreateJobOrderPage() {
     })
 
     return !hasError
-  }, [jobOrderForms, handleFormUpdate])
+  }, [jobOrderForms, handleFormUpdate, joTypeOptions, materialSpecOptions])
 
-  const handleCreateJobOrders = useCallback(
+  const createJobOrdersWithStatus = useCallback(
     async (status: JobOrderStatus) => {
       if (!quotationData || !user?.uid) {
         toast({
@@ -544,22 +636,13 @@ export default function CreateJobOrderPage() {
         return
       }
 
-      if (!validateForms()) {
-        toast({
-          title: "Missing Fields",
-          description: "Please fill in all required fields for all Job Orders.",
-          variant: "destructive",
-        })
-        return
-      }
-
       setIsSubmitting(true)
 
-      const quotation = quotationData.quotation
-      const products = quotationData.products
-      const client = quotationData.client
-
       try {
+        const quotation = quotationData.quotation
+        const products = quotationData.products
+        const client = quotationData.client
+
         let jobOrdersData = []
 
         // Single product from quotation object
@@ -575,52 +658,59 @@ export default function CreateJobOrderPage() {
         jobOrdersData = [
           {
             quotationId: quotation.id,
-            joNumber: await generatePersonalizedJONumber(userData), // Replace hardcoded "JO-AUTO-GEN" with personalized number
-            dateRequested: form.dateRequested!.toISOString(),
+            created: new Date(),
+            joNumber: form.joNumber || await generatePersonalizedJONumber(userData), // Use input JO# if provided, else generate
+            dateRequested: form.dateRequested!,
             joType: form.joType as JobOrderType,
-            deadline: form.deadline!.toISOString(),
+            deadline: form.deadline!,
             campaignName: form.campaignName, // Added campaign name
             requestedBy: userData?.first_name || "Auto-Generated",
             remarks: form.remarks,
             attachments: form.attachmentUrl
-              ? [
-                  {
-                    url: form.attachmentUrl,
-                    name: form.attachmentFile?.name || "Attachment",
-                    type: form.attachmentFile?.type || "image",
-                  },
-                ]
-              : [],
-            dtiBirUrl: dtiBirUrl, // Added client compliance
-            gisUrl: gisUrl, // Added client compliance
-            idSignatureUrl: idSignatureUrl, // Added client compliance
+              ? {
+                url: form.attachmentUrl,
+                name: form.attachmentFile?.name || "Attachment",
+                type: form.attachmentFile?.type || "image",
+              }
+              : null,
+            materialSpec: form.materialSpec,
+            materialSpecAttachmentUrl: form.materialSpecAttachmentUrl,
+            clientCompliance: {
+              dtiBirUrl: dtiBirUrl, // Added client compliance
+              gisUrl: gisUrl, // Added client compliance
+              idSignatureUrl: idSignatureUrl,
+            }, // Initialize empty clientCompliance
             quotationNumber: quotation.quotation_number,
             clientName: client?.name || "N/A",
-            clientCompany: client?.name || "N/A", // Changed from client?.company to client?.name
-            contractDuration: contractDuration, // Use new contractDuration
-            contractPeriodStart: quotation.start_date || "",
-            contractPeriodEnd: quotation.end_date || "",
-            siteName: product.name || "", // Get from product
-            siteCode: product.site_code || "N/A", // Get from product
-            siteType: product.type || "N/A",
+            clientCompany: quotation?.client_company_name || "N/A", // Changed from client?.company to client?.name
+            clientCompanyId: quotation.client_company_id || "",
+            clientId: client?.id || "",
+            contractDuration: totalDays, // Use totalDays as number
+            contractPeriodStart: quotation.start_date ? new Date(quotation.start_date) : null,
+            contractPeriodEnd: quotation.end_date ? new Date(quotation.end_date) : null,
+            siteName: quotation.items?.[0]?.name || "", // Get from quotation items
+            siteCode: quotation.items?.[0]?.site_code || "N/A", // Get from quotation items
+            siteType: quotation.items?.[0]?.site_type || "N/A",
             siteSize:
-              (product.specs_rental?.width && product.specs_rental?.height
-                ? `${product.specs_rental.width}x${product.specs_rental.height}ft`
-                : "N/A") || "N/A", // Corrected siteSize
-            siteIllumination: product.light?.illumination_status || "N/A", // Corrected siteIllumination
+              (quotation.items?.[0]?.height && quotation.items?.[0]?.width
+                ? `${quotation.items[0].width}x${quotation.items[0].height}ft`
+                : "N/A") || "N/A", // Use quotation items height and width
+            siteIllumination: quotation.items?.[0]?.light ? "Yes" : "No", // Use quotation items light as boolean
+            illumination: products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
             leaseRatePerMonth:
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
                 : 0, // Corrected monthlyRate
-            totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+            totalMonths: totalDays/30, // This might still be relevant for other calculations, but not for totalLease directly
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
-            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            siteImageUrl: quotation.items?.[0]?.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
             missingCompliance: missingCompliance,
-            product_id: quotation.product_id || product.id || "",
+            product_id: quotation.items[0].id || "",
             company_id: userData?.company_id || "",
             created_by: user.uid, // Added created_by
+            content_type: contentType, // Added content_type
             projectCompliance: { // Construct projectCompliance object
               signedQuotation: {
                 completed: !!signedQuotationUrl,
@@ -692,7 +782,6 @@ export default function CreateJobOrderPage() {
     [
       quotationData,
       user,
-      validateForms,
       jobOrderForms,
       totalDays,
       signedQuotationUrl,
@@ -704,6 +793,46 @@ export default function CreateJobOrderPage() {
       userData,
       toast,
     ],
+  )
+
+  const handleCreateJobOrders = useCallback(
+    async (status: JobOrderStatus) => {
+      if (!quotationData || !user?.uid) {
+        toast({
+          title: "Missing Information",
+          description: "Cannot create Job Orders due to missing data or user authentication.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!validateForms()) {
+        toast({
+          title: "Missing Fields",
+          description: "Please fill in all required fields for all Job Orders.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check if any project compliances are missing
+      const hasMissingProjectCompliance = missingCompliance.signedQuotation ||
+        missingCompliance.signedContract ||
+        missingCompliance.poMo ||
+        missingCompliance.finalArtwork ||
+        missingCompliance.paymentAdvance
+
+      // If there are missing project compliances, show the confirmation dialog
+      if (hasMissingProjectCompliance) {
+        setPendingJobOrderStatus(status)
+        setShowComplianceDialog(true)
+        return
+      }
+
+      // If all compliances are complete, proceed with creation
+      await createJobOrdersWithStatus(status)
+    },
+    [quotationData, user?.uid, validateForms, missingCompliance, createJobOrdersWithStatus],
   )
 
   const handleDismissAndNavigate = useCallback(() => {
@@ -825,6 +954,7 @@ export default function CreateJobOrderPage() {
     if (quotationData && userData?.uid) {
       const initialForms: JobOrderFormData[] = [
         {
+          joNumber: "",
           joType: "",
           dateRequested: new Date(),
           deadline: undefined,
@@ -834,6 +964,11 @@ export default function CreateJobOrderPage() {
           attachmentUrl: null,
           uploadingAttachment: false,
           attachmentError: null,
+          materialSpec: "",
+          materialSpecAttachmentFile: null,
+          materialSpecAttachmentUrl: null,
+          uploadingMaterialSpecAttachment: false,
+          materialSpecAttachmentError: null,
           joTypeError: false,
           dateRequestedError: false,
         },
@@ -841,6 +976,22 @@ export default function CreateJobOrderPage() {
       setJobOrderForms(initialForms)
     }
   }, [quotationData, userData?.uid])
+
+  // Reset joType and materialSpec if they are not in the new dynamic options
+  useEffect(() => {
+    setJobOrderForms((prev) => {
+      const updated = [...prev]
+      if (updated[0]) {
+        if (updated[0].joType && !joTypeOptions.includes(updated[0].joType)) {
+          updated[0] = { ...updated[0], joType: "" }
+        }
+        if (updated[0].materialSpec && !materialSpecOptions.includes(updated[0].materialSpec)) {
+          updated[0] = { ...updated[0], materialSpec: "" }
+        }
+      }
+      return updated
+    })
+  }, [joTypeOptions, materialSpecOptions])
 
   // Early returns after all hooks
   if (loading) {
@@ -867,21 +1018,21 @@ export default function CreateJobOrderPage() {
   const quotation = quotationData.quotation
   const products = quotationData.products
   const client = quotationData.client
-
+  console.log()
   return (
-    <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="flex flex-col min-h-screen bg-gray-50 p-2">
+      <div className="flex items-center bg-white gap-4 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-2xl font-bold text-gray-900">Create Job Order</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl w-full mx-auto bg-gray-50 p-6 rounded-lg">
         {/* Left Column: Booking Information */}
-        <div className="space-y-6 lg:border-r lg:border-gray-200 lg:pr-8">
+        <div className="space-y-6 lg:pr-8 bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-lg font-bold text-gray-900">Booking Information</h2>
-          <div className="space-y-3 text-gray-800">
+          <div className="text-gray-800">
             <div className="space-y-0.5">
               <a
                 href={`/sales/quotations/${quotation.id}`}
@@ -891,21 +1042,23 @@ export default function CreateJobOrderPage() {
               </a>
               <p className="text-xs text-gray-600">Project ID: {quotation.id}</p>
             </div>
-            <div className="space-y-0.5">
-              <p className="text-sm">
-                <span className="font-semibold">Client Name:</span> {client?.name || "N/A"}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold">Contract Period:</span>{" "}
-                {formatPeriod(quotation.start_date, quotation.end_date)}
-              </p>
+            <div className="space-y-0.5 mt-3">
+              <div>
+                <p className="text-sm">
+                  <span className="font-semibold">Client Name:</span> {client?.name || "N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Contract Period:</span> {formatPeriod(quotation.start_date, quotation.end_date)}
+                </p>
+              </div>
             </div>
 
+
             {/* Products/Sites List */}
-            <div className="space-y-1 mt-3">
+            <div className="space-y-1">
               <p className="text-sm font-semibold">Site:</p>
               <div className="space-y-2">
                 {productTotals.map((productTotal, index) => {
@@ -913,18 +1066,17 @@ export default function CreateJobOrderPage() {
                   const product = products[index] || {}
 
                   return (
-                    <div key={index} className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md">
+                    <div key={index} className="flex items-center align-items-start gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
                       <Image
                         src={product.media?.[0]?.url || "/placeholder.svg?height=40&width=40&query=billboard"}
                         alt={productTotal.productName || "Site image"}
-                        width={40}
-                        height={40}
+                        width={50}
+                        height={60}
                         className="rounded-md object-cover"
                       />
                       <div className="flex-1">
                         <p className="font-semibold text-sm">{productTotal.siteCode}</p>
                         <p className="text-xs text-gray-600">{productTotal.productName}</p>
-                        <p className="text-xs text-gray-500">{formatCurrency(productTotal.monthlyRate)}/month</p>
                       </div>
                     </div>
                   )
@@ -936,12 +1088,26 @@ export default function CreateJobOrderPage() {
             <div className="space-y-0.5 mt-3">
               <div>
                 <p className="text-sm">
-                  <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotals[0].subtotal)}
+                  <span className="font-semibold">Site Type:</span> {"N/A"}
                 </p>
                 <p className="text-sm">
-                  <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotals[0].vat)}
+                  <span className="font-semibold">Size:</span> {"N/A"}
                 </p>
-                <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(productTotals[0].total)}</p>
+                <p className="text-sm">
+                  <span className="font-semibold">Illumination:</span> {"N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Lease Rate/Month:</span> {formatCurrency(productTotals[0].monthlyRate)}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Total Lease:</span> {formatCurrency(productTotals[0].subtotal)}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">12%VAT:</span> {formatCurrency(productTotals[0].vat)}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Total:</span> {formatCurrency(productTotals[0].total)}
+                </p>
               </div>
             </div>
 
@@ -1167,7 +1333,7 @@ export default function CreateJobOrderPage() {
               {/* Signed Quotation */}
               <div className="flex items-center gap-2">
                 {signedQuotationUrl ? (
-                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
                 ) : (
                   <input
                     type="radio"
@@ -1237,7 +1403,7 @@ export default function CreateJobOrderPage() {
               {/* Signed Contract */}
               <div className="flex items-center gap-2">
                 {signedContractUrl ? (
-                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
                 ) : (
                   <input
                     type="radio"
@@ -1306,7 +1472,7 @@ export default function CreateJobOrderPage() {
               {/* PO/MO */}
               <div className="flex items-center gap-2">
                 {poMoUrl ? (
-                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
                 ) : (
                   <input
                     type="radio"
@@ -1376,7 +1542,7 @@ export default function CreateJobOrderPage() {
               {/* Final Artwork */}
               <div className="flex items-center gap-2">
                 {finalArtworkUrl ? (
-                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
                 ) : (
                   <input
                     type="radio"
@@ -1397,20 +1563,22 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    FinalArtwork
+                    Final Artwork
                   </a>
                 ) : (
                   <input
                     type="file"
                     id="final-artwork-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     className="hidden"
                     onChange={(event) => {
                       if (event.target.files && event.target.files[0]) {
+                        const file = event.target.files[0]
+                        const fileType = file.type.startsWith('image/') ? "image" : "document"
                         if (quotationId) {
                           handleFileUpload(
-                            event.target.files[0],
-                            "document",
+                            file,
+                            fileType,
                             setFinalArtworkFile,
                             setFinalArtworkUrl,
                             setUploadingFinalArtwork,
@@ -1446,7 +1614,7 @@ export default function CreateJobOrderPage() {
               {/* Payment as Deposit/Advance */}
               <div className="flex items-center gap-2">
                 {paymentAdvanceConfirmed ? (
-                  <CircleCheck  className="h-4 w-4 text-white fill-green-500" />
+                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
                 ) : (
                   <input
                     type="radio"
@@ -1470,16 +1638,16 @@ export default function CreateJobOrderPage() {
         {/* Right Column: Job Order Forms */}
         <div className="space-y-4">
           {missingCompliance.dtiBir ||
-          missingCompliance.gis ||
-          missingCompliance.idSignature ||
-          missingCompliance.signedQuotation ||
-          missingCompliance.signedContract ||
-          missingCompliance.poMo ||
-          missingCompliance.finalArtwork ||
-          missingCompliance.paymentAdvance ? (
+            missingCompliance.gis ||
+            missingCompliance.idSignature ||
+            missingCompliance.signedQuotation ||
+            missingCompliance.signedContract ||
+            missingCompliance.poMo ||
+            missingCompliance.finalArtwork ||
+            missingCompliance.paymentAdvance ? (
             <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
               <AlertCircle className="h-4 w-4 text-red-500" />
-              <AlertTitle className="text-red-700 text-sm">
+              <AlertTitle className="text-red-700 text-xs">
                 This client has some missing project compliance requirements.
               </AlertTitle>
               <AlertDescription className="text-red-700 text-xs">
@@ -1492,232 +1660,312 @@ export default function CreateJobOrderPage() {
               </AlertDescription>
             </Alert>
           ) : null}
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="flex justify-between items-center ">
+              <p className="text-xs flex-1 font-bold text-blue-600">
+                JO#
+              </p>
+              <h2 className="text-lg flex-1 font-bold text-gray-900 text-center">
+                Job Order
+              </h2>
+              <p className="text-xs flex-1 font-bold text-blue-600 text-right">
+                {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+              </p>
+            </div>
 
-          <h2 className="text-lg font-bold text-gray-900">
-            Job Order
-          </h2>
+            <div className="space-y-4">
+              <div className="space-y-4 pt-6">
 
-          <div className="space-y-4">
-            <div className="space-y-4 pt-6">
-              {/* Same form fields as in the tabs, but without the card header */}
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">JO #</Label>
-                <Input value="(Auto-Generated)" disabled className="flex-1 bg-gray-100 text-gray-600 text-sm h-9" />
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Campaign Name</Label>
-                <Input
-                  placeholder="Fantastic 4"
-                  value={jobOrderForms[0]?.campaignName || ""}
-                  onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
-                  className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Date Requested</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
+                <div className="flex items-center space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">JO Type</Label>
+                  <Select
+                    onValueChange={(value: JobOrderType) => {
+                      handleFormUpdate(0, "joType", value)
+                      handleFormUpdate(0, "joTypeError", false)
+                    }}
+                    value={jobOrderForms[0]?.joType}
+                  >
+                    <SelectTrigger
                       className={cn(
-                        "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                        !jobOrderForms[0]?.dateRequested && "text-gray-500",
-                        jobOrderForms[0]?.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
+                        "flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                        jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
                       )}
-                      onClick={() => handleFormUpdate(0, "dateRequestedError", false)}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                      {jobOrderForms[0]?.dateRequested ? (
-                        format(jobOrderForms[0].dateRequested, "PPP")
-                      ) : (
-                        <span>Date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={jobOrderForms[0]?.dateRequested}
-                      onSelect={(date) => {
-                        handleFormUpdate(0, "dateRequested", date)
-                        handleFormUpdate(0, "dateRequestedError", false)
-                      }}
-                      // Removed initialFocus to ensure it opens to the selected date
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">JO Type</Label>
-                <Select
-                  onValueChange={(value: JobOrderType) => {
-                    handleFormUpdate(0, "joType", value)
-                    handleFormUpdate(0, "joTypeError", false)
-                  }}
-                  value={jobOrderForms[0]?.joType}
-                >
-                  <SelectTrigger
-                    className={cn(
-                      "flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                      jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
-                    )}
-                  >
-                    <SelectValue placeholder="Choose JO Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {joTypes.map((type) => (
-                      <SelectItem key={type} value={type} className="text-sm">
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Deadline</Label>
-                <div className="flex-1 flex gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                          !jobOrderForms[0]?.deadline && "text-gray-500",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                        {jobOrderForms[0]?.deadline ? (
-                          format(jobOrderForms[0].deadline, "PPP")
-                        ) : (
-                          <span>Select Date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={jobOrderForms[0]?.deadline}
-                        onSelect={(date) => handleFormUpdate(0, "deadline", date)}
-                        disabled={{ before: new Date() }} // Disable past dates
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="outline"
-                    className="w-24 h-9 text-xs bg-transparent"
-                    onClick={() => setShowComingSoonDialog(true)}
-                  >
-                    Timeline
-                  </Button>
+                      <SelectValue placeholder="Choose JO Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {joTypeOptions.map((type) => (
+                        <SelectItem key={type} value={type} className="text-sm">
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Requested By</Label>
-                <Input
-                  value={userData?.first_name || "(Auto-Generated)"}
-                  disabled
-                  className="flex-1 bg-gray-100 text-gray-600 text-sm h-9"
-                />
-              </div>
+                <div className="flex items-center space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">Campaign Name</Label>
+                  <Input
+                    placeholder="Fantastic 4"
+                    value={jobOrderForms[0]?.campaignName || ""}
+                    onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
+                    className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
+                  />
+                </div>
 
-              <div className="flex items-start space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Remarks</Label>
-                <Input
-                  placeholder="Remarks..."
-                  value={jobOrderForms[0]?.remarks || ""}
-                  onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
-                  className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
-                />
-              </div>
-
-              {/* Material Preview */}
-              <div className="flex items-start space-x-2">
-                <Label className="w-36 text-sm text-gray-800">Material Preview</Label>
-                {jobOrderForms[0]?.attachmentUrl ? (
-                  <div className="relative w-12 h-12 rounded-md overflow-hidden">
-                    <Image
-                      src={jobOrderForms[0].attachmentUrl}
-                      alt="Material Preview"
-                      layout="fill"
-                      objectFit="cover"
-                    />
+                <div className="flex items-center space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">Deadline</Label>
+                  <div className="flex-1 flex gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                            !jobOrderForms[0]?.deadline && "text-gray-500",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          {jobOrderForms[0]?.deadline ? (
+                            format(jobOrderForms[0].deadline, "PPP")
+                          ) : (
+                            <span>Select Date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={jobOrderForms[0]?.deadline}
+                          onSelect={(date) => handleFormUpdate(0, "deadline", date)}
+                          disabled={{ before: new Date() }} // Disable past dates
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-0 right-0 h-4 w-4 text-white bg-black/50 hover:bg-black/70"
-                      onClick={() => {
-                        handleFormUpdate(0, "attachmentUrl", null)
-                        handleFormUpdate(0, "attachmentFile", null)
-                      }}
+                      variant="outline"
+                      className="w-24 h-9 text-xs bg-transparent"
+                      onClick={() => setShowComingSoonDialog(true)}
                     >
-                      <XCircle className="h-3 w-3" />
+                      Timeline
                     </Button>
                   </div>
-                ) : (
-                  <input
-                    type="file"
-                    id="attachment-upload-0"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        handleProductAttachmentUpload(0, event.target.files[0])
-                      }
-                    }}
+                </div>
+
+                {jobOrderForms[0]?.joType !== "Monitoring" && (
+                  <div className="flex items-center space-x-2">
+                    <Label className="w-36 text-sm text-gray-800">Material Spec</Label>
+                    <Select
+                      onValueChange={(value) => handleFormUpdate(0, "materialSpec", value)}
+                      value={jobOrderForms[0]?.materialSpec}
+                    >
+                      <SelectTrigger className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
+                        <SelectValue placeholder="Choose Material Spec" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {materialSpecOptions.map((spec) => (
+                          <SelectItem key={spec} value={spec} className="text-sm">
+                            {spec}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {/* Combined Attachment Upload in Single Line */}
+                <div className="flex items-start space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">Attachment</Label>
+                </div>
+                <div className="flex items-start space-x-2">
+
+                  <div className="flex items-center align-center gap-4 flex-1">
+                    {/* Final Artwork */}
+                    <div className="flex flex-col items-center gap-2">
+                      {finalArtworkUrl ? (
+                        <div className="flex items-center gap-2">
+                          {isImageFile(null, finalArtworkUrl) ? (
+                            <div className="relative inline-block">
+                              <Image
+                                src={finalArtworkUrl}
+                                alt="Final Artwork"
+                                width={100}
+                                height={100}
+                                className="rounded-md object-cover shadow-md"
+                              />
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <FileText className="h-5 w-5 text-blue-600" />
+                          )}
+                        </div>
+                      ) : jobOrderForms[0]?.materialSpecAttachmentUrl ? (
+                        <div className="flex items-center gap-2">
+                          {isImageFile(jobOrderForms[0].materialSpecAttachmentFile?.name || null, jobOrderForms[0].materialSpecAttachmentUrl) ? (
+                            <Image
+                              src={jobOrderForms[0].materialSpecAttachmentUrl}
+                              alt={jobOrderForms[0].materialSpecAttachmentFile?.name || "Attachment"}
+                              width={50}
+                              height={50}
+                              className="rounded-md object-cover shadow-md"
+                            />
+                          ) : (
+                            <>
+                              <FileText className="h-5 w-5 text-blue-600" />
+                              <span className="text-xs text-blue-600">{jobOrderForms[0].materialSpecAttachmentFile?.name || "Attachment"}</span>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            type="file"
+                            id="material-spec-attachment-upload-0"
+                            accept="image/*,application/pdf"
+                            className="hidden"
+                            onChange={(event) => {
+                              if (event.target.files && event.target.files[0]) {
+                                handleMaterialSpecAttachmentUpload(0, event.target.files[0])
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            className="w-14 h-14 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                            onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}
+                            disabled={jobOrderForms[0]?.uploadingMaterialSpecAttachment}
+                          >
+
+                            {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                            <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                            </div>
+                            <span className="text-xs mt-1">
+                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : "Upload"}
+                            </span>
+                          </Button>
+                        </>
+                      )}
+                      {jobOrderForms[0]?.materialSpecAttachmentError && (
+                        <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
+                    </div>
+
+                    {/* new upload*/}
+                    <div className="flex flex-col items-center gap-2">
+                      <input
+                        type="file"
+                        id="attachment-upload-0"
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        onChange={(event) => {
+                          if (event.target.files && event.target.files[0]) {
+                            handleProductAttachmentUpload(0, event.target.files[0])
+                          }
+                        }}
+                      />
+                      {jobOrderForms[0]?.attachmentUrl ? (
+                        <div className="flex items-center gap-2 relative">
+                          {isImageFile(jobOrderForms[0].attachmentFile?.name || null, jobOrderForms[0].attachmentUrl) ? (
+                            <Image
+                              src={jobOrderForms[0].attachmentUrl}
+                              alt={jobOrderForms[0].attachmentFile?.name || "Attachment"}
+                              width={100}
+                              height={100}
+                              className="rounded-md object-cover shadow-md"
+                            />
+                          ) : (
+                            <>
+                              <FileText className="h-5 w-5 text-blue-600" />
+                              <span className="text-xs text-blue-600">{jobOrderForms[0].attachmentFile?.name || "Attachment"}</span>
+                            </>
+                          )}
+                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
+                          onClick={() => document.getElementById("attachment-upload-0")?.click()}
+                          disabled={jobOrderForms[0]?.uploadingAttachment}
+                        >
+                          {jobOrderForms[0]?.uploadingAttachment ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-20 w-20 text-white" />
+                          )}
+                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                          </div>
+                          <span className="text-xs mt-1">
+                            {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : ""}
+                          </span>
+                        </Button>
+                      )}
+                      {jobOrderForms[0]?.attachmentError && (
+                        <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">Remarks</Label>
+                  <Input
+                    placeholder="Remarks..."
+                    value={jobOrderForms[0]?.remarks || ""}
+                    onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                    className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
                   />
-                )}
-                {!jobOrderForms[0]?.attachmentUrl && (
-                  <Button
-                    variant="outline"
-                    className="w-12 h-12 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                    onClick={() => document.getElementById("attachment-upload-0")?.click()}
-                    disabled={jobOrderForms[0]?.uploadingAttachment}
-                  >
-                    {jobOrderForms[0]?.uploadingAttachment ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                    <span className="text-xs mt-1">
-                      {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : "Upload"}
-                    </span>
-                  </Button>
-                )}
-                {jobOrderForms[0]?.attachmentError && (
-                  <p className="text-xs text-red-500 mt-1">{jobOrderForms[0].attachmentError}</p>
-                )}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Label className="w-36 text-sm text-gray-800">Requested By</Label>
+                  <Input
+                    value={userData?.first_name || "(Auto-Generated)"}
+                    disabled
+                    className="flex-1 bg-gray-100 text-gray-600 text-sm h-9"
+                  />
+                </div>
+
               </div>
             </div>
-          </div>
 
-          <p className="text-xs text-gray-500 mt-4 text-center">
-            This Job Order will be forwarded to your Logistics Team.
-          </p>
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              This Job Order will be forwarded to your Logistics Team.
+            </p>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 justify-center">
-            <Button
-              variant="outline"
-              onClick={() => handleCreateJobOrders("draft")}
-              disabled={isSubmitting}
-              className="flex-1 bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Save as Draft
-            </Button>
-            <Button
-              onClick={() => handleCreateJobOrders("pending")}
-              disabled={isSubmitting}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Create Job Order
-            </Button>
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => handleCreateJobOrders("draft")}
+                disabled={isSubmitting}
+                className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Save as Draft
+              </Button>
+              <Button
+                onClick={() => handleCreateJobOrders("pending")}
+                disabled={isSubmitting}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Create JO
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1732,6 +1980,25 @@ export default function CreateJobOrderPage() {
 
       {/* Coming Soon Dialog */}
       <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />
+
+      {/* Compliance Confirmation Dialog */}
+      <ComplianceConfirmationDialog
+        isOpen={showComplianceDialog}
+        onClose={() => setShowComplianceDialog(false)}
+        onSkip={() => {
+          if (pendingJobOrderStatus) {
+            createJobOrdersWithStatus(pendingJobOrderStatus)
+          }
+          setShowComplianceDialog(false)
+        }}
+        complianceItems={[
+          { name: "Signed Quotation", completed: !missingCompliance.signedQuotation, type: "upload" },
+          { name: "Signed Contract", completed: !missingCompliance.signedContract, type: "upload" },
+          { name: "PO/MO", completed: !missingCompliance.poMo, type: "upload" },
+          { name: "Final Artwork", completed: !missingCompliance.finalArtwork, type: "upload" },
+          { name: "Payment as Deposit/Advance", completed: !missingCompliance.paymentAdvance, type: "confirmation" },
+        ]}
+      />
     </div>
   )
 }

@@ -99,7 +99,7 @@ export default function CreateTreasuryCollectiblePage() {
       if (user?.uid) {
         setIsSearchingClients(true)
         try {
-          const result = await getPaginatedClients(10, null, clientSearchTerm.trim(), null, user.uid)
+          const result = await getPaginatedClients(10, null, clientSearchTerm.trim(), null, user.uid, undefined, false)
           setClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients:", error)
