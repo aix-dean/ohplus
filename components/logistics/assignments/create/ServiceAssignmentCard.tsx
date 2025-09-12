@@ -3,8 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Search, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { collection, query, orderBy, limit, getDocs, where } from "firebase/firestore"; // Import Firestore functions
 import { db } from "@/lib/firebase"; // Import db
 import { format } from "date-fns"; // Import format
@@ -108,7 +111,7 @@ interface FormData {
   projectSite: string;
   serviceType: string;
   assignedTo: string;
-  serviceDuration: string;
+  serviceDuration: number;
   priority: string;
   equipmentRequired: string;
   materialSpecs: string;
@@ -140,17 +143,11 @@ interface ServiceAssignmentCardProps {
   productId: string;
   formData: FormData;
   handleInputChange: (field: string, value: any) => void;
-  handleDateInputChange: (type: "start" | "end" | "alarm", value: string) => void;
   products: Product[];
   teams: Team[];
   saNumber: string;
-  startDateInput: string;
-  endDateInput: string;
-  alarmDateInput: string;
   jobOrderData: JobOrder | null;
-  setStartDateInput: (value: string) => void;
-  setEndDateInput: (value: string) => void;
-  setAlarmDateInput: (value: string) => void;
+  onOpenProductSelection: () => void;
 }
 
 export function ServiceAssignmentCard({
@@ -158,19 +155,12 @@ export function ServiceAssignmentCard({
   productId,
   formData,
   handleInputChange,
-  handleDateInputChange,
   products,
   teams,
   saNumber,
-  startDateInput,
-  endDateInput,
-  alarmDateInput,
   jobOrderData,
-  setStartDateInput,
-  setEndDateInput,
-  setAlarmDateInput,
   onOpenProductSelection
-}: ServiceAssignmentCardProps & { onOpenProductSelection: () => void }) {
+}: ServiceAssignmentCardProps) {
   const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
   const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(jobOrderData); // State to hold selected job order data
   const [currentTime, setCurrentTime] = useState(""); // State for current time display
@@ -256,10 +246,10 @@ export function ServiceAssignmentCard({
   };
 
   // Helper function to calculate service duration
-  const calculateServiceDuration = (startDate: Date | null, endDate: Date | null, serviceType: string): string => {
+  const calculateServiceDuration = (startDate: Date | null, endDate: Date | null, serviceType: string): number => {
     // For monitoring and maintenance, duration is typically 1 day
     if (["Monitoring", "Maintenance"].includes(serviceType)) {
-      return "1 Day";
+      return 1;
     }
 
     // If we have both dates, calculate the difference
@@ -268,21 +258,19 @@ export function ServiceAssignmentCard({
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) {
-        return "1 Day";
-      } else if (diffDays === 1) {
-        return "1 Day";
+        return 1;
       } else {
-        return `${diffDays} Days`;
+        return diffDays;
       }
     }
 
     // If only start date is available, assume 1 day
     if (startDate && !endDate) {
-      return "1 Day";
+      return 1;
     }
 
     // Default fallback
-    return "";
+    return 0;
   };
 
   const handleJobOrderSelect = (jobOrder: JobOrder) => {
@@ -295,17 +283,21 @@ export function ServiceAssignmentCard({
     handleInputChange("remarks", jobOrder.remarks || "");
     handleInputChange("message", jobOrder.message || "");
 
+    // Set materialSpecs from job order data
+    handleInputChange("materialSpecs", jobOrder.materialSpec || "");
+
+    // Set illuminationNits from job order data
+    handleInputChange("illuminationNits", jobOrder.illumination || "");
+
     // Set dates if available and valid
     const requestedDate = parseDateSafely(jobOrder.dateRequested);
     if (requestedDate) {
       handleInputChange("startDate", requestedDate);
-      setStartDateInput(format(requestedDate, "yyyy-MM-dd"));
     }
 
     const deadlineDate = parseDateSafely(jobOrder.deadline);
     if (deadlineDate) {
       handleInputChange("endDate", deadlineDate);
-      setEndDateInput(format(deadlineDate, "yyyy-MM-dd"));
     }
 
     // Auto-calculate service duration based on dates
@@ -413,47 +405,88 @@ export function ServiceAssignmentCard({
 
             {/* Service Start Date - Row Layout */}
             <div className="flex items-center space-x-4">
-              <Label htmlFor="serviceStartDate" className="w-32 flex-shrink-0">
+              <Label className="w-32 flex-shrink-0">
                 {["Monitoring", "Maintenance"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
               </Label>
-              <div className="relative flex-1">
-                <Input
-                  id="serviceStartDate"
-                  type="text"
-                  placeholder="-Choose Date-"
-                  value={startDateInput}
-                  onChange={(e) => handleDateInputChange("start", e.target.value)}
-                  className="pr-8"
-                />
-                <Calendar className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <div className="flex-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                        !formData.startDate && "text-gray-500",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {formData.startDate ? (
+                        format(formData.startDate, "PPP")
+                      ) : (
+                        <span>Choose Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.startDate || undefined}
+                      onSelect={(date) => handleInputChange("startDate", date || null)}
+                      disabled={{ before: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
             {/* Service End Date - Row Layout */}
             <div className="flex items-center space-x-4">
-              <Label htmlFor="serviceEndDate" className="w-32 flex-shrink-0">Service End Date:</Label>
-              <div className="relative flex-1">
-                <Input
-                  id="serviceEndDate"
-                  type="text"
-                  placeholder="-Choose Date-"
-                  value={endDateInput}
-                  onChange={(e) => handleDateInputChange("end", e.target.value)}
-                  className="pr-8"
-                />
-                <Calendar className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Label className="w-32 flex-shrink-0">Service End Date:</Label>
+              <div className="flex-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                        !formData.endDate && "text-gray-500",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {formData.endDate ? (
+                        format(formData.endDate, "PPP")
+                      ) : (
+                        <span>Choose Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.endDate || undefined}
+                      onSelect={(date) => handleInputChange("endDate", date || null)}
+                      disabled={{ before: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0">Service Duration:</Label>
-              <Input
-                id="serviceDuration"
-                placeholder="Enter service duration"
-                value={formData.serviceDuration}
-                onChange={(e) => handleInputChange("serviceDuration", e.target.value)}
-                className="flex-1"
-              />
+              <div className="flex-1 flex items-center space-x-2">
+                <Input
+                  id="serviceDuration"
+                  type="number"
+                  placeholder="0"
+                  value={formData.serviceDuration || ""}
+                  onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
+                  className="flex-1"
+                  min="0"
+                />
+                <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
+              </div>
             </div>
 
             {!["Monitoring", "Change Material", "Maintenance"].includes(formData.serviceType) && (
@@ -464,9 +497,10 @@ export function ServiceAssignmentCard({
                     <SelectValue placeholder="Select material" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="perforated_sticker">Perforated Sticker</SelectItem>
-                    <SelectItem value="tarpaulin">Tarpaulin</SelectItem>
-                    <SelectItem value="acrylic">Acrylic</SelectItem>
+                    <SelectItem value="Tarpaulin">Tarpaulin</SelectItem>
+                    <SelectItem value="Sticker">Sticker</SelectItem>
+                    <SelectItem value="Digital File">Digital File</SelectItem>
+                    <SelectItem value="Others">Others</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -551,12 +585,15 @@ export function ServiceAssignmentCard({
             {!["Monitoring", "Maintenance"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
                 <Label className="w-32 flex-shrink-0">Gondola:</Label>
-                <Input
-                  placeholder="Enter gondola details"
-                  value={formData.gondola}
-                  onChange={(e) => handleInputChange("gondola", e.target.value)}
-                  className="flex-1"
-                />
+                <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select Yes or No" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
 

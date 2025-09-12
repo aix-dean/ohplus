@@ -9,7 +9,7 @@ interface FormData {
   projectSite: string;
   serviceType: string;
   assignedTo: string;
-  serviceDuration: string;
+  serviceDuration: number;
   priority: string;
   equipmentRequired: string;
   materialSpecs: string;
@@ -44,17 +44,10 @@ export function CreateServiceAssignmentForm({
   productId,
   formData,
   handleInputChange,
-  handleDateInputChange,
   products,
   teams,
   saNumber,
-  startDateInput,
-  endDateInput,
-  alarmDateInput,
   jobOrderData,
-  setStartDateInput,
-  setEndDateInput,
-  setAlarmDateInput,
   handleServiceCostChange,
   addOtherFee,
   removeOtherFee,
@@ -69,17 +62,10 @@ export function CreateServiceAssignmentForm({
   productId: string;
   formData: FormData;
   handleInputChange: (field: string, value: any) => void;
-  handleDateInputChange: (type: "start" | "end" | "alarm", value: string) => void;
   products: Product[];
   teams: Team[];
   saNumber: string;
-  startDateInput: string;
-  endDateInput: string;
-  alarmDateInput: string;
   jobOrderData: JobOrder | null;
-  setStartDateInput: (value: string) => void;
-  setEndDateInput: (value: string) => void;
-  setAlarmDateInput: (value: string) => void;
   handleServiceCostChange: (field: string, value: string) => void;
   addOtherFee: () => void;
   removeOtherFee: (index: number) => void;
@@ -95,17 +81,10 @@ export function CreateServiceAssignmentForm({
           productId={productId}
           formData={formData}
           handleInputChange={handleInputChange}
-          handleDateInputChange={handleDateInputChange}
           products={products}
           teams={teams}
           saNumber={saNumber}
-          startDateInput={startDateInput}
-          endDateInput={endDateInput}
-          alarmDateInput={alarmDateInput}
           jobOrderData={jobOrderData}
-          setStartDateInput={setStartDateInput}
-          setEndDateInput={setEndDateInput}
-          setAlarmDateInput={setAlarmDateInput}
           onOpenProductSelection={onOpenProductSelection}
         />
       </div>

@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
           gisUrl: data.gisUrl,
           idSignatureUrl: data.idSignatureUrl,
           siteImageUrl: data.siteImageUrl,
+          materialSpec: data.materialSpec || "",
+          illumination: data.illumination || "",
         })
         lastDocId = doc.id
       }

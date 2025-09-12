@@ -74,7 +74,7 @@ export default function CreateServiceAssignmentPage() {
     projectSite: initialProjectSite || "",
     serviceType: "",
     assignedTo: "",
-    serviceDuration: "",
+    serviceDuration: 0,
     priority: "",
     equipmentRequired: "",
     materialSpecs: "",
@@ -102,10 +102,13 @@ export default function CreateServiceAssignmentPage() {
     },
   })
 
-  // Date input strings for direct input
-  const [startDateInput, setStartDateInput] = useState("")
-  const [endDateInput, setEndDateInput] = useState("")
-  const [alarmDateInput, setAlarmDateInput] = useState("")
+  // Auto-set sales field to current user's full name
+  useEffect(() => {
+    if (userData?.first_name && userData?.last_name && !formData.sales) {
+      setFormData(prev => ({ ...prev, sales: `${userData.first_name} ${userData.last_name}` }));
+    }
+  }, [userData, formData.sales]);
+
 
   // Generate a random SA number on mount
   useEffect(() => {
@@ -240,16 +243,7 @@ export default function CreateServiceAssignmentPage() {
             // Set the SA number from draft
             setSaNumber(draftData.saNumber || "")
 
-            // Set date inputs
-            if (draftData.coveredDateStart) {
-              setStartDateInput(format(draftData.coveredDateStart.toDate(), "yyyy-MM-dd"))
-            }
-            if (draftData.coveredDateEnd) {
-              setEndDateInput(format(draftData.coveredDateEnd.toDate(), "yyyy-MM-dd"))
-            }
-            if (draftData.alarmDate) {
-              setAlarmDateInput(format(draftData.alarmDate.toDate(), "yyyy-MM-dd"))
-            }
+            // Date inputs are now handled directly as Date objects
           }
         } catch (error) {
           console.error("Error loading draft:", error)
@@ -285,12 +279,7 @@ export default function CreateServiceAssignmentPage() {
                 // You might want to pre-fill other fields like assignedTo, crew, etc.
               }))
 
-              if (fetchedJobOrder.dateRequested) {
-                setStartDateInput(format(new Date(fetchedJobOrder.dateRequested), "yyyy-MM-dd"))
-              }
-              if (fetchedJobOrder.deadline) {
-                setEndDateInput(format(new Date(fetchedJobOrder.deadline), "yyyy-MM-dd"))
-              }
+              // Date inputs are now handled directly as Date objects
             }
           }
         } catch (error) {
@@ -306,43 +295,6 @@ export default function CreateServiceAssignmentPage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Handle date input changes and convert to Date objects
-  const handleDateInputChange = (type: "start" | "end" | "alarm", value: string) => {
-    try {
-      // Only attempt to parse if we have a value
-      if (value) {
-        const date = new Date(value)
-
-        // Check if date is valid
-        if (!isNaN(date.getTime())) {
-          if (type === "start") {
-            setStartDateInput(value)
-            handleInputChange("startDate", date)
-          } else if (type === "end") {
-            setEndDateInput(value)
-            handleInputChange("endDate", date)
-          } else if (type === "alarm") {
-            setAlarmDateInput(value)
-            handleInputChange("alarmDate", date)
-          }
-        }
-      } else {
-        // If input is cleared, clear the date
-        if (type === "start") {
-          setStartDateInput("")
-          handleInputChange("startDate", null)
-        } else if (type === "end") {
-          setEndDateInput("")
-          handleInputChange("endDate", null)
-        } else if (type === "alarm") {
-          setAlarmDateInput("")
-          handleInputChange("alarmDate", null)
-        }
-      }
-    } catch (error) {
-      console.error(`Error parsing date for ${type}:`, error)
-    }
-  }
 
   // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -410,7 +362,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
         assignedTo: formData.assignedTo,
-        serviceDuration: formData.serviceDuration,
+        serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
@@ -474,7 +426,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
         assignedTo: formData.assignedTo,
-        serviceDuration: formData.serviceDuration,
+        serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
@@ -614,7 +566,7 @@ export default function CreateServiceAssignmentPage() {
       projectSite: "",
       serviceType: "",
       assignedTo: "",
-      serviceDuration: "",
+      serviceDuration: 0,
       priority: "",
       equipmentRequired: "",
       materialSpecs: "",
@@ -640,9 +592,6 @@ export default function CreateServiceAssignmentPage() {
         total: 0,
       },
     })
-    setStartDateInput("")
-    setEndDateInput("")
-    setAlarmDateInput("")
 
     // Generate new SA number
     const randomNum = Math.floor(100000 + Math.random() * 900000)
@@ -690,6 +639,7 @@ export default function CreateServiceAssignmentPage() {
         },
         status: "Draft",
         created: new Date(),
+        serviceDuration: `${formData.serviceDuration} days`,
       }
 
       if (action === "print") {
@@ -753,17 +703,10 @@ export default function CreateServiceAssignmentPage() {
         productId={formData.projectSite}
         formData={formData}
         handleInputChange={handleInputChange}
-        handleDateInputChange={handleDateInputChange}
         products={products}
         teams={teams}
         saNumber={saNumber}
-        startDateInput={startDateInput}
-        endDateInput={endDateInput}
-        alarmDateInput={alarmDateInput}
         jobOrderData={jobOrderData}
-        setStartDateInput={setStartDateInput}
-        setEndDateInput={setEndDateInput}
-        setAlarmDateInput={setAlarmDateInput}
         handleServiceCostChange={handleServiceCostChange}
         addOtherFee={addOtherFee}
         removeOtherFee={removeOtherFee}

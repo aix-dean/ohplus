@@ -336,6 +336,8 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
         created_by: data.createdBy || "",
         company_id: data.company_id || "",
         quotation_id: data.quotationId || "",
+        materialSpec: data.materialSpec || "",
+        illumination: data.illumination || "",
       })
     })
 
@@ -390,6 +392,8 @@ export async function getJobOrdersByProductId(productId: string): Promise<JobOrd
         company_id: data.company_id || "",
         quotation_id: data.quotationId || "",
         product_id: data.product_id || "",
+        materialSpec: data.materialSpec || "",
+        illumination: data.illumination || "",
       } as JobOrder)
     })
 

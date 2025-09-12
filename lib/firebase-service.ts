@@ -62,6 +62,7 @@ export interface Product {
     elevation?: number | null
     height?: number | null
     width?: number | null
+    illumination?: string
   }
   type?: string
   status?: string
