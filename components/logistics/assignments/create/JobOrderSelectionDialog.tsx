@@ -29,71 +29,52 @@ export function JobOrderSelectionDialog({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedJobOrderId, setSelectedJobOrderId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<{
+    hasNextPage: boolean
+    hasPrevPage: boolean
+    lastDocId: string | null
+  } | null>(null)
 
-  const fetchJobOrders = async () => {
+  const fetchJobOrders = async (page: number = 1, lastDocId?: string | null) => {
     if (!productId || !companyId) return
 
     setLoading(true)
     setError(null)
 
     try {
-      const jobOrdersRef = collection(db, "job_orders")
-      const q = query(
-        jobOrdersRef,
-        where("product_id", "==", productId),
-        where("company_id", "==", companyId)
-      )
-
-      const querySnapshot = await getDocs(q)
-      const orders: JobOrder[] = []
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        orders.push({
-          id: doc.id,
-          joNumber: data.joNumber || "N/A",
-          joType: data.joType || "N/A",
-          status: data.status || "unknown",
-          siteName: data.siteName || "N/A",
-          clientName: data.clientName || "N/A",
-          clientCompany: data.clientCompany || "N/A",
-          dateRequested: data.dateRequested || "",
-          deadline: data.deadline || "",
-          remarks: data.remarks || "",
-          assignTo: data.assignTo || "",
-          requestedBy: data.requestedBy || "",
-          attachments: data.attachments || [],
-          created: data.created,
-          updated: data.updated,
-          created_by: data.created_by || "",
-          company_id: data.company_id || "",
-          quotation_id: data.quotation_id,
-          contractDuration: data.contractDuration,
-          contractPeriodEnd: data.contractPeriodEnd,
-          contractPeriodStart: data.contractPeriodStart,
-          leaseRatePerMonth: data.leaseRatePerMonth,
-          missingCompliance: data.missingCompliance,
-          quotationNumber: data.quotationNumber,
-          product_id: data.product_id,
-          projectCompliance: data.projectCompliance,
-          dtiBirUrl: data.dtiBirUrl,
-          gisUrl: data.gisUrl,
-          idSignatureUrl: data.idSignatureUrl,
-          siteImageUrl: data.siteImageUrl,
-        })
+      const params = new URLSearchParams({
+        productId,
+        page: page.toString(),
       })
 
-      // Sort by creation date (newest first)
-      orders.sort((a, b) => {
-        if (a.created && b.created) {
-          const dateA = a.created instanceof Date ? a.created : a.created.toDate()
-          const dateB = b.created instanceof Date ? b.created : b.created.toDate()
-          return dateB.getTime() - dateA.getTime()
-        }
-        return 0
-      })
+      // Only add companyId if it's provided (for backward compatibility)
+      if (companyId) {
+        params.append("companyId", companyId)
+      }
 
-      setJobOrders(orders)
+      if (lastDocId) {
+        params.append("lastDocId", lastDocId)
+      }
+
+      console.log('API Call:', `/api/logistics/assignments/job-orders?${params}`)
+      const response = await fetch(`/api/logistics/assignments/job-orders?${params}`)
+      const data = await response.json()
+      console.log('API Response:', data)
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch job orders")
+      }
+
+      // The API already returns the correct number of items (10 + 1 for pagination check)
+      // Just use what the API returns, it handles the pagination logic
+      setJobOrders(data.jobOrders)
+      setPagination(data.pagination)
+      setCurrentPage(page)
+
+      // Debug info
+      console.log('Job Orders Debug:', data.debug)
+      console.log('Job Orders:', data.jobOrders.length, 'items')
     } catch (err) {
       console.error("Error fetching job orders:", err)
       setError("Failed to load job orders")
@@ -103,11 +84,25 @@ export function JobOrderSelectionDialog({
   }
 
   useEffect(() => {
-    if (open && productId && companyId) {
-      fetchJobOrders()
+    if (open && productId) {
+      console.log('Opening dialog with productId:', productId, 'companyId:', companyId)
+      fetchJobOrders(1)
       setSelectedJobOrderId(null) // Reset selection when dialog opens
+      setCurrentPage(1) // Reset page when dialog opens
     }
-  }, [open, productId, companyId])
+  }, [open, productId])
+
+  const handleNextPage = () => {
+    if (pagination?.hasNextPage && pagination.lastDocId) {
+      fetchJobOrders(currentPage + 1, pagination.lastDocId)
+    }
+  }
+
+  const handlePrevPage = () => {
+    if (pagination?.hasPrevPage) {
+      fetchJobOrders(currentPage - 1)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -169,7 +164,7 @@ export function JobOrderSelectionDialog({
           {error && (
             <div className="text-center py-8">
               <p className="text-red-600 mb-4">{error}</p>
-              <Button onClick={fetchJobOrders} variant="outline">
+              <Button onClick={() => fetchJobOrders(1)} variant="outline">
                 Try Again
               </Button>
             </div>
@@ -183,70 +178,70 @@ export function JobOrderSelectionDialog({
           )}
 
           {!loading && !error && jobOrders.length > 0 && (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {jobOrders.map((jo) => (
                 <div
                   key={jo.id}
-                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  className={`border rounded-lg p-3 cursor-pointer transition-all ${
                     selectedJobOrderId === jo.id
                       ? "border-blue-500 bg-blue-50 shadow-md"
                       : "border-gray-200 hover:shadow-md hover:border-gray-300"
                   }`}
                   onClick={() => setSelectedJobOrderId(jo.id)}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                         selectedJobOrderId === jo.id
                           ? "border-blue-500 bg-blue-500"
                           : "border-gray-300"
                       }`}>
                         {selectedJobOrderId === jo.id && (
-                          <Check className="h-3 w-3 text-white" />
+                          <Check className="h-2.5 w-2.5 text-white" />
                         )}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg text-gray-900">{jo.joNumber}</h3>
-                        <p className="text-sm text-gray-600">{jo.joType}</p>
+                        <h3 className="font-semibold text-sm text-gray-900">{jo.joNumber}</h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                            {jo.joType}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                    <Badge className={getStatusColor(jo.status)}>
+                    <Badge className={`${getStatusColor(jo.status)} text-xs px-1.5 py-0.5`}>
                       {jo.status.charAt(0).toUpperCase() + jo.status.slice(1)}
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                        <User className="h-4 w-4" />
-                        <span className="font-medium">Client:</span>
-                      </div>
-                      <p className="text-sm text-gray-900">
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <User className="h-3 w-3" />
+                      <span className="font-medium">Client:</span>
+                      <span className="text-gray-900 truncate">
                         {jo.clientName}
                         {jo.clientCompany && jo.clientCompany !== jo.clientName && (
                           <span className="text-gray-600"> ({jo.clientCompany})</span>
                         )}
-                      </p>
+                      </span>
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                        <Calendar className="h-4 w-4" />
-                        <span className="font-medium">Deadline:</span>
-                      </div>
-                      <p className="text-sm text-gray-900">{formatDate(jo.deadline)}</p>
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <Calendar className="h-3 w-3" />
+                      <span className="font-medium">Deadline:</span>
+                      <span className="text-gray-900">{formatDate(jo.deadline)}</span>
                     </div>
-                  </div>
 
-                  <div className="mb-3">
-                    <span className="text-sm font-medium text-gray-600">Date Requested:</span>
-                    <p className="text-sm text-gray-900">{formatDate(jo.dateRequested)}</p>
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <span className="font-medium">Requested:</span>
+                      <span className="text-gray-900">{formatDate(jo.dateRequested)}</span>
+                    </div>
                   </div>
 
                   {jo.remarks && jo.remarks !== "n/a" && (
-                    <div className="mb-3">
-                      <span className="text-sm font-medium text-gray-600">Remarks:</span>
-                      <p className="text-sm text-gray-900 mt-1">{jo.remarks}</p>
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium">Remarks:</span>
+                      <p className="text-gray-900 mt-0.5 truncate">{jo.remarks}</p>
                     </div>
                   )}
                 </div>
@@ -254,6 +249,31 @@ export function JobOrderSelectionDialog({
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {(pagination?.hasPrevPage || pagination?.hasNextPage) && (
+          <div className="flex justify-center items-center gap-2 py-4 border-t">
+            <Button
+              onClick={handlePrevPage}
+              disabled={!pagination?.hasPrevPage}
+              variant="outline"
+              size="sm"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage}
+            </span>
+            <Button
+              onClick={handleNextPage}
+              disabled={!pagination?.hasNextPage}
+              variant="outline"
+              size="sm"
+            >
+              Next
+            </Button>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button onClick={() => onOpenChange(false)} variant="outline">

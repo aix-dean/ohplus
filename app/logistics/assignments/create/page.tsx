@@ -761,6 +761,9 @@ export default function CreateServiceAssignmentPage() {
         endDateInput={endDateInput}
         alarmDateInput={alarmDateInput}
         jobOrderData={jobOrderData}
+        setStartDateInput={setStartDateInput}
+        setEndDateInput={setEndDateInput}
+        setAlarmDateInput={setAlarmDateInput}
         handleServiceCostChange={handleServiceCostChange}
         addOtherFee={addOtherFee}
         removeOtherFee={removeOtherFee}

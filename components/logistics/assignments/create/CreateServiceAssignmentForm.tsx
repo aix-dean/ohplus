@@ -52,6 +52,9 @@ export function CreateServiceAssignmentForm({
   endDateInput,
   alarmDateInput,
   jobOrderData,
+  setStartDateInput,
+  setEndDateInput,
+  setAlarmDateInput,
   handleServiceCostChange,
   addOtherFee,
   removeOtherFee,
@@ -74,6 +77,9 @@ export function CreateServiceAssignmentForm({
   endDateInput: string;
   alarmDateInput: string;
   jobOrderData: JobOrder | null;
+  setStartDateInput: (value: string) => void;
+  setEndDateInput: (value: string) => void;
+  setAlarmDateInput: (value: string) => void;
   handleServiceCostChange: (field: string, value: string) => void;
   addOtherFee: () => void;
   removeOtherFee: (index: number) => void;
@@ -97,6 +103,9 @@ export function CreateServiceAssignmentForm({
           endDateInput={endDateInput}
           alarmDateInput={alarmDateInput}
           jobOrderData={jobOrderData}
+          setStartDateInput={setStartDateInput}
+          setEndDateInput={setEndDateInput}
+          setAlarmDateInput={setAlarmDateInput}
           onOpenProductSelection={onOpenProductSelection}
         />
       </div>

@@ -18,7 +18,15 @@ import { useToast } from "@/hooks/use-toast";
 import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
 
 // New component for displaying Job Order details JO#:
-function JobOrderDetailsCard({ jobOrder, onHide }: { jobOrder: JobOrder; onHide: () => void }) {
+function JobOrderDetailsCard({
+  jobOrder,
+  onHide,
+  onChange
+}: {
+  jobOrder: JobOrder;
+  onHide: () => void;
+  onChange: () => void;
+}) {
   // Helper function to format date
   const formatDate = (date: string | Date | Timestamp | undefined) => {
     if (!date) return "N/A";
@@ -89,7 +97,7 @@ function JobOrderDetailsCard({ jobOrder, onHide }: { jobOrder: JobOrder; onHide:
           <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
         </div>
         <div className="flex justify-end">
-          <Button variant="link" size="sm">Change</Button>
+          <Button variant="link" size="sm" onClick={onChange}>Change</Button>
         </div>
       </CardContent>
     </Card>
@@ -140,6 +148,9 @@ interface ServiceAssignmentCardProps {
   endDateInput: string;
   alarmDateInput: string;
   jobOrderData: JobOrder | null;
+  setStartDateInput: (value: string) => void;
+  setEndDateInput: (value: string) => void;
+  setAlarmDateInput: (value: string) => void;
 }
 
 export function ServiceAssignmentCard({
@@ -155,6 +166,9 @@ export function ServiceAssignmentCard({
   endDateInput,
   alarmDateInput,
   jobOrderData,
+  setStartDateInput,
+  setEndDateInput,
+  setAlarmDateInput,
   onOpenProductSelection
 }: ServiceAssignmentCardProps & { onOpenProductSelection: () => void }) {
   const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
@@ -173,6 +187,14 @@ export function ServiceAssignmentCard({
     }));
   }, []);
 
+  // Auto-calculate service duration when dates or service type change
+  useEffect(() => {
+    const duration = calculateServiceDuration(formData.startDate, formData.endDate, formData.serviceType);
+    if (duration && duration !== formData.serviceDuration) {
+      handleInputChange("serviceDuration", duration);
+    }
+  }, [formData.startDate, formData.endDate, formData.serviceType]);
+
   const handleIdentifyJOClick = () => {
     // Check if a product is selected
     if (!productId) {
@@ -189,15 +211,137 @@ export function ServiceAssignmentCard({
     setShowJobOrderSelectionDialog(true);
   };
 
+  // Helper function to safely parse and validate dates
+  const parseDateSafely = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+
+    try {
+      let date: Date;
+
+      // Handle different date formats
+      if (dateValue instanceof Date) {
+        date = dateValue;
+      } else if (typeof dateValue === 'string') {
+        // Try parsing as ISO string first
+        date = new Date(dateValue);
+        // If invalid, try other formats
+        if (isNaN(date.getTime())) {
+          // Try parsing as timestamp (seconds)
+          if (!isNaN(Number(dateValue))) {
+            date = new Date(Number(dateValue) * 1000);
+          } else {
+            return null;
+          }
+        }
+      } else if (typeof dateValue === 'number') {
+        // Handle timestamp in seconds
+        date = new Date(dateValue * 1000);
+      } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+        // Handle Firestore Timestamp
+        date = new Date(dateValue.seconds * 1000);
+      } else {
+        return null;
+      }
+
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+
+      return date;
+    } catch (error) {
+      console.warn('Error parsing date:', dateValue, error);
+      return null;
+    }
+  };
+
+  // Helper function to calculate service duration
+  const calculateServiceDuration = (startDate: Date | null, endDate: Date | null, serviceType: string): string => {
+    // For monitoring and maintenance, duration is typically 1 day
+    if (["Monitoring", "Maintenance"].includes(serviceType)) {
+      return "1 Day";
+    }
+
+    // If we have both dates, calculate the difference
+    if (startDate && endDate) {
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        return "1 Day";
+      } else if (diffDays === 1) {
+        return "1 Day";
+      } else {
+        return `${diffDays} Days`;
+      }
+    }
+
+    // If only start date is available, assume 1 day
+    if (startDate && !endDate) {
+      return "1 Day";
+    }
+
+    // Default fallback
+    return "";
+  };
+
   const handleJobOrderSelect = (jobOrder: JobOrder) => {
     // Set the selected job order and show the details
     setSelectedJobOrder(jobOrder);
     setShowJobOrderDetails(true);
+
+    // Auto-fill form fields with job order data
+    handleInputChange("serviceType", jobOrder.joType || "");
+    handleInputChange("remarks", jobOrder.remarks || "");
+    handleInputChange("message", jobOrder.message || "");
+
+    // Set dates if available and valid
+    const requestedDate = parseDateSafely(jobOrder.dateRequested);
+    if (requestedDate) {
+      handleInputChange("startDate", requestedDate);
+      setStartDateInput(format(requestedDate, "yyyy-MM-dd"));
+    }
+
+    const deadlineDate = parseDateSafely(jobOrder.deadline);
+    if (deadlineDate) {
+      handleInputChange("endDate", deadlineDate);
+      setEndDateInput(format(deadlineDate, "yyyy-MM-dd"));
+    }
+
+    // Auto-calculate service duration based on dates
+    const duration = calculateServiceDuration(requestedDate, deadlineDate, jobOrder.joType || "");
+    if (duration) {
+      handleInputChange("serviceDuration", duration);
+    }
+
+    // Set assignedTo if available
+    if (jobOrder.assignTo) {
+      handleInputChange("assignedTo", jobOrder.assignTo);
+    }
+
+    // Set priority based on deadline proximity
+    if (deadlineDate) {
+      const now = new Date();
+      const daysDiff = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff <= 1) {
+        handleInputChange("priority", "High");
+      } else if (daysDiff <= 3) {
+        handleInputChange("priority", "Medium");
+      } else {
+        handleInputChange("priority", "Low");
+      }
+    }
   };
 
   const handleHideJobOrderDetails = () => {
     setShowJobOrderDetails(false);
     setSelectedJobOrder(null);
+  };
+
+  const handleChangeJobOrder = () => {
+    // Re-open the job order selection dialog
+    setShowJobOrderSelectionDialog(true);
   };
 
   return (
@@ -439,7 +583,11 @@ export function ServiceAssignmentCard({
             </div>
           )}
           {showJobOrderDetails && selectedJobOrder && (
-            <JobOrderDetailsCard jobOrder={selectedJobOrder} onHide={handleHideJobOrderDetails} />
+            <JobOrderDetailsCard
+              jobOrder={selectedJobOrder}
+              onHide={handleHideJobOrderDetails}
+              onChange={handleChangeJobOrder}
+            />
           )}
         </div>
       </div>
@@ -448,7 +596,7 @@ export function ServiceAssignmentCard({
       <JobOrderSelectionDialog
         open={showJobOrderSelectionDialog}
         onOpenChange={setShowJobOrderSelectionDialog}
-        productId={productId}
+        productId={productId || ""}
         companyId={companyId || ""}
         onSelectJobOrder={handleJobOrderSelect}
       />
