@@ -35,6 +35,7 @@ import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderListDialog } from "@/components/job-order-list-dialog"
+import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
 
 
 // Service types as provided
@@ -62,6 +63,7 @@ export default function CreateServiceAssignmentPage() {
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [isProductSelectionDialogOpen, setIsProductSelectionDialogOpen] = useState(false) // State for ProductSelectionDialog
 
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [isNewTeamDialogOpen, setIsNewTeamDialogOpen] = useState(false)
@@ -135,6 +137,42 @@ export default function CreateServiceAssignmentPage() {
 
     fetchProducts()
   }, [])
+
+  // Auto-select product when projectSite parameter is present
+  useEffect(() => {
+    const autoSelectProduct = async () => {
+      if (initialProjectSite && !formData.projectSite && userData?.company_id) {
+        try {
+          // First check if the product is already in the loaded products
+          const existingProduct = products.find(p => p.id === initialProjectSite)
+          if (existingProduct) {
+            setFormData(prev => ({ ...prev, projectSite: initialProjectSite }))
+            return
+          }
+
+          // If not found in loaded products, fetch the specific product document
+          const productDoc = await getDoc(doc(db, "products", initialProjectSite))
+          if (productDoc.exists()) {
+            const productData = { id: productDoc.id, ...productDoc.data() } as Product
+            // Add the product to the products array if it's not already there
+            setProducts(prev => {
+              const exists = prev.find(p => p.id === productData.id)
+              if (!exists) {
+                return [...prev, productData]
+              }
+              return prev
+            })
+            // Set the projectSite in form data
+            setFormData(prev => ({ ...prev, projectSite: initialProjectSite }))
+          }
+        } catch (error) {
+          console.error("Error fetching product for auto-selection:", error)
+        }
+      }
+    }
+
+    autoSelectProduct()
+  }, [initialProjectSite, formData.projectSite, userData?.company_id, products])
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -233,23 +271,26 @@ export default function CreateServiceAssignmentPage() {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
 
-            // Pre-fill form fields from job order
-            setFormData((prev) => ({
-              ...prev,
-              projectSite: fetchedJobOrder.product_id || "",
-              serviceType: fetchedJobOrder.joType || "",
-              remarks: fetchedJobOrder.remarks || "",
-              message: fetchedJobOrder.message || "",
-              startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
-              endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
-              // You might want to pre-fill other fields like assignedTo, crew, etc.
-            }))
+            // Only pre-fill form fields if projectSite parameter is provided or if it's explicitly allowed
+            // If no projectSite parameter, keep fields empty as requested
+            if (initialProjectSite) {
+              setFormData((prev) => ({
+                ...prev,
+                projectSite: fetchedJobOrder.product_id || "",
+                serviceType: fetchedJobOrder.joType || "",
+                remarks: fetchedJobOrder.remarks || "",
+                message: fetchedJobOrder.message || "",
+                startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
+                endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
+                // You might want to pre-fill other fields like assignedTo, crew, etc.
+              }))
 
-            if (fetchedJobOrder.dateRequested) {
-              setStartDateInput(format(new Date(fetchedJobOrder.dateRequested), "yyyy-MM-dd"))
-            }
-            if (fetchedJobOrder.deadline) {
-              setEndDateInput(format(new Date(fetchedJobOrder.deadline), "yyyy-MM-dd"))
+              if (fetchedJobOrder.dateRequested) {
+                setStartDateInput(format(new Date(fetchedJobOrder.dateRequested), "yyyy-MM-dd"))
+              }
+              if (fetchedJobOrder.deadline) {
+                setEndDateInput(format(new Date(fetchedJobOrder.deadline), "yyyy-MM-dd"))
+              }
             }
           }
         } catch (error) {
@@ -258,7 +299,7 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId]) // Rerun when jobOrderId changes
+  }, [jobOrderId, initialProjectSite]) // Rerun when jobOrderId or initialProjectSite changes
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
@@ -674,6 +715,11 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
+  // Handle product selection
+  const handleProductSelect = (product: Product) => {
+    handleInputChange("projectSite", product.id || "")
+  }
+
   if (fetchingProducts) {
     return (
       <div className="container mx-auto py-4">
@@ -704,7 +750,23 @@ export default function CreateServiceAssignmentPage() {
         onSubmit={handleSubmit}
         loading={loading}
         companyId={userData?.company_id || null}
-        productId={formData.projectSite} // Pass productId from formData
+        productId={formData.projectSite}
+        formData={formData}
+        handleInputChange={handleInputChange}
+        handleDateInputChange={handleDateInputChange}
+        products={products}
+        teams={teams}
+        saNumber={saNumber}
+        startDateInput={startDateInput}
+        endDateInput={endDateInput}
+        alarmDateInput={alarmDateInput}
+        jobOrderData={jobOrderData}
+        handleServiceCostChange={handleServiceCostChange}
+        addOtherFee={addOtherFee}
+        removeOtherFee={removeOtherFee}
+        updateOtherFee={updateOtherFee}
+        calculateServiceCostTotal={calculateServiceCostTotal}
+        onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
       />
 
 
@@ -746,6 +808,12 @@ export default function CreateServiceAssignmentPage() {
             // Handle error appropriately
           }
         }}
+      />
+
+      <ProductSelectionDialog
+        open={isProductSelectionDialogOpen}
+        onOpenChange={setIsProductSelectionDialogOpen}
+        onSelectProduct={handleProductSelect}
       />
     </section>
   )
