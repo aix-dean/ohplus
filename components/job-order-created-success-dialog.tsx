@@ -162,7 +162,7 @@ export function JobOrderCreatedSuccessDialog({
       admin: "ADMIN",
       cms: "CMS",
     }
-    const departmentFrom = roleToDepartment[userData.role] || "UNKNOWN"
+    const departmentFrom = "Sales"
 
     const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
     const navigateTo = `/logistics/job-orders/${joIds[0]}`
@@ -170,7 +170,7 @@ export function JobOrderCreatedSuccessDialog({
     const notifications = departments.map((dept) => ({
       company_id: userData.company_id!,
       department_from: departmentFrom,
-      department_to: dept.toUpperCase(),
+      department_to: dept,
       description: "A new job order has been created and requires your attention.",
       navigate_to: navigateTo,
       title: "New Job Order Created",
