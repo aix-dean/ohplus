@@ -834,17 +834,9 @@ function SalesDashboardContent() {
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
           content_type: site.content_type || "",
-          height: site.specs_rental?.height || undefined,
-          width: site.specs_rental?.width || undefined,
-          audience_type: site.specs_rental?.audience_type || undefined,
-          elevation: site.specs_rental?.elevation || undefined,
-          traffic_count: site.specs_rental?.traffic_count || undefined,
-          site_code: site.site_code || undefined,
-          site_orientation: site.specs_rental?.site_orientation || undefined,
-          caretaker: site.specs_rental?.caretaker || undefined,
+          specs_rental: site.specs_rental,
 
         }))
-        console.log("sites data", sitesData)
         const clientData = {
           id: selectedClientForProposal!.id,
           name: selectedClientForProposal!.contactPerson,
@@ -912,14 +904,15 @@ function SalesDashboardContent() {
     setIsCreatingCostEstimate(true)
     try {
       const sitesData = selectedSites.map((site) => ({
-        id: site.id!, // Ensure id is a string
-        name: site.name,
-        location: site.specs_rental?.location || (site as any).light?.location || "N/A",
-        price: site.price || 0,
-        type: site.type || "Unknown",
-        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-      }))
-      console.log("sites data", sitesData)
+          id: site.id!, // Ensure id is a string
+          name: site.name,
+          location: site.specs_rental?.location || (site as any).light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+          content_type: site.content_type || "",
+          specs_rental: site.specs_rental,
+        }))
       const clientData = {
         id: selectedClientForProposal!.id,
         name: selectedClientForProposal!.contactPerson,
@@ -1021,6 +1014,8 @@ function SalesDashboardContent() {
           price: site.price || 0,
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+          content_type: site.content_type || "",
+          specs_rental: site.specs_rental,
         }))
         console.log("sites data", sitesData)
         const options = {

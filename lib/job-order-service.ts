@@ -13,13 +13,24 @@ const CLIENT_COMPANIES_COLLECTION = "client_company"
 
 // Removed local QuotationItem interface, will use QuotationProduct from types/quotation.ts
 
-export async function getQuotationsForSelection(userId: string): Promise<Quotation[]> {
+export async function getQuotationsForSelection(userId: string, companyId?: string, status?: string): Promise<Quotation[]> {
   try {
-    const q = query(
+    let q = query(
       collection(db, QUOTATIONS_COLLECTION),
       where("created_by", "==", userId),
       orderBy("created", "desc"),
     )
+
+    // If companyId is provided, add filter
+    if (companyId) {
+      q = query(q, where("company_id", "==", companyId))
+    }
+
+    // If status is provided, add filter
+    if (status) {
+      q = query(q, where("status", "==", status.toLowerCase()))
+    }
+
     const querySnapshot = await getDocs(q)
     const quotations: Quotation[] = querySnapshot.docs.map((doc) => ({
       id: doc.id,
@@ -205,17 +216,50 @@ export async function createMultipleJobOrders(
 ): Promise<string[]> {
   console.log("Creating multiple job orders:", jobOrdersData.length)
 
+  // DEBUG: Log the received jobOrdersData
+  console.log("[DEBUG] Received jobOrdersData in service:")
+  jobOrdersData.forEach((jobOrder, index) => {
+    console.log(`[DEBUG] Job Order ${index}:`)
+    console.log(`- created:`, jobOrder.created, "Type:", typeof jobOrder.created)
+    console.log(`- dateRequested:`, jobOrder.dateRequested, "Type:", typeof jobOrder.dateRequested)
+    console.log(`- deadline:`, jobOrder.deadline, "Type:", typeof jobOrder.deadline)
+    console.log(`- contractPeriodStart:`, jobOrder.contractPeriodStart, "Type:", typeof jobOrder.contractPeriodStart)
+    console.log(`- contractPeriodEnd:`, jobOrder.contractPeriodEnd, "Type:", typeof jobOrder.contractPeriodEnd)
+
+    // Check for invalid dates
+    if (jobOrder.created && jobOrder.created instanceof Date) {
+      console.log(`- created is valid Date:`, !isNaN(jobOrder.created.getTime()))
+    }
+    if (jobOrder.dateRequested && jobOrder.dateRequested instanceof Date) {
+      console.log(`- dateRequested is valid Date:`, !isNaN(jobOrder.dateRequested.getTime()))
+    }
+    if (jobOrder.deadline && jobOrder.deadline instanceof Date) {
+      console.log(`- deadline is valid Date:`, !isNaN(jobOrder.deadline.getTime()))
+    }
+    if (jobOrder.contractPeriodStart && jobOrder.contractPeriodStart instanceof Date) {
+      console.log(`- contractPeriodStart is valid Date:`, !isNaN(jobOrder.contractPeriodStart.getTime()))
+    }
+    if (jobOrder.contractPeriodEnd && jobOrder.contractPeriodEnd instanceof Date) {
+      console.log(`- contractPeriodEnd is valid Date:`, !isNaN(jobOrder.contractPeriodEnd.getTime()))
+    }
+  })
+
   try {
     const jobOrderIds: string[] = []
 
     for (const jobOrderData of jobOrdersData) {
-      const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
+      // DEBUG: Log what we're about to send to Firestore
+      console.log("[DEBUG] Preparing to save job order to Firestore:")
+      const firestoreData = {
         ...jobOrderData,
         createdBy: createdBy,
         status: status,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }
+      console.log("- Final data being saved:", firestoreData)
+
+      const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), firestoreData)
       jobOrderIds.push(docRef.id)
       console.log("Job Order successfully added with ID:", docRef.id)
 
@@ -254,6 +298,11 @@ export async function createMultipleJobOrders(
     return jobOrderIds
   } catch (error: any) { // Explicitly type error
     console.error("Error adding multiple job orders to Firestore:", error)
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    })
     throw error
   }
 }

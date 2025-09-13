@@ -54,7 +54,6 @@ export interface Product {
     spots_per_loop?: number
   } | null
   specs_rental?: {
-    audience_type?: string
     audience_types?: string[]
     geopoint?: [number, number]
     location?: string

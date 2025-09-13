@@ -10,7 +10,7 @@ import {
   type User as FirebaseUser,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { tenantAuth, db, TENANT_ID } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 import { subscriptionService } from "@/lib/subscription-service"
@@ -307,8 +307,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
-      console.log("Logging in user with tenant ID:", auth.tenantId)
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      console.log("Logging in user with tenant ID:", tenantAuth.tenantId)
+      const userCredential = await signInWithEmailAndPassword(tenantAuth, email, password)
       setUser(userCredential.user)
       await fetchUserData(userCredential.user)
     } catch (error) {
@@ -321,16 +321,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginOHPlusOnly = async (email: string, password: string) => {
     setLoading(true)
     try {
-      console.log("Logging in OHPLUS user only with tenant ID:", auth.tenantId)
+      console.log("Logging in OHPLUS user only with tenant ID:", tenantAuth.tenantId)
 
       // Authenticate with Firebase using tenant ID
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(tenantAuth, email, password)
 
       // Check if this is an OHPLUS account
       const isOHPlusAccount = await findOHPlusAccount(userCredential.user.uid)
 
       if (!isOHPlusAccount) {
-        await signOut(auth)
+        await signOut(tenantAuth)
         throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
       }
 
@@ -362,9 +362,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setIsRegistering(true)
     try {
-      console.log("Registering new user with tenant ID:", auth.tenantId)
+      console.log("Registering new user with tenant ID:", tenantAuth.tenantId)
 
-      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
+      const userCredential = await createUserWithEmailAndPassword(tenantAuth, personalInfo.email, password)
       const firebaseUser = userCredential.user
 
       let licenseKey = generateLicenseKey()
@@ -482,7 +482,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     try {
       console.log("Logging out user")
-      await signOut(auth)
+      await signOut(tenantAuth)
       setUser(null)
       setUserData(null)
       setProjectData(null)
@@ -496,8 +496,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      console.log("Sending password reset email to:", email, "with tenant ID:", auth.tenantId)
-      await sendPasswordResetEmail(auth, email)
+      console.log("Sending password reset email to:", email, "with tenant ID:", tenantAuth.tenantId)
+      await sendPasswordResetEmail(tenantAuth, email)
       console.log("Password reset email sent successfully")
     } catch (error: any) {
       console.error("Password reset error:", error)
@@ -534,8 +534,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    console.log("Setting up auth state listener with tenant ID:", auth.tenantId)
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    console.log("Setting up auth state listener with tenant ID:", tenantAuth.tenantId)
+    const unsubscribe = onAuthStateChanged(tenantAuth, async (firebaseUser) => {
       if (firebaseUser) {
         console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
@@ -552,7 +552,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await fetchUserData(firebaseUser)
         } else {
           console.log("No OHPLUS account found, signing out")
-          await signOut(auth)
+          await signOut(tenantAuth)
         }
       } else {
         console.log("Auth state changed: user logged out")
