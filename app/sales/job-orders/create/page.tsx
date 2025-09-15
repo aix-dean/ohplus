@@ -1936,18 +1936,16 @@ export default function CreateJobOrderPage() {
                           />
                           <Button
                             variant="outline"
-                            className="w-[100px] h-[100px] relative flex flex-col items-center justify-center text-white border-2 border-gray-300 bg-gray-300 hover:bg-gray-200"
-                            onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}
-                            disabled={jobOrderForms[0]?.uploadingMaterialSpecAttachment}
+                            className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
                           >
 
                             {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Upload className="h-20 w-20" />
+                              <ImageIcon  className="h-20 w-20 text-white" />
                             )}
                             <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
                             </div>
                             <span className="text-xs mt-1">
                               {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
