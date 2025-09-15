@@ -786,7 +786,7 @@ export default function CreateJobOrderPage() {
             totalAmount: productTotal, // Use recalculated total
             siteImageUrl: quotation.items?.[0]?.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
             missingCompliance: missingCompliance,
-            product_id: quotation.items[0].id || "",
+            product_id: quotation.items[0].product_id || "",
             company_id: userData?.company_id || "",
             created_by: user.uid, // Added created_by
             content_type: contentType, // Added content_type
