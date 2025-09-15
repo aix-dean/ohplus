@@ -54,7 +54,6 @@ export interface Product {
     spots_per_loop?: number
   } | null
   specs_rental?: {
-    audience_type?: string
     audience_types?: string[]
     geopoint?: [number, number]
     location?: string
@@ -62,7 +61,25 @@ export interface Product {
     elevation?: number | null
     height?: number | null
     width?: number | null
-    illumination?: string
+    site_orientation?: string | null
+    caretaker?: string | null
+    structure:{
+      color?: string | null
+      condition?: string | null
+      contractor?: string | null
+      last_maintenance?: Date | null
+    }
+    illumination:{
+      bottom_count?: number | null
+      bottom_lighting_specs?: string | null
+      left_count?: number | null
+      left_lighting_specs?: string | null
+      right_count?: number | null
+      right_lighting_specs?: string | null
+      upper_count?: number | null
+      upper_lighting_specs?: string | null
+      power_consumption_monthly?: number | null
+    }
   }
   type?: string
   status?: string
