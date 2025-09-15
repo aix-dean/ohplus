@@ -13,6 +13,10 @@ interface SendCostEstimateOptionsDialogProps {
   onOpenChange: (open: boolean) => void
   costEstimate: CostEstimate
   onEmailClick: () => void
+  companyData?: {
+    photo_url?: string
+    name?: string
+  } | null
 }
 
 export function SendCostEstimateOptionsDialog({
@@ -20,6 +24,7 @@ export function SendCostEstimateOptionsDialog({
   onOpenChange,
   costEstimate,
   onEmailClick,
+  companyData,
 }: SendCostEstimateOptionsDialogProps) {
   const { toast } = useToast()
 
@@ -50,10 +55,10 @@ export function SendCostEstimateOptionsDialog({
         <div className="grid gap-4 py-4">
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-              {costEstimate.lineItems?.[0]?.image ? (
+              {companyData?.photo_url ? (
                 <Image
-                  src={costEstimate.lineItems[0].image || "/placeholder.svg"}
-                  alt="Cost Estimate Image"
+                  src={companyData.photo_url || "/placeholder.svg"}
+                  alt="Company Logo"
                   width={80}
                   height={80}
                   objectFit="contain"
@@ -61,7 +66,7 @@ export function SendCostEstimateOptionsDialog({
               ) : (
                 <Image
                   src="/placeholder.svg?height=80&width=80"
-                  alt="Placeholder"
+                  alt="Company Logo"
                   width={80}
                   height={80}
                   objectFit="contain"
