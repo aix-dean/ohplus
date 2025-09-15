@@ -1020,7 +1020,6 @@ export async function createDirectQuotation(
           height: site.height || 0,
           width: site.width || 0,
           content_type: site.content_type || "",
-          specs: site.specs_rental,
         },
       ],
       projectCompliance: {
@@ -1111,7 +1110,6 @@ export async function createMultipleQuotations(
             height: site.height || 0,
             width: site.width || 0,
             content_type: site.content_type || "",
-            specs: site.specs_rental,
           },
         ],
         projectCompliance: {

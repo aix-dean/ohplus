@@ -35,11 +35,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     pathname?.startsWith("/unauthorized") // Handle unauthorized path
   const isPublicProposal = pathname?.startsWith("/proposals/view/")
   const isPublicQuotation = pathname?.startsWith("/quotations/")
-  const isPublicCostEstimate = pathname?.startsWith("/cost-estimates/view/")
 
 
   // If it's a public proposal view, render without navigation and without auth check
-  if (isPublicProposal || isPublicQuotation || isPublicCostEstimate) {
+  if (isPublicProposal || isPublicQuotation) {
     return <div className="min-h-screen bg-gray-50">{children}</div>
   }
 

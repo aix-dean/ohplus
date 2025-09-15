@@ -60,7 +60,6 @@ export default function JobOrdersPage() {
     fetchJOs()
   }, [user?.uid])
 
-
   const filteredJobOrders = useMemo(() => {
     if (!searchTerm) {
       return jobOrders
@@ -303,7 +302,6 @@ export default function JobOrdersPage() {
           </Card>
         )}
       </div>
-
     </div>
   )
 }

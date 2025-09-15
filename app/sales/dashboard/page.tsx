@@ -784,6 +784,10 @@ function SalesDashboardContent() {
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const handleDatesSelected = async (startDate: Date, endDate: Date) => {
+    console.log("[v0] handleDatesSelected - userData:", userData)
+    console.log("[v0] handleDatesSelected - userData.company_id:", userData?.company_id)
+    console.log("[v0] handleDatesSelected - user:", user)
+    console.log("[v0] handleDatesSelected - actionAfterDateSelection:", actionAfterDateSelection)
 
     if (!user?.uid || !userData?.company_id) {
       console.log("[v0] handleDatesSelected - Missing auth data:", {
@@ -833,10 +837,8 @@ function SalesDashboardContent() {
           price: site.price || 0,
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-          content_type: site.content_type || "",
-          specs_rental: site.specs_rental,
-
         }))
+
         const clientData = {
           id: selectedClientForProposal!.id,
           name: selectedClientForProposal!.contactPerson,
@@ -859,7 +861,7 @@ function SalesDashboardContent() {
           created_by_last_name: userData.last_name,
         }
 
-
+        console.log("[v0] handleDatesSelected - creating quotation with options:", options)
 
         let quotationIds: string[]
 
@@ -904,15 +906,14 @@ function SalesDashboardContent() {
     setIsCreatingCostEstimate(true)
     try {
       const sitesData = selectedSites.map((site) => ({
-          id: site.id!, // Ensure id is a string
-          name: site.name,
-          location: site.specs_rental?.location || (site as any).light?.location || "N/A",
-          price: site.price || 0,
-          type: site.type || "Unknown",
-          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-          content_type: site.content_type || "",
-          specs_rental: site.specs_rental,
-        }))
+        id: site.id!, // Ensure id is a string
+        name: site.name,
+        location: site.specs_rental?.location || (site as any).light?.location || "N/A",
+        price: site.price || 0,
+        type: site.type || "Unknown",
+        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+      }))
+
       const clientData = {
         id: selectedClientForProposal!.id,
         name: selectedClientForProposal!.contactPerson,
@@ -1014,10 +1015,8 @@ function SalesDashboardContent() {
           price: site.price || 0,
           type: site.type || "Unknown",
           image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-          content_type: site.content_type || "",
-          specs_rental: site.specs_rental,
         }))
-        console.log("sites data", sitesData)
+
         const options = {
           startDate: undefined,
           endDate: undefined,

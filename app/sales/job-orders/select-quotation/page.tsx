@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2, Search, FileText, CheckCircle, ArrowLeft, Package } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationsForSelection } from "@/lib/job-order-service"
 import type { Quotation } from "@/lib/types/quotation"
@@ -16,7 +15,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export default function SelectQuotationPage() {
-  const { userData } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -28,7 +27,7 @@ export default function SelectQuotationPage() {
 
   useEffect(() => {
     const fetchQuotations = async () => {
-      if (!userData?.uid) {
+      if (!user?.uid) {
         toast({
           title: "Authentication Required",
           description: "Please log in to view quotations.",
@@ -39,7 +38,7 @@ export default function SelectQuotationPage() {
       }
       setLoading(true)
       try {
-        const fetchedQuotations = await getQuotationsForSelection(userData.uid, userData.company_id || undefined, "reserved")
+        const fetchedQuotations = await getQuotationsForSelection(user.uid)
         const filteredByProduct = productId
           ? fetchedQuotations.filter((quotation) => {
               if (quotation.product_id === productId) return true
@@ -63,7 +62,7 @@ export default function SelectQuotationPage() {
     }
 
     fetchQuotations()
-  }, [userData?.uid, userData?.company_id, toast, productId])
+  }, [user?.uid, toast, productId])
 
   const filteredQuotations = quotations.filter(
     (q) =>
@@ -124,60 +123,50 @@ export default function SelectQuotationPage() {
           </div>
         ) : (
           <ScrollArea className="flex-1 pr-4 -mr-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quotation Number</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Products/Site</TableHead>
-                  <TableHead>Sales</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuotations.map((quotation) => {
-                  const productCount = getProductCount(quotation)
-                  const isMultiProduct = productCount > 1
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredQuotations.map((quotation) => {
+                const productCount = getProductCount(quotation)
+                const isMultiProduct = productCount > 1
 
-                  return (
-                    <TableRow
-                      key={quotation.id}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSelect(quotation)}
-                    >
-                      <TableCell className="font-semibold">
-                        {quotation.quotation_number}
+                return (
+                  <Card
+                    key={quotation.id}
+                    className={cn(
+                      "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors",
+                      "hover:bg-gray-50",
+                    )}
+                    onClick={() => handleSelect(quotation)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-base">{quotation.quotation_number}</p>
+                      <div className="flex items-center gap-2">
                         {isMultiProduct && (
-                          <Badge variant="secondary" className="ml-2 text-xs">
+                          <Badge variant="secondary" className="text-xs">
                             <Package className="h-3 w-3 mr-1" />
                             {productCount} Products
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>{quotation.client_name}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {isMultiProduct ? "Products: " : "Site: "}
-                        {getProductNames(quotation)}
-                      </TableCell>
-                      <TableCell>
-                        {quotation.created_by_first_name || quotation.created_by_last_name
-                          ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={quotation.status === "reserved" ? "default" : "secondary"}>
-                          {quotation.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-1">Client: {quotation.client_name}</p>
+                    <p className="text-sm text-gray-700 mb-1 line-clamp-2">
+                      {isMultiProduct ? "Products: " : "Site: "}
+                      {getProductNames(quotation)}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Sales:{" "}
+                      {quotation.created_by_first_name || quotation.created_by_last_name
+                        ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
+                        : "N/A"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-auto">
+                      Created:{" "}
+                      {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
+                    </p>
+                  </Card>
+                )
+              })}
+            </div>
           </ScrollArea>
         )}
         <div className="flex justify-end gap-2 mt-4">

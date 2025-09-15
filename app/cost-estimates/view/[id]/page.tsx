@@ -1,15 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Calculator, Loader2, Download, ArrowLeft, Share2, Plus, Minus } from "lucide-react"
+import { CheckCircle, XCircle, Calculator, Loader2, Download, ArrowLeft, Share2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { useAuth } from "@/contexts/auth-context"
 
 const categoryLabels = {
   media_cost: "Media Cost",
@@ -25,66 +22,6 @@ function generateQRCodeUrl(costEstimateId: string): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
 }
 
-const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
-  const { userData } = useAuth()
-  const [companyLogo, setCompanyLogo] = useState<string>("")
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchCompanyLogo = async () => {
-      if (!userData?.company_id) {
-        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
-        setLoading(false)
-        return
-      }
-
-      try {
-        const companyDocRef = doc(db, "companies", userData.company_id)
-        const companyDocSnap = await getDoc(companyDocRef)
-
-        if (companyDocSnap.exists()) {
-          const companyData = companyDocSnap.data()
-          if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-            setCompanyLogo(companyData.photo_url)
-          } else {
-            setCompanyLogo("/ohplus-new-logo.png") // Default fallback
-          }
-        } else {
-          setCompanyLogo("/ohplus-new-logo.png") // Default fallback
-        }
-      } catch (error) {
-        console.error("Error fetching company logo:", error)
-        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchCompanyLogo()
-  }, [userData?.company_id])
-
-  if (loading) {
-    return (
-      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
-        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={companyLogo || "/placeholder.svg"}
-      alt="Company logo"
-      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
-      onError={(e) => {
-        // Fallback to default logo if image fails to load
-        const target = e.target as HTMLImageElement
-        target.src = "/ohplus-new-logo.png"
-      }}
-    />
-  )
-}
-
 export default function PublicCostEstimateViewPage() {
   const params = useParams()
   const router = useRouter()
@@ -93,8 +30,6 @@ export default function PublicCostEstimateViewPage() {
   const [loading, setLoading] = useState(true)
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState<number>(1)
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     async function fetchCostEstimate() {
@@ -170,13 +105,13 @@ export default function PublicCostEstimateViewPage() {
         },
         body: JSON.stringify({
           costEstimateId: costEstimate.id,
-          status: "accepted",
+          status: "approved",
           userId: "public_viewer",
         }),
       })
 
       if (response.ok) {
-        setCostEstimate({ ...costEstimate, status: "accepted" })
+        setCostEstimate({ ...costEstimate, status: "approved", approvedAt: new Date() })
         toast({
           title: "Cost estimate approved!",
           description: "Thank you for your approval. We will proceed with the next steps.",
@@ -208,14 +143,14 @@ export default function PublicCostEstimateViewPage() {
         },
         body: JSON.stringify({
           costEstimateId: costEstimate.id,
-          status: "declined",
+          status: "rejected",
           userId: "public_viewer",
-          rejectionReason: "Declined by client",
+          rejectionReason: "Rejected by client",
         }),
       })
 
       if (response.ok) {
-        setCostEstimate({ ...costEstimate, status: "declined" })
+        setCostEstimate({ ...costEstimate, status: "rejected", rejectedAt: new Date() })
         toast({
           title: "Cost estimate rejected",
           description: "Your feedback has been recorded. We will contact you to discuss alternatives.",
@@ -290,91 +225,74 @@ export default function PublicCostEstimateViewPage() {
     )
   }
 
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.1, 2)) // Max zoom 200%
-  }
-
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3)) // Min zoom 30%
-  }
-
-  const handleResetZoom = () => {
-    setZoomLevel(1)
-  }
-
   return (
     <>
       {/* Fixed header */}
-      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
-        <span className="text-black font-medium">Public Cost Estimate View</span>
-        <span className="text-black italic ml-2">{costEstimate?.id}</span>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel <= 0.3}
-            >
-              <Minus className="h-3 w-3" />
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="max-w-[850px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" className="text-gray-600" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleResetZoom}
-              className="h-7 px-2 text-xs font-medium hover:bg-gray-200 min-w-[50px]"
+            <Badge
+              className={`${
+                costEstimate.status === "approved"
+                  ? "bg-green-100 text-green-800 border-green-200"
+                  : costEstimate.status === "rejected"
+                    ? "bg-red-100 text-red-800 border-red-200"
+                    : "bg-blue-100 text-blue-800 border-blue-200"
+              } border font-medium px-3 py-1`}
             >
-              {Math.round(zoomLevel * 100)}%
+              {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+              {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+              <span className="capitalize">{costEstimate.status}</span>
+            </Badge>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-gray-600 bg-transparent"
+              onClick={() => setShowQRModal(true)}
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel >= 2}
-            >
-              <Plus className="h-3 w-3" />
+            <Button variant="outline" size="sm" className="text-gray-600 bg-transparent" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Download</span>
             </Button>
           </div>
         </div>
-        <div className="flex items-center">
-          <Button
-            onClick={handleDownloadPDF}
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 hover:bg-gray-200"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 flex">
-        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-          <div
-            className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
-          >
-            <div className="bg-white shadow-lg border-transparent relative w-[210mm] min-h-[297mm]">
-              {/* Document Header */}
-              <div className="border-b-2 border-orange-600 p-6 sm:p-8">
-                <div className="flex justify-between items-start mb-4 md:mb-6">
-                  <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
-                  <div className="text-right">
-                    <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                      COST ESTIMATE
-                    </h1>
-                    <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                      ₱{costEstimate.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                </div>
+      {/* Document Container */}
+      <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 pt-16">
+        <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
+          {/* Document Header */}
+          <div className="border-b-2 border-orange-600 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
+                <p className="text-sm text-gray-500">{costEstimate.id}</p>
               </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                <div className="text-center">
+                  <img
+                    src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                    alt="QR Code"
+                    className="w-16 h-16 border border-gray-300 bg-white p-1 rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
+                </div>
+                <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
+              </div>
+            </div>
+          </div>
 
-              {/* Document Content */}
-              <div className="p-6 sm:p-8">
+          {/* Document Content */}
+          <div className="p-6 sm:p-8">
             {/* Client Information Header */}
             <div className="mb-6">
               <div className="flex justify-between items-start mb-6">
@@ -435,15 +353,15 @@ export default function PublicCostEstimateViewPage() {
                     <h3 className="text-sm font-medium text-gray-500 mb-2">Status</h3>
                     <Badge
                       className={`${
-                        costEstimate.status === "accepted"
+                        costEstimate.status === "approved"
                           ? "bg-green-100 text-green-800 border-green-200"
-                          : costEstimate.status === "declined"
+                          : costEstimate.status === "rejected"
                             ? "bg-red-100 text-red-800 border-red-200"
                             : "bg-blue-100 text-blue-800 border-blue-200"
                       } border font-medium px-3 py-1`}
                     >
-                      {costEstimate.status === "accepted" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
-                      {costEstimate.status === "declined" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+                      {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                      {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
                       <span className="capitalize">{costEstimate.status}</span>
                     </Badge>
                   </div>
@@ -497,7 +415,7 @@ export default function PublicCostEstimateViewPage() {
                             {item.unitPrice.toLocaleString()}
                           </td>
                           <td className="py-3 px-4 text-right border-b border-gray-200">
-                            <div className="font-medium text-gray-900">{item.total.toLocaleString()}</div>
+                            <div className="font-medium text-gray-900">{item.totalPrice.toLocaleString()}</div>
                           </td>
                         </tr>
                       ))}
@@ -505,13 +423,13 @@ export default function PublicCostEstimateViewPage() {
                         <td colSpan={4} className="py-3 px-4 text-right font-medium">
                           Subtotal:
                         </td>
-                        <td className="py-3 px-4 text-right font-medium">{costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0).toLocaleString()}</td>
+                        <td className="py-3 px-4 text-right font-medium">{costEstimate.subtotal.toLocaleString()}</td>
                       </tr>
                       <tr className="bg-gray-50">
                         <td colSpan={4} className="py-3 px-4 text-right font-medium">
-                          VAT (12%):
+                          VAT ({(costEstimate.taxRate * 100).toFixed(0)}%):
                         </td>
-                        <td className="py-3 px-4 text-right font-medium">{(costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0) * 0.12).toLocaleString()}</td>
+                        <td className="py-3 px-4 text-right font-medium">{costEstimate.taxAmount.toLocaleString()}</td>
                       </tr>
                       <tr className="bg-orange-50">
                         <td colSpan={4} className="py-3 px-4 text-right font-bold">
@@ -577,7 +495,7 @@ export default function PublicCostEstimateViewPage() {
                     </div>
                   </div>
                 </div>
-              ) : costEstimate.status === "accepted" ? (
+              ) : costEstimate.status === "approved" ? (
                 <div className="mb-8">
                   <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
                     <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
@@ -587,12 +505,12 @@ export default function PublicCostEstimateViewPage() {
                       soon.
                     </p>
                     <p className="text-green-700 text-sm mt-2">
-                      Approved on: {new Date().toLocaleDateString()} at{" "}
-                      {new Date().toLocaleTimeString()}
+                      Approved on: {costEstimate.approvedAt?.toLocaleDateString()} at{" "}
+                      {costEstimate.approvedAt?.toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
-              ) : costEstimate.status === "declined" ? (
+              ) : costEstimate.status === "rejected" ? (
                 <div className="mb-8">
                   <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                     <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
@@ -602,8 +520,8 @@ export default function PublicCostEstimateViewPage() {
                       revised estimate.
                     </p>
                     <p className="text-red-700 text-sm mt-2">
-                      Rejected on: {new Date().toLocaleDateString()} at{" "}
-                      {new Date().toLocaleTimeString()}
+                      Rejected on: {costEstimate.rejectedAt?.toLocaleDateString()} at{" "}
+                      {costEstimate.rejectedAt?.toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
@@ -618,8 +536,6 @@ export default function PublicCostEstimateViewPage() {
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
       {/* QR Code Modal */}
       {showQRModal && (

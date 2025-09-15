@@ -28,9 +28,8 @@ import {
   Calculator,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
+import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy } from "@/lib/cost-estimate-service" // Import CostEstimate service
 import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
-import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
@@ -49,7 +48,7 @@ function CostEstimatesPageContent() {
   const [hasMorePages, setHasMorePages] = useState(true)
   const itemsPerPage = 10
 
-  const { user, userData } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
@@ -157,25 +156,8 @@ function CostEstimatesPageContent() {
     router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
-  const handleDownloadPDF = async (costEstimate: CostEstimate) => {
-    try {
-      // Fetch the full cost estimate data first
-      const fullCostEstimate = await getCostEstimate(costEstimate.id)
-      if (!fullCostEstimate) {
-        throw new Error("Cost estimate not found")
-      }
-
-      // Generate PDF using the same function as the detail page
-      await generateCostEstimatePDF(fullCostEstimate, undefined, false, {
-        first_name: user?.displayName?.split(' ')[0] || "",
-        last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
-        email: user?.email || "",
-        company_id: userData?.company_id || "",
-      })
-    } catch (error) {
-      console.error("Error downloading PDF:", error)
-      alert("Failed to download PDF. Please try again.")
-    }
+  const handleDownloadPDF = (costEstimate: CostEstimate) => {
+    console.log("Download PDF for cost estimate:", costEstimate.id)
   }
 
   return (

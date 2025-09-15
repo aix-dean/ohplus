@@ -9,8 +9,6 @@ import {
   startAfter,
   type DocumentSnapshot,
   addDoc,
-  updateDoc,
-  doc,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore"
@@ -227,27 +225,6 @@ export class BookingService {
       return docRef.id
     } catch (error) {
       console.error("[DEBUG] Error creating booking:", error)
-      throw error
-    }
-  }
-
-  async updateBookingProjectCompliance(quotationId: string, projectCompliance: ProjectCompliance): Promise<void> {
-    try {
-      const bookingsRef = collection(db, "booking")
-      const q = query(bookingsRef, where("quotation_id", "==", quotationId))
-      const querySnapshot = await getDocs(q)
-
-      const updates = querySnapshot.docs.map((document) =>
-        updateDoc(doc(db, "booking", document.id), {
-          projectCompliance,
-          updated: serverTimestamp(),
-        })
-      )
-
-      await Promise.all(updates)
-      console.log(`Updated projectCompliance for ${updates.length} booking(s) with quotation_id: ${quotationId}`)
-    } catch (error) {
-      console.error("Error updating booking projectCompliance:", error)
       throw error
     }
   }

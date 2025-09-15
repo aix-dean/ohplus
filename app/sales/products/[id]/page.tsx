@@ -1,8 +1,7 @@
 "use client"
 
-import React from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -18,8 +17,6 @@ import {
   Mail,
   Eye,
   AlertCircle,
-  Loader2,
-  ImageIcon,
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -34,244 +31,6 @@ import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/fi
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
 import { getAllJobOrders, type JobOrder } from "@/lib/job-order-service"
-import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { collection, query, where, getDocs } from "firebase/firestore"
-
-const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
-  const [currentDate, setCurrentDate] = useState(new Date())
-
-  const isDateBooked = (date: Date) => {
-    return bookedDates.some(bookedDate =>
-      bookedDate.getDate() === date.getDate() &&
-      bookedDate.getMonth() === date.getMonth() &&
-      bookedDate.getFullYear() === date.getFullYear()
-    )
-  }
-
-  const generateCalendarMonths = () => {
-    const months = []
-    for (let i = 0; i < 3; i++) {
-      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1)
-      months.push(monthDate)
-    }
-    return months
-  }
-
-  const generateMonthDays = (monthDate: Date) => {
-    const year = monthDate.getFullYear()
-    const month = monthDate.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const startDate = new Date(firstDay)
-    startDate.setDate(startDate.getDate() - firstDay.getDay())
-
-    const days = []
-    const current = new Date(startDate)
-
-    while (current <= lastDay || days.length % 7 !== 0) {
-      days.push(new Date(current))
-      current.setDate(current.getDate() + 1)
-    }
-
-    return days
-  }
-
-  const months = generateCalendarMonths()
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Booking Calendar</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentDate(new Date())}
-          >
-            Today
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {months.map((monthDate, monthIndex) => {
-          const days = generateMonthDays(monthDate)
-          const monthName = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-
-          return (
-            <div key={monthIndex} className="border rounded-lg p-4">
-              <h4 className="font-semibold text-center mb-4">{monthName}</h4>
-
-              {/* Day headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar days */}
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((day, dayIndex) => {
-                  const isCurrentMonth = day.getMonth() === monthDate.getMonth()
-                  const isToday = day.toDateString() === new Date().toDateString()
-                  const booked = isDateBooked(day)
-
-                  return (
-                    <div
-                      key={dayIndex}
-                      className={`
-                        text-center py-2 text-sm relative
-                        ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-900'}
-                        ${isToday ? 'bg-blue-100 rounded' : ''}
-                        ${booked ? 'bg-red-100 text-red-800 font-semibold' : ''}
-                      `}
-                    >
-                      {day.getDate()}
-                      {booked && (
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-500 rounded-full"></div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="flex items-center justify-center gap-6 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
-          <span>Booked</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
-          <span>Today</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const GoogleMap = React.memo(({ location, className }: { location: string; className?: string }) => {
-  const mapRef = useRef<HTMLDivElement>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState(false)
-
-  useEffect(() => {
-    const initializeMaps = async () => {
-      try {
-        await loadGoogleMaps()
-        await initializeMap()
-      } catch (error) {
-        console.error("Error loading Google Maps:", error)
-        setMapError(true)
-      }
-    }
-
-    const initializeMap = async () => {
-      if (!mapRef.current || !window.google) return
-
-      try {
-        const geocoder = new window.google.maps.Geocoder()
-
-        // Geocode the location
-        geocoder.geocode({ address: location }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
-          if (status === "OK" && results && results[0]) {
-            const map = new window.google.maps.Map(mapRef.current!, {
-              center: results[0].geometry.location,
-              zoom: 15,
-              disableDefaultUI: true,
-              gestureHandling: "none",
-              zoomControl: false,
-              mapTypeControl: false,
-              scaleControl: false,
-              streetViewControl: false,
-              rotateControl: false,
-              fullscreenControl: false,
-              styles: [
-                {
-                  featureType: "poi",
-                  elementType: "labels",
-                  stylers: [{ visibility: "off" }],
-                },
-              ],
-            })
-
-            // Add marker
-            new window.google.maps.Marker({
-              position: results[0].geometry.location,
-              map: map,
-              title: location,
-              icon: {
-                url:
-                  "data:image/svg+xml;charset=UTF-8," +
-                  encodeURIComponent(`
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#ef4444"/>
-                  </svg>
-                `),
-                scaledSize: new window.google.maps.Size(32, 32),
-                anchor: new window.google.maps.Point(16, 32),
-              },
-            })
-
-            setMapLoaded(true)
-          } else {
-            console.error("Geocoding failed:", status)
-            setMapError(true)
-          }
-        })
-      } catch (error) {
-        console.error("Error initializing map:", error)
-        setMapError(true)
-      }
-    }
-
-    initializeMaps()
-  }, [location])
-
-  if (mapError) {
-    return (
-      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
-        <div className="text-center text-gray-500">
-          <p className="text-sm">Map unavailable</p>
-          <p className="text-xs mt-1">{location}</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`relative ${className}`}>
-      <div ref={mapRef} className="w-full h-full rounded-lg" />
-      {!mapLoaded && (
-        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Loading map...</p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-});
 
 function formatDate(dateString: any): string {
   if (!dateString) return "N/A"
@@ -297,7 +56,7 @@ function formatDate(dateString: any): string {
   }
 }
 
-function CustomNotification({
+function Notification({
   show,
   type,
   message,
@@ -374,10 +133,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [jobOrdersLoading, setJobOrdersLoading] = useState(true)
   const [marketplaceDialogOpen, setMarketplaceDialogOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("booking-summary")
-  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false)
-  const [bookedDates, setBookedDates] = useState<Date[]>([])
-  const [calendarLoading, setCalendarLoading] = useState(false)
 
   const [notification, setNotification] = useState<{
     show: boolean
@@ -879,60 +634,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
   }
 
-  const getTabCount = (tab: string) => {
-    switch (tab) {
-      case "booking-summary":
-        return 2 // Hardcoded for now, as the booking summary seems to have static data
-      case "ce":
-        return costEstimates.length
-      case "quote":
-        return quotations.length
-      case "job-order":
-        return jobOrders.length
-      default:
-        return 0
-    }
-  }
-
-  const fetchBookedDates = async () => {
-    if (!params.id) return
-
-    setCalendarLoading(true)
-    try {
-      const productId = Array.isArray(params.id) ? params.id[0] : params.id
-      const bookingsRef = collection(db, "booking")
-      const q = query(bookingsRef, where("product_id", "==", productId))
-      const querySnapshot = await getDocs(q)
-
-      const dates: Date[] = []
-      querySnapshot.forEach((doc) => {
-        const booking = doc.data()
-        if (booking.start_date && booking.end_date) {
-          const startDate = booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date)
-          const endDate = booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date)
-
-          // Add all dates between start and end
-          const currentDate = new Date(startDate)
-          while (currentDate <= endDate) {
-            dates.push(new Date(currentDate))
-            currentDate.setDate(currentDate.getDate() + 1)
-          }
-        }
-      })
-
-      setBookedDates(dates)
-    } catch (error) {
-      console.error("Error fetching booked dates:", error)
-    } finally {
-      setCalendarLoading(false)
-    }
-  }
-
-  const handleCalendarOpen = () => {
-    setCalendarDialogOpen(true)
-    fetchBookedDates()
-  }
-
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-6">
@@ -1002,7 +703,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Notification */}
-      <CustomNotification
+      <Notification
         show={notification.show}
         type={notification.type}
         message={notification.message}
@@ -1063,11 +764,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       variant="secondary"
                       size="icon"
                       className="absolute top-2 right-2 h-8 w-8 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
-                      onClick={() => {
-                        setActiveImageIndex(0)
-                        setImageViewerOpen(true)
-                      }}
-                      aria-label="View image gallery"
+                      onClick={() => setImageViewerOpen(true)}
+                      aria-label="View full size image"
                     >
                       <Maximize className="h-4 w-4" />
                     </Button>
@@ -1087,20 +785,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               {/* Site Code and Name */}
               <div className="p-4 border-b border-gray-100">
                 <div className="text-lg font-bold text-gray-900 mb-1">
-                  {product?.name || "Unknown Site"}
-                </div>
-                <div className="text-sm text-gray-600">
                   {product?.site_code || product?.specs_rental?.site_code || "No Site Code"}
                 </div>
+                <div className="text-sm text-gray-600">{product?.name || "Unknown Site"}</div>
               </div>
 
               {/* Site Calendar Button */}
               <div className="p-4 border-b border-gray-100">
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={handleCalendarOpen}
-                >
+                <Button variant="outline" className="w-full bg-transparent">
                   <Calendar className="h-4 w-4 mr-2" />
                   Site Calendar
                 </Button>
@@ -1154,24 +846,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </div>
               </div>
 
-              {/* Map View */}
-              {(product?.type?.toLowerCase() === "rental" ? product.specs_rental?.location : product.light?.location) && (
-                <div className="p-4 border-t border-gray-100">
-                  <div className="aspect-[4/3] w-full rounded-lg overflow-hidden">
-                    <GoogleMap
-                      location={product?.type?.toLowerCase() === "rental" ? product.specs_rental.location : product.light.location}
-                      className="w-full h-full"
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Action Buttons */}
               {!product?.deleted && (
                 <div className="p-4 space-y-2 border-t border-gray-100">
                   <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Propose this Site</Button>
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create CE</Button>
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create Quote</Button>
+                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create CE/ Quote</Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600 text-white"
                     onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
@@ -1186,7 +865,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
         {/* Right Content - Tabbed Interface */}
         <section className="lg:col-span-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs defaultValue="booking-summary" className="w-full">
             <div className="flex items-center justify-between mb-4">
               <TabsList className="grid w-fit grid-cols-4">
                 <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
@@ -1194,7 +873,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <TabsTrigger value="quote">Quote</TabsTrigger>
                 <TabsTrigger value="job-order">Job Order</TabsTrigger>
               </TabsList>
-              <div className="text-sm text-gray-600">Total: {getTabCount(activeTab)}</div>
+              <div className="text-sm text-gray-600">Total: 2025</div>
             </div>
 
             <TabsContent value="booking-summary" className="mt-0">
@@ -1448,122 +1127,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </Tabs>
         </section>
       </main>
-
-      {/* Site Calendar Dialog */}
-      <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
-        <DialogContent className="sm:max-w-4xl" aria-labelledby="calendar-dialog-title">
-          <DialogHeader>
-            <DialogTitle id="calendar-dialog-title">Site Calendar - {product?.name || "Product"}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {calendarLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <span className="ml-2 text-gray-600">Loading calendar...</span>
-              </div>
-            ) : (
-              <CalendarView bookedDates={bookedDates} />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Image Gallery Dialog */}
-      <Dialog open={imageViewerOpen} onOpenChange={setImageViewerOpen}>
-        <DialogContent className="sm:max-w-4xl" aria-labelledby="image-gallery-dialog-title">
-          <DialogHeader>
-            <DialogTitle id="image-gallery-dialog-title">Image Gallery</DialogTitle>
-          </DialogHeader>
-
-          <div className="relative">
-            {product?.media && product.media.length > 0 ? (
-              <>
-                <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-gray-100">
-                  <Image
-                    src={product.media[activeImageIndex]?.url || "/placeholder.svg"}
-                    alt={`Product image ${activeImageIndex + 1}`}
-                    fill
-                    className="object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/building-billboard.png"
-                      target.className = "object-contain opacity-50"
-                    }}
-                  />
-                </div>
-
-                {/* Navigation buttons */}
-                {product.media.length > 1 && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 h-10 w-10 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
-                      onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : product.media.length - 1))}
-                      aria-label="Previous image"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-10 w-10 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
-                      onClick={() => setActiveImageIndex((prev) => (prev < product.media.length - 1 ? prev + 1 : 0))}
-                      aria-label="Next image"
-                    >
-                      <ArrowLeft className="h-4 w-4 rotate-180" />
-                    </Button>
-                  </>
-                )}
-
-                {/* Thumbnail strip */}
-                {product.media.length > 1 && (
-                  <div className="flex justify-center gap-2 mt-4 overflow-x-auto">
-                    {product.media.map((image, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setActiveImageIndex(index)}
-                        className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                          index === activeImageIndex
-                            ? "border-blue-500 ring-2 ring-blue-200"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                        aria-label={`View image ${index + 1}`}
-                      >
-                        <Image
-                          src={image.url || "/placeholder.svg"}
-                          alt={`Thumbnail ${index + 1}`}
-                          width={64}
-                          height={64}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/building-billboard.png"
-                            target.className = "object-cover opacity-50"
-                          }}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Image counter */}
-                <div className="text-center mt-2 text-sm text-gray-600">
-                  {activeImageIndex + 1} of {product.media.length}
-                </div>
-              </>
-            ) : (
-              <div className="aspect-[4/3] w-full rounded-lg bg-gray-100 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-2" />
-                  <p>No images available</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={marketplaceDialogOpen} onOpenChange={setMarketplaceDialogOpen}>
         <DialogContent className="sm:max-w-2xl" aria-labelledby="marketplace-dialog-title">
