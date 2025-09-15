@@ -39,6 +39,7 @@ import {
 import { updateQuotation } from "@/lib/quotation-service" // Import updateQuotation
 import type { QuotationProduct } from "@/lib/types/quotation" // Corrected import for QuotationProduct
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import { bookingService } from "@/lib/booking-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
 import type { Product } from "@/lib/firebase-service"
@@ -47,6 +48,7 @@ import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
+import { serverTimestamp, Timestamp } from "firebase/firestore"
 
 
 interface JobOrderFormData {
@@ -133,6 +135,7 @@ export default function CreateJobOrderPage() {
   // Success dialog states
   const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
   const [createdJoIds, setCreatedJoIds] = useState<string[]>([])
+
 
   // Coming soon dialog state
   const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
@@ -246,23 +249,32 @@ export default function CreateJobOrderPage() {
     return `₱${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }, [])
 
-  const formatPeriod = useCallback((startDate: string | undefined, endDate: string | undefined) => {
-    if (!startDate || !endDate) return "N/A"
-    try {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const startMonth = format(start, "MMMM")
-      const startDay = format(start, "dd")
-      const startYear = format(start, "yyyy")
-      const endMonth = format(end, "MMMM")
-      const endYear = format(end, "yyyy")
 
-      return `${startMonth} ${startDay}, ${startYear} to ${endMonth} ${endYear}`
-    } catch (e) {
-      console.error("Error formatting period:", e)
-      return "Invalid Dates"
-    }
-  }, [])
+  const formatPeriod = useCallback(
+    (startDate?: Date | Timestamp | null, endDate?: Date | Timestamp | null) => {
+      if (!startDate || !endDate) return "N/A"
+
+      const start = startDate instanceof Timestamp
+        ? startDate.toDate()
+        : startDate instanceof Date
+          ? startDate
+          : new Date(startDate)
+
+      const end = endDate instanceof Timestamp
+        ? endDate.toDate()
+        : endDate instanceof Date
+          ? endDate
+          : new Date(endDate)
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn("Invalid date inputs:", startDate, endDate)
+        return "Invalid Dates"
+      }
+
+      return `${format(start, "MMM dd, yyyy")} to ${format(end, "MMM dd, yyyy")}`
+    },
+    []
+  )
 
   const isImageFile = useCallback((fileName: string | null, fileUrl: string | null) => {
     if (!fileName && !fileUrl) return false;
@@ -413,34 +425,43 @@ export default function CreateJobOrderPage() {
             const existingField = currentProjectCompliance[projectComplianceFieldKey]
             const existingFieldData = existingField
 
+            const updatedProjectCompliance = {
+              ...currentProjectCompliance, // Spread the fully initialized object
+              [projectComplianceFieldKey]: {
+                // Preserve existing field data if it exists, otherwise create new object with defaults
+                ...(existingFieldData || {
+                  completed: false,
+                  fileName: null,
+                  fileUrl: null,
+                  notes: null,
+                  uploadedAt: null,
+                  uploadedBy: null,
+                  status: "pending"
+                }),
+                completed: true,
+                fileName: file.name,
+                fileUrl: downloadURL,
+                uploadedAt: new Date().toISOString(),
+                uploadedBy: user?.uid || null,
+                ...(projectComplianceFieldKey === "signedQuotation" && { status: "completed" }), // Add status for signedQuotation
+              },
+            }
+
             await updateQuotation(
               quotationId,
               {
-                projectCompliance: {
-                  ...currentProjectCompliance, // Spread the fully initialized object
-                  [projectComplianceFieldKey]: {
-                    // Preserve existing field data if it exists, otherwise create new object with defaults
-                    ...(existingFieldData || {
-                      completed: false,
-                      fileName: null,
-                      fileUrl: null,
-                      notes: null,
-                      uploadedAt: null,
-                      uploadedBy: null,
-                      status: "pending"
-                    }),
-                    completed: true,
-                    fileName: file.name,
-                    fileUrl: downloadURL,
-                    uploadedAt: new Date().toISOString(),
-                    uploadedBy: user?.uid || null,
-                    ...(projectComplianceFieldKey === "signedQuotation" && { status: "completed" }), // Add status for signedQuotation
-                  },
-                },
+                projectCompliance: updatedProjectCompliance,
               },
               user?.uid || "unknown",
               userData?.first_name || "System",
             )
+
+            // Update local quotationData to reflect the change
+            setQuotationData(prev => prev ? { ...prev, quotation: { ...prev.quotation, projectCompliance: updatedProjectCompliance } } : null)
+
+            // Also update the booking document
+            await bookingService.updateBookingProjectCompliance(quotationId, updatedProjectCompliance)
+
             toast({
               title: "Project Compliance Document Updated",
               description: `Quotation's ${fieldToUpdate} updated successfully.`,
@@ -649,6 +670,64 @@ export default function CreateJobOrderPage() {
         const form = jobOrderForms[0]
         const product = products[0] || {}
 
+        // DEBUG: Log all date/time values before processing
+        console.log("[DEBUG] Date/Time values in job order creation:")
+        console.log("- Current time:", new Date().toISOString())
+        console.log("- Form dateRequested:", form.dateRequested, "Type:", typeof form.dateRequested)
+        console.log("- Form deadline:", form.deadline, "Type:", typeof form.deadline)
+        console.log("- Quotation start_date:", quotation.start_date, "Type:", typeof quotation.start_date, "Raw value:", quotation.start_date)
+        console.log("- Quotation end_date:", quotation.end_date, "Type:", typeof quotation.end_date, "Raw value:", quotation.end_date)
+
+        // Validate date objects
+        const createdDate = new Date()
+        console.log("- Created date object:", createdDate, "Is valid:", !isNaN(createdDate.getTime()))
+
+        let contractPeriodStart = null
+        let contractPeriodEnd = null
+
+        if (quotation.start_date) {
+          try {
+            // Handle Firestore Timestamp objects
+            if (quotation.start_date && typeof quotation.start_date === 'object' && 'toDate' in quotation.start_date) {
+              contractPeriodStart = quotation.start_date.toDate()
+            } else {
+              contractPeriodStart = new Date(quotation.start_date)
+            }
+            console.log("- Contract period start parsed:", contractPeriodStart, "Is valid:", !isNaN(contractPeriodStart.getTime()))
+          } catch (error) {
+            console.error("- Error parsing contractPeriodStart:", error)
+            contractPeriodStart = null
+          }
+        }
+
+        if (quotation.end_date) {
+          try {
+            // Handle Firestore Timestamp objects
+            if (quotation.end_date && typeof quotation.end_date === 'object' && 'toDate' in quotation.end_date) {
+              contractPeriodEnd = quotation.end_date.toDate()
+            } else {
+              contractPeriodEnd = new Date(quotation.end_date)
+            }
+            console.log("- Contract period end parsed:", contractPeriodEnd, "Is valid:", !isNaN(contractPeriodEnd.getTime()))
+          } catch (error) {
+            console.error("- Error parsing contractPeriodEnd:", error)
+            contractPeriodEnd = null
+          }
+        }
+
+        // Check form dates
+        if (form.dateRequested) {
+          console.log("- Form dateRequested valid:", !isNaN(form.dateRequested.getTime()), "Value:", form.dateRequested.toISOString())
+        } else {
+          console.warn("- Form dateRequested is null/undefined")
+        }
+
+        if (form.deadline) {
+          console.log("- Form deadline valid:", !isNaN(form.deadline.getTime()), "Value:", form.deadline.toISOString())
+        } else {
+          console.warn("- Form deadline is null/undefined")
+        }
+
         const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
         const subtotal = quotation.total_amount || 0 // Use total_amount for single product
@@ -658,7 +737,7 @@ export default function CreateJobOrderPage() {
         jobOrdersData = [
           {
             quotationId: quotation.id,
-            created: new Date(),
+            created: createdDate,
             joNumber: form.joNumber || await generatePersonalizedJONumber(userData), // Use input JO# if provided, else generate
             dateRequested: form.dateRequested!,
             joType: form.joType as JobOrderType,
@@ -667,12 +746,12 @@ export default function CreateJobOrderPage() {
             requestedBy: userData?.first_name || "Auto-Generated",
             remarks: form.remarks,
             attachments: form.attachmentUrl
-              ? {
+              ? [{
                 url: form.attachmentUrl,
                 name: form.attachmentFile?.name || "Attachment",
                 type: form.attachmentFile?.type || "image",
-              }
-              : null,
+              }]
+              : [],
             materialSpec: form.materialSpec,
             materialSpecAttachmentUrl: form.materialSpecAttachmentUrl,
             clientCompliance: {
@@ -685,9 +764,9 @@ export default function CreateJobOrderPage() {
             clientCompany: quotation?.client_company_name || "N/A", // Changed from client?.company to client?.name
             clientCompanyId: quotation.client_company_id || "",
             clientId: client?.id || "",
-            contractDuration: totalDays, // Use totalDays as number
-            contractPeriodStart: quotation.start_date ? new Date(quotation.start_date) : null,
-            contractPeriodEnd: quotation.end_date ? new Date(quotation.end_date) : null,
+            contractDuration: totalDays.toString(), // Convert to string as expected by type
+            contractPeriodStart: contractPeriodStart || undefined,
+            contractPeriodEnd: contractPeriodEnd || undefined,
             siteName: quotation.items?.[0]?.name || "", // Get from quotation items
             siteCode: quotation.items?.[0]?.site_code || "N/A", // Get from quotation items
             siteType: quotation.items?.[0]?.site_type || "N/A",
@@ -701,7 +780,7 @@ export default function CreateJobOrderPage() {
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
                 : 0, // Corrected monthlyRate
-            totalMonths: totalDays/30, // This might still be relevant for other calculations, but not for totalLease directly
+            totalMonths: totalDays / 30, // This might still be relevant for other calculations, but not for totalLease directly
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
@@ -717,7 +796,7 @@ export default function CreateJobOrderPage() {
                 fileName: signedQuotationFile?.name || null,
                 fileUrl: signedQuotationUrl,
                 notes: null,
-                uploadedAt: signedQuotationUrl ? new Date().toISOString() : null,
+                uploadedAt: signedQuotationUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (signedQuotationUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -726,7 +805,7 @@ export default function CreateJobOrderPage() {
                 fileName: signedContractFile?.name || null,
                 fileUrl: signedContractUrl,
                 notes: null,
-                uploadedAt: signedContractUrl ? new Date().toISOString() : null,
+                uploadedAt: signedContractUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (signedContractUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -735,7 +814,7 @@ export default function CreateJobOrderPage() {
                 fileName: poMoFile?.name || null,
                 fileUrl: poMoUrl,
                 notes: null,
-                uploadedAt: poMoUrl ? new Date().toISOString() : null,
+                uploadedAt: poMoUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (poMoUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -744,7 +823,7 @@ export default function CreateJobOrderPage() {
                 fileName: finalArtworkFile?.name || null,
                 fileUrl: finalArtworkUrl,
                 notes: null,
-                uploadedAt: finalArtworkUrl ? new Date().toISOString() : null,
+                uploadedAt: finalArtworkUrl ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (finalArtworkUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
@@ -753,13 +832,21 @@ export default function CreateJobOrderPage() {
                 fileName: null,
                 fileUrl: null,
                 notes: null,
-                uploadedAt: paymentAdvanceConfirmed ? new Date().toISOString() : null,
+                uploadedAt: paymentAdvanceConfirmed ? serverTimestamp() : null,
                 uploadedBy: user?.uid || null,
                 status: (paymentAdvanceConfirmed ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
             },
           },
         ]
+
+        // DEBUG: Log the final jobOrdersData before sending to service
+        console.log("[DEBUG] Final jobOrdersData being sent to service:")
+        console.log("- created:", jobOrdersData[0].created, "Type:", typeof jobOrdersData[0].created)
+        console.log("- dateRequested:", jobOrdersData[0].dateRequested, "Type:", typeof jobOrdersData[0].dateRequested)
+        console.log("- deadline:", jobOrdersData[0].deadline, "Type:", typeof jobOrdersData[0].deadline)
+        console.log("- contractPeriodStart:", jobOrdersData[0].contractPeriodStart, "Type:", typeof jobOrdersData[0].contractPeriodStart)
+        console.log("- contractPeriodEnd:", jobOrdersData[0].contractPeriodEnd, "Type:", typeof jobOrdersData[0].contractPeriodEnd)
 
         const joIds = await createMultipleJobOrders(
           jobOrdersData.map((jo) => ({ ...jo, assignTo: "" })), // Add default assignTo
@@ -794,6 +881,11 @@ export default function CreateJobOrderPage() {
       toast,
     ],
   )
+
+  const handleDismissAndNavigate = useCallback(() => {
+    setShowJobOrderSuccessDialog(false)
+    router.push("/sales/job-orders")
+  }, [router])
 
   const handleCreateJobOrders = useCallback(
     async (status: JobOrderStatus) => {
@@ -835,10 +927,6 @@ export default function CreateJobOrderPage() {
     [quotationData, user?.uid, validateForms, missingCompliance, createJobOrdersWithStatus],
   )
 
-  const handleDismissAndNavigate = useCallback(() => {
-    setShowJobOrderSuccessDialog(false)
-    router.push("/sales/job-orders")
-  }, [router])
 
   // useEffect hooks
   useEffect(() => {
@@ -1088,7 +1176,7 @@ export default function CreateJobOrderPage() {
             <div className="space-y-0.5 mt-3">
               <div>
                 <p className="text-sm">
-                  <span className="font-semibold">Site Type:</span> {"N/A"}
+                  <span className="font-semibold">Site Type:</span> {quotationData.quotation.items[0].content_type}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Size:</span> {"N/A"}
@@ -1643,8 +1731,7 @@ export default function CreateJobOrderPage() {
             missingCompliance.signedQuotation ||
             missingCompliance.signedContract ||
             missingCompliance.poMo ||
-            missingCompliance.finalArtwork ||
-            missingCompliance.paymentAdvance ? (
+            missingCompliance.finalArtwork? (
             <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <AlertTitle className="text-red-700 text-xs">
@@ -1659,7 +1746,17 @@ export default function CreateJobOrderPage() {
                 </ul>
               </AlertDescription>
             </Alert>
-          ) : null}
+          ) : (
+            <Alert className="bg-green-100 border-green-400 text-green-700 py-2 px-3">
+              <CircleCheck className="h-4 w-4 text-green-500" />
+              <AlertTitle className="text-green-700 text-xs">
+                All compliance requirements are met.
+              </AlertTitle>
+              <AlertDescription className="text-green-700 text-xs">
+                All required documents have been uploaded successfully.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex justify-between items-center ">
               <p className="text-xs flex-1 font-bold text-blue-600">
@@ -1798,8 +1895,14 @@ export default function CreateJobOrderPage() {
                               </div>
                             </div>
                           ) : (
-                            <FileText className="h-5 w-5 text-blue-600" />
+                            <div className="relative inline-block">
+                              <FileText className="h-20 w-20 text-blue-600" />
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                              </div>
+                            </div>
                           )}
+                          
                         </div>
                       ) : jobOrderForms[0]?.materialSpecAttachmentUrl ? (
                         <div className="flex items-center gap-2">
@@ -1833,21 +1936,19 @@ export default function CreateJobOrderPage() {
                           />
                           <Button
                             variant="outline"
-                            className="w-14 h-14 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                            onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}
-                            disabled={jobOrderForms[0]?.uploadingMaterialSpecAttachment}
+                            className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
                           >
 
                             {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Plus className="h-4 w-4" />
+                              <ImageIcon  className="h-20 w-20 text-white" />
                             )}
                             <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
                             </div>
                             <span className="text-xs mt-1">
-                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : "Upload"}
+                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
                             </span>
                           </Button>
                         </>
@@ -1969,6 +2070,7 @@ export default function CreateJobOrderPage() {
           </div>
         </div>
       </div>
+
 
       {/* Success Dialog */}
       <JobOrderCreatedSuccessDialog

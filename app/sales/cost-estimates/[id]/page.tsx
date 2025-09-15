@@ -445,11 +445,11 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }
 
   const fetchClientHistory = useCallback(async () => {
-    if (!costEstimate?.client?.id) return
+    if (!costEstimate?.page_id) return
 
     setLoadingHistory(true)
     try {
-      const history = await getCostEstimatesByClientId(costEstimate.client.id)
+      const history = await getCostEstimatesByPageId(costEstimate.page_id)
       // Filter out current cost estimate from history
       const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
       setClientHistory(filteredHistory)
@@ -458,7 +458,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     } finally {
       setLoadingHistory(false)
     }
-  }, [costEstimate?.client?.id, costEstimate?.id])
+  }, [costEstimate?.page_id, costEstimate?.id])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -544,16 +544,13 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       setEmailBody(
         `Dear ${costEstimate.client?.contactPerson || costEstimate.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed cost estimate for your advertising campaign. Please find the full cost estimate attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`,
       )
-      if (user?.email) {
-        setCcEmail(user.email) // Default CC to current user's email
-      } else {
-        setCcEmail("")
-      }
+      // CC field is intentionally left empty (no auto-fill)
+      setCcEmail("")
     }
-  }, [isSendEmailDialogOpen, costEstimate, user])
+  }, [isSendEmailDialogOpen, costEstimate])
 
   const handleSendEmail = () => {
-    router.push(`/sales/cost-estimates/${params.id}/compose-email`)
+    router.push(`/sales/cost-estimates/${params.id}/compose`)
   }
 
   const handleSendEmailConfirm = async () => {
@@ -1415,28 +1412,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         }
       `}</style>
 
-      {/* Word-style Toolbar */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
-            <Badge className={`${statusConfig.color} border font-medium px-3 py-1`}>
-              {statusConfig.icon}
-              <span className="ml-1.5">{statusConfig.label}</span>
-            </Badge>
-          </div>
-
-          <div className="flex items-center space-x-2"></div>
-        </div>
-      </div>
 
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
@@ -1733,6 +1708,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           isOpen={isSendOptionsDialogOpen}
           onOpenChange={setIsSendOptionsDialogOpen}
           costEstimate={costEstimate}
+          companyData={companyData}
           onEmailClick={() => {
             setIsSendOptionsDialogOpen(false)
             handleSendEmail()

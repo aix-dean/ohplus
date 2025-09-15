@@ -1,4 +1,5 @@
 import type { ProposalClient } from "./proposal"
+import type { SpecsRental } from "./quotation"
 
 export type CostEstimateStatus = "draft" | "sent" | "viewed" | "accepted" | "declined" | "revised"
 
@@ -13,6 +14,7 @@ export interface CostEstimateLineItem {
   category: string // e.g., "Billboard Rental", "Production", "Installation", "Maintenance"
   notes?: string
   image?: string // Added optional image field for product images
+  specs?: SpecsRental // Added specs field to match quotation structure
 }
 
 export interface CostEstimate {
