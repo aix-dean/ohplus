@@ -13,6 +13,8 @@ export interface SpecsRental {
   location?: string // e.g., "manila"
   traffic_count?: number
   type?: string // e.g., "RENTAL"
+  height?: number // Billboard height in feet/meters
+  width?: number // Billboard width in feet/meters
 }
 
 export interface QuotationProduct {

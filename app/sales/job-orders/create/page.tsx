@@ -1956,67 +1956,72 @@ export default function CreateJobOrderPage() {
                         <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
                       )}
                     </div>
-                    <div className="flex items-center justify-center">
-                      <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
-                    </div>
-
-                    {/* new upload*/}
-                    <div className="flex flex-col items-center gap-2">
-                      <input
-                        type="file"
-                        id="attachment-upload-0"
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        onChange={(event) => {
-                          if (event.target.files && event.target.files[0]) {
-                            handleProductAttachmentUpload(0, event.target.files[0])
-                          }
-                        }}
-                      />
-                      {jobOrderForms[0]?.attachmentUrl ? (
-                        <div className="flex items-center gap-2 relative">
-                          {isImageFile(jobOrderForms[0].attachmentFile?.name || null, jobOrderForms[0].attachmentUrl) ? (
-                            <Image
-                              src={jobOrderForms[0].attachmentUrl}
-                              alt={jobOrderForms[0].attachmentFile?.name || "Attachment"}
-                              width={100}
-                              height={100}
-                              className="rounded-md object-cover shadow-md"
-                            />
-                          ) : (
-                            <>
-                              <FileText className="h-5 w-5 text-blue-600" />
-                              <span className="text-xs text-blue-600">{jobOrderForms[0].attachmentFile?.name || "Attachment"}</span>
-                            </>
-                          )}
-                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
-                          </div>
+                    {jobOrderForms[0]?.joType !== "Change Material" && (
+                      <>
+                        <div className="flex items-center justify-center">
+                          <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
                         </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
-                          onClick={() => document.getElementById("attachment-upload-0")?.click()}
-                          disabled={jobOrderForms[0]?.uploadingAttachment}
-                        >
-                          {jobOrderForms[0]?.uploadingAttachment ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+
+                        {/* new upload*/}
+
+                        <div className="flex flex-col items-center gap-2">
+                          <input
+                            type="file"
+                            id="attachment-upload-0"
+                            accept="image/*,application/pdf"
+                            className="hidden"
+                            onChange={(event) => {
+                              if (event.target.files && event.target.files[0]) {
+                                handleProductAttachmentUpload(0, event.target.files[0])
+                              }
+                            }}
+                          />
+                          {jobOrderForms[0]?.attachmentUrl ? (
+                            <div className="flex items-center gap-2 relative">
+                              {isImageFile(jobOrderForms[0].attachmentFile?.name || null, jobOrderForms[0].attachmentUrl) ? (
+                                <Image
+                                  src={jobOrderForms[0].attachmentUrl}
+                                  alt={jobOrderForms[0].attachmentFile?.name || "Attachment"}
+                                  width={100}
+                                  height={100}
+                                  className="rounded-md object-cover shadow-md"
+                                />
+                              ) : (
+                                <>
+                                  <FileText className="h-5 w-5 text-blue-600" />
+                                  <span className="text-xs text-blue-600">{jobOrderForms[0].attachmentFile?.name || "Attachment"}</span>
+                                </>
+                              )}
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                              </div>
+                            </div>
                           ) : (
-                            <Upload className="h-20 w-20 text-white" />
+                            <Button
+                              variant="outline"
+                              className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
+                              onClick={() => document.getElementById("attachment-upload-0")?.click()}
+                              disabled={jobOrderForms[0]?.uploadingAttachment}
+                            >
+                              {jobOrderForms[0]?.uploadingAttachment ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-20 w-20 text-white" />
+                              )}
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                              </div>
+                              <span className="text-xs mt-1">
+                                {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : ""}
+                              </span>
+                            </Button>
                           )}
-                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
-                          </div>
-                          <span className="text-xs mt-1">
-                            {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : ""}
-                          </span>
-                        </Button>
-                      )}
-                      {jobOrderForms[0]?.attachmentError && (
-                        <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
-                      )}
-                    </div>
+                          {jobOrderForms[0]?.attachmentError && (
+                            <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
