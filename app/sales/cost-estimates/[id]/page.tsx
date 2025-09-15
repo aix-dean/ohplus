@@ -124,6 +124,14 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
+// Helper function to get effective dates with defaults
+const getEffectiveDates = (startDate: Date | null | undefined, endDate: Date | null | undefined) => {
+  const today = new Date()
+  const effectiveStartDate = startDate || today
+  const effectiveEndDate = endDate || new Date(today.getFullYear(), today.getMonth() + 1, today.getDate())
+  return { effectiveStartDate, effectiveEndDate }
+}
+
 export default function CostEstimatePage({ params }: { params: { id: string } }) {
   const { id: costEstimateId } = params
   const router = useRouter()
@@ -173,7 +181,19 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
-    setTempValues({ ...tempValues, [fieldName]: currentValue })
+    if (fieldName === "contractPeriod") {
+      const { effectiveStartDate, effectiveEndDate } = getEffectiveDates(
+        costEstimate?.startDate,
+        costEstimate?.endDate
+      )
+      setTempValues({
+        ...tempValues,
+        startDate: currentValue?.startDate || effectiveStartDate,
+        endDate: currentValue?.endDate || effectiveEndDate
+      })
+    } else {
+      setTempValues({ ...tempValues, [fieldName]: currentValue })
+    }
     setHasUnsavedChanges(true)
   }
 
@@ -315,7 +335,26 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           break
 
         case "size":
-          updatedCostEstimate.size = newValue
+          // Parse the size string like "10 x 20 ft" and update specs
+          const sizeMatch = newValue.match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/)
+          if (sizeMatch) {
+            const height = parseFloat(sizeMatch[1])
+            const width = parseFloat(sizeMatch[2])
+            updatedCostEstimate.lineItems = updatedCostEstimate.lineItems.map((item) => {
+              const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+              if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
+                return {
+                  ...item,
+                  specs: {
+                    ...item.specs,
+                    height,
+                    width,
+                  },
+                }
+              }
+              return item
+            })
+          }
           break
 
         case "signatureName":
@@ -1152,12 +1191,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Type</span>
-              <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.content_type || "Billboard"}</span>
             </div>
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Size</span>
-              <span className="text-gray-700">: </span>
+              <span className="text-gray-700">:&nbsp;</span>
               {isEditing && editingField === "size" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
@@ -1175,10 +1214,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                       ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
-                  onClick={() => isEditing && handleFieldEdit("size", costEstimate?.size || "")}
+                  onClick={() => isEditing && handleFieldEdit("size", siteLineItems[0]?.specs?.height && siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.height} x ${siteLineItems[0].specs.width} ft` : "")}
                   title={isEditing ? "Click to edit size" : ""}
                 >
-                  {costEstimate?.size || ""}
+                  {siteLineItems[0]?.specs?.height && siteLineItems[0]?.specs?.width ? ` ${siteLineItems[0].specs.height}ft x ${siteLineItems[0].specs.width} ft` : ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1218,10 +1257,20 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                     })
                   }
                   title={isEditing ? "Click to edit contract period" : ""}
-                >
-                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : ""}
-                  {costEstimate?.startDate && costEstimate?.endDate ? " - " : ""}
-                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : ""}
+                >&nbsp;
+                  {(() => {
+                    const { effectiveStartDate, effectiveEndDate } = getEffectiveDates(
+                      costEstimate?.startDate,
+                      costEstimate?.endDate
+                    )
+                    return (
+                      <>
+                        {format(effectiveStartDate, "MMMM d, yyyy")}
+                        {" - "}
+                        {format(effectiveEndDate, "MMMM d, yyyy")}
+                      </>
+                    )
+                  })()}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1235,7 +1284,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex items-center">
                 <span className="w-4 text-center">•</span>
                 <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">: </span>
+                <span className="text-gray-700">:&nbsp;</span>
                 {isEditing && editingField === "illumination" ? (
                   <div className="flex items-center gap-2 ml-1">
                     <Input

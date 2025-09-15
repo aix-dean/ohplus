@@ -31,6 +31,7 @@ import {
   X,
   Building,
   History,
+  Calculator,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -50,6 +51,7 @@ import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
+import { createCostEstimateFromQuotation } from "@/lib/cost-estimate-service"
 
 interface CompanyData {
   id: string
@@ -184,6 +186,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [clientHistory, setClientHistory] = useState<Quotation[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [isCreatingCostEstimate, setIsCreatingCostEstimate] = useState(false)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<Record<string, any>>({})
@@ -662,14 +665,14 @@ The OH Plus Team`,
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Type</span>
-            <span className="text-gray-700">: {item?.type || "Rental"}</span>
+            <span className="text-gray-700">: {items[0]?.type || "Rental"}</span>
           </div>
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Size</span>
             <span className="text-gray-700">: </span>
-            <span className="text-gray-700">100ft (H) x 60ft (W)</span>
+            <span className="text-gray-700">{items[0]?.specs.height || 0}ft (H) x {items[0]?.specs.width || 0}ft (W)</span>
           </div>
 
           <div className="flex items-center">
@@ -942,6 +945,41 @@ The OH Plus Team`,
     router.push(`/sales/quotations/${quotationId}/compose-email`)
   }
 
+  const handleCreateCostEstimate = async () => {
+    if (!quotation || !user?.uid || !userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "Missing required information to create cost estimate.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCreatingCostEstimate(true)
+    try {
+      const costEstimateId = await createCostEstimateFromQuotation(quotation, user.uid, {
+        company_id: userData.company_id,
+      })
+
+      toast({
+        title: "Cost Estimate Created",
+        description: "Cost estimate has been created successfully from this quotation.",
+      })
+
+      // Navigate to the created cost estimate
+      router.push(`/sales/cost-estimates/${costEstimateId}`)
+    } catch (error) {
+      console.error("Error creating cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create cost estimate. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingCostEstimate(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Word-style Toolbar */}
@@ -1185,7 +1223,25 @@ The OH Plus Team`,
             )}
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <div className="fixed bottom-6 right-6 flex space-x-4">
+          <Button
+            onClick={handleCreateCostEstimate}
+            disabled={isCreatingCostEstimate}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+          >
+            {isCreatingCostEstimate ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating...
+              </>
+            ) : (
+              <>
+                <Calculator className="h-5 w-5 mr-2" /> Create Cost Estimate
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Pagination Controls - Updated for quotations */}
       {relatedQuotations.length > 1 ? (
