@@ -8,7 +8,6 @@ export interface MediaItem {
 }
 
 export interface SpecsRental {
-  audience_type?: string
   audience_types?: string[] // e.g., ["General Public"]
   elevation?: number
   location?: string // e.g., "manila"
@@ -28,7 +27,7 @@ export interface QuotationProduct {
   health_percentage?: number // Added from image
   light?: boolean // Added from image
   media?: MediaItem[] // Added from image
-  specs_rental?: SpecsRental // Added from image
+  specs?: SpecsRental // Added from image
   // New fields from image data model
   media_url?: string // Added to match image exactly
   duration_days?: number // Duration specific to this item (if different from overall)
@@ -76,12 +75,12 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  start_date?: string | any // Made optional - supports both string and Timestamp
-  end_date?: string | any // Made optional - supports both string and Timestamp
+  start_date?: Date | any // Made optional - supports both string and Timestamp
+  end_date?: Date | any // Made optional - supports both string and Timestamp
   total_amount: number
   duration_days: number // Overall duration for the quotation
   notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" | "reserved"
   created: any // Firebase Timestamp
   updated?: any // Firebase Timestamp
   created_by?: string
