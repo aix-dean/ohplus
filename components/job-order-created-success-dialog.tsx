@@ -162,7 +162,7 @@ export function JobOrderCreatedSuccessDialog({
       admin: "ADMIN",
       cms: "CMS",
     }
-    const departmentFrom = "Sales"
+     const departmentFrom = "Sales"
 
     const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
     const navigateTo = `/logistics/job-orders/${joIds[0]}`
