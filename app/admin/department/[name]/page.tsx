@@ -1,16 +1,16 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { ArrowLeft, UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
 import {
@@ -44,8 +44,12 @@ interface User {
   department?: string
 }
 
-export default function UserManagementPage() {
+export default function DepartmentDetailsPage() {
+  const params = useParams()
+  const router = useRouter()
   const { userData, refreshUserData } = useAuth()
+  const departmentName = decodeURIComponent(params.name as string)
+
   const [users, setUsers] = useState<User[]>([])
   const [roles] = useState<HardcodedRole[]>(getAllRoles())
   const [loading, setLoading] = useState(true)
@@ -62,10 +66,24 @@ export default function UserManagementPage() {
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
-  const [usersByDepartment, setUsersByDepartment] = useState<Record<string, User[]>>({})
+  const [departmentUsers, setDepartmentUsers] = useState<User[]>([])
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const router = useRouter()
+  // Role to department mapping
+  const roleToDepartment: Record<string, string> = {
+    admin: "Administrator",
+    sales: "Sales Team",
+    logistics: "Logistics Team",
+    cms: "Content Management",
+  }
+
+  // Department color mapping for divider lines
+  const departmentColors: Record<string, string> = {
+    "Administrator": "bg-violet-500",
+    "Sales Team": "bg-red-500",
+    "Logistics Team": "bg-blue-500",
+    "Content Management": "bg-yellow-500",
+  }
 
   // Debounce search term
   useEffect(() => {
@@ -116,69 +134,43 @@ export default function UserManagementPage() {
     return () => unsubscribe()
   }, [userData?.company_id])
 
-  // Filter users based on debounced search term
-  const filteredUsers = users.filter(
-    (user) =>
-      user.displayName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
-  )
-
-  // Role to department mapping
-  const roleToDepartment: Record<string, string> = {
-    admin: "Administrator",
-    sales: "Sales Team",
-    logistics: "Logistics Team",
-    cms: "Content Management",
-  }
-
-  // Department color mapping for divider lines
-  const departmentColors: Record<string, string> = {
-    "Administrator": "bg-violet-500",
-    "Sales Team": "bg-red-500",
-    "Logistics Team": "bg-blue-500",
-    "Content Management": "bg-yellow-500",
-  }
-
-  // Group users by department (simple implementation)
-  const groupUsersByRoles = async (usersToGroup: User[]) => {
-    if (usersToGroup.length === 0) {
-      setUsersByDepartment({})
-      return
-    }
-
-    const grouped: Record<string, User[]> = {}
-
-    // Initialize departments
-    Object.values(roleToDepartment).forEach((department) => {
-      grouped[department] = []
-    })
-
-    // Group users by their roles
-    for (const user of usersToGroup) {
-      try {
-        const userRoles = await getUserRoles(user.id)
-        userRoles.forEach((roleId) => {
-          const departmentName = roleToDepartment[roleId]
-          if (departmentName && !grouped[departmentName].find((u) => u.id === user.id)) {
-            grouped[departmentName].push(user)
-          }
-        })
-      } catch (error) {
-        console.error(`Error getting roles for user ${user.id}:`, error)
-      }
-    }
-
-    setUsersByDepartment(grouped)
-  }
-
-  // Group users by roles when filtered users change
+  // Get users for this department - using same logic as user management page
   useEffect(() => {
-    if (filteredUsers.length > 0) {
-      groupUsersByRoles(filteredUsers)
-    } else {
-      setUsersByDepartment({})
+    const loadDepartmentUsers = async () => {
+      if (users.length === 0) {
+        setDepartmentUsers([])
+        return
+      }
+
+      const departmentUserList: User[] = []
+
+      // Use same logic as user management page
+      for (const user of users) {
+        try {
+          const userRoles = await getUserRoles(user.id)
+          userRoles.forEach((roleId) => {
+            const userDepartmentName = roleToDepartment[roleId]
+            if (userDepartmentName === departmentName && !departmentUserList.find((u) => u.id === user.id)) {
+              departmentUserList.push(user)
+            }
+          })
+        } catch (error) {
+          console.error(`Error getting roles for user ${user.id}:`, error)
+        }
+      }
+
+      // Apply search filter to department users
+      const filteredDepartmentUsers = departmentUserList.filter(
+        (user) =>
+          user.displayName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
+      )
+
+      setDepartmentUsers(filteredDepartmentUsers)
     }
-  }, [filteredUsers])
+
+    loadDepartmentUsers()
+  }, [users, departmentName, debouncedSearchTerm])
 
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
@@ -300,8 +292,6 @@ export default function UserManagementPage() {
     })
   }
 
-
-
   // Component to display user roles
   function UserRolesBadges({ userId }: { userId: string }) {
     const [userRoles, setUserRoles] = useState<RoleType[]>([])
@@ -338,8 +328,8 @@ export default function UserManagementPage() {
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">User Management</h1>
-            <p className="text-muted-foreground">Manage users and their permissions.</p>
+            <h1 className="text-2xl font-bold">Department Details</h1>
+            <p className="text-muted-foreground">Loading department information...</p>
           </div>
         </div>
         <Card>
@@ -356,9 +346,18 @@ export default function UserManagementPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">User Management ({users.length})</h1>
-          <p className="text-muted-foreground">Manage users and their roles.</p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Users className="h-6 w-6" />
+              {departmentName}
+            </h1>
+            <p className="text-muted-foreground">Manage users in the {departmentName} department</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -384,78 +383,67 @@ export default function UserManagementPage() {
         </div>
       </div>
 
+      {/* Department Color Line */}
+      <div className={`h-1 w-full ${departmentColors[departmentName] || 'bg-gray-300'} mb-6 rounded`}></div>
+
       <div className="flex items-center justify-between mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search users..."
+            placeholder="Search users in this department..."
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Badge variant="secondary" className="text-sm">
+          {departmentUsers.length} member{departmentUsers.length !== 1 ? 's' : ''}
+        </Badge>
       </div>
 
-      {loading && users.length === 0 ? (
-        <div className="flex justify-center p-8">
-          <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-2">Loading users...</span>
-        </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Object.keys(usersByDepartment).length === 0 ? (
-            <div className="col-span-full text-center py-6">
-              No users found
-            </div>
-          ) : (
-            Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
-              <Card key={department} className="h-fit">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    {department}
-                    <Badge variant="secondary" className="ml-auto">
-                      {departmentUsers.length}
-                    </Badge>
-                  </CardTitle>
-                  <div className={`h-1 w-full ${departmentColors[department] || 'bg-gray-300'} mt-2`}></div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {departmentUsers.slice(0, 5).map((user) => (
-                    <div key={user.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h4 className="font-medium">{user.displayName}</h4>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                        </div>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
+      <div className="space-y-4">
+        {departmentUsers.length > 0 ? (
+          departmentUsers.map((user) => (
+            <Card key={user.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div>
+                      <h4 className="font-medium text-lg">{user.displayName}</h4>
+                      <p className="text-muted-foreground">{user.email}</p>
                     </div>
-                  ))}
-                  {departmentUsers.length > 5 && (
-                    <div className="text-center text-sm text-muted-foreground py-2">
-                      +{departmentUsers.length - 5} more users
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(user.status)}
                     </div>
-                  )}
-                  <div className="pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => router.push(`/admin/department/${department}`)}
-                    >
-                      View More Details
-                    </Button>
+                    <div className="flex flex-wrap gap-1">
+                      <UserRolesBadges userId={user.id} />
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
+                  <Button variant="outline" size="sm" onClick={() => handleEditRoles(user)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Edit Roles
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No users found</h3>
+              <p className="text-muted-foreground mb-4">
+                There are no users currently assigned to the {departmentName} department.
+              </p>
+              <Button onClick={handleAddUser}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add First User
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <CompanyRegistrationDialog
         isOpen={isCompanyRegistrationDialogOpen}
@@ -530,7 +518,6 @@ export default function UserManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   )
 }
