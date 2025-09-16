@@ -16,7 +16,6 @@ import {
 } from "firebase/firestore"
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import type { Proposal } from "@/lib/types/proposal"
-import type { Quotation } from "@/lib/types/quotation"
 
 const COST_ESTIMATES_COLLECTION = "cost_estimates"
 
@@ -51,7 +50,6 @@ interface CostEstimateSiteData {
   type: string
   image?: string // Added image field for product images
   specs_rental?: any // Added specs_rental field to match quotation structure
-  content_type: string
 }
 
 // Generate a secure password for cost estimate access
@@ -163,121 +161,6 @@ export async function createCostEstimateFromProposal(
   }
 }
 
-// Create a new cost estimate from a quotation
-export async function createCostEstimateFromQuotation(
-  quotation: Quotation,
-  userId: string,
-  options?: CreateCostEstimateOptions,
-): Promise<string> {
-  try {
-    const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
-    let totalAmount = 0
-    const lineItems: CostEstimateLineItem[] = options?.customLineItems || []
-
-    // If customLineItems are not provided, generate them from quotation items
-    if (!options?.customLineItems || options.customLineItems.length === 0) {
-      quotation.items.forEach((item) => {
-        const pricePerDay = (typeof item.price === "number" ? item.price : 0) / 30
-        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : item.price // Use original price if no duration
-        lineItems.push({
-          id: item.id || item.product_id || "",
-          product_id: item.product_id,
-          description: item.name,
-          quantity: 1,
-          unitPrice: item.price, // Keep original unit price for reference
-          total: calculatedTotalPrice,
-          category: item.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
-          notes: `Location: ${item.location}`,
-          image: item.media_url || (item.media && item.media.length > 0 ? item.media[0].url : undefined),
-          specs: item.specs,
-          content_type: item.content_type,
-          site_code: item.site_code,
-          health_percentage: item.health_percentage,
-          light: item.light,
-          media: item.media,
-          media_url: item.media_url,
-          duration_days: item.duration_days,
-          item_total_amount: item.item_total_amount,
-          height: item.height,
-          width: item.width,
-          site_type: item.site_type,
-        })
-      })
-
-      // Add default cost categories if not using custom line items
-      lineItems.push({
-        id: "production-cost",
-        description: "Production Cost (Tarpaulin/LED Content)",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Production",
-        notes: "Estimated cost for content production.",
-      })
-      lineItems.push({
-        id: "installation-cost",
-        description: "Installation/Dismantling Fees",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Installation",
-        notes: "Estimated cost for installation and dismantling.",
-      })
-      lineItems.push({
-        id: "maintenance-cost",
-        description: "Maintenance & Monitoring",
-        quantity: 1,
-        unitPrice: 0,
-        total: 0,
-        category: "Maintenance",
-        notes: "Estimated cost for ongoing maintenance and monitoring.",
-      })
-    }
-
-    // Recalculate total amount based on final line items
-    totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
-
-    const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
-
-    const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
-      proposalId: quotation.proposalId || null, // Link to proposal if quotation has one
-      quotationId: quotation.id, // Link to the quotation
-      costEstimateNumber: costEstimateNumber, // Store the new number
-      title: `Cost Estimate for ${quotation.quotation_number}`,
-      client: {
-        id: quotation.client_id || "",
-        name: quotation.client_name || "",
-        email: quotation.client_email || "",
-        company: quotation.client_company_name || "",
-        phone: quotation.client_phone || "",
-        address: quotation.client_address || "",
-        designation: quotation.client_designation || "",
-        industry: quotation.client_company_id || "",
-        company_id: quotation.client_company_id || "",
-      },
-      lineItems,
-      totalAmount,
-      status: "draft",
-      notes: options?.notes || "",
-      customMessage: options?.customMessage || "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      createdBy: userId,
-      company_id: options?.company_id || quotation.company_id || "",
-      page_id: options?.page_id || "",
-      startDate: options?.startDate || quotation.start_date || null, // Store new dates
-      endDate: options?.endDate || quotation.end_date || null, // Store new dates
-      durationDays: durationDays || quotation.duration_days || null, // Store duration in days
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
-    })
-
-    return newCostEstimateRef.id
-  } catch (error) {
-    console.error("Error creating cost estimate from quotation:", error)
-    throw new Error("Failed to create cost estimate from quotation.")
-  }
-}
-
 // Create a cost estimate directly without a proposal
 export async function createDirectCostEstimate(
   clientData: CostEstimateClientData,
@@ -304,12 +187,7 @@ export async function createDirectCostEstimate(
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
           image: site.image || undefined, // Added image field to line items
-          specs: {
-            ...site.specs_rental,
-            height: site.specs_rental?.height || 0,
-            width: site.specs_rental?.width || 0,
-          }, // Added specs field with height/width from quotation structure
-          content_type: site.content_type || "",
+          specs: site.specs_rental, // Added specs field to match quotation structure
         })
       })
     }
@@ -423,7 +301,6 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -464,7 +341,6 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
     return {
       id: docSnap.id,
       proposalId: data.proposalId || null,
-      quotationId: data.quotationId || null,
       costEstimateNumber: data.costEstimateNumber || null,
       title: data.title,
       client: data.client,
@@ -528,7 +404,6 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -591,7 +466,6 @@ export async function getPaginatedCostEstimates(
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -647,7 +521,6 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -765,12 +638,7 @@ export async function createMultipleCostEstimates(
         category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
         notes: `Location: ${site.location}`,
         image: site.image || undefined, // Added image field to line items for multiple cost estimates
-        specs: {
-          ...site.specs_rental,
-          height: site.specs_rental?.height || 0,
-          width: site.specs_rental?.width || 0,
-        }, // Added specs field with height/width from quotation structure
-        content_type: site.content_type || "",
+        specs: site.specs_rental, // Added specs field to match quotation structure
       })
 
       // Calculate total amount for this site
@@ -834,7 +702,6 @@ export async function getCostEstimatesByPageId(pageId: string): Promise<CostEsti
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -875,7 +742,6 @@ export async function getCostEstimatesByClientId(clientId: string): Promise<Cost
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
-        quotationId: data.quotationId || null,
         costEstimateNumber: data.costEstimateNumber || null,
         title: data.title,
         client: data.client,
@@ -898,6 +764,65 @@ export async function getCostEstimatesByClientId(clientId: string): Promise<Cost
     })
   } catch (error) {
     console.error("Error fetching cost estimates by client ID:", error)
+    return []
+  }
+}
+
+// Get cost estimates by product ID and company ID for history sidebar
+export async function getCostEstimatesByProductIdAndCompanyId(productId: string, companyId: string, excludeId?: string): Promise<CostEstimate[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const costEstimatesRef = collection(db, COST_ESTIMATES_COLLECTION)
+    const q = query(costEstimatesRef, orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const costEstimates: CostEstimate[] = []
+
+    querySnapshot.forEach((doc) => {
+      // Skip the excluded cost estimate if specified
+      if (excludeId && doc.id === excludeId) {
+        return
+      }
+
+      const data = doc.data()
+      const costEstimate = {
+        id: doc.id,
+        proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems || [],
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+
+      // Check if the cost estimate matches the product ID and company ID
+      const hasMatchingProduct = costEstimate.lineItems.some((item) => item.id === productId)
+      const hasMatchingCompany = costEstimate.company_id === companyId
+
+      if (hasMatchingProduct && hasMatchingCompany) {
+        costEstimates.push(costEstimate)
+      }
+    })
+
+    return costEstimates
+  } catch (error) {
+    console.error("Error fetching cost estimates by product ID and company ID:", error)
     return []
   }
 }

@@ -10,6 +10,7 @@ import {
   updateCostEstimate,
   getCostEstimatesByPageId,
   getCostEstimatesByClientId, // Import new function
+  getCostEstimatesByProductIdAndCompanyId, // Import new function
   updateCostEstimateStatus, // Import updateCostEstimateStatus
 } from "@/lib/cost-estimate-service"
 import type {
@@ -124,14 +125,6 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
-// Helper function to get effective dates with defaults
-const getEffectiveDates = (startDate: Date | null | undefined, endDate: Date | null | undefined) => {
-  const today = new Date()
-  const effectiveStartDate = startDate || today
-  const effectiveEndDate = endDate || new Date(today.getFullYear(), today.getMonth() + 1, today.getDate())
-  return { effectiveStartDate, effectiveEndDate }
-}
-
 export default function CostEstimatePage({ params }: { params: { id: string } }) {
   const { id: costEstimateId } = params
   const router = useRouter()
@@ -181,19 +174,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
-    if (fieldName === "contractPeriod") {
-      const { effectiveStartDate, effectiveEndDate } = getEffectiveDates(
-        costEstimate?.startDate,
-        costEstimate?.endDate
-      )
-      setTempValues({
-        ...tempValues,
-        startDate: currentValue?.startDate || effectiveStartDate,
-        endDate: currentValue?.endDate || effectiveEndDate
-      })
-    } else {
-      setTempValues({ ...tempValues, [fieldName]: currentValue })
-    }
+    setTempValues({ ...tempValues, [fieldName]: currentValue })
     setHasUnsavedChanges(true)
   }
 
@@ -335,26 +316,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           break
 
         case "size":
-          // Parse the size string like "10 x 20 ft" and update specs
-          const sizeMatch = newValue.match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/)
-          if (sizeMatch) {
-            const height = parseFloat(sizeMatch[1])
-            const width = parseFloat(sizeMatch[2])
-            updatedCostEstimate.lineItems = updatedCostEstimate.lineItems.map((item) => {
-              const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-              if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-                return {
-                  ...item,
-                  specs: {
-                    ...item.specs,
-                    height,
-                    width,
-                  },
-                }
-              }
-              return item
-            })
-          }
+          updatedCostEstimate.size = newValue
           break
 
         case "signatureName":
@@ -484,20 +446,20 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }
 
   const fetchClientHistory = useCallback(async () => {
-    if (!costEstimate?.page_id) return
+    if (!costEstimate?.lineItems?.[0]?.id || !costEstimate?.company_id || !costEstimate?.id) return
 
     setLoadingHistory(true)
     try {
-      const history = await getCostEstimatesByPageId(costEstimate.page_id)
-      // Filter out current cost estimate from history
-      const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
-      setClientHistory(filteredHistory)
+      const productId = costEstimate.lineItems[0].id
+      const companyId = costEstimate.company_id
+      const history = await getCostEstimatesByProductIdAndCompanyId(productId, companyId, costEstimate.id)
+      setClientHistory(history)
     } catch (error) {
       console.error("Error fetching client history:", error)
     } finally {
       setLoadingHistory(false)
     }
-  }, [costEstimate?.page_id, costEstimate?.id])
+  }, [costEstimate?.lineItems?.[0]?.id, costEstimate?.company_id, costEstimate?.id])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -560,7 +522,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }, [user, userData])
 
   useEffect(() => {
-    if (costEstimate?.client?.id) {
+    if (costEstimate?.lineItems?.[0]?.id) {
       fetchClientHistory()
     }
   }, [fetchClientHistory])
@@ -1191,12 +1153,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Type</span>
-              <span className="text-gray-700">: {siteLineItems[0]?.content_type || "Billboard"}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
             </div>
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Size</span>
-              <span className="text-gray-700">:&nbsp;</span>
+              <span className="text-gray-700">: </span>
               {isEditing && editingField === "size" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
@@ -1214,10 +1176,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                       ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
-                  onClick={() => isEditing && handleFieldEdit("size", siteLineItems[0]?.specs?.height && siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.height} x ${siteLineItems[0].specs.width} ft` : "")}
+                  onClick={() => isEditing && handleFieldEdit("size", costEstimate?.size || "")}
                   title={isEditing ? "Click to edit size" : ""}
                 >
-                  {siteLineItems[0]?.specs?.height && siteLineItems[0]?.specs?.width ? ` ${siteLineItems[0].specs.height}ft x ${siteLineItems[0].specs.width} ft` : ""}
+                  {costEstimate?.size || ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1257,20 +1219,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                     })
                   }
                   title={isEditing ? "Click to edit contract period" : ""}
-                >&nbsp;
-                  {(() => {
-                    const { effectiveStartDate, effectiveEndDate } = getEffectiveDates(
-                      costEstimate?.startDate,
-                      costEstimate?.endDate
-                    )
-                    return (
-                      <>
-                        {format(effectiveStartDate, "MMMM d, yyyy")}
-                        {" - "}
-                        {format(effectiveEndDate, "MMMM d, yyyy")}
-                      </>
-                    )
-                  })()}
+                >
+                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : ""}
+                  {costEstimate?.startDate && costEstimate?.endDate ? " - " : ""}
+                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : ""}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1284,7 +1236,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex items-center">
                 <span className="w-4 text-center">•</span>
                 <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">:&nbsp;</span>
+                <span className="text-gray-700">: </span>
                 {isEditing && editingField === "illumination" ? (
                   <div className="flex items-center gap-2 ml-1">
                     <Input
