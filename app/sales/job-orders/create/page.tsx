@@ -154,11 +154,11 @@ export default function CreateJobOrderPage() {
       dtiBir: !dtiBirUrl && !quotationData?.client?.compliance?.dti,
       gis: !gisUrl && !quotationData?.client?.compliance?.gis,
       idSignature: !idSignatureUrl && !quotationData?.client?.compliance?.id,
-      signedQuotation: !signedQuotationUrl && !projectCompliance?.signedQuotation?.fileUrl,
+      signedQuotation: !signedQuotationUrl && !(projectCompliance?.signedQuotation?.fileUrl || projectCompliance?.signedQuotation?.status === "completed"),
       signedContract: !signedContractUrl && !projectCompliance?.signedContract?.fileUrl,
-      poMo: !poMoUrl && !projectCompliance?.irrevocablePo?.fileUrl,
+      poMo: !poMoUrl && !projectCompliance?.poMo?.fileUrl,
       finalArtwork: !finalArtworkUrl && !projectCompliance?.finalArtwork?.fileUrl,
-      paymentAdvance: !paymentAdvanceConfirmed && !projectCompliance?.paymentAsDeposit?.fileUrl,
+      paymentAdvance: !paymentAdvanceConfirmed && !(projectCompliance?.paymentAsDeposit?.completed),
     }
   }, [
     dtiBirUrl,
@@ -218,7 +218,7 @@ export default function CreateJobOrderPage() {
 
   // Extract content_type from quotation data
   const contentType = useMemo(() => {
-    return quotationData?.quotation?.items?.content_type || "static"
+    return quotationData?.quotation?.items?.[0]?.content_type || "static"
   }, [quotationData])
 
   // Dynamic JO type options based on content_type
@@ -354,17 +354,17 @@ export default function CreateJobOrderPage() {
           let projectComplianceFieldKey:
             | "signedQuotation"
             | "signedContract"
-            | "irrevocablePo"
+            | "poMo"
             | "finalArtwork"
             | "paymentAsDeposit"
-            | undefined
+            | undefined;
 
           if (fieldToUpdate === "signedQuotation") {
             projectComplianceFieldKey = "signedQuotation"
           } else if (fieldToUpdate === "signedContract") {
             projectComplianceFieldKey = "signedContract"
           } else if (fieldToUpdate === "poMo") {
-            projectComplianceFieldKey = "irrevocablePo"
+            projectComplianceFieldKey = "poMo"
           } else if (fieldToUpdate === "finalArtwork") {
             projectComplianceFieldKey = "finalArtwork"
           } else if (fieldToUpdate === "paymentAsDeposit") {
@@ -375,6 +375,7 @@ export default function CreateJobOrderPage() {
             // Get the current project compliance from quotation data or use empty object with proper typing
             const currentProjectCompliance = quotationData?.quotation?.projectCompliance || {
               finalArtwork: {
+                completed: false,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -383,6 +384,7 @@ export default function CreateJobOrderPage() {
                 status: "pending"
               },
               paymentAsDeposit: {
+                completed: false,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -390,7 +392,8 @@ export default function CreateJobOrderPage() {
                 uploadedBy: null,
                 status: "pending"
               },
-              irrevocablePo: {
+              poMo: {
+                completed: false,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -399,6 +402,7 @@ export default function CreateJobOrderPage() {
                 status: "pending"
               },
               signedContract: {
+                completed: false,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -407,6 +411,7 @@ export default function CreateJobOrderPage() {
                 status: "pending"
               },
               signedQuotation: {
+                completed: false,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -425,6 +430,7 @@ export default function CreateJobOrderPage() {
               [projectComplianceFieldKey]: {
                 // Preserve existing field data if it exists, otherwise create new object with defaults
                 ...(existingFieldData || {
+                  completed: false,
                   fileName: null,
                   fileUrl: null,
                   notes: null,
@@ -432,6 +438,7 @@ export default function CreateJobOrderPage() {
                   uploadedBy: null,
                   status: "pending"
                 }),
+                completed: true,
                 fileName: file.name,
                 fileUrl: downloadURL,
                 uploadedAt: new Date().toISOString(),
@@ -760,17 +767,15 @@ export default function CreateJobOrderPage() {
             contractDuration: totalDays.toString(), // Convert to string as expected by type
             contractPeriodStart: contractPeriodStart || undefined,
             contractPeriodEnd: contractPeriodEnd || undefined,
-            siteName: quotation.items?.name || "", // Get from quotation items
-            siteCode: quotation.items?.site_code || "N/A", // Get from quotation items
-            siteType: quotation.items?.site_type || "N/A",
+            siteName: quotation.items?.[0]?.name || "", // Get from quotation items
+            siteCode: quotation.items?.[0]?.site_code || "N/A", // Get from quotation items
+            siteType: quotation.items?.[0]?.site_type || "N/A",
             siteSize:
-              (quotation.items?.height && quotation.items?.width
-                ? `${quotation.items.width}x${quotation.items.height}ft`
+              (quotation.items?.[0]?.height && quotation.items?.[0]?.width
+                ? `${quotation.items[0].width}x${quotation.items[0].height}ft`
                 : "N/A") || "N/A", // Use quotation items height and width
-            siteIllumination: quotation.items?.light ? "Yes" : "No", // Use quotation items light as boolean
-            illumination: typeof products[0]?.specs_rental?.illumination === 'object'
-              ? "Custom Illumination Setup"
-              : products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
+            siteIllumination: quotation.items?.[0]?.light ? "Yes" : "No", // Use quotation items light as boolean
+            illumination: products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
             leaseRatePerMonth:
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
@@ -779,14 +784,15 @@ export default function CreateJobOrderPage() {
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
-            siteImageUrl: quotation.items?.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            siteImageUrl: quotation.items?.[0]?.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
             missingCompliance: missingCompliance,
-            product_id: quotation.items.product_id || "",
+            product_id: quotation.items[0].product_id || "",
             company_id: userData?.company_id || "",
             created_by: user.uid, // Added created_by
             content_type: contentType, // Added content_type
             projectCompliance: { // Construct projectCompliance object
               signedQuotation: {
+                completed: !!signedQuotationUrl,
                 fileName: signedQuotationFile?.name || null,
                 fileUrl: signedQuotationUrl,
                 notes: null,
@@ -795,6 +801,7 @@ export default function CreateJobOrderPage() {
                 status: (signedQuotationUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               signedContract: {
+                completed: !!signedContractUrl,
                 fileName: signedContractFile?.name || null,
                 fileUrl: signedContractUrl,
                 notes: null,
@@ -802,7 +809,8 @@ export default function CreateJobOrderPage() {
                 uploadedBy: user?.uid || null,
                 status: (signedContractUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
-              irrevocablePo: {
+              poMo: {
+                completed: !!poMoUrl,
                 fileName: poMoFile?.name || null,
                 fileUrl: poMoUrl,
                 notes: null,
@@ -811,6 +819,7 @@ export default function CreateJobOrderPage() {
                 status: (poMoUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               finalArtwork: {
+                completed: !!finalArtworkUrl,
                 fileName: finalArtworkFile?.name || null,
                 fileUrl: finalArtworkUrl,
                 notes: null,
@@ -819,6 +828,7 @@ export default function CreateJobOrderPage() {
                 status: (finalArtworkUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
               },
               paymentAsDeposit: {
+                completed: paymentAdvanceConfirmed,
                 fileName: null,
                 fileUrl: null,
                 notes: null,
@@ -993,13 +1003,13 @@ export default function CreateJobOrderPage() {
             if (projectCompliance.signedContract?.fileUrl) {
               setSignedContractUrl(projectCompliance.signedContract.fileUrl)
             }
-            if (projectCompliance.irrevocablePo?.fileUrl) {
-              setPoMoUrl(projectCompliance.irrevocablePo.fileUrl)
+            if (projectCompliance.poMo?.fileUrl) {
+              setPoMoUrl(projectCompliance.poMo.fileUrl)
             }
             if (projectCompliance.finalArtwork?.fileUrl) {
               setFinalArtworkUrl(projectCompliance.finalArtwork.fileUrl)
             }
-            if (projectCompliance.paymentAsDeposit?.fileUrl) {
+            if (projectCompliance.paymentAsDeposit?.completed) {
               setPaymentAdvanceConfirmed(true)
             }
           }
@@ -1140,7 +1150,7 @@ export default function CreateJobOrderPage() {
               <p className="text-sm font-semibold">Site:</p>
               <div className="space-y-2">
                 {productTotals.map((productTotal, index) => {
-                  const item = quotation.items
+                  const item = quotation
                   const product = products[index] || {}
 
                   return (
@@ -1166,7 +1176,7 @@ export default function CreateJobOrderPage() {
             <div className="space-y-0.5 mt-3">
               <div>
                 <p className="text-sm">
-                  <span className="font-semibold">Site Type:</span> {quotationData.quotation.items.content_type}
+                  <span className="font-semibold">Site Type:</span> {quotationData.quotation.items[0].content_type}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Size:</span> {"N/A"}
@@ -1432,7 +1442,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    {quotationData?.quotation?.projectCompliance?.signedQuotation?.fileName || "Signed_Quotation"}
+                    Signed_Quotation
                   </a>
                 ) : (
                   <input
@@ -1502,7 +1512,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    {quotationData?.quotation?.projectCompliance?.signedContract?.fileName || "Signed_Contract"}
+                    Signed_Contract
                   </a>
                 )}
                 <input
@@ -1562,7 +1572,7 @@ export default function CreateJobOrderPage() {
                   />
                 )}
                 <Label htmlFor="po-mo-radio" className="text-sm flex-1">
-                  Irrevocable PO
+                  PO/MO
                 </Label>
                 {poMoUrl ? (
                   <a
@@ -1571,7 +1581,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    {quotationData?.quotation?.projectCompliance?.irrevocablePo?.fileName || "PO_MO"}
+                    PO_MO
                   </a>
                 ) : (
                   <input
@@ -1641,7 +1651,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    {quotationData?.quotation?.projectCompliance?.finalArtwork?.fileName || "Final Artwork"}
+                    Final Artwork
                   </a>
                 ) : (
                   <input
@@ -1721,23 +1731,18 @@ export default function CreateJobOrderPage() {
             missingCompliance.signedQuotation ||
             missingCompliance.signedContract ||
             missingCompliance.poMo ||
-            missingCompliance.finalArtwork ||
-            missingCompliance.paymentAdvance ? (
+            missingCompliance.finalArtwork? (
             <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <AlertTitle className="text-red-700 text-xs">
-                This client has some missing compliance requirements.
+                This client has some missing project compliance requirements.
               </AlertTitle>
               <AlertDescription className="text-red-700 text-xs">
                 <ul className="list-disc list-inside ml-2">
-                  {missingCompliance.dtiBir && <li>- DTI/BIR 2303</li>}
-                  {missingCompliance.gis && <li>- GIS</li>}
-                  {missingCompliance.idSignature && <li>- ID with Signature</li>}
                   {missingCompliance.signedQuotation && <li>- Signed Quotation</li>}
                   {missingCompliance.signedContract && <li>- Signed Contract</li>}
-                  {missingCompliance.poMo && <li>- Irrevocable PO</li>}
+                  {missingCompliance.poMo && <li>- PO/MO</li>}
                   {missingCompliance.finalArtwork && <li>- Final Artwork</li>}
-                  {missingCompliance.paymentAdvance && <li>- Payment as Deposit/Advance</li>}
                 </ul>
               </AlertDescription>
             </Alert>
@@ -1885,20 +1890,16 @@ export default function CreateJobOrderPage() {
                                 height={100}
                                 className="rounded-md object-cover shadow-md"
                               />
-                              {jobOrderForms[0]?.joType === "Change Material" && (
-                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                                </div>
-                              )}
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                              </div>
                             </div>
                           ) : (
                             <div className="relative inline-block">
                               <FileText className="h-20 w-20 text-blue-600" />
-                              {jobOrderForms[0]?.joType === "Change Material" && (
-                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                                </div>
-                              )}
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                              </div>
                             </div>
                           )}
                           
@@ -1943,11 +1944,9 @@ export default function CreateJobOrderPage() {
                             ) : (
                               <ImageIcon  className="h-20 w-20 text-white" />
                             )}
-                            {jobOrderForms[0]?.joType === "Change Material" && (
-                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                              </div>
-                            )}
+                            <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                            </div>
                             <span className="text-xs mt-1">
                               {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
                             </span>
@@ -1958,14 +1957,12 @@ export default function CreateJobOrderPage() {
                         <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
                       )}
                     </div>
-                    {jobOrderForms[0]?.joType === "Change Material" && (
-                      <>
-                        <div className="flex items-center justify-center">
-                          <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
-                        </div>
+                    <div className="flex items-center justify-center">
+                      <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
+                    </div>
 
-                        {/* new upload*/}
-                        <div className="flex flex-col items-center gap-2">
+                    {/* new upload*/}
+                    <div className="flex flex-col items-center gap-2">
                       <input
                         type="file"
                         id="attachment-upload-0"
@@ -2020,9 +2017,7 @@ export default function CreateJobOrderPage() {
                       {jobOrderForms[0]?.attachmentError && (
                         <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
                       )}
-                        </div>
-                      </>
-                    )}
+                    </div>
                   </div>
                 </div>
 
@@ -2101,7 +2096,7 @@ export default function CreateJobOrderPage() {
         complianceItems={[
           { name: "Signed Quotation", completed: !missingCompliance.signedQuotation, type: "upload" },
           { name: "Signed Contract", completed: !missingCompliance.signedContract, type: "upload" },
-          { name: "Irrevocable PO", completed: !missingCompliance.poMo, type: "upload" },
+          { name: "PO/MO", completed: !missingCompliance.poMo, type: "upload" },
           { name: "Final Artwork", completed: !missingCompliance.finalArtwork, type: "upload" },
           { name: "Payment as Deposit/Advance", completed: !missingCompliance.paymentAdvance, type: "confirmation" },
         ]}

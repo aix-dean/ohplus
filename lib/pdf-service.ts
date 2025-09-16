@@ -247,7 +247,15 @@ interface ServiceAssignmentPDFData {
   alarmDate: Date | null
   alarmTime: string
   attachments: { name: string; type: string }[]
-  serviceExpenses: { name: string; amount: string }[]
+  serviceCost: {
+    crewFee: string
+    overtimeFee: string
+    transpo: string
+    tollFee: string
+    mealAllowance: string
+    otherFees: { name: string; amount: string }[]
+    total: number
+  }
   status: string
   created: Date
 }
@@ -442,8 +450,7 @@ export async function generateServiceAssignmentPDF(
     }
 
     // Service Cost Section
-    const totalCost = serviceAssignment.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0)
-    if (totalCost > 0) {
+    if (serviceAssignment.serviceCost.total > 0) {
       checkNewPage(40)
       pdf.setFontSize(16)
       pdf.setFont("helvetica", "bold")
@@ -457,13 +464,31 @@ export async function generateServiceAssignmentPDF(
       pdf.setFontSize(11)
       pdf.setFont("helvetica", "normal")
 
-      // All expenses
-      serviceAssignment.serviceExpenses.forEach((expense) => {
-        if (expense.name && expense.amount && Number.parseFloat(expense.amount) > 0) {
+      const costItems = [
+        { label: "Crew Fee:", value: serviceAssignment.serviceCost.crewFee },
+        { label: "Overtime Fee:", value: serviceAssignment.serviceCost.overtimeFee },
+        { label: "Transportation:", value: serviceAssignment.serviceCost.transpo },
+        { label: "Toll Fee:", value: serviceAssignment.serviceCost.tollFee },
+        { label: "Meal Allowance:", value: serviceAssignment.serviceCost.mealAllowance },
+      ]
+
+      costItems.forEach((item) => {
+        if (item.value && Number.parseFloat(item.value) > 0) {
           pdf.setFont("helvetica", "bold")
-          pdf.text(`${expense.name}:`, margin, yPosition)
+          pdf.text(item.label, margin, yPosition)
           pdf.setFont("helvetica", "normal")
-          pdf.text(formatCurrency(Number.parseFloat(expense.amount)), rightColumn, yPosition)
+          pdf.text(formatCurrency(Number.parseFloat(item.value)), rightColumn, yPosition)
+          yPosition += 6
+        }
+      })
+
+      // Other fees
+      serviceAssignment.serviceCost.otherFees.forEach((fee) => {
+        if (fee.name && fee.amount && Number.parseFloat(fee.amount) > 0) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text(`${fee.name}:`, margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(formatCurrency(Number.parseFloat(fee.amount)), rightColumn, yPosition)
           yPosition += 6
         }
       })
@@ -477,7 +502,7 @@ export async function generateServiceAssignmentPDF(
       pdf.setFontSize(14)
       pdf.setFont("helvetica", "bold")
       pdf.text("TOTAL COST:", margin, yPosition)
-      pdf.text(formatCurrency(totalCost), rightColumn, yPosition)
+      pdf.text(formatCurrency(serviceAssignment.serviceCost.total), rightColumn, yPosition)
       yPosition += 15
     }
 

@@ -45,7 +45,7 @@ export function GenerateQuotationDialog({
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [selectedProductId, setSelectedProductId] = useState<string>(initialProductIds?.[0] || "")
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(initialProductIds || [])
   const [startDate, setStartDate] = useState<Date | undefined>(new Date())
   const [endDate, setEndDate] = useState<Date | undefined>(new Date())
   const [validUntil, setValidUntil] = useState<Date | undefined>(() => {
@@ -90,46 +90,41 @@ export function GenerateQuotationDialog({
   }, [isOpen, initialClientId, toast])
 
   useEffect(() => {
-    if (startDate && endDate && selectedProductId) {
-      const selectedProduct = products.find((p) => p.id === selectedProductId)
-      if (selectedProduct) {
-        const quotationProduct: QuotationProduct = {
-          product_id: selectedProduct.id!,
-          name: selectedProduct.name,
-          location: selectedProduct.location || "",
-          price: selectedProduct.price || 0,
-          site_code: selectedProduct.site_code || "",
-          type: selectedProduct.type || "",
-          description: selectedProduct.description,
-          health_percentage: selectedProduct.health_percentage,
-          light: selectedProduct.light,
-          media: selectedProduct.media,
-          specs_rental: selectedProduct.specs_rental,
-          media_url: selectedProduct.media && selectedProduct.media.length > 0 ? selectedProduct.media[0].url : undefined,
-          duration_days: 0, // Will be calculated by service
-          item_total_amount: 0, // Will be calculated by service
-        }
+    if (startDate && endDate && selectedProductIds.length > 0) {
+      const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id))
+      const quotationProducts: QuotationProduct[] = selectedProducts.map((p) => ({
+        product_id: p.id,
+        name: p.name,
+        location: p.location,
+        price: p.price || 0,
+        site_code: p.site_code,
+        type: p.type,
+        description: p.description,
+        health_percentage: p.health_percentage,
+        light: p.light,
+        media: p.media,
+        specs_rental: p.specs_rental,
+        media_url: p.media && p.media.length > 0 ? p.media[0].url : undefined,
+        duration_days: 0, // Will be calculated by service
+        item_total_amount: 0, // Will be calculated by service
+      }))
 
-        const { durationDays, totalAmount } = calculateQuotationTotal(
-          startDate.toISOString(),
-          endDate.toISOString(),
-          quotationProduct,
-        )
-        setDurationDays(durationDays)
-        setTotalAmount(totalAmount)
-      } else {
-        setDurationDays(0)
-        setTotalAmount(0)
-      }
+      const { durationDays, totalAmount } = calculateQuotationTotal(
+        startDate.toISOString(),
+        endDate.toISOString(),
+        quotationProducts,
+      )
+      setDurationDays(durationDays)
+      setTotalAmount(totalAmount)
     } else {
       setDurationDays(0)
       setTotalAmount(0)
     }
-  }, [startDate, endDate, selectedProductId, products])
+  }, [startDate, endDate, selectedProductIds, products])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedClient || !selectedProductId || !startDate || !endDate || !validUntil) {
+    if (!selectedClient || selectedProductIds.length === 0 || !startDate || !endDate || !validUntil) {
       toast({
         title: "Missing Information",
         description: "Please select a client, at least one product, and valid dates.",
@@ -141,32 +136,29 @@ export function GenerateQuotationDialog({
     setLoading(true)
     try {
       const quotationNumber = generateQuotationNumber()
-      const selectedProduct = products.find((p) => p.id === selectedProductId)
-      if (!selectedProduct) {
-        throw new Error("Selected product not found")
-      }
+      const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id))
 
-      const quotationProduct: QuotationProduct = {
-        product_id: selectedProduct.id!,
-        name: selectedProduct.name,
-        location: selectedProduct.location || "",
-        price: selectedProduct.price || 0,
-        site_code: selectedProduct.site_code || "",
-        type: selectedProduct.type || "",
-        description: selectedProduct.description,
-        health_percentage: selectedProduct.health_percentage,
-        light: selectedProduct.light,
-        media: selectedProduct.media,
-        specs_rental: selectedProduct.specs_rental,
-        media_url: selectedProduct.media && selectedProduct.media.length > 0 ? selectedProduct.media[0].url : undefined,
+      const quotationProducts: QuotationProduct[] = selectedProducts.map((p) => ({
+        product_id: p.id,
+        name: p.name,
+        location: p.location,
+        price: p.price || 0,
+        site_code: p.site_code,
+        type: p.type,
+        description: p.description,
+        health_percentage: p.health_percentage,
+        light: p.light,
+        media: p.media,
+        specs_rental: p.specs_rental,
+        media_url: p.media && p.media.length > 0 ? p.media[0].url : undefined,
         duration_days: 0, // Will be calculated by service
         item_total_amount: 0, // Will be calculated by service
-      }
+      }))
 
       const { durationDays: calculatedDurationDays, totalAmount: calculatedTotalAmount } = calculateQuotationTotal(
         startDate.toISOString(),
         endDate.toISOString(),
-        quotationProduct,
+        quotationProducts,
       )
 
       const newQuotationData = {
@@ -183,13 +175,12 @@ export function GenerateQuotationDialog({
         total_amount: calculatedTotalAmount,
         duration_days: calculatedDurationDays,
         notes: notes,
-        status: "draft" as const, // Default status
+        status: "draft", // Default status
         created_by: user?.uid || "unknown",
         created_by_first_name: user?.displayName?.split(" ")[0] || "Unknown",
         created_by_last_name: user?.displayName?.split(" ").slice(1).join(" ") || "",
         seller_id: user?.uid || "unknown", // Assuming seller_id is the current user's ID
-        items: quotationProduct,
-        created: new Date().toISOString(),
+        items: quotationProducts,
       }
 
       const quotationId = await createQuotation(newQuotationData)
@@ -245,8 +236,12 @@ export function GenerateQuotationDialog({
               Products
             </Label>
             <Select
-              onValueChange={(productId) => setSelectedProductId(productId)}
-              value={selectedProductId}
+              onValueChange={(productId) => {
+                setSelectedProductIds((prev) =>
+                  prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+                )
+              }}
+              value={selectedProductIds[0] || ""} // Display first selected product or empty
               disabled={loading}
             >
               <SelectTrigger className="col-span-3">
@@ -254,13 +249,36 @@ export function GenerateQuotationDialog({
               </SelectTrigger>
               <SelectContent>
                 {products.map((product) => (
-                  <SelectItem key={product.id!} value={product.id!}>
+                  <SelectItem key={product.id} value={product.id}>
                     {product.name} ({product.location})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {selectedProductIds.length > 0 && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="col-span-1"></div>
+              <div className="col-span-3 flex flex-wrap gap-2">
+                {selectedProductIds.map((id) => {
+                  const product = products.find((p) => p.id === id)
+                  return (
+                    <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                      {product?.name}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0.5"
+                        onClick={() => setSelectedProductIds((prev) => prev.filter((pid) => pid !== id))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="startDate" className="text-right">

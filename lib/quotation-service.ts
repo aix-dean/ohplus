@@ -51,11 +51,11 @@ export async function createQuotation(quotationData: Omit<Quotation, "id">): Pro
       duration_days: quotationData.duration_days || 0,
       total_amount: quotationData.total_amount || 0,
       valid_until: quotationData.valid_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      items: quotationData.items || {},
+      items: quotationData.items || [],
       projectCompliance: quotationData.projectCompliance || {
         signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-        irrevocablePo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
       },
@@ -92,34 +92,39 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
 
     if (quotationDoc.exists()) {
       const data = quotationDoc.data() as Quotation
-      const itemInQuotation = data.items || {} // Changed from products to items
+      const itemsFromQuotation = data.items || [] // Changed from products to items
 
-      // Fetch full product details for the product in the quotation
-      let enrichedItem: QuotationProduct = itemInQuotation as QuotationProduct
-      if (itemInQuotation.id) {
-        const fullProductDetails = await getProductFromFirebase(itemInQuotation.id)
-        if (fullProductDetails) {
-          // Merge existing quotation product data with full product details.
-          // Prioritize quotation-specific fields (like price, notes if they were overridden)
-          // but ensure all detailed fields (media, specs_rental, description, etc.) are present.
-          enrichedItem = {
-            ...fullProductDetails, // Start with all details from the product collection
-            ...itemInQuotation, // Overlay with any specific data stored in the quotation's product entry
-            // Ensure price from quotation is used if it exists, otherwise fallback to product price
-            price: itemInQuotation.price !== undefined ? itemInQuotation.price : fullProductDetails.price,
-            // Populate media_url from the first media item if available
-            media_url:
-              fullProductDetails.media && fullProductDetails.media.length > 0
-                ? fullProductDetails.media[0].url
-                : undefined,
-          } as QuotationProduct
-        }
-      }
+      // Fetch full product details for each product in the quotation
+      const enrichedItems: QuotationProduct[] = await Promise.all(
+        itemsFromQuotation.map(async (itemInQuotation) => {
+          // Changed productInQuotation to itemInQuotation
+          if (itemInQuotation.id) {
+            const fullProductDetails = await getProductFromFirebase(itemInQuotation.id)
+            if (fullProductDetails) {
+              // Merge existing quotation product data with full product details.
+              // Prioritize quotation-specific fields (like price, notes if they were overridden)
+              // but ensure all detailed fields (media, specs_rental, description, etc.) are present.
+              return {
+                ...fullProductDetails, // Start with all details from the product collection
+                ...itemInQuotation, // Overlay with any specific data stored in the quotation's product entry
+                // Ensure price from quotation is used if it exists, otherwise fallback to product price
+                price: itemInQuotation.price !== undefined ? itemInQuotation.price : fullProductDetails.price,
+                // Populate media_url from the first media item if available
+                media_url:
+                  fullProductDetails.media && fullProductDetails.media.length > 0
+                    ? fullProductDetails.media[0].url
+                    : undefined,
+              } as QuotationProduct
+            }
+          }
+          return itemInQuotation // Return as is if product not found or no ID
+        }),
+      )
 
       return {
         id: quotationDoc.id,
         ...data,
-        items: enrichedItem, // Changed products to items
+        items: enrichedItems, // Changed products to items
       } as Quotation
     }
 
@@ -166,7 +171,7 @@ export function generateQuotationNumber(): string {
 export function calculateQuotationTotal(
   startDate: string,
   endDate: string,
-  items: QuotationProduct, // Changed from products to items
+  items: QuotationProduct[], // Changed from products to items
 ): {
   durationDays: number
   totalAmount: number
@@ -176,12 +181,14 @@ export function calculateQuotationTotal(
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
   let totalAmount = 0
-  const item = items
-  const dailyRate = (item.price || 0) / 30 // Assuming price is monthly
-  const itemTotal = dailyRate * Math.max(1, durationDays)
-  item.item_total_amount = itemTotal // Assign calculated item total amount
-  item.duration_days = Math.max(1, durationDays) // Assign calculated duration days to item
-  totalAmount += itemTotal
+  items.forEach((item) => {
+    // Changed product to item
+    const dailyRate = (item.price || 0) / 30 // Assuming price is monthly
+    const itemTotal = dailyRate * Math.max(1, durationDays)
+    item.item_total_amount = itemTotal // Assign calculated item total amount
+    item.duration_days = Math.max(1, durationDays) // Assign calculated duration days to item
+    totalAmount += itemTotal
+  })
 
   return {
     durationDays: Math.max(1, durationDays), // Minimum 1 day
@@ -492,7 +499,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   productsTableHeight += 5 // Section title spacing
   productsTableHeight += 8 // Line spacing
   productsTableHeight += 8 // Header row height
-  productsTableHeight += 25 // Data rows (25mm per row)
+  productsTableHeight += quotation.items.length * 25 // Data rows (25mm per row)
   productsTableHeight += 15 // Spacing after table
   checkNewPage(productsTableHeight)
 
@@ -544,31 +551,44 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   })
   yPosition += headerRowHeight
 
-  const item = quotation.items
-  checkNewPage(dataRowHeight + 5) // Check for space for the next row
-  pdf.setFillColor(255, 255, 255) // bg-white
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
-  pdf.setDrawColor(200, 200, 200)
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
+  for (const item of quotation.items) {
+    checkNewPage(dataRowHeight + 5) // Check for space for the next row
+    pdf.setFillColor(255, 255, 255) // bg-white
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
+    pdf.setDrawColor(200, 200, 200)
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
 
-  currentX = margin
+    currentX = margin
 
-  // Image column - uniform size for all images
-  const imageSize = 16 // Adjusted image size for better visibility
-  const imageX = currentX + cellPadding + (colWidths[0] - imageSize) / 2 // Center image in column
-  const imageY = yPosition + (dataRowHeight - imageSize) / 2
+    // Image column - uniform size for all images
+    const imageSize = 16 // Adjusted image size for better visibility
+    const imageX = currentX + cellPadding + (colWidths[0] - imageSize) / 2 // Center image in column
+    const imageY = yPosition + (dataRowHeight - imageSize) / 2
 
-  // Use media_url if available, otherwise fallback to media[0].url
-  const imageUrlToUse = item.media_url || (item.media && item.media.length > 0 ? item.media[0].url : undefined)
+    // Use media_url if available, otherwise fallback to media[0].url
+    const imageUrlToUse = item.media_url || (item.media && item.media.length > 0 ? item.media[0].url : undefined)
 
-  if (imageUrlToUse) {
-    try {
-      const imageBase64 = await loadImageAsBase64(imageUrlToUse)
-      if (imageBase64) {
-        pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
+    if (imageUrlToUse) {
+      try {
+        const imageBase64 = await loadImageAsBase64(imageUrlToUse)
+        if (imageBase64) {
+          pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
+        }
+      } catch (error) {
+        // Add placeholder if image fails to load
+        pdf.setFillColor(240, 240, 240)
+        pdf.rect(imageX, imageY, imageSize, imageSize, "F")
+        pdf.setFontSize(6)
+        pdf.setTextColor(150, 150, 150)
+        pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
+          align: "center",
+          baseline: "middle",
+        })
+        pdf.setTextColor(0, 0, 0)
+        pdf.setFontSize(9)
       }
-    } catch (error) {
-      // Add placeholder if image fails to load
+    } else {
+      // Add placeholder for missing image
       pdf.setFillColor(240, 240, 240)
       pdf.rect(imageX, imageY, imageSize, imageSize, "F")
       pdf.setFontSize(6)
@@ -580,90 +600,78 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       pdf.setTextColor(0, 0, 0)
       pdf.setFontSize(9)
     }
-  } else {
-    // Add placeholder for missing image
-    pdf.setFillColor(240, 240, 240)
-    pdf.rect(imageX, imageY, imageSize, imageSize, "F")
-    pdf.setFontSize(6)
-    pdf.setTextColor(150, 150, 150)
-    pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
-      align: "center",
+    currentX += colWidths[0]
+
+    // Product column
+    let productY = yPosition + cellPadding
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "bold")
+    productY = addText(safeString(item.name), currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 9)
+
+    if (item.site_code) {
+      pdf.setFontSize(8)
+      pdf.setFont("helvetica", "normal")
+      pdf.setTextColor(100, 100, 100) // Gray for site code
+      productY = addText(`Site: ${item.site_code}`, currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 8)
+      pdf.setTextColor(0, 0, 0)
+    }
+    if (item.description) {
+      pdf.setFontSize(8)
+      pdf.setFont("helvetica", "italic")
+      pdf.setTextColor(100, 100, 100) // Gray for description
+      productY = addText(
+        safeString(item.description),
+        currentX + cellPadding,
+        productY,
+        colWidths[1] - 2 * cellPadding,
+        8,
+      )
+      pdf.setTextColor(0, 0, 0)
+    }
+    currentX += colWidths[1]
+
+    // Type column
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(safeString(item.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
       baseline: "middle",
     })
-    pdf.setTextColor(0, 0, 0)
+    currentX += colWidths[2]
+
+    // Location column
+    const locationText = safeString(item.location)
+    const locationTextHeight = calculateTextHeight(locationText, colWidths[3] - 2 * cellPadding, 9)
+    const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
+    addText(locationText, currentX + cellPadding, locationTextY, colWidths[3] - 2 * cellPadding, 9)
+    currentX += colWidths[3]
+
+    // Price column
     pdf.setFontSize(9)
-  }
-  currentX += colWidths[0]
-
-  // Product column
-  let productY = yPosition + cellPadding
-  pdf.setFontSize(9)
-  pdf.setFont("helvetica", "bold")
-  productY = addText(safeString(item.name), currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 9)
-
-  if (item.site_code) {
+    pdf.setFont("helvetica", "bold")
+    pdf.text(
+      `PHP${safeString(item.price)}`,
+      currentX + colWidths[4] - cellPadding,
+      yPosition + dataRowHeight / 2 - 3, // Adjusted for "per month"
+      {
+        baseline: "middle",
+        align: "right",
+      },
+    )
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(100, 100, 100) // Gray for site code
-    productY = addText(`Site: ${item.site_code}`, currentX + cellPadding, productY, colWidths[1] - 2 * cellPadding, 8)
-    pdf.setTextColor(0, 0, 0)
-  }
-  if (item.description) {
-    pdf.setFontSize(8)
-    pdf.setFont("helvetica", "italic")
-    pdf.setTextColor(100, 100, 100) // Gray for description
-    productY = addText(
-      safeString(item.description),
-      currentX + cellPadding,
-      productY,
-      colWidths[1] - 2 * cellPadding,
-      8,
+    pdf.setTextColor(100, 100, 100) // Gray for "per month"
+    pdf.text(
+      `/month`,
+      currentX + colWidths[4] - cellPadding,
+      yPosition + dataRowHeight / 2 + 3, // Adjusted for "per month"
+      {
+        baseline: "middle",
+        align: "right",
+      },
     )
     pdf.setTextColor(0, 0, 0)
+    yPosition += dataRowHeight
   }
-  currentX += colWidths[1]
-
-  // Type column
-  pdf.setFontSize(9)
-  pdf.setFont("helvetica", "normal")
-  pdf.text(safeString(item.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
-    baseline: "middle",
-  })
-  currentX += colWidths[2]
-
-  // Location column
-  const locationText = safeString(item.location)
-  const locationTextHeight = calculateTextHeight(locationText, colWidths[3] - 2 * cellPadding, 9)
-  const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
-  addText(locationText, currentX + cellPadding, locationTextY, colWidths[3] - 2 * cellPadding, 9)
-  currentX += colWidths[3]
-
-  // Price column
-  pdf.setFontSize(9)
-  pdf.setFont("helvetica", "bold")
-  pdf.text(
-    `PHP${safeString(item.price)}`,
-    currentX + colWidths[4] - cellPadding,
-    yPosition + dataRowHeight / 2 - 3, // Adjusted for "per month"
-    {
-      baseline: "middle",
-      align: "right",
-    },
-  )
-  pdf.setFontSize(8)
-  pdf.setFont("helvetica", "normal")
-  pdf.setTextColor(100, 100, 100) // Gray for "per month"
-  pdf.text(
-    `/month`,
-    currentX + colWidths[4] - cellPadding,
-    yPosition + dataRowHeight / 2 + 3, // Adjusted for "per month"
-    {
-      baseline: "middle",
-      align: "right",
-    },
-  )
-  pdf.setTextColor(0, 0, 0)
-  yPosition += dataRowHeight
 
   // Total Amount Row
   checkNewPage(headerRowHeight)
@@ -814,10 +822,10 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      const quotation = { id: doc.id, ...data, items: data.items || {} } as Quotation
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
-      // Check if the item in this quotation matches the product ID
-      const hasMatchingProduct = quotation.items.product_id === campaignId
+      // Check if any item in this quotation matches the product ID
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === campaignId)
 
       if (hasMatchingProduct) {
         quotations.push(quotation)
@@ -887,7 +895,7 @@ export async function getQuotationsPaginated(
   const quotations: any[] = []
   querySnapshot.forEach((doc) => {
     const data = doc.data()
-    quotations.push({ id: doc.id, ...data, items: data.items || {} }) // Changed products to items
+    quotations.push({ id: doc.id, ...data, items: data.items || [] }) // Changed products to items
   })
 
   const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null
@@ -918,7 +926,7 @@ export async function copyQuotation(originalQuotationId: string, userId: string,
       projectCompliance: {
         signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-        irrevocablePo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
       },
@@ -999,24 +1007,26 @@ export async function createDirectQuotation(
       duration_days: durationDays,
       total_amount: totalAmount,
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-      items: {
-        product_id: site.id || "", // This serves as the product_id
-        name: site.name || "",
-        location: site.location || "",
-        price: site.price || 0,
-        type: site.type || "",
-        duration_days: durationDays,
-        item_total_amount: totalAmount,
-        media_url: site.image || "",
-        height: site.height || 0,
-        width: site.width || 0,
-        content_type: site.content_type || "",
-        specs: site.specs_rental,
-      },
+      items: [
+        {
+          product_id: site.id || "", // This serves as the product_id
+          name: site.name || "",
+          location: site.location || "",
+          price: site.price || 0,
+          type: site.type || "",
+          duration_days: durationDays,
+          item_total_amount: totalAmount,
+          media_url: site.image || "",
+          height: site.height || 0,
+          width: site.width || 0,
+          content_type: site.content_type || "",
+          specs: site.specs_rental,
+        },
+      ],
       projectCompliance: {
         signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-        irrevocablePo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+        poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
       },
@@ -1081,8 +1091,6 @@ export async function createMultipleQuotations(
         created_by: userId,
         seller_id: userId,
         company_id: options.company_id,
-        page_id: pageId, // Set the same page_id for all quotations in this group
-        page_number: i + 1, // Set sequential page numbers (1, 2, 3, etc.)
         created_by_first_name: options.created_by_first_name || "",
         created_by_last_name: options.created_by_last_name || "",
         start_date: options.startDate ? Timestamp.fromDate(options.startDate) : null,
@@ -1090,24 +1098,26 @@ export async function createMultipleQuotations(
         duration_days: durationDays,
         total_amount: totalAmount,
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        items: {
-          product_id: site.id || "", // This serves as the product_id
-          name: site.name || "",
-          location: site.location || "",
-          price: site.price || 0,
-          type: site.type || "",
-          duration_days: durationDays,
-          item_total_amount: totalAmount,
-          media_url: site.image || "",
-          height: site.height || 0,
-          width: site.width || 0,
-          content_type: site.content_type || "",
-          specs: site.specs_rental,
-        },
+        items: [
+          {
+            product_id: site.id || "", // This serves as the product_id
+            name: site.name || "",
+            location: site.location || "",
+            price: site.price || 0,
+            type: site.type || "",
+            duration_days: durationDays,
+            item_total_amount: totalAmount,
+            media_url: site.image || "",
+            height: site.height || 0,
+            width: site.width || 0,
+            content_type: site.content_type || "",
+            specs: site.specs_rental,
+          },
+        ],
         projectCompliance: {
           signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
           signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          irrevocablePo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
+          poMo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
           finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
           paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         },
@@ -1139,10 +1149,10 @@ export async function getQuotationsByProductId(productId: string): Promise<Quota
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      const quotation = { id: doc.id, ...data, items: data.items || {} } as Quotation
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
       // Check if any item in this quotation matches the product ID
-      const hasMatchingProduct = quotation.items.product_id === productId
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
 
       if (hasMatchingProduct) {
         quotations.push(quotation)
@@ -1178,7 +1188,7 @@ export async function getQuotationsByClientId(clientId: string): Promise<Quotati
         quotation_number: data.quotation_number || "", // Ensure quotation_number is a string
         status: data.status || "draft", // Ensure status is a valid type
         valid_until: data.valid_until?.toDate(),
-        items: data.items || {}, // Ensure items is an object
+        items: data.items || [], // Ensure items is an array
       } as Quotation)
     })
 
@@ -1204,7 +1214,7 @@ export async function getQuotationsByClientName(clientName: string): Promise<Quo
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || {} } as Quotation)
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
     })
 
     return quotations
@@ -1222,14 +1232,14 @@ export async function getQuotationsByPageId(pageId: string): Promise<Quotation[]
     }
 
     const quotationsRef = collection(db, "quotations")
-    const q = query(quotationsRef, where("page_id", "==", pageId), orderBy("page_number", "asc"))
+    const q = query(quotationsRef, where("page_id", "==", pageId), orderBy("created", "desc"))
 
     const querySnapshot = await getDocs(q)
     const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, items: data.items || {} } as Quotation)
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation)
     })
 
     return quotations
@@ -1253,9 +1263,9 @@ export async function getQuotationsByProductIdAndCompanyId(productId: string, co
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      const quotation = { id: doc.id, ...data, items: data.items || {} } as Quotation
+      const quotation = { id: doc.id, ...data, items: data.items || [] } as Quotation
 
-      const hasMatchingProduct = quotation.items.product_id === productId
+      const hasMatchingProduct = quotation.items.some((item) => item.product_id === productId)
       const hasMatchingCompany = quotation.company_id === companyId
 
       if (hasMatchingProduct && hasMatchingCompany) {
@@ -1312,7 +1322,7 @@ export async function getQuotationsByClientCompanyId(clientCompanyId: string): P
         quotation_number: data.quotation_number || "", // Ensure quotation_number is a string
         status: data.status || "draft", // Ensure status is a valid type
         valid_until: data.valid_until?.toDate(),
-        items: data.items || {}, // Ensure items is an object
+        items: data.items || [], // Ensure items is an array
       } as Quotation)
     })
 

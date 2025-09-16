@@ -23,30 +23,30 @@ import { searchProducts, SearchResult } from "@/lib/algolia-service"
 import { Pagination } from "@/components/ui/pagination"
 
 interface Booking {
-   id: string
-   product_name?: string
-   product_id?: string
-   product_owner?: string
-   client_name?: string
-   client_company_name?: string
-   client?: {
-     name?: string
-     company_name?: string
-   }
-   start_date?: any
-   end_date?: any
-   status?: string
-   created?: any
-   quotation_id?: string
-   reservation_id?: string // Generated reservation ID with format "RV-" + currentmillis
-   projectCompliance?: {
-     signedContract?: { status: string; fileUrl?: string; fileName?: string };
-     irrevocablePo?: { status: string; fileUrl?: string; fileName?: string };
-     paymentAsDeposit?: { status: string; note?: string; fileUrl?: string; fileName?: string };
-     finalArtwork?: { status: string; fileUrl?: string; fileName?: string };
-     signedQuotation?: { status: string; fileUrl?: string; fileName?: string };
-   };
- }
+  id: string
+  product_name?: string
+  product_id?: string
+  product_owner?: string
+  client_name?: string
+  client_company_name?: string
+  client?: {
+    name?: string
+    company_name?: string
+  }
+  start_date?: any
+  end_date?: any
+  status?: string
+  created?: any
+  quotation_id?: string
+  reservation_id?: string // Generated reservation ID with format "RV-" + currentmillis
+  projectCompliance?: {
+    signedContract?: { status: string; fileUrl?: string; fileName?: string };
+    irrevocablePo?: { status: string; fileUrl?: string; fileName?: string };
+    paymentAsDeposit?: { status: string; note?: string; fileUrl?: string; fileName?: string };
+    finalArtwork?: { status: string; fileUrl?: string; fileName?: string };
+    signedQuotation?: { status: string; fileUrl?: string; fileName?: string };
+  };
+}
 
 interface Product {
   id?: string
@@ -292,21 +292,21 @@ export default function ReservationsPage() {
       {
         key: "signedContract",
         name: "Signed Contract",
-        status: compliance.signedContract?.fileUrl ? "completed" : "upload",
+        status: compliance.signedContract?.status || "upload",
         file: compliance.signedContract?.fileName,
         fileUrl: compliance.signedContract?.fileUrl,
       },
       {
         key: "irrevocablePo",
         name: "Irrevocable PO",
-        status: compliance.irrevocablePo?.fileUrl ? "completed" : "upload",
+        status: compliance.irrevocablePo?.status || "upload",
         file: compliance.irrevocablePo?.fileName,
         fileUrl: compliance.irrevocablePo?.fileUrl,
       },
       {
         key: "paymentAsDeposit",
         name: "Payment as Deposit",
-        status: compliance.paymentAsDeposit?.fileUrl ? "completed" : "confirmation",
+        status: compliance.paymentAsDeposit?.status || "confirmation",
         note: "For Treasury's confirmation",
         file: compliance.paymentAsDeposit?.fileName,
         fileUrl: compliance.paymentAsDeposit?.fileUrl,
@@ -317,14 +317,14 @@ export default function ReservationsPage() {
       {
         key: "finalArtwork",
         name: "Final Artwork",
-        status: compliance.finalArtwork?.fileUrl ? "completed" : "upload",
+        status: compliance.finalArtwork?.status || "upload",
         file: compliance.finalArtwork?.fileName,
         fileUrl: compliance.finalArtwork?.fileUrl,
       },
       {
         key: "signedQuotation",
         name: "Signed Quotation",
-        status: compliance.signedQuotation?.fileUrl ? "completed" : "upload",
+        status: compliance.signedQuotation?.status || "upload",
         file: compliance.signedQuotation?.fileName,
         fileUrl: compliance.signedQuotation?.fileUrl,
       },
@@ -566,6 +566,13 @@ export default function ReservationsPage() {
             <span className="text-sm text-gray-600">
               Total Reservations: {loading ? "..." : totalReservationsCount}
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-blue-600 border-blue-600 hover:bg-blue-50 bg-transparent"
+            >
+              See History
+            </Button>
           </div>
         </div>
 

@@ -109,13 +109,7 @@ export default function QuotationsListPage() {
       const fetchedQuotations: any[] = []
 
       querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        fetchedQuotations.push({
-          id: doc.id,
-          ...data,
-          // Ensure projectCompliance is included
-          projectCompliance: data.projectCompliance || {}
-        })
+        fetchedQuotations.push({ id: doc.id, ...doc.data() })
       })
 
       // Check if there are more pages
@@ -486,21 +480,21 @@ export default function QuotationsListPage() {
       {
         key: "signedContract",
         name: "Signed Contract",
-        status: compliance.signedContract?.fileUrl ? "completed" : "upload",
+        status: compliance.signedContract?.status || "upload",
         file: compliance.signedContract?.fileName,
         fileUrl: compliance.signedContract?.fileUrl,
       },
       {
         key: "irrevocablePo",
         name: "Irrevocable PO",
-        status: compliance.irrevocablePo?.fileUrl ? "completed" : "upload",
+        status: compliance.irrevocablePo?.status || "upload",
         file: compliance.irrevocablePo?.fileName,
         fileUrl: compliance.irrevocablePo?.fileUrl,
       },
       {
         key: "paymentAsDeposit",
         name: "Payment as Deposit",
-        status: compliance.paymentAsDeposit?.fileUrl ? "completed" : "confirmation",
+        status: compliance.paymentAsDeposit?.status || "confirmation",
         note: "For Treasury's confirmation",
         file: compliance.paymentAsDeposit?.fileName,
         fileUrl: compliance.paymentAsDeposit?.fileUrl,
@@ -511,14 +505,14 @@ export default function QuotationsListPage() {
       {
         key: "finalArtwork",
         name: "Final Artwork",
-        status: compliance.finalArtwork?.fileUrl ? "completed" : "upload",
+        status: compliance.finalArtwork?.status || "upload",
         file: compliance.finalArtwork?.fileName,
         fileUrl: compliance.finalArtwork?.fileUrl,
       },
       {
         key: "signedQuotation",
         name: "Signed Quotation",
-        status: compliance.signedQuotation?.fileUrl ? "completed" : "upload",
+        status: compliance.signedQuotation?.status || "upload",
         file: compliance.signedQuotation?.fileName,
         fileUrl: compliance.signedQuotation?.fileUrl,
       },
@@ -662,7 +656,7 @@ export default function QuotationsListPage() {
   }
 
   const generateShareText = (quotation: any) => {
-    return `Check out this quotation: ${quotation.quotation_number || "Quotation"} for ${quotation.client_name || "Client"} - ${quotation.items?.name || "Service"}`
+    return `Check out this quotation: ${quotation.quotation_number || "Quotation"} for ${quotation.client_name || "Client"} - ${quotation.items?.[0]?.name || "Service"}`
   }
 
   const copyToClipboard = async (text: string) => {
@@ -783,20 +777,18 @@ export default function QuotationsListPage() {
   const validateComplianceForJO = (quotation: any) => {
     const compliance = quotation.projectCompliance || {}
 
-    // Check if either signed contract OR signed quotation is uploaded
-    const hasSignedContract = compliance.signedContract?.fileUrl
-    const hasSignedQuotation = compliance.signedQuotation?.fileUrl
+    // Required compliance items (excluding Payment as Deposit)
+    const requiredItems = [
+      { key: "signedContract", name: "Signed Contract" },
+      { key: "irrevocablePo", name: "Irrevocable PO" },
+      { key: "finalArtwork", name: "Final Artwork" },
+    ]
 
-    if (hasSignedContract || hasSignedQuotation) {
-      return {
-        isValid: true,
-        missingItems: [],
-      }
-    }
+    const missingItems = requiredItems.filter((item) => compliance[item.key]?.status !== "completed")
 
     return {
-      isValid: false,
-      missingItems: ["Signed Contract or Signed Quotation"],
+      isValid: missingItems.length === 0,
+      missingItems: missingItems.map((item) => item.name),
     }
   }
 
@@ -983,7 +975,7 @@ export default function QuotationsListPage() {
                                 className="py-3 text-sm text-blue-600 cursor-pointer hover:underline"
                                 onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                               >
-                                {quotation.items?.name || quotation.product_name || "N/A"}
+                                {quotation.items?.[0]?.name || quotation.product_name || "N/A"}
                               </TableCell>
                               <TableCell
                                 className="py-3 text-sm text-gray-700 cursor-pointer"
@@ -1305,7 +1297,7 @@ export default function QuotationsListPage() {
                   {selectedQuotationForShare.quotation_number || "New Quotation"}
                 </div>
                 <div className="text-xs text-gray-600">
-                  {selectedQuotationForShare.client_name} • {selectedQuotationForShare.items?.name || "Service"}
+                  {selectedQuotationForShare.client_name} • {selectedQuotationForShare.items?.[0]?.name || "Service"}
                 </div>
               </div>
 
