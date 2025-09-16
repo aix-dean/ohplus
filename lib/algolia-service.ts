@@ -107,13 +107,13 @@ export async function searchProducts(query: string, userId?: string): Promise<Se
 }
 
 // Function to search service assignments
-export async function searchServiceAssignments(query: string, companyId?: string): Promise<SearchResponse> {
+export async function searchServiceAssignments(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
-    console.log(`Searching service assignments for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""}`)
+    console.log(`Searching service assignments for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
 
     // Create the request body
-    const requestBody: any = { query, indexName: 'service_assignments' }
+    const requestBody: any = { query, indexName: 'service_assignments', page, hitsPerPage }
 
     // Add filters if companyId is provided
     if (companyId) {

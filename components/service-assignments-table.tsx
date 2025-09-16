@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs, limit } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs, limit, startAfter } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { generateServiceAssignmentDetailsPDF } from "@/lib/pdf-service"
 import { teamsService } from "@/lib/teams-service"
+import { searchServiceAssignments } from "@/lib/algolia-service"
 import type { Product } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import type { Team } from "@/lib/types/team"
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Pagination } from "@/components/ui/pagination"
 import { MoreVertical, Printer, X, Bell, FileText } from "lucide-react"
 
 interface ServiceAssignment {
@@ -41,6 +43,30 @@ interface ServiceAssignment {
   company_id?: string | null
 }
 
+interface ServiceAssignmentSearchResult {
+  objectID: string
+  saNumber?: string
+  projectSiteId?: string
+  projectSiteName?: string
+  projectSiteLocation?: string
+  serviceType?: string
+  assignedTo?: string
+  jobDescription?: string
+  message?: string
+  joNumber?: string
+  requestedBy?: {
+    id: string
+    name: string
+    department: string
+  }
+  status?: string
+  coveredDateStart?: any
+  coveredDateEnd?: any
+  created?: any
+  updated?: any
+  company_id?: string
+}
+
 interface ServiceAssignmentsTableProps {
   onSelectAssignment?: (id: string) => void
   companyId?: string
@@ -53,6 +79,13 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
 
   const handlePrint = async (assignment: ServiceAssignment) => {
     try {
@@ -132,35 +165,217 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     setTeams(prev => ({ ...prev, ...newTeams }))
   }
 
+  // Function to fetch assignments from Firestore with pagination
+  const fetchAssignmentsFromFirestore = async (page: number = 1) => {
+    setLoading(true)
+    try {
+      let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+
+      // Filter by company_id if provided
+      if (companyId) {
+        q = query(q, where("company_id", "==", companyId))
+      }
+
+      const querySnapshot = await getDocs(q)
+      const allDocs = querySnapshot.docs
+
+      // Convert to assignments data
+      let allAssignments: ServiceAssignment[] = allDocs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          ...data,
+          // Ensure dates are properly handled
+          coveredDateStart: data.coveredDateStart,
+          coveredDateEnd: data.coveredDateEnd,
+          created: data.created,
+          updated: data.updated,
+        } as ServiceAssignment
+      })
+
+      // Apply client-side search filtering if searchQuery is provided
+      if (searchQuery && searchQuery.trim()) {
+        const searchTerm = searchQuery.trim().toLowerCase()
+        allAssignments = allAssignments.filter(assignment =>
+          assignment.saNumber.toLowerCase().includes(searchTerm) ||
+          assignment.projectSiteName.toLowerCase().includes(searchTerm) ||
+          assignment.serviceType.toLowerCase().includes(searchTerm) ||
+          (assignment.message && assignment.message.toLowerCase().includes(searchTerm))
+        )
+        console.log(`Filtered ${allAssignments.length} assignments for search term: "${searchTerm}"`)
+      }
+
+      // Get the slice for current page
+      const startIndex = (page - 1) * itemsPerPage
+      const endIndex = Math.min(startIndex + itemsPerPage, allAssignments.length)
+      const pageAssignments = allAssignments.slice(startIndex, endIndex)
+
+      console.log(`Page ${page}: showing ${pageAssignments.length} of ${allAssignments.length} assignments`)
+
+      setAssignments(pageAssignments)
+      setHasMore(allAssignments.length > endIndex)
+      setTotalPages(Math.ceil(allAssignments.length / itemsPerPage))
+      setTotalItems(allAssignments.length)
+
+      // Fetch team data for the assignments
+      await fetchTeamsForAssignments(pageAssignments)
+    } catch (error) {
+      console.error("Error fetching assignments:", error)
+      setAssignments([])
+      setHasMore(false)
+      setTotalPages(1)
+      setTotalItems(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Function to fetch assignments using Algolia search
+  const fetchAssignmentsFromAlgolia = async (query: string, page: number = 1) => {
+    console.log(`Searching for "${query}" on page ${page}`)
+    setLoading(true)
+    try {
+      const searchResult = await searchServiceAssignments(query, companyId || undefined, page - 1, itemsPerPage) // Algolia uses 0-based indexing
+
+      console.log("Search result:", searchResult)
+
+      if (searchResult.error) {
+        console.error("Algolia search error:", searchResult.error)
+        setAssignments([])
+        setTotalPages(1)
+        setHasMore(false)
+        setTotalItems(0)
+        return
+      }
+
+      console.log(`Found ${searchResult.nbHits} results, showing ${searchResult.hits.length} on page ${page}`)
+
+      // Convert Algolia hits to ServiceAssignment format
+      const assignmentsData: ServiceAssignment[] = searchResult.hits.map(hit => {
+        const saHit = hit as any // Cast to any to access service assignment fields
+        console.log('Processing hit:', hit)
+        return {
+          id: hit.objectID,
+          saNumber: saHit.saNumber || '',
+          projectSiteId: saHit.projectSiteId || '',
+          projectSiteName: saHit.projectSiteName || '',
+          projectSiteLocation: saHit.projectSiteLocation || '',
+          serviceType: saHit.serviceType || '',
+          assignedTo: saHit.assignedTo || '',
+          jobDescription: saHit.jobDescription || '',
+          message: saHit.message || '',
+          joNumber: saHit.joNumber || '',
+          requestedBy: saHit.requestedBy || { id: '', name: '', department: '' },
+          status: saHit.status || '',
+          coveredDateStart: saHit.coveredDateStart ? new Date(saHit.coveredDateStart) : null,
+          coveredDateEnd: saHit.coveredDateEnd ? new Date(saHit.coveredDateEnd) : null,
+          created: saHit.created ? new Date(saHit.created) : null,
+          updated: saHit.updated ? new Date(saHit.updated) : null,
+          company_id: saHit.company_id
+        }
+      })
+
+      console.log("Processed assignments:", assignmentsData)
+
+      setAssignments(assignmentsData)
+      setTotalPages(searchResult.nbPages)
+      setHasMore(page < searchResult.nbPages)
+      setTotalItems(searchResult.nbHits)
+
+      // Fetch team data for the assignments
+      await fetchTeamsForAssignments(assignmentsData)
+    } catch (error) {
+      console.error("Error searching assignments:", error)
+      setAssignments([])
+      setTotalPages(1)
+      setHasMore(false)
+      setTotalItems(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Pagination handlers
+  const handleNextPage = () => {
+    console.log(`handleNextPage called. hasMore: ${hasMore}, currentPage: ${currentPage}`)
+    if (hasMore) {
+      setCurrentPage(prev => {
+        const newPage = prev + 1
+        console.log(`Setting page to: ${newPage}`)
+        return newPage
+      })
+    }
+  }
+
+  const handlePreviousPage = () => {
+    console.log(`handlePreviousPage called. currentPage: ${currentPage}`)
+    if (currentPage > 1) {
+      setCurrentPage(prev => {
+        const newPage = prev - 1
+        console.log(`Setting page to: ${newPage}`)
+        return newPage
+      })
+    }
+  }
+
+  // Single useEffect to handle all data fetching
   useEffect(() => {
-    let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+    console.log(`Data fetch triggered: currentPage=${currentPage}, searchQuery="${searchQuery}", companyId="${companyId}"`)
+    console.log(`Fetching page ${currentPage}`)
+    // Use Firestore for all data fetching
+    fetchAssignmentsFromFirestore(currentPage)
+  }, [currentPage, searchQuery, companyId])
+
+  // Separate effect to reset pagination when search/filter changes
+  useEffect(() => {
+    console.log(`Search/filter change detected, resetting to page 1`)
+    setCurrentPage(1)
+  }, [searchQuery, companyId])
+
+  // Fallback function using real-time Firestore listener (original implementation)
+  const fetchAssignmentsFromFirestoreRealtime = () => {
+    console.log(`Fetching assignments from Firestore for page ${currentPage}`)
+    setLoading(true)
+
+    let realtimeQuery = query(collection(db, "service_assignments"), orderBy("created", "desc"))
 
     // Filter by company_id if provided
     if (companyId) {
-      q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
+      realtimeQuery = query(realtimeQuery, where("company_id", "==", companyId))
     }
 
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+    const unsubscribe = onSnapshot(realtimeQuery, async (querySnapshot) => {
+      console.log(`Received ${querySnapshot.size} assignments from Firestore`)
       const assignmentsData: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
-        console.log(`Assignment ${doc.id} data:`, data)
         assignmentsData.push({
           id: doc.id,
           ...data,
         } as ServiceAssignment)
       })
-      console.log("All assignments data:", assignmentsData)
-      setAssignments(assignmentsData)
+
+      console.log(`Total assignments: ${assignmentsData.length}`)
+
+      // Apply pagination client-side for real-time data
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const endIndex = startIndex + itemsPerPage
+      const paginatedData = assignmentsData.slice(startIndex, endIndex)
+
+      console.log(`Showing assignments ${startIndex + 1} to ${endIndex} of ${assignmentsData.length}`)
+
+      setAssignments(paginatedData)
+      setHasMore(assignmentsData.length > endIndex)
+      setTotalPages(Math.ceil(assignmentsData.length / itemsPerPage))
 
       // Fetch team data for the assignments
-      await fetchTeamsForAssignments(assignmentsData)
+      await fetchTeamsForAssignments(paginatedData)
 
       setLoading(false)
     })
 
-    return () => unsubscribe()
-  }, [companyId])
+    return unsubscribe
+  }
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -179,15 +394,9 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     }
   }
 
-  // Filter assignments based on status and search
+  // Filter assignments based on status (search is now handled server-side)
   const filteredAssignments = assignments.filter(assignment => {
-    const matchesStatus = statusFilter === "all" || assignment.status.toLowerCase() === statusFilter.toLowerCase()
-    const matchesSearch = !searchQuery ||
-      assignment.saNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assignment.projectSiteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assignment.serviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (assignment.message && assignment.message.toLowerCase().includes(searchQuery.toLowerCase()))
-    return matchesStatus && matchesSearch
+    return statusFilter === "all" || assignment.status.toLowerCase() === statusFilter.toLowerCase()
   })
 
   if (loading) {
@@ -244,7 +453,14 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
                 <TableCell>{assignment.projectSiteName}</TableCell>
                 <TableCell>
                   {assignment.coveredDateEnd ? (
-                    format(new Date(assignment.coveredDateEnd.toDate()), "MMM d, yyyy")
+                    format(
+                      assignment.coveredDateEnd instanceof Date
+                        ? assignment.coveredDateEnd
+                        : assignment.coveredDateEnd.toDate
+                          ? assignment.coveredDateEnd.toDate()
+                          : new Date(assignment.coveredDateEnd),
+                      "MMM d, yyyy"
+                    )
                   ) : (
                     "Not specified"
                   )}
@@ -286,6 +502,18 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
           )}
         </TableBody>
       </Table>
+
+      {/* Pagination Controls */}
+      {assignments.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalItems={totalItems}
+          onNextPage={handleNextPage}
+          onPreviousPage={handlePreviousPage}
+          hasMore={hasMore}
+        />
+      )}
     </div>
   )
 }
