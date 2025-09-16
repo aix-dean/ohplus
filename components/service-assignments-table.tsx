@@ -85,6 +85,9 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [totalPages, setTotalPages] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [totalItems, setTotalItems] = useState(0)
+  const [lastDoc, setLastDoc] = useState<any>(null)
+  const [allFetchedDocs, setAllFetchedDocs] = useState<any[]>([])
+  const [isSearchMode, setIsSearchMode] = useState(false)
   const itemsPerPage = 10
 
   const handlePrint = async (assignment: ServiceAssignment) => {
@@ -165,36 +168,39 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     setTeams(prev => ({ ...prev, ...newTeams }))
   }
 
-  // Function to fetch assignments from Firestore with pagination
+  // Function to fetch assignments from Firestore with server-side pagination
   const fetchAssignmentsFromFirestore = async (page: number = 1) => {
     setLoading(true)
     try {
-      let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+      const hasSearch = !!(searchQuery && searchQuery.trim())
+      setIsSearchMode(hasSearch)
 
-      // Filter by company_id if provided
-      if (companyId) {
-        q = query(q, where("company_id", "==", companyId))
-      }
+      if (hasSearch) {
+        // For search: fetch all data for client-side filtering and pagination
+        console.log(`Fetching all data for search: "${searchQuery.trim()}"`)
+        let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
 
-      const querySnapshot = await getDocs(q)
-      const allDocs = querySnapshot.docs
+        if (companyId) {
+          q = query(q, where("company_id", "==", companyId))
+        }
 
-      // Convert to assignments data
-      let allAssignments: ServiceAssignment[] = allDocs.map(doc => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          ...data,
-          // Ensure dates are properly handled
-          coveredDateStart: data.coveredDateStart,
-          coveredDateEnd: data.coveredDateEnd,
-          created: data.created,
-          updated: data.updated,
-        } as ServiceAssignment
-      })
+        const querySnapshot = await getDocs(q)
+        const allDocs = querySnapshot.docs
 
-      // Apply client-side search filtering if searchQuery is provided
-      if (searchQuery && searchQuery.trim()) {
+        // Convert to assignments data
+        let allAssignments: ServiceAssignment[] = allDocs.map(doc => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            ...data,
+            coveredDateStart: data.coveredDateStart,
+            coveredDateEnd: data.coveredDateEnd,
+            created: data.created,
+            updated: data.updated,
+          } as ServiceAssignment
+        })
+
+        // Apply search filtering
         const searchTerm = searchQuery.trim().toLowerCase()
         allAssignments = allAssignments.filter(assignment =>
           assignment.saNumber.toLowerCase().includes(searchTerm) ||
@@ -202,23 +208,88 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
           assignment.serviceType.toLowerCase().includes(searchTerm) ||
           (assignment.message && assignment.message.toLowerCase().includes(searchTerm))
         )
-        console.log(`Filtered ${allAssignments.length} assignments for search term: "${searchTerm}"`)
+
+        // Client-side pagination for search results
+        const startIndex = (page - 1) * itemsPerPage
+        const endIndex = Math.min(startIndex + itemsPerPage, allAssignments.length)
+        const pageAssignments = allAssignments.slice(startIndex, endIndex)
+
+        setAssignments(pageAssignments)
+        setHasMore(allAssignments.length > endIndex)
+        setTotalPages(Math.ceil(allAssignments.length / itemsPerPage))
+        setTotalItems(allAssignments.length)
+        setAllFetchedDocs(allDocs)
+
+        await fetchTeamsForAssignments(pageAssignments)
+      } else {
+        // For non-search: use server-side pagination
+        let q = query(collection(db, "service_assignments"), orderBy("created", "desc"), limit(itemsPerPage + 1))
+
+        if (companyId) {
+          q = query(q, where("company_id", "==", companyId))
+        }
+
+        // Handle pagination cursor
+        if (page > 1) {
+          if (lastDoc && page > currentPage) {
+            // Going forward: use cursor
+            q = query(q, startAfter(lastDoc))
+          } else {
+            // Going backward or jumping: refetch from beginning and slice
+            q = query(collection(db, "service_assignments"), orderBy("created", "desc"), limit(page * itemsPerPage + 1))
+            if (companyId) {
+              q = query(q, where("company_id", "==", companyId))
+            }
+          }
+        } else {
+          // Page 1: reset cursor
+          setLastDoc(null)
+        }
+
+        const querySnapshot = await getDocs(q)
+        const docs = querySnapshot.docs
+
+        let pageDocs: any[]
+        let hasMorePages: boolean
+
+        if (page > 1 && page <= currentPage) {
+          // Going backward: slice the fetched documents
+          const startIndex = (page - 1) * itemsPerPage
+          const endIndex = Math.min(startIndex + itemsPerPage, docs.length)
+          pageDocs = docs.slice(startIndex, endIndex)
+          hasMorePages = docs.length > endIndex
+        } else {
+          // Going forward or page 1: use the first itemsPerPage documents
+          hasMorePages = docs.length > itemsPerPage
+          pageDocs = hasMorePages ? docs.slice(0, itemsPerPage) : docs
+        }
+
+        // Convert to assignments data
+        const pageAssignments: ServiceAssignment[] = pageDocs.map(doc => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            ...data,
+            coveredDateStart: data.coveredDateStart,
+            coveredDateEnd: data.coveredDateEnd,
+            created: data.created,
+            updated: data.updated,
+          } as ServiceAssignment
+        })
+
+        // Update cursor for next page (only when going forward)
+        if (page >= currentPage && hasMorePages && pageDocs.length > 0) {
+          setLastDoc(pageDocs[pageDocs.length - 1])
+        }
+
+        setAssignments(pageAssignments)
+        setHasMore(hasMorePages)
+        setTotalPages(hasMorePages ? page + 1 : page) // Estimate based on current page
+        setTotalItems(0) // Unknown with server-side pagination
+        setAllFetchedDocs(docs)
+
+        await fetchTeamsForAssignments(pageAssignments)
       }
-
-      // Get the slice for current page
-      const startIndex = (page - 1) * itemsPerPage
-      const endIndex = Math.min(startIndex + itemsPerPage, allAssignments.length)
-      const pageAssignments = allAssignments.slice(startIndex, endIndex)
-
-      console.log(`Page ${page}: showing ${pageAssignments.length} of ${allAssignments.length} assignments`)
-
-      setAssignments(pageAssignments)
-      setHasMore(allAssignments.length > endIndex)
-      setTotalPages(Math.ceil(allAssignments.length / itemsPerPage))
-      setTotalItems(allAssignments.length)
-
-      // Fetch team data for the assignments
-      await fetchTeamsForAssignments(pageAssignments)
     } catch (error) {
       console.error("Error fetching assignments:", error)
       setAssignments([])
@@ -232,12 +303,9 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
 
   // Function to fetch assignments using Algolia search
   const fetchAssignmentsFromAlgolia = async (query: string, page: number = 1) => {
-    console.log(`Searching for "${query}" on page ${page}`)
     setLoading(true)
     try {
       const searchResult = await searchServiceAssignments(query, companyId || undefined, page - 1, itemsPerPage) // Algolia uses 0-based indexing
-
-      console.log("Search result:", searchResult)
 
       if (searchResult.error) {
         console.error("Algolia search error:", searchResult.error)
@@ -248,12 +316,9 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         return
       }
 
-      console.log(`Found ${searchResult.nbHits} results, showing ${searchResult.hits.length} on page ${page}`)
-
       // Convert Algolia hits to ServiceAssignment format
       const assignmentsData: ServiceAssignment[] = searchResult.hits.map(hit => {
         const saHit = hit as any // Cast to any to access service assignment fields
-        console.log('Processing hit:', hit)
         return {
           id: hit.objectID,
           saNumber: saHit.saNumber || '',
@@ -275,8 +340,6 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         }
       })
 
-      console.log("Processed assignments:", assignmentsData)
-
       setAssignments(assignmentsData)
       setTotalPages(searchResult.nbPages)
       setHasMore(page < searchResult.nbPages)
@@ -297,44 +360,33 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
 
   // Pagination handlers
   const handleNextPage = () => {
-    console.log(`handleNextPage called. hasMore: ${hasMore}, currentPage: ${currentPage}`)
     if (hasMore) {
-      setCurrentPage(prev => {
-        const newPage = prev + 1
-        console.log(`Setting page to: ${newPage}`)
-        return newPage
-      })
+      setCurrentPage(prev => prev + 1)
     }
   }
 
   const handlePreviousPage = () => {
-    console.log(`handlePreviousPage called. currentPage: ${currentPage}`)
     if (currentPage > 1) {
-      setCurrentPage(prev => {
-        const newPage = prev - 1
-        console.log(`Setting page to: ${newPage}`)
-        return newPage
-      })
+      setCurrentPage(prev => prev - 1)
     }
   }
 
   // Single useEffect to handle all data fetching
   useEffect(() => {
-    console.log(`Data fetch triggered: currentPage=${currentPage}, searchQuery="${searchQuery}", companyId="${companyId}"`)
-    console.log(`Fetching page ${currentPage}`)
     // Use Firestore for all data fetching
     fetchAssignmentsFromFirestore(currentPage)
   }, [currentPage, searchQuery, companyId])
 
   // Separate effect to reset pagination when search/filter changes
   useEffect(() => {
-    console.log(`Search/filter change detected, resetting to page 1`)
     setCurrentPage(1)
+    setLastDoc(null)
+    setAllFetchedDocs([])
+    setIsSearchMode(false)
   }, [searchQuery, companyId])
 
   // Fallback function using real-time Firestore listener (original implementation)
   const fetchAssignmentsFromFirestoreRealtime = () => {
-    console.log(`Fetching assignments from Firestore for page ${currentPage}`)
     setLoading(true)
 
     let realtimeQuery = query(collection(db, "service_assignments"), orderBy("created", "desc"))
@@ -345,7 +397,6 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     }
 
     const unsubscribe = onSnapshot(realtimeQuery, async (querySnapshot) => {
-      console.log(`Received ${querySnapshot.size} assignments from Firestore`)
       const assignmentsData: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
@@ -355,14 +406,10 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         } as ServiceAssignment)
       })
 
-      console.log(`Total assignments: ${assignmentsData.length}`)
-
       // Apply pagination client-side for real-time data
       const startIndex = (currentPage - 1) * itemsPerPage
       const endIndex = startIndex + itemsPerPage
       const paginatedData = assignmentsData.slice(startIndex, endIndex)
-
-      console.log(`Showing assignments ${startIndex + 1} to ${endIndex} of ${assignmentsData.length}`)
 
       setAssignments(paginatedData)
       setHasMore(assignmentsData.length > endIndex)
