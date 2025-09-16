@@ -4,13 +4,15 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrderById } from "@/lib/job-order-service"
+import { generateJobOrderPDF } from "@/lib/pdf-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
-import { format } from "date-fns"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Calendar, User, MapPin, FileText, Download, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { format } from "date-fns"
 import { Timestamp } from "firebase/firestore"
 
 // Helper function to safely parse date values (copied from app/sales/job-orders/page.tsx)
@@ -108,75 +110,334 @@ export default function JobOrderDetailsPage() {
   const dateRequested = safeParseDate(jobOrder.dateRequested);
   const deadline = safeParseDate(jobOrder.deadline);
 
+  const handleDownloadPDF = async () => {
+    try {
+      await generateJobOrderPDF(jobOrder)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "approved":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "completed":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "cancelled":
+        return "bg-red-100 text-red-800 border-red-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4 text-gray-600 hover:text-gray-900">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Job Orders
+    <div className="min-h-screen bg-gray-50/50 flex flex-col">
+      {/* Sticky Header */}
+      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push("/sales/job-orders")}
+          className="text-black hover:bg-gray-100 p-1 h-8 w-8"
+        >
+          <ArrowLeft className="h-4 w-4" />
         </Button>
+        <span className="text-black font-medium">Job Order Details</span>
+        <span className="text-black italic ml-2">{jobOrder.joNumber}</span>
 
-        <Card className="border-gray-200 shadow-sm rounded-xl">
-          <CardHeader className="border-b border-gray-200 pb-4">
-            <CardTitle className="text-2xl font-bold text-gray-900">Job Order: {jobOrder.joNumber}</CardTitle>
-            <p className="text-sm text-gray-600">Created by {jobOrder.requestedBy} on {dateRequested ? format(dateRequested, "MMM d, yyyy") : "N/A"}</p>
-          </CardHeader>
-          <CardContent className="pt-6 grid gap-4 text-gray-700">
-            <div>
-              <h3 className="font-semibold text-gray-800">Site Information</h3>
-              <p><strong>Site Name:</strong> {jobOrder.siteName}</p>
-              <p><strong>Site Code:</strong> {jobOrder.siteCode || "N/A"}</p>
-              <p><strong>Location:</strong> {jobOrder.siteLocation || "N/A"}</p>
-            </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={getStatusColor(jobOrder.status || "")}
+          >
+            {jobOrder.status?.toUpperCase() || "PENDING"}
+          </Badge>
+        </div>
+      </div>
 
-            <div>
-              <h3 className="font-semibold text-gray-800">Job Details</h3>
-              <p><strong>Type:</strong> <Badge variant="outline">{jobOrder.joType}</Badge></p>
-              <p><strong>Description:</strong> {jobOrder.jobDescription || "N/A"}</p>
-              <p><strong>Deadline:</strong> {deadline ? format(deadline, "MMM d, yyyy") : "N/A"}</p>
-              <p><strong>Assigned To:</strong> {jobOrder.assignTo || "Unassigned"}</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-800">Client Information</h3>
-              <p><strong>Client Name:</strong> {jobOrder.clientName || "N/A"}</p>
-              <p><strong>Client Company:</strong> {jobOrder.clientCompany || "N/A"}</p>
-            </div>
-
-            {jobOrder.message && (
-              <div>
-                <h3 className="font-semibold text-gray-800">Message</h3>
-                <p>{jobOrder.message}</p>
+      {/* Main content area */}
+      <div className="flex-1 flex">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+          <div className="w-full max-w-4xl">
+            {/* Document Container */}
+            <div className="bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden">
+              {/* Document Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold">Job Order Details</h1>
+                    <p className="text-blue-100 mt-1">Job Order: {jobOrder.joNumber}</p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs px-3 py-1 ${
+                      jobOrder.status?.toLowerCase() === "approved"
+                        ? "bg-green-100 text-green-800 border-green-300"
+                        : jobOrder.status?.toLowerCase() === "completed"
+                        ? "bg-green-100 text-green-800 border-green-300"
+                        : "bg-gray-100 text-gray-800 border-gray-300"
+                    }`}
+                  >
+                    {jobOrder.status?.toUpperCase() || "PENDING"}
+                  </Badge>
+                </div>
               </div>
-            )}
 
-            {jobOrder.attachments && jobOrder.attachments.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-800">Attachments</h3>
-                <ul>
-                  {jobOrder.attachments.map((attachment, index) => (
-                    <li key={index}><a href={attachment} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{attachment}</a></li>
-                  ))}
-                </ul>
+              {/* Document Content */}
+              <div className="p-6 space-y-8">
+                {/* Basic Information Section */}
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                    Basic Information
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Job Order Number</label>
+                      <p className="text-base text-gray-900">{jobOrder.joNumber}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Job Type</label>
+                      <p className="text-base text-gray-900">{jobOrder.joType}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Site Name</label>
+                      <p className="text-base text-gray-900">{jobOrder.siteName}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Site Location</label>
+                      <p className="text-base text-gray-900">{jobOrder.siteLocation || "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Requested By</label>
+                      <p className="text-base text-gray-900">{jobOrder.requestedBy}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Assigned To</label>
+                      <p className="text-base text-gray-900">{jobOrder.assignTo || "Unassigned"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Date Requested</label>
+                      <p className="text-base text-gray-900">{dateRequested ? format(dateRequested, "PPP") : "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Deadline</label>
+                      <p className="text-base text-gray-900">{deadline ? format(deadline, "PPP") : "N/A"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Job Description Section */}
+                {jobOrder.jobDescription && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                      Job Description
+                    </h2>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-gray-700">{jobOrder.jobDescription}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Client Information Section */}
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                    Client Information
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Client Name</label>
+                      <p className="text-base text-gray-900">{jobOrder.clientName || "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Client Company</label>
+                      <p className="text-base text-gray-900">{jobOrder.clientCompany || "N/A"}</p>
+                    </div>
+                    {jobOrder.quotationNumber && (
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Quotation Number</label>
+                        <p className="text-base text-gray-900">{jobOrder.quotationNumber}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Additional Information Section */}
+                {(jobOrder.message || jobOrder.remarks) && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                      Additional Information
+                    </h2>
+                    {jobOrder.message && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Message</label>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-gray-700">{jobOrder.message}</p>
+                        </div>
+                      </div>
+                    )}
+                    {jobOrder.remarks && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Remarks</label>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-gray-700">{jobOrder.remarks}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Attachments Section */}
+                {jobOrder.attachments && jobOrder.attachments.length > 0 && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                      Attachments
+                    </h2>
+                    <div className="space-y-2">
+                      {jobOrder.attachments.map((attachment, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <FileText className="w-5 h-5 text-gray-500" />
+                          <a
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline flex-1"
+                          >
+                            {attachment.name}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Timeline Section */}
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                    Timeline
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">Job Order Created</p>
+                        <p className="text-sm text-gray-600">{dateRequested ? format(dateRequested, "PPP") : "N/A"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className={`w-3 h-3 rounded-full mt-2 flex-shrink-0 ${
+                        jobOrder.status?.toLowerCase() === "completed" ? "bg-green-500" :
+                        jobOrder.status?.toLowerCase() === "approved" ? "bg-blue-500" : "bg-gray-400"
+                      }`}></div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">Current Status</p>
+                        <p className="text-sm text-gray-600">{jobOrder.status || "Pending"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-
-            <div className="mt-4">
-              <h3 className="font-semibold text-gray-800">Status</h3>
-              <Badge
-                variant="default"
-                className={
-                  jobOrder.status === "approved"
-                    ? "bg-green-100 text-green-800 hover:bg-green-100"
-                    : jobOrder.status === "pending"
-                    ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                    : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                }
-              >
-                {jobOrder.status?.toUpperCase() || "N/A"}
-              </Badge>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-80 border-l border-gray-200 p-6 overflow-y-auto bg-gray-50">
+          {/* Document Info */}
+          <div className="space-y-6">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Document Info</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Type:</span>
+                  <span className="font-medium">Job Order</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">ID:</span>
+                  <span className="font-mono text-xs">{jobOrder.joNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Created:</span>
+                  <span className="font-medium">{dateRequested ? format(dateRequested, "PPP") : "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Deadline:</span>
+                  <span className="font-medium">{deadline ? format(deadline, "PPP") : "N/A"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Overview */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Status Overview</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    jobOrder.status?.toLowerCase() === "approved" ? "bg-green-500" :
+                    jobOrder.status?.toLowerCase() === "completed" ? "bg-green-500" :
+                    jobOrder.status?.toLowerCase() === "pending" ? "bg-blue-500" : "bg-gray-400"
+                  }`}></div>
+                  <span className="text-sm font-medium">{jobOrder.status || "Pending"}</span>
+                </div>
+                <div className="text-xs text-gray-600">
+                  Last updated: {dateRequested ? format(dateRequested, "PPP") : "N/A"}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Quick Actions</h3>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={handleDownloadPDF}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => router.push("/sales/job-orders")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to List
+                </Button>
+              </div>
+            </div>
+
+            {/* Job Details Summary */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Job Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Type:</span>
+                  <span className="font-medium">{jobOrder.joType}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Site:</span>
+                  <span className="font-medium">{jobOrder.siteName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Assigned:</span>
+                  <span className="font-medium">{jobOrder.assignTo || "Unassigned"}</span>
+                </div>
+                {jobOrder.attachments && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Attachments:</span>
+                    <span className="font-medium">{jobOrder.attachments.length}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

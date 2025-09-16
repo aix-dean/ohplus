@@ -1190,7 +1190,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-                  { title: "Project Bulletins", href: "/sales/project-monitoring", icon: Monitor },
+                  { title: "Project Bulletin", href: "/sales/project-monitoring", icon: Monitor },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
