@@ -29,9 +29,11 @@ import {
   Play,
   ChevronDown,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, use } from "react"
 import { Document, Page, pdfjs } from "react-pdf"
 
 // Configure PDF.js worker
@@ -195,7 +197,7 @@ export const formatFirebaseDate = (timestamp: any): string => {
 }
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 interface ServiceAssignment {
@@ -265,10 +267,25 @@ export default function SiteDetailsPage({ params }: Props) {
   const view = searchParams.get("view")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { userData } = useAuth()
+  const { id } = use(params)
 
   const [illuminationOn, setIlluminationOn] = useState(false)
   const [illuminationMode, setIlluminationMode] = useState("Manual")
   const [complianceDialogOpen, setComplianceDialogOpen] = useState(false)
+  const [addComplianceDialogOpen, setAddComplianceDialogOpen] = useState(false)
+  const [viewComplianceDialogOpen, setViewComplianceDialogOpen] = useState(false)
+  const [editComplianceDialogOpen, setEditComplianceDialogOpen] = useState(false)
+  const [editingComplianceIndex, setEditingComplianceIndex] = useState<number | null>(null)
+  const [complianceForm, setComplianceForm] = useState({
+    name: '',
+    document: null as File | null,
+  })
+  const [editComplianceForm, setEditComplianceForm] = useState({
+    name: '',
+    document: null as File | null,
+  })
+  const [isUploadingCompliance, setIsUploadingCompliance] = useState(false)
+  const [complianceError, setComplianceError] = useState('')
 
   // Fetch product data and job orders
   useEffect(() => {
@@ -277,7 +294,7 @@ export default function SiteDetailsPage({ params }: Props) {
         setLoading(true)
 
         // Fetch product data
-        const productData = await getProductById(params.id)
+        const productData = await getProductById(id)
         if (!productData) {
           notFound()
         }
@@ -286,7 +303,7 @@ export default function SiteDetailsPage({ params }: Props) {
         // Fetch job orders for this product
         const jobOrdersQuery = query(
           collection(db, "job_orders"), // Changed collection to "job_orders"
-          where("product_id", "==", params.id), // Assuming "product_id" links to the site
+          where("product_id", "==", id), // Assuming "product_id" links to the site
           orderBy("createdAt", "desc"), // Changed from 'created' to 'createdAt'
         )
 
@@ -316,10 +333,10 @@ export default function SiteDetailsPage({ params }: Props) {
     }
 
     fetchData()
-  }, [params.id])
+  }, [id])
 
   const handleCreateServiceAssignment = () => {
-    router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+    router.push(`/logistics/assignments/create?projectSite=${id}`)
   }
 
   const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -966,26 +983,31 @@ export default function SiteDetailsPage({ params }: Props) {
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <Bell className="h-4 w-4 text-gray-500" />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setComplianceDialogOpen(true)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setComplianceDialogOpen(true)}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
-                  {product.compliance?.map((item: ComplianceItem, index: number) => (
+                  {Array.isArray(product.compliance) ? [...product.compliance]
+                    .sort((a: ComplianceItem, b: ComplianceItem) => {
+                      const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                      const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                      return timeB - timeA // Newest first
+                    })
+                    .map((item: ComplianceItem, index: number) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <span className="w-4 h-4 flex items-center justify-center text-lg">✅</span>
+                      <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-xs font-bold ${
+                        item.doc_url ? 'bg-green-500' : 'bg-gray-400'
+                      }`}>
+                        ✓
+                      </div>
                       <div className="flex flex-col">
                         <label
                           style={{
@@ -1015,10 +1037,17 @@ export default function SiteDetailsPage({ params }: Props) {
                         )}
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-sm text-gray-500">No compliance data available</div>
+                  )}
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button variant="outline" size="sm" className="bg-transparent w-[203px] h-[47px]">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-transparent w-[203px] h-[47px]"
+                    onClick={() => setViewComplianceDialogOpen(true)}
+                  >
                     View
                   </Button>
                 </div>
@@ -1322,7 +1351,7 @@ export default function SiteDetailsPage({ params }: Props) {
         product={product}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${id}`)
         }}
       />
       <DisplayIndexCardDialog
@@ -1330,7 +1359,7 @@ export default function SiteDetailsPage({ params }: Props) {
         onOpenChange={setDisplayIndexCardDialogOpen}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${id}`)
         }}
       />
 
@@ -1629,31 +1658,457 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Edit Compliance Dialog */}
-      <Dialog open={complianceDialogOpen} onOpenChange={setComplianceDialogOpen}>
-        <DialogContent className="max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Compliance</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">Compliance editing functionality will be implemented here.</p>
-          </div>
-          <div className="flex gap-2 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => setComplianceDialogOpen(false)}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => setComplianceDialogOpen(false)}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              Save
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={complianceDialogOpen} onOpenChange={setComplianceDialogOpen}>
+          <DialogContent className="max-w-lg mx-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Compliance</DialogTitle>
+            </DialogHeader>
+
+            {/* Table-like header */}
+            <div className="grid grid-cols-2 px-2 py-2 font-medium text-sm text-gray-700">
+              <span>Items</span>
+              <span className="text-right">Actions</span>
+            </div>
+
+            <div className="space-y-2">
+              {Array.isArray(product?.compliance) && product.compliance.length > 0 ? (
+                product.compliance.map((item: ComplianceItem, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-md bg-gray-50"
+                  >
+                    {/* Item name */}
+                    <span className="text-sm font-medium">{item.name}</span>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
+                        onClick={() => {
+                          if (product?.compliance && Array.isArray(product.compliance)) {
+                            const item = product.compliance[index]
+                            setEditingComplianceIndex(index)
+                            setEditComplianceForm({
+                              name: item.name,
+                              document: null, // Reset document selection
+                            })
+                            setEditComplianceDialogOpen(true)
+                          }
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 p-0 text-gray-500 hover:text-red-600"
+                        onClick={() => {
+                          console.log("Remove compliance item:", index);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 px-3">No compliance items yet.</p>
+              )}
+            </div>
+
+            {/* Add Compliance Row */}
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                className="w-full border border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                onClick={() => {
+                  setAddComplianceDialogOpen(true)
+                }}
+              >
+                + Add Compliance
+              </Button>
+            </div>
+
+            {/* OK button */}
+            <div className="flex justify-end mt-6">
+              <Button
+                onClick={() => setComplianceDialogOpen(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                OK
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Compliance Dialog */}
+        <Dialog open={addComplianceDialogOpen} onOpenChange={setAddComplianceDialogOpen}>
+          <DialogContent className="max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle>Add Compliance Document</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <input
+                  type="text"
+                  value={complianceForm.name}
+                  onChange={(e) => setComplianceForm({ ...complianceForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter document name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Document <span className="text-gray-500">(Optional)</span></label>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setComplianceForm({ ...complianceForm, document: file })
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {complianceForm.document && (
+                  <p className="text-sm text-gray-600">Selected: {complianceForm.document.name}</p>
+                )}
+              </div>
+              {complianceError && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                  {complianceError}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddComplianceDialogOpen(false)
+                  setComplianceForm({ name: '', document: null })
+                }}
+                className="flex-1"
+                disabled={isUploadingCompliance}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  // Clear previous error
+                  setComplianceError('')
+
+                  // Validation
+                  if (!complianceForm.name.trim()) {
+                    setComplianceError('Document name is required')
+                    return
+                  }
+
+                  // Check file size if a document is selected (limit to 10MB)
+                  if (complianceForm.document && complianceForm.document.size > 10 * 1024 * 1024) {
+                    setComplianceError('File size must be less than 10MB')
+                    return
+                  }
+
+                  if (!product || !userData) {
+                    setComplianceError('Missing product or user information')
+                    return
+                  }
+
+                  setIsUploadingCompliance(true)
+                  try {
+                    let downloadURL = ''
+
+                    // Upload document to Firebase Storage only if a document is selected
+                    if (complianceForm.document) {
+                      downloadURL = await uploadFileToFirebaseStorage(complianceForm.document, `compliance/${product.id}/`)
+                    }
+
+                    // Create new compliance item
+                    const uploaderName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email || 'Unknown User'
+                    const newComplianceItem: ComplianceItem = {
+                      name: complianceForm.name.trim(),
+                      doc_url: downloadURL,
+                      created: new Date(),
+                      created_by: uploaderName
+                    }
+
+                    // Get existing compliance or create empty array
+                    const existingCompliance = Array.isArray(product.compliance) ? product.compliance : []
+
+                    // Add new compliance item
+                    const updatedCompliance = [...existingCompliance, newComplianceItem]
+
+                    // Update product with new compliance array
+                    await updateProduct(product.id, { compliance: updatedCompliance })
+
+                    // Update local product state
+                    setProduct({ ...product, compliance: updatedCompliance })
+
+                    // Reset form and close dialog
+                    setComplianceForm({ name: '', document: null })
+                    setAddComplianceDialogOpen(false)
+                    setComplianceError('')
+                  } catch (error) {
+                    console.error('Error adding compliance document:', error)
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+                    setComplianceError(`Failed to add compliance document: ${errorMessage}. Please try again.`)
+                  } finally {
+                    setIsUploadingCompliance(false)
+                  }
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                disabled={!complianceForm.name.trim() || isUploadingCompliance}
+              >
+                {isUploadingCompliance ? 'Uploading...' : 'Add Document'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Compliance Dialog */}
+        <Dialog open={editComplianceDialogOpen} onOpenChange={setEditComplianceDialogOpen}>
+          <DialogContent className="max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Compliance Document</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <input
+                  type="text"
+                  value={editComplianceForm.name}
+                  onChange={(e) => setEditComplianceForm({ ...editComplianceForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter document name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Document <span className="text-gray-500">(Optional)</span></label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setEditComplianceForm({ ...editComplianceForm, document: file })
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {!editComplianceForm.document && editingComplianceIndex !== null && product?.compliance && Array.isArray(product.compliance) && product.compliance[editingComplianceIndex]?.doc_url && (
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
+                      {(() => {
+                        const url = product.compliance[editingComplianceIndex].doc_url
+                        const filename = url.split('/').pop()?.split('?')[0] || 'document'
+                        return filename
+                      })()}
+                    </div>
+                  )}
+                </div>
+                {editComplianceForm.document && (
+                  <p className="text-sm text-gray-600">Selected: {editComplianceForm.document.name}</p>
+                )}
+              </div>
+              {complianceError && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                  {complianceError}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditComplianceDialogOpen(false)
+                  setEditingComplianceIndex(null)
+                  setEditComplianceForm({ name: '', document: null })
+                }}
+                className="flex-1"
+                disabled={isUploadingCompliance}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  // Clear previous error
+                  setComplianceError('')
+
+                  // Validation
+                  if (!editComplianceForm.name.trim()) {
+                    setComplianceError('Document name is required')
+                    return
+                  }
+
+                  // Check file size if a document is selected (limit to 10MB)
+                  if (editComplianceForm.document && editComplianceForm.document.size > 10 * 1024 * 1024) {
+                    setComplianceError('File size must be less than 10MB')
+                    return
+                  }
+
+                  if (!product || !userData || editingComplianceIndex === null) {
+                    setComplianceError('Missing product, user information, or editing index')
+                    return
+                  }
+
+                  setIsUploadingCompliance(true)
+                  try {
+                    let downloadURL = ''
+
+                    // Upload new document to Firebase Storage only if a new document is selected
+                    if (editComplianceForm.document) {
+                      downloadURL = await uploadFileToFirebaseStorage(editComplianceForm.document, `compliance/${product.id}/`)
+                    } else {
+                      // Keep existing document URL if no new document is selected
+                      downloadURL = product.compliance[editingComplianceIndex]?.doc_url || ''
+                    }
+
+                    // Update the compliance item
+                    const uploaderName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email || 'Unknown User'
+                    const updatedComplianceItem: ComplianceItem = {
+                      name: editComplianceForm.name.trim(),
+                      doc_url: downloadURL,
+                      created: product.compliance[editingComplianceIndex]?.created || new Date(),
+                      created_by: product.compliance[editingComplianceIndex]?.created_by || uploaderName
+                    }
+
+                    // Get existing compliance array
+                    const existingCompliance = Array.isArray(product.compliance) ? [...product.compliance] : []
+
+                    // Update the specific item
+                    existingCompliance[editingComplianceIndex] = updatedComplianceItem
+
+                    // Update product with updated compliance array
+                    await updateProduct(product.id, { compliance: existingCompliance })
+
+                    // Update local product state
+                    setProduct({ ...product, compliance: existingCompliance })
+
+                    // Reset form and close dialog
+                    setEditComplianceForm({ name: '', document: null })
+                    setEditComplianceDialogOpen(false)
+                    setEditingComplianceIndex(null)
+                    setComplianceError('')
+                  } catch (error) {
+                    console.error('Error updating compliance document:', error)
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+                    setComplianceError(`Failed to update compliance document: ${errorMessage}. Please try again.`)
+                  } finally {
+                    setIsUploadingCompliance(false)
+                  }
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                disabled={!editComplianceForm.name.trim() || isUploadingCompliance}
+              >
+                {isUploadingCompliance ? 'Updating...' : 'Update Document'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Compliance Dialog */}
+        <Dialog open={viewComplianceDialogOpen} onOpenChange={setViewComplianceDialogOpen}>
+          <DialogContent className="max-w-2xl mx-auto">
+            <DialogHeader>
+              <DialogTitle>View Compliances</DialogTitle>
+            </DialogHeader>
+
+            {/* Table header */}
+            <div className="grid grid-cols-3 px-4 py-2 text-sm font-medium text-gray-700 border-b">
+              <span>Items</span>
+              <span>Attachment</span>
+              <span className="text-right">Actions</span>
+            </div>
+
+            {/* Table body */}
+            <div className="divide-y">
+              {Array.isArray(product?.compliance) && product.compliance.length > 0 ? (
+                [...product.compliance]
+                  .sort((a: ComplianceItem, b: ComplianceItem) => {
+                    const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                    const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                    return timeB - timeA // Newest first
+                  })
+                  .map((item: ComplianceItem, index: number) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-3 items-center px-4 py-3 bg-gray-50"
+                  >
+                    {/* Item with status indicator */}
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`w-5 h-5 flex items-center justify-center rounded-sm text-white text-xs ${
+                          item.doc_url ? "bg-green-500" : "bg-gray-300"
+                        }`}
+                      >
+                        ✓
+                      </div>
+                      <span className="text-sm font-medium text-gray-800">
+                        {item.name}
+                      </span>
+                    </div>
+
+                    {/* Attachment column */}
+                    <div className="text-sm">
+                      {item.doc_url ? (
+                        <a
+                          href={item.doc_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Document
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 cursor-not-allowed">Upload</span>
+                      )}
+                    </div>
+
+                    {/* Actions column */}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
+                        onClick={() => {
+                          if (product?.compliance && Array.isArray(product.compliance)) {
+                            const item = product.compliance[index]
+                            setEditingComplianceIndex(index)
+                            setEditComplianceForm({
+                              name: item.name,
+                              document: null, // Reset document selection
+                            })
+                            setEditComplianceDialogOpen(true)
+                          }
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  No compliance documents found
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end mt-6">
+              <Button
+                onClick={() => setViewComplianceDialogOpen(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                OK
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
 
     {/* Maintenance History Dialog */}
     <Dialog open={maintenanceHistoryDialogOpen} onOpenChange={setMaintenanceHistoryDialogOpen}>

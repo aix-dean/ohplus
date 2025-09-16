@@ -79,11 +79,17 @@ export interface Product {
     uploaded_by: string
     created: any
   }>
-  compliance?: {
-    lease_agreement?: string
-    mayors_permit?: string
-    bir_registration?: string
-    structural_approval?: string
+  compliance?: Array<{
+    name: string
+    doc_url: string
+    created: any
+    created_by: string
+  }>
+  structure?: {
+    color?: string
+    contractor?: string
+    condition?: string
+    last_maintenance?: any
   }
 }
 
