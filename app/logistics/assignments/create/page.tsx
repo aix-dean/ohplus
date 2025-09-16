@@ -433,15 +433,57 @@ export default function CreateServiceAssignmentPage() {
         jobOrderId: jobOrderData?.id || null, // Add job order ID if present
       }
 
+      let assignmentDocRef
+
       if (isEditingDraft && draftId) {
         // Update existing draft to pending
-        await updateDoc(doc(db, "service_assignments", draftId), assignmentData)
+        assignmentDocRef = doc(db, "service_assignments", draftId)
+        await updateDoc(assignmentDocRef, assignmentData)
       } else {
         // Create new assignment
-        await addDoc(collection(db, "service_assignments"), {
+        assignmentDocRef = await addDoc(collection(db, "service_assignments"), {
           ...assignmentData,
           created: serverTimestamp(),
         })
+      }
+
+      // Create notification for Logistics and Admin
+      try {
+        const notificationTitle = `New Service Assignment: ${saNumber}`
+        const notificationDescription = `A new ${formData.serviceType} service assignment has been created for ${selectedProduct?.name || "Unknown Site"}`
+
+        // Create notification for Logistics department
+        await addDoc(collection(db, "notifications"), {
+          type: "Service Assignment",
+          title: notificationTitle,
+          description: notificationDescription,
+          department_to: "Logistics",
+          uid_to: null, // Send to all Logistics users
+          company_id: userData?.company_id,
+          department_from: "Logistics",
+          viewed: false,
+          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
+          created: serverTimestamp(),
+        })
+
+        // Create notification for Admin department
+        await addDoc(collection(db, "notifications"), {
+          type: "Service Assignment",
+          title: notificationTitle,
+          description: notificationDescription,
+          department_to: "Admin",
+          uid_to: null, // Send to all Admin users
+          company_id: userData?.company_id,
+          department_from: "Logistics",
+          viewed: false,
+          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
+          created: serverTimestamp(),
+        })
+
+        console.log("Notifications created successfully for service assignment:", assignmentDocRef.id)
+      } catch (notificationError) {
+        console.error("Error creating notifications for service assignment:", notificationError)
+        // Don't throw here - we don't want notification failure to break assignment creation
       }
 
       // Show success dialog

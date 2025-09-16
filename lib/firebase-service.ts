@@ -758,6 +758,23 @@ export async function updateServiceAssignment(
   }
 }
 
+export async function createServiceAssignment(assignmentData: Omit<ServiceAssignment, "id" | "created" | "updated">): Promise<string> {
+  try {
+    const newAssignment = {
+      ...assignmentData,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(collection(db, "service_assignments"), newAssignment)
+    console.log("Service assignment created with ID:", docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating service assignment:", error)
+    throw error
+  }
+}
+
 // Add this function at the end of the file
 export async function getProductBookings(productId: string): Promise<Booking[]> {
   try {
