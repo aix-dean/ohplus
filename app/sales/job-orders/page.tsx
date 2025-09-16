@@ -260,7 +260,7 @@ export default function JobOrdersPage() {
                       onClick={() => router.push(`/sales/job-orders/${jo.id}`)} // Placeholder navigation
                     >
                       <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
-                      <TableCell className="py-3">{jo.siteName}</TableCell>
+                      <TableCell className="py-3">{jo.siteName || "N/A"}</TableCell>
                       <TableCell className="py-3">
                         <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
                           {dateRequested ? format(dateRequested, "MMM d, yyyy") : "N/A"}

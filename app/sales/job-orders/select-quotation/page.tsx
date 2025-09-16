@@ -43,8 +43,8 @@ export default function SelectQuotationPage() {
         const filteredByProduct = productId
           ? fetchedQuotations.filter((quotation) => {
               if (quotation.product_id === productId) return true
-              if (quotation.items && Array.isArray(quotation.items)) {
-                return quotation.items.some((item: any) => item.product_id === productId)
+              if (quotation.items && quotation.items.product_id === productId) {
+                return true
               }
               return false
             })
@@ -69,8 +69,8 @@ export default function SelectQuotationPage() {
     (q) =>
       q.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.items?.some(item => item.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      q.items?.some(item => item.site_code?.toLowerCase().includes(searchTerm.toLowerCase())),
+      q.items?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.items?.site_code?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleSelect = (quotation: Quotation) => {
@@ -78,19 +78,15 @@ export default function SelectQuotationPage() {
   }
 
   const getProductCount = (quotation: Quotation): number => {
-    if (quotation.items && Array.isArray(quotation.items)) {
-      return quotation.items.length
-    }
     return 1 // Single product
   }
 
   const getProductNames = (quotation: Quotation): string => {
-    if (quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0) {
-      return quotation.items.map((item: any) => item.name).join(", ")
+    if (quotation.items && quotation.items.name) {
+      return quotation.items.name
     }
     return "N/A"
   }
-
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-4 md:p-6">
@@ -136,46 +132,34 @@ export default function SelectQuotationPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotations.map((quotation) => {
-                  const productCount = getProductCount(quotation)
-                  const isMultiProduct = productCount > 1
-
-                  return (
-                    <TableRow
-                      key={quotation.id}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSelect(quotation)}
-                    >
-                      <TableCell className="font-semibold">
-                        {quotation.quotation_number}
-                        {isMultiProduct && (
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            <Package className="h-3 w-3 mr-1" />
-                            {productCount} Products
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{quotation.client_name}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {isMultiProduct ? "Products: " : "Site: "}
-                        {getProductNames(quotation)}
-                      </TableCell>
-                      <TableCell>
-                        {quotation.created_by_first_name || quotation.created_by_last_name
-                          ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={quotation.status === "reserved" ? "default" : "secondary"}>
-                          {quotation.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {filteredQuotations.map((quotation) => (
+                  <TableRow
+                    key={quotation.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSelect(quotation)}
+                  >
+                    <TableCell className="font-semibold">
+                      {quotation.quotation_number}
+                    </TableCell>
+                    <TableCell>{quotation.client_name}</TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      Site: {getProductNames(quotation)}
+                    </TableCell>
+                    <TableCell>
+                      {quotation.created_by_first_name || quotation.created_by_last_name
+                        ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={quotation.status === "reserved" ? "default" : "secondary"}>
+                        {quotation.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </ScrollArea>

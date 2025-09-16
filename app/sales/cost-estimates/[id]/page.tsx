@@ -10,6 +10,7 @@ import {
   updateCostEstimate,
   getCostEstimatesByPageId,
   getCostEstimatesByClientId, // Import new function
+  getCostEstimatesByProductIdAndCompanyId, // Import new function
   updateCostEstimateStatus, // Import updateCostEstimateStatus
 } from "@/lib/cost-estimate-service"
 import type {
@@ -445,20 +446,20 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }
 
   const fetchClientHistory = useCallback(async () => {
-    if (!costEstimate?.page_id) return
+    if (!costEstimate?.lineItems?.[0]?.id || !costEstimate?.company_id || !costEstimate?.id) return
 
     setLoadingHistory(true)
     try {
-      const history = await getCostEstimatesByPageId(costEstimate.page_id)
-      // Filter out current cost estimate from history
-      const filteredHistory = history.filter((ce) => ce.id !== costEstimate.id)
-      setClientHistory(filteredHistory)
+      const productId = costEstimate.lineItems[0].id
+      const companyId = costEstimate.company_id
+      const history = await getCostEstimatesByProductIdAndCompanyId(productId, companyId, costEstimate.id)
+      setClientHistory(history)
     } catch (error) {
       console.error("Error fetching client history:", error)
     } finally {
       setLoadingHistory(false)
     }
-  }, [costEstimate?.page_id, costEstimate?.id])
+  }, [costEstimate?.lineItems?.[0]?.id, costEstimate?.company_id, costEstimate?.id])
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -521,7 +522,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }, [user, userData])
 
   useEffect(() => {
-    if (costEstimate?.client?.id) {
+    if (costEstimate?.lineItems?.[0]?.id) {
       fetchClientHistory()
     }
   }, [fetchClientHistory])
