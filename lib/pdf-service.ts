@@ -228,6 +228,7 @@ interface ServiceAssignmentPDFData {
   projectSiteLocation: string
   serviceType: string
   assignedTo: string
+  assignedToName?: string
   serviceDuration: string
   priority: string
   equipmentRequired: string
@@ -343,10 +344,9 @@ export async function generateServiceAssignmentDetailsPDF(
       { label: "Project Site:", value: assignmentData.projectSiteName },
       { label: "Location:", value: assignmentData.projectSiteLocation || "N/A" },
       { label: "Service Type:", value: assignmentData.serviceType },
-      { label: "Assigned To:", value: assignmentData.assignedTo },
+      { label: "Assigned To:", value: assignmentData.assignedToName || assignmentData.assignedTo },
       { label: "Duration:", value: assignmentData.serviceDuration ? `${assignmentData.serviceDuration} hours` : "N/A" },
       { label: "Priority:", value: assignmentData.priority },
-      { label: "Crew:", value: assignmentData.crew || "N/A" },
     ]
 
     // Display all fields in a single column layout, one row per field
@@ -355,10 +355,9 @@ export async function generateServiceAssignmentDetailsPDF(
       { label: "Project Site:", value: assignmentData.projectSiteName },
       { label: "Location:", value: assignmentData.projectSiteLocation || "N/A" },
       { label: "Service Type:", value: assignmentData.serviceType },
-      { label: "Assigned To:", value: assignmentData.assignedTo },
+      { label: "Assigned To:", value: assignmentData.assignedToName || assignmentData.assignedTo },
       { label: "Duration:", value: assignmentData.serviceDuration ? `${assignmentData.serviceDuration} hours` : "N/A" },
       { label: "Priority:", value: assignmentData.priority },
-      { label: "Crew:", value: assignmentData.crew || "N/A" },
       { label: "Created:", value: assignmentData.created?.toDate?.()?.toLocaleDateString() || "N/A" },
       { label: "Start Date:", value: assignmentData.coveredDateStart?.toDate?.()?.toLocaleDateString() || "N/A" },
       { label: "End Date:", value: assignmentData.coveredDateEnd?.toDate?.()?.toLocaleDateString() || "N/A" },
@@ -793,13 +792,12 @@ export async function generateServiceAssignmentPDF(
       { label: "Project Site:", value: serviceAssignment.projectSiteName },
       { label: "Location:", value: serviceAssignment.projectSiteLocation || "N/A" },
       { label: "Service Type:", value: serviceAssignment.serviceType },
-      { label: "Assigned To:", value: serviceAssignment.assignedTo },
+      { label: "Assigned To:", value: (serviceAssignment as any).assignedToName || serviceAssignment.assignedTo },
       {
         label: "Duration:",
         value: serviceAssignment.serviceDuration ? `${serviceAssignment.serviceDuration} hours` : "N/A",
       },
       { label: "Priority:", value: serviceAssignment.priority },
-      { label: "Crew:", value: serviceAssignment.crew || "N/A" },
     ]
 
     leftColumnData.forEach((item) => {
