@@ -230,6 +230,8 @@ interface ComplianceItem {
   doc_url: string
   created: any
   created_by: string
+  filename_doc: string
+  deleted: boolean
 }
 
 export default function SiteDetailsPage({ params }: Props) {
@@ -283,9 +285,13 @@ export default function SiteDetailsPage({ params }: Props) {
   const [editComplianceForm, setEditComplianceForm] = useState({
     name: '',
     document: null as File | null,
+    originalFilename: '',
   })
   const [isUploadingCompliance, setIsUploadingCompliance] = useState(false)
   const [complianceError, setComplianceError] = useState('')
+  const [complianceAddSuccessDialogOpen, setComplianceAddSuccessDialogOpen] = useState(false)
+  const [complianceEditSuccessDialogOpen, setComplianceEditSuccessDialogOpen] = useState(false)
+  const [complianceDeleteSuccessDialogOpen, setComplianceDeleteSuccessDialogOpen] = useState(false)
 
   // Fetch product data and job orders
   useEffect(() => {
@@ -995,53 +1001,58 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardHeader>
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
-                  {Array.isArray(product.compliance) ? [...product.compliance]
-                    .sort((a: ComplianceItem, b: ComplianceItem) => {
-                      const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
-                      const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
-                      return timeB - timeA // Newest first
-                    })
-                    .map((item: ComplianceItem, index: number) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-xs font-bold ${
-                        item.doc_url ? 'bg-green-500' : 'bg-gray-400'
-                      }`}>
-                        ✓
-                      </div>
-                      <div className="flex flex-col">
-                        <label
-                          style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 600,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#000000'
-                          }}
-                        >
-                          {item.name}
-                        </label>
-                        {item.created_by && (
-                          <span
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 400,
-                              fontSize: '12px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#666666'
-                            }}
-                          >
-                            Created by {item.created_by} on {formatFirebaseDate(item.created)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="text-sm text-gray-500">No compliance data available</div>
-                  )}
+                  {(() => {
+                    if (!Array.isArray(product.compliance)) {
+                      return (
+                        <div className="text-sm text-gray-500">No Compliance have been created yet</div>
+                      )
+                    }
+
+                    const nonDeletedItems = product.compliance.filter((item: ComplianceItem) => !item.deleted)
+
+                    if (nonDeletedItems.length === 0) {
+                      return (
+                        <div className="text-sm text-gray-500">
+                          {product.compliance.some((item: ComplianceItem) => item.deleted)
+                            ? "All compliance records have been deleted"
+                            : "No Compliance have been created yet"
+                          }
+                        </div>
+                      )
+                    }
+
+                    return nonDeletedItems
+                      .sort((a: ComplianceItem, b: ComplianceItem) => {
+                        const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                        const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                        return timeB - timeA // Newest first
+                      })
+                      .map((item: ComplianceItem, index: number) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-xs font-bold ${
+                            item.doc_url ? 'bg-green-500' : 'bg-gray-400'
+                          }`}>
+                            ✓
+                          </div>
+                          <div className="flex flex-col">
+                            <label
+                              style={{
+                                fontFamily: 'Inter',
+                                fontWeight: 600,
+                                fontSize: '18px',
+                                lineHeight: '132%',
+                                letterSpacing: '0%',
+                                color: '#000000'
+                              }}
+                            >
+                              {item.name}
+                            </label>
+                          </div>
+                        </div>
+                      ))
+                  })()}
                 </div>
-                <div className="flex justify-end mt-4">
+                <div className="absolute bottom-4 right-4">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1218,7 +1229,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   </DropdownMenu>
                 </div>
               </CardHeader>
-              <CardContent className="p-4">
+              <CardContent className="p-4 relative">
                 {product.content_schedule && product.content_schedule.length > 0 ? (
                   <div className="space-y-2 text-sm">
                     {product.content_schedule.map((content: { start_date: any; end_date: any; name: string }, index: number) => (
@@ -1527,6 +1538,60 @@ export default function SiteDetailsPage({ params }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* Compliance Add Success Dialog */}
+      <Dialog open={complianceAddSuccessDialogOpen} onOpenChange={setComplianceAddSuccessDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">Success</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <div className="text-green-600 text-lg font-semibold mb-2">✓</div>
+            <p className="text-gray-700">Compliance document added successfully!</p>
+          </div>
+          <div className="flex justify-center">
+            <Button onClick={() => setComplianceAddSuccessDialogOpen(false)} className="w-full">
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Compliance Edit Success Dialog */}
+      <Dialog open={complianceEditSuccessDialogOpen} onOpenChange={setComplianceEditSuccessDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">Success</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <div className="text-green-600 text-lg font-semibold mb-2">✓</div>
+            <p className="text-gray-700">Compliance document updated successfully!</p>
+          </div>
+          <div className="flex justify-center">
+            <Button onClick={() => setComplianceEditSuccessDialogOpen(false)} className="w-full">
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Compliance Delete Success Dialog */}
+      <Dialog open={complianceDeleteSuccessDialogOpen} onOpenChange={setComplianceDeleteSuccessDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">Success</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <div className="text-green-600 text-lg font-semibold mb-2">✓</div>
+            <p className="text-gray-700">Compliance document deleted successfully!</p>
+          </div>
+          <div className="flex justify-center">
+            <Button onClick={() => setComplianceDeleteSuccessDialogOpen(false)} className="w-full">
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Fullscreen Blueprint Dialog */}
       <Dialog open={fullscreenDialogOpen} onOpenChange={setFullscreenDialogOpen}>
         <DialogContent className="max-w-6xl mx-auto max-h-[90vh] overflow-hidden">
@@ -1671,51 +1736,96 @@ export default function SiteDetailsPage({ params }: Props) {
             </div>
 
             <div className="space-y-2">
-              {Array.isArray(product?.compliance) && product.compliance.length > 0 ? (
-                product.compliance.map((item: ComplianceItem, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-md bg-gray-50"
-                  >
-                    {/* Item name */}
-                    <span className="text-sm font-medium">{item.name}</span>
+              {(() => {
+                if (!Array.isArray(product?.compliance)) {
+                  return (
+                    <p className="text-sm text-gray-500 px-3">No Compliance have been created yet</p>
+                  )
+                }
 
-                    {/* Action buttons */}
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
-                        onClick={() => {
-                          if (product?.compliance && Array.isArray(product.compliance)) {
-                            const item = product.compliance[index]
-                            setEditingComplianceIndex(index)
-                            setEditComplianceForm({
-                              name: item.name,
-                              document: null, // Reset document selection
-                            })
-                            setEditComplianceDialogOpen(true)
-                          }
-                        }}
+                const nonDeletedItems = product.compliance.filter((item: ComplianceItem) => !item.deleted)
+
+                if (nonDeletedItems.length === 0) {
+                  return (
+                    <p className="text-sm text-gray-500 px-3">
+                      {product.compliance.some((item: ComplianceItem) => item.deleted)
+                        ? "All compliance records have been deleted"
+                        : "No Compliance have been created yet"
+                      }
+                    </p>
+                  )
+                }
+
+                return nonDeletedItems
+                  .sort((a: ComplianceItem, b: ComplianceItem) => {
+                    const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                    const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                    return timeB - timeA // Newest first
+                  })
+                  .map((item: ComplianceItem, filteredIndex: number) => {
+                    const originalIndex = product.compliance.findIndex((origItem: ComplianceItem) => origItem === item);
+                    return (
+                      <div
+                        key={originalIndex}
+                        className="flex items-center justify-between p-3 rounded-md bg-gray-50"
                       >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 p-0 text-gray-500 hover:text-red-600"
-                        onClick={() => {
-                          console.log("Remove compliance item:", index);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 px-3">No compliance items yet.</p>
-              )}
+                        {/* Item name */}
+                        <span className="text-sm font-medium">{item.name}</span>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center space-x-3">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
+                            onClick={() => {
+                              if (product?.compliance && Array.isArray(product.compliance)) {
+                                const item = product.compliance[originalIndex]
+                                setEditingComplianceIndex(originalIndex)
+                                setEditComplianceForm({
+                                  name: item.name,
+                                  document: null, // Reset document selection
+                                  originalFilename: item.filename_doc || '',
+                                })
+                                setEditComplianceDialogOpen(true)
+                              }
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 p-0 text-gray-500 hover:text-red-600"
+                            onClick={async () => {
+                              if (!product || !Array.isArray(product.compliance)) return
+
+                              try {
+                                // Create a copy of the compliance array
+                                const updatedCompliance = [...product.compliance]
+                                // Set deleted to true for the selected item
+                                updatedCompliance[originalIndex] = { ...updatedCompliance[originalIndex], deleted: true }
+
+                                // Update the product in the database
+                                await updateProduct(product.id, { compliance: updatedCompliance })
+
+                                // Update local product state
+                                setProduct({ ...product, compliance: updatedCompliance })
+                                // Show success dialog
+                                setComplianceDeleteSuccessDialogOpen(true)
+                              } catch (error) {
+                                console.error('Error deleting compliance item:', error)
+                                alert('Failed to delete compliance item. Please try again.')
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })
+              })()}
             </div>
 
             {/* Add Compliance Row */}
@@ -1735,7 +1845,7 @@ export default function SiteDetailsPage({ params }: Props) {
             <div className="flex justify-end mt-6">
               <Button
                 onClick={() => setComplianceDialogOpen(false)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-[186px] h-[47px]"
               >
                 OK
               </Button>
@@ -1762,7 +1872,25 @@ export default function SiteDetailsPage({ params }: Props) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Document <span className="text-gray-500">(Optional)</span></label>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const fileInput = document.getElementById('add-compliance-file-input') as HTMLInputElement
+                      fileInput?.click()
+                    }}
+                    className="text-sm"
+                  >
+                    Choose File
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {complianceForm.document ? complianceForm.document.name : 'No file chosen'}
+                  </span>
+                </div>
                 <input
+                  id="add-compliance-file-input"
                   type="file"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   onChange={(e) => {
@@ -1771,11 +1899,8 @@ export default function SiteDetailsPage({ params }: Props) {
                       setComplianceForm({ ...complianceForm, document: file })
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="hidden"
                 />
-                {complianceForm.document && (
-                  <p className="text-sm text-gray-600">Selected: {complianceForm.document.name}</p>
-                )}
               </div>
               {complianceError && (
                 <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
@@ -1832,7 +1957,9 @@ export default function SiteDetailsPage({ params }: Props) {
                       name: complianceForm.name.trim(),
                       doc_url: downloadURL,
                       created: new Date(),
-                      created_by: uploaderName
+                      created_by: uploaderName,
+                      filename_doc: complianceForm.document ? complianceForm.document.name : '',
+                      deleted: false
                     }
 
                     // Get existing compliance or create empty array
@@ -1851,6 +1978,8 @@ export default function SiteDetailsPage({ params }: Props) {
                     setComplianceForm({ name: '', document: null })
                     setAddComplianceDialogOpen(false)
                     setComplianceError('')
+                    // Show success dialog
+                    setComplianceAddSuccessDialogOpen(true)
                   } catch (error) {
                     console.error('Error adding compliance document:', error)
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
@@ -1887,31 +2016,38 @@ export default function SiteDetailsPage({ params }: Props) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Document <span className="text-gray-500">(Optional)</span></label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setEditComplianceForm({ ...editComplianceForm, document: file })
-                      }
+                <div className="flex items-center space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const fileInput = document.getElementById('edit-compliance-file-input') as HTMLInputElement
+                      fileInput?.click()
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {!editComplianceForm.document && editingComplianceIndex !== null && product?.compliance && Array.isArray(product.compliance) && product.compliance[editingComplianceIndex]?.doc_url && (
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                      {(() => {
-                        const url = product.compliance[editingComplianceIndex].doc_url
-                        const filename = url.split('/').pop()?.split('?')[0] || 'document'
-                        return filename
-                      })()}
-                    </div>
-                  )}
+                    className="text-sm"
+                  >
+                    Choose File
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {editComplianceForm.document
+                      ? editComplianceForm.document.name
+                      : editComplianceForm.originalFilename || 'No file chosen'
+                    }
+                  </span>
                 </div>
-                {editComplianceForm.document && (
-                  <p className="text-sm text-gray-600">Selected: {editComplianceForm.document.name}</p>
-                )}
+                <input
+                  id="edit-compliance-file-input"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setEditComplianceForm({ ...editComplianceForm, document: file })
+                    }
+                  }}
+                  className="hidden"
+                />
               </div>
               {complianceError && (
                 <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
@@ -1924,8 +2060,10 @@ export default function SiteDetailsPage({ params }: Props) {
                 variant="outline"
                 onClick={() => {
                   setEditComplianceDialogOpen(false)
-                  setEditingComplianceIndex(null)
-                  setEditComplianceForm({ name: '', document: null })
+                  setTimeout(() => {
+                    setEditingComplianceIndex(null)
+                    setEditComplianceForm({ name: '', document: null, originalFilename: '' })
+                  }, 300) // Delay to allow dialog close animation
                 }}
                 className="flex-1"
                 disabled={isUploadingCompliance}
@@ -1972,7 +2110,9 @@ export default function SiteDetailsPage({ params }: Props) {
                       name: editComplianceForm.name.trim(),
                       doc_url: downloadURL,
                       created: product.compliance[editingComplianceIndex]?.created || new Date(),
-                      created_by: product.compliance[editingComplianceIndex]?.created_by || uploaderName
+                      created_by: product.compliance[editingComplianceIndex]?.created_by || uploaderName,
+                      filename_doc: editComplianceForm.document ? editComplianceForm.document.name : (product.compliance[editingComplianceIndex]?.filename_doc || ''),
+                      deleted: product.compliance[editingComplianceIndex]?.deleted || false
                     }
 
                     // Get existing compliance array
@@ -1988,10 +2128,12 @@ export default function SiteDetailsPage({ params }: Props) {
                     setProduct({ ...product, compliance: existingCompliance })
 
                     // Reset form and close dialog
-                    setEditComplianceForm({ name: '', document: null })
+                    setEditComplianceForm({ name: '', document: null, originalFilename: '' })
                     setEditComplianceDialogOpen(false)
                     setEditingComplianceIndex(null)
                     setComplianceError('')
+                    // Show success dialog
+                    setComplianceEditSuccessDialogOpen(true)
                   } catch (error) {
                     console.error('Error updating compliance document:', error)
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
@@ -2025,83 +2167,104 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Table body */}
             <div className="divide-y">
-              {Array.isArray(product?.compliance) && product.compliance.length > 0 ? (
-                [...product.compliance]
+              {(() => {
+                if (!Array.isArray(product?.compliance)) {
+                  return (
+                    <div className="text-center py-6 text-gray-500 text-sm">
+                      No Compliance have been created yet
+                    </div>
+                  )
+                }
+
+                const nonDeletedItems = product.compliance.filter((item: ComplianceItem) => !item.deleted)
+
+                if (nonDeletedItems.length === 0) {
+                  return (
+                    <div className="text-center py-6 text-gray-500 text-sm">
+                      {product.compliance.some((item: ComplianceItem) => item.deleted)
+                        ? "All compliance records have been deleted"
+                        : "No Compliance have been created yet"
+                      }
+                    </div>
+                  )
+                }
+
+                return nonDeletedItems
                   .sort((a: ComplianceItem, b: ComplianceItem) => {
                     const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
                     const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
                     return timeB - timeA // Newest first
                   })
-                  .map((item: ComplianceItem, index: number) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-3 items-center px-4 py-3 bg-gray-50"
-                  >
-                    {/* Item with status indicator */}
-                    <div className="flex items-center space-x-2">
+                  .map((item: ComplianceItem, filteredIndex: number) => {
+                    const originalIndex = product.compliance.findIndex((origItem: ComplianceItem) => origItem === item);
+                    return (
                       <div
-                        className={`w-5 h-5 flex items-center justify-center rounded-sm text-white text-xs ${
-                          item.doc_url ? "bg-green-500" : "bg-gray-300"
-                        }`}
+                        key={originalIndex}
+                        className="grid grid-cols-3 items-center px-4 py-3 bg-gray-50"
                       >
-                        ✓
+                        {/* Item with status indicator */}
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-5 h-5 flex items-center justify-center rounded-sm text-white text-xs ${
+                              item.doc_url ? "bg-green-500" : "bg-gray-300"
+                            }`}
+                          >
+                            ✓
+                          </div>
+                          <span className="text-sm font-medium text-gray-800">
+                            {item.name}
+                          </span>
+                        </div>
+
+                        {/* Attachment column */}
+                        <div className="text-sm">
+                          {item.doc_url ? (
+                            <a
+                              href={item.doc_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              View Document
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 cursor-not-allowed">Upload</span>
+                          )}
+                        </div>
+
+                        {/* Actions column */}
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
+                            onClick={() => {
+                              if (product?.compliance && Array.isArray(product.compliance)) {
+                                const item = product.compliance[originalIndex]
+                                setEditingComplianceIndex(originalIndex)
+                                setEditComplianceForm({
+                                  name: item.name,
+                                  document: null, // Reset document selection
+                                  originalFilename: item.filename_doc || '',
+                                })
+                                setEditComplianceDialogOpen(true)
+                              }
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-800">
-                        {item.name}
-                      </span>
-                    </div>
-
-                    {/* Attachment column */}
-                    <div className="text-sm">
-                      {item.doc_url ? (
-                        <a
-                          href={item.doc_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View Document
-                        </a>
-                      ) : (
-                        <span className="text-gray-400 cursor-not-allowed">Upload</span>
-                      )}
-                    </div>
-
-                    {/* Actions column */}
-                    <div className="flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600"
-                        onClick={() => {
-                          if (product?.compliance && Array.isArray(product.compliance)) {
-                            const item = product.compliance[index]
-                            setEditingComplianceIndex(index)
-                            setEditComplianceForm({
-                              name: item.name,
-                              document: null, // Reset document selection
-                            })
-                            setEditComplianceDialogOpen(true)
-                          }
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-gray-500 text-sm">
-                  No compliance documents found
-                </div>
-              )}
+                    )
+                  })
+              })()}
             </div>
 
             {/* Footer */}
             <div className="flex justify-end mt-6">
               <Button
                 onClick={() => setViewComplianceDialogOpen(false)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-[186px] h-[47px]"
               >
                 OK
               </Button>
