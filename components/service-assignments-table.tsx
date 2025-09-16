@@ -1,8 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, where, doc, getDoc } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { generateServiceAssignmentDetailsPDF } from "@/lib/pdf-service"
+import { teamsService } from "@/lib/teams-service"
+import type { Product } from "@/lib/firebase-service"
+import type { JobOrder } from "@/lib/types/job-order"
+import type { Team } from "@/lib/types/team"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
@@ -11,7 +16,6 @@ import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreVertical, Printer, X, Bell, FileText } from "lucide-react"
-import type { Team } from "@/lib/types/team"
 
 interface ServiceAssignment {
   id: string
@@ -49,6 +53,45 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  const handlePrint = async (assignment: ServiceAssignment) => {
+    try {
+      // Fetch full assignment data
+      const assignmentDoc = await getDoc(doc(db, "service_assignments", assignment.id))
+      if (!assignmentDoc.exists()) {
+        console.error("Assignment not found")
+        return
+      }
+      const fullAssignmentData: any = { id: assignmentDoc.id, ...assignmentDoc.data() }
+
+      // Fetch job order if present
+      let jobOrderData = null
+      if (fullAssignmentData.jobOrderId) {
+        const jobOrderDoc = await getDoc(doc(db, "job_orders", fullAssignmentData.jobOrderId))
+        if (jobOrderDoc.exists()) {
+          jobOrderData = { id: jobOrderDoc.id, ...jobOrderDoc.data() }
+        }
+      }
+
+      // Fetch products
+      const productsRef = collection(db, "products")
+      const q = query(productsRef, where("deleted", "==", false), orderBy("name", "asc"), limit(100))
+      const querySnapshot = await getDocs(q)
+      const products: Product[] = []
+      querySnapshot.forEach((doc) => {
+        products.push({ id: doc.id, ...doc.data() } as Product)
+      })
+
+      // Fetch teams
+      const teamsData = await teamsService.getAllTeams()
+      const teams = teamsData.filter((team) => team.status === "active")
+
+      // Generate PDF
+      await generateServiceAssignmentDetailsPDF(fullAssignmentData, jobOrderData, products, teams)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+    }
+  }
 
   // Function to fetch team data for assignments
   const fetchTeamsForAssignments = async (assignmentsData: ServiceAssignment[]) => {
@@ -219,19 +262,19 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => window.print()}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrint(assignment); }}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log("Cancel assignment", assignment.id)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Cancel assignment", assignment.id); }}>
                         <X className="mr-2 h-4 w-4" />
                         Cancel
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log("Set alarm for", assignment.id)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Set alarm for", assignment.id); }}>
                         <Bell className="mr-2 h-4 w-4" />
                         Set an Alarm
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/logistics/reports/create?assignment=${assignment.id}`)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/logistics/reports/create?assignment=${assignment.id}`); }}>
                         <FileText className="mr-2 h-4 w-4" />
                         Create a Report
                       </DropdownMenuItem>
