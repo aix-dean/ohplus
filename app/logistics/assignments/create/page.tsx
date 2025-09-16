@@ -35,12 +35,12 @@ import { useToast } from "@/hooks/use-toast"
 
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
-import { JobOrderListDialog } from "@/components/job-order-list-dialog"
+import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
 
 
 // Service types as provided
-const SERVICE_TYPES = ["Roll Up", "Roll Down", "Monitoring", "Change Material", "Maintenance"]
+const SERVICE_TYPES = ["Roll Up", "Roll Down", "Monitoring", "Change Material", "Maintenance", "Repair"]
 
 import { CreateServiceAssignmentForm } from '@/components/logistics/assignments/create/CreateServiceAssignmentForm';
 
@@ -61,7 +61,7 @@ export default function CreateServiceAssignmentPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [isEditingDraft, setIsEditingDraft] = useState(false)
   const [draftId, setDraftId] = useState<string | null>(null)
-  const [isJobOrderListDialogOpen, setIsJobOrderListDialogOpen] = useState(false) // State for JobOrderListDialog
+  const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
 
   const [teams, setTeams] = useState<Team[]>([])
@@ -93,6 +93,15 @@ export default function CreateServiceAssignmentPage() {
     alarmTime: "",
     attachments: [] as { name: string; type: string; file?: File }[],
     serviceExpenses: [] as { name: string; amount: string }[],
+    serviceCost: {
+      crewFee: "",
+      overtimeFee: "",
+      transpo: "",
+      tollFee: "",
+      mealAllowance: "",
+      otherFees: [] as { name: string; amount: string }[],
+      total: 0,
+    },
   })
 
   // Auto-set sales field to current user's full name
@@ -223,6 +232,15 @@ export default function CreateServiceAssignmentPage() {
               alarmTime: draftData.alarmTime || "",
               attachments: draftData.attachments || [],
               serviceExpenses: draftData.serviceExpenses || [],
+              serviceCost: {
+                crewFee: "",
+                overtimeFee: "",
+                transpo: "",
+                tollFee: "",
+                mealAllowance: "",
+                otherFees: [],
+                total: 0,
+              },
             })
 
             // Set the SA number from draft
@@ -250,22 +268,56 @@ export default function CreateServiceAssignmentPage() {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
 
-            // Only pre-fill form fields if projectSite parameter is provided or if it's explicitly allowed
-            // If no projectSite parameter, keep fields empty as requested
-            if (initialProjectSite) {
+            // Set the project site from the job order's product_id
+            const productId = fetchedJobOrder.product_id || ""
+            if (productId) {
+              // Helper function to safely parse dates
+              const parseDateSafely = (dateValue: any): Date | null => {
+                if (!dateValue) return null;
+
+                try {
+                  let date: Date;
+
+                  if (dateValue instanceof Date) {
+                    date = dateValue;
+                  } else if (typeof dateValue === 'string') {
+                    date = new Date(dateValue);
+                    if (isNaN(date.getTime())) {
+                      return null;
+                    }
+                  } else if (typeof dateValue === 'number') {
+                    date = new Date(dateValue * 1000);
+                  } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+                    date = new Date(dateValue.seconds * 1000);
+                  } else {
+                    return null;
+                  }
+
+                  if (isNaN(date.getTime())) {
+                    return null;
+                  }
+
+                  return date;
+                } catch (error) {
+                  console.warn('Error parsing date:', dateValue, error);
+                  return null;
+                }
+              };
+
               setFormData((prev) => ({
                 ...prev,
-                projectSite: fetchedJobOrder.product_id || "",
+                projectSite: productId,
                 serviceType: fetchedJobOrder.joType || "",
                 remarks: fetchedJobOrder.remarks || "",
                 message: fetchedJobOrder.message || "",
-                startDate: fetchedJobOrder.dateRequested ? new Date(fetchedJobOrder.dateRequested) : null,
-                endDate: fetchedJobOrder.deadline ? new Date(fetchedJobOrder.deadline) : null,
+                startDate: parseDateSafely(fetchedJobOrder.dateRequested),
+                endDate: parseDateSafely(fetchedJobOrder.deadline),
                 // You might want to pre-fill other fields like assignedTo, crew, etc.
               }))
 
-              // Date inputs are now handled directly as Date objects
             }
+
+            // Date inputs are now handled directly as Date objects
           }
         } catch (error) {
           console.error("Error fetching job order for pre-fill:", error)
@@ -273,7 +325,7 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId, initialProjectSite]) // Rerun when jobOrderId or initialProjectSite changes
+  }, [jobOrderId]) // Rerun when jobOrderId changes
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
@@ -359,7 +411,9 @@ export default function CreateServiceAssignmentPage() {
         remarks: formData.remarks,
         requestedBy: {
           id: user.uid,
-          name: user.displayName || "Unknown User",
+          name: userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.displayName || "Unknown User",
           department: "LOGISTICS",
         },
         message: formData.message,
@@ -373,6 +427,7 @@ export default function CreateServiceAssignmentPage() {
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
+        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
       }
 
       if (isEditingDraft && draftId) {
@@ -423,7 +478,9 @@ export default function CreateServiceAssignmentPage() {
         remarks: formData.remarks,
         requestedBy: {
           id: user.uid,
-          name: user.displayName || "Unknown User",
+          name: userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.displayName || "Unknown User",
           department: "LOGISTICS",
         },
         message: formData.message,
@@ -437,6 +494,7 @@ export default function CreateServiceAssignmentPage() {
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
+        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
       }
 
       if (isEditingDraft && draftId) {
@@ -541,6 +599,15 @@ export default function CreateServiceAssignmentPage() {
       alarmTime: "",
       attachments: [],
       serviceExpenses: [],
+      serviceCost: {
+        crewFee: "",
+        overtimeFee: "",
+        transpo: "",
+        tollFee: "",
+        mealAllowance: "",
+        otherFees: [],
+        total: 0,
+      },
     })
 
     // Generate new SA number
@@ -630,7 +697,39 @@ export default function CreateServiceAssignmentPage() {
     }
 
     // Show the job order selection dialog
-    setIsJobOrderListDialogOpen(true);
+    setIsJobOrderSelectionDialogOpen(true);
+  };
+
+  // Handle job order selection
+  const handleJobOrderSelect = (jobOrder: JobOrder) => {
+    // Navigate to the same page with the selected job order ID
+    router.push(`/logistics/assignments/create?jobOrderId=${jobOrder.id}`);
+  };
+
+  // Handle changing job order
+  const handleChangeJobOrder = () => {
+    setJobOrderData(null);
+    // Clear the jobOrderId from URL
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('jobOrderId');
+    window.history.replaceState({}, '', newUrl.toString());
+
+    // Reset form fields that were auto-filled from job order
+    setFormData(prev => ({
+      ...prev,
+      serviceType: "",
+      remarks: "",
+      message: "",
+      materialSpecs: "",
+      illuminationNits: "",
+      startDate: null,
+      endDate: null,
+      serviceDuration: 0,
+      assignedTo: "",
+      priority: "",
+    }));
+
+    setIsJobOrderSelectionDialogOpen(true);
   };
 
   if (fetchingProducts) {
@@ -649,9 +748,12 @@ export default function CreateServiceAssignmentPage() {
       {/* Header */}
 
       <div className="flex items-center gap-2">
-        <Link href="/logistics/assignments" className="inline-flex items-center text-gray-600 hover:text-gray-800">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center text-gray-600 hover:text-gray-800"
+        >
           <ArrowLeft className="h-5 w-5" />
-        </Link>
+        </button>
         <h1 className="text-xl font-semibold text-gray-800">
           {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
         </h1>
@@ -676,6 +778,7 @@ export default function CreateServiceAssignmentPage() {
         calculateTotal={calculateTotal}
         onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
         onIdentifyJO={handleIdentifyJO}
+        onChangeJobOrder={handleChangeJobOrder}
       />
 
 
@@ -723,6 +826,15 @@ export default function CreateServiceAssignmentPage() {
         open={isProductSelectionDialogOpen}
         onOpenChange={setIsProductSelectionDialogOpen}
         onSelectProduct={handleProductSelect}
+      />
+
+      <JobOrderSelectionDialog
+        open={isJobOrderSelectionDialogOpen}
+        onOpenChange={setIsJobOrderSelectionDialogOpen}
+        productId={formData.projectSite}
+        companyId={userData?.company_id || ""}
+        onSelectJobOrder={handleJobOrderSelect}
+        selectedJobOrderId={jobOrderId}
       />
     </section>
   )

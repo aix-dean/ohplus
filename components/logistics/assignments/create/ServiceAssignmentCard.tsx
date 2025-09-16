@@ -20,7 +20,8 @@ import type { Team } from "@/lib/types/team";
 import { useToast } from "@/hooks/use-toast";
 import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
 
-// New component for displaying Job Order details JO#:
+/*
+// New component for displaying Job Order details JO#: change
 function JobOrderDetailsCard({
   jobOrder,
   onHide,
@@ -45,7 +46,7 @@ function JobOrderDetailsCard({
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span className="text-2xl font-bold">JOB ORDER</span>
+          <span className="text-2xl font-bold">JOB ORDERs</span>
           <Button variant="ghost" size="sm" onClick={onHide}>
             <X className="h-5 w-5" />
           </Button>
@@ -99,13 +100,15 @@ function JobOrderDetailsCard({
           <Label className="w-1/2">Requested by:</Label>
           <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
         </div>
-        <div className="flex justify-end">
+          <div className="flex justify-end">
           <Button variant="link" size="sm" onClick={onChange}>Change</Button>
         </div>
+
       </CardContent>
     </Card>
   );
 }
+*/
 
 interface FormData {
   projectSite: string;
@@ -177,6 +180,14 @@ export function ServiceAssignmentCard({
     }));
   }, []);
 
+  // Auto-show job order details when jobOrderData is present
+  useEffect(() => {
+    if (jobOrderData && !showJobOrderDetails) {
+      setSelectedJobOrder(jobOrderData);
+      setShowJobOrderDetails(true);
+    }
+  }, [jobOrderData, showJobOrderDetails]);
+
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
     const duration = calculateServiceDuration(formData.startDate, formData.endDate, formData.serviceType);
@@ -232,8 +243,8 @@ export function ServiceAssignmentCard({
 
   // Helper function to calculate service duration
   const calculateServiceDuration = (startDate: Date | null, endDate: Date | null, serviceType: string): number => {
-    // For monitoring and maintenance, duration is typically 1 day
-    if (["Monitoring", "Maintenance"].includes(serviceType)) {
+    // For monitoring, maintenance, and repair, duration is typically 1 day
+    if (["Monitoring", "Maintenance", "Repair"].includes(serviceType)) {
       return 1;
     }
 
@@ -322,7 +333,7 @@ export function ServiceAssignmentCard({
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-[90%]">
       <CardHeader>
         <CardTitle>
           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
@@ -346,7 +357,7 @@ export function ServiceAssignmentCard({
         </CardTitle>
       </CardHeader>
       <div className="flex flex-col lg:flex-row gap-4 p-4">
-        <div className="flex flex-col gap-4 w-full lg:w-1/2">
+        <div className="flex flex-col gap-4 w-full lg:w-[70%]">
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col text-sm">
               <p>SA#: {saNumber}</p>
@@ -370,12 +381,13 @@ export function ServiceAssignmentCard({
                   <SelectItem value="Monitoring">Monitoring</SelectItem>
                   <SelectItem value="Change Material">Change Material</SelectItem>
                   <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  <SelectItem value="Repair">Repair</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Campaign Name - Row Layout */}
-            {formData.serviceType !== "Maintenance" && (
+            {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
               <div className="flex items-center space-x-4">
                 <Label htmlFor="campaignName" className="w-32 flex-shrink-0">Campaign Name:</Label>
                 <Input
@@ -391,7 +403,7 @@ export function ServiceAssignmentCard({
             {/* Service Start Date - Row Layout */}
             <div className="flex items-center space-x-4">
               <Label className="w-32 flex-shrink-0">
-                {["Monitoring", "Maintenance"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
+                {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
               </Label>
               <div className="flex-1">
                 <Popover>
@@ -474,7 +486,7 @@ export function ServiceAssignmentCard({
               </div>
             </div>
 
-            {!["Monitoring", "Change Material", "Maintenance"].includes(formData.serviceType) && (
+            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
                 <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">Material Specs:</Label>
                 <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
@@ -563,7 +575,7 @@ export function ServiceAssignmentCard({
               </Select>
             </div>
 
-            {!["Monitoring", "Change Material", "Maintenance"].includes(formData.serviceType) && (
+            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
                 <Label className="w-32 flex-shrink-0">Illumination/Nits:</Label>
                 <Input
@@ -575,7 +587,7 @@ export function ServiceAssignmentCard({
               </div>
             )}
 
-            {!["Monitoring", "Maintenance"].includes(formData.serviceType) && (
+            {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
                 <Label className="w-32 flex-shrink-0">Gondola:</Label>
                 <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
@@ -590,7 +602,7 @@ export function ServiceAssignmentCard({
               </div>
             )}
 
-            {!["Monitoring", "Maintenance"].includes(formData.serviceType) && (
+            {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
                 <Label className="w-32 flex-shrink-0">Logistics:</Label>
                 <Input
@@ -603,7 +615,9 @@ export function ServiceAssignmentCard({
             )}
           </CardContent>
         </div>
-        <div className="flex flex-col gap-4 w-full lg:w-1/2">
+        <div className="flex flex-col gap-4 w-full lg:w-[30%]">
+           {/* Job order details are now shown in the sidebar */}
+           {/*
            {showJobOrderDetails && selectedJobOrder && (
              <JobOrderDetailsCard
                jobOrder={selectedJobOrder}
@@ -611,10 +625,13 @@ export function ServiceAssignmentCard({
                onChange={handleChangeJobOrder}
              />
            )}
+           */}
          </div>
-      </div>
+       </div>
 
-      {/* Job Order Selection Dialog */}
+
+
+       {/* Job Order Selection Dialog */}
       <JobOrderSelectionDialog
         open={showJobOrderSelectionDialog}
         onOpenChange={setShowJobOrderSelectionDialog}
