@@ -13,8 +13,6 @@ export interface SpecsRental {
   location?: string // e.g., "manila"
   traffic_count?: number
   type?: string // e.g., "RENTAL"
-  height?: number // Billboard height in feet/meters
-  width?: number // Billboard width in feet/meters
 }
 
 export interface QuotationProduct {
@@ -56,7 +54,7 @@ export interface ClientCompliance {
 }
 
 export interface ProjectComplianceItem {
-  completed: boolean
+  completed?: boolean
   fileName: string | null
   fileUrl: string | null
   notes: string | null
@@ -68,7 +66,7 @@ export interface ProjectComplianceItem {
 export interface ProjectCompliance {
   finalArtwork: ProjectComplianceItem
   paymentAsDeposit: ProjectComplianceItem
-  poMo: ProjectComplianceItem
+  irrevocablePo: ProjectComplianceItem
   signedContract: ProjectComplianceItem
   signedQuotation: ProjectComplianceItem
 }
@@ -99,10 +97,12 @@ export interface Quotation {
   campaignId?: string
   proposalId?: string
   company_id?: string // Added company ID
+  page_id?: string // Added page ID for grouping related quotations
+  page_number?: number // Added page number for ordering within a page group
   valid_until?: any // Firebase Timestamp
   seller_id?: string
   product_id?: string // Added to support legacy single product quotations
-  items: QuotationProduct[] // Renamed from 'products' to 'items'
+  items: QuotationProduct // Renamed from 'products' to 'items'
   projectCompliance?: ProjectCompliance
   client_compliance?: ClientCompliance // Added client compliance
 }

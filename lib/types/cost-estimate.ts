@@ -7,7 +7,6 @@ export type CostEstimateClient = ProposalClient
 
 export interface CostEstimateLineItem {
   id: string
-  product_id?: string // Added to match quotation structure
   description: string
   quantity: number
   unitPrice: number
@@ -16,23 +15,11 @@ export interface CostEstimateLineItem {
   notes?: string
   image?: string // Added optional image field for product images
   specs?: SpecsRental // Added specs field to match quotation structure
-  content_type?: string
-  site_code?: string // Added to match quotation structure
-  health_percentage?: number // Added to match quotation structure
-  light?: boolean // Added to match quotation structure
-  media?: any[] // Added to match quotation structure
-  media_url?: string // Added to match quotation structure
-  duration_days?: number // Added to match quotation structure
-  item_total_amount?: number // Added to match quotation structure
-  height?: number // Added to match quotation structure
-  width?: number // Added to match quotation structure
-  site_type?: string // Added to match quotation structure
 }
 
 export interface CostEstimate {
   id: string
   proposalId: string | null // Nullable if it's a direct cost estimate
-  quotationId?: string | null // Link to quotation if created from quotation
   costEstimateNumber: string // New field for CE + currentmillis
   title: string
   client: ProposalClient // Reusing ProposalClient type for consistency
