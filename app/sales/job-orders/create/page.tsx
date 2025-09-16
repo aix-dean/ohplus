@@ -1883,16 +1883,20 @@ export default function CreateJobOrderPage() {
                                 height={100}
                                 className="rounded-md object-cover shadow-md"
                               />
-                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                              </div>
+                              {jobOrderForms[0]?.joType === "Change Material" && (
+                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="relative inline-block">
                               <FileText className="h-20 w-20 text-blue-600" />
-                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                              </div>
+                              {jobOrderForms[0]?.joType === "Change Material" && (
+                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                                </div>
+                              )}
                             </div>
                           )}
                           
@@ -1937,9 +1941,11 @@ export default function CreateJobOrderPage() {
                             ) : (
                               <ImageIcon  className="h-20 w-20 text-white" />
                             )}
-                            <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                              <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                            </div>
+                            {jobOrderForms[0]?.joType === "Change Material" && (
+                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
+                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
+                              </div>
+                            )}
                             <span className="text-xs mt-1">
                               {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
                             </span>
@@ -1950,12 +1956,14 @@ export default function CreateJobOrderPage() {
                         <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
                       )}
                     </div>
-                    <div className="flex items-center justify-center">
-                      <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
-                    </div>
+                    {jobOrderForms[0]?.joType === "Change Material" && (
+                      <>
+                        <div className="flex items-center justify-center">
+                          <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
+                        </div>
 
-                    {/* new upload*/}
-                    <div className="flex flex-col items-center gap-2">
+                        {/* new upload*/}
+                        <div className="flex flex-col items-center gap-2">
                       <input
                         type="file"
                         id="attachment-upload-0"
@@ -2010,7 +2018,9 @@ export default function CreateJobOrderPage() {
                       {jobOrderForms[0]?.attachmentError && (
                         <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
                       )}
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
