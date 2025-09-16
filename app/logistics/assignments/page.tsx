@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
-import { Plus, Filter, Search } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -12,8 +12,9 @@ export default function ServiceAssignmentsPage() {
   const router = useRouter()
   const { userData } = useAuth()
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
-  const handleSelectAssignment = async (id) => {
+  const handleSelectAssignment = async (id: string) => {
     router.push(`/logistics/service-assignments/${id}`)
   }
 
@@ -34,17 +35,23 @@ export default function ServiceAssignmentsPage() {
       </header>
 
       <main className="p-4">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <div className="relative w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input placeholder="Search assignments..." className="pl-8" />
+            <Input
+              placeholder="Search assignments..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="mr-2 h-4 w-4" /> Filter
-          </Button>
         </div>
 
-        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} companyId={userData?.company_id} />
+        <ServiceAssignmentsTable
+          onSelectAssignment={handleSelectAssignment}
+          companyId={userData?.company_id || undefined}
+          searchQuery={searchQuery}
+        />
       </main>
     </div>
   )

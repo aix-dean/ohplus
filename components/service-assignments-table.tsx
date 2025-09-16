@@ -40,9 +40,10 @@ interface ServiceAssignment {
 interface ServiceAssignmentsTableProps {
   onSelectAssignment?: (id: string) => void
   companyId?: string
+  searchQuery?: string
 }
 
-export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
+export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQuery }: ServiceAssignmentsTableProps) {
   const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [teams, setTeams] = useState<Record<string, Team>>({})
@@ -135,10 +136,15 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
     }
   }
 
-  // Filter assignments based on status
+  // Filter assignments based on status and search
   const filteredAssignments = assignments.filter(assignment => {
-    if (statusFilter === "all") return true
-    return assignment.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || assignment.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesSearch = !searchQuery ||
+      assignment.saNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.projectSiteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.serviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (assignment.message && assignment.message.toLowerCase().includes(searchQuery.toLowerCase()))
+    return matchesStatus && matchesSearch
   })
 
   if (loading) {
