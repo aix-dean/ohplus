@@ -125,6 +125,7 @@ export interface ServiceAssignment {
   alarmDate: Date | null
   alarmTime: string
   attachments: { name: string; type: string }[]
+  serviceExpenses: { name: string; amount: string }[]
   status: string
   created: any
   updated: any
