@@ -768,7 +768,9 @@ export default function CreateJobOrderPage() {
                 ? `${quotation.items.width}x${quotation.items.height}ft`
                 : "N/A") || "N/A", // Use quotation items height and width
             siteIllumination: quotation.items?.light ? "Yes" : "No", // Use quotation items light as boolean
-            illumination: products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
+            illumination: typeof products[0]?.specs_rental?.illumination === 'object'
+              ? "Custom Illumination Setup"
+              : products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
             leaseRatePerMonth:
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
