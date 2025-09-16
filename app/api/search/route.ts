@@ -3,6 +3,10 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   console.log("Search API route called")
 
+  // Default values for pagination
+  let page = 0
+  let hitsPerPage = 10
+
   try {
     // Parse the request body
     let query = ""
@@ -13,6 +17,8 @@ export async function POST(request: Request) {
       query = body.query || ""
       filters = body.filters
       indexName = body.indexName
+      page = body.page || 0
+      hitsPerPage = body.hitsPerPage || 10
     } catch (error) {
       console.error("Error parsing request body:", error)
       return NextResponse.json(
@@ -20,9 +26,9 @@ export async function POST(request: Request) {
           error: "Invalid request body",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query: "",
         },
@@ -39,9 +45,9 @@ export async function POST(request: Request) {
           error: "Query parameter is required and must be a string",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query: "",
         },
@@ -71,9 +77,9 @@ export async function POST(request: Request) {
           error: "Algolia configuration is incomplete. Please check your environment variables.",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query,
         },
@@ -101,7 +107,8 @@ export async function POST(request: Request) {
 
     const searchParams: any = {
       query,
-      hitsPerPage: "50", // More for assignments
+      hitsPerPage: hitsPerPage.toString(),
+      page: page.toString(),
       attributesToRetrieve,
       attributesToHighlight,
     }
@@ -133,9 +140,9 @@ export async function POST(request: Request) {
           details: errorText,
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query,
         },
@@ -157,9 +164,9 @@ export async function POST(request: Request) {
         details: error instanceof Error ? error.message : "Unknown error",
         hits: [],
         nbHits: 0,
-        page: 0,
+        page: page,
         nbPages: 0,
-        hitsPerPage: 0,
+        hitsPerPage: hitsPerPage,
         processingTimeMS: 0,
         query: "",
       },
