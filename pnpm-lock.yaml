@@ -177,13 +177,21 @@ importers:
         specifier: ^19
         version: 19.0.0(react@19.0.0)
       react-dropzone:
+<<<<<<< HEAD
         specifier: latest
+=======
+        specifier: ^14.3.8
+>>>>>>> develop
         version: 14.3.8(react@19.0.0)
       react-hook-form:
         specifier: latest
         version: 7.62.0(react@19.0.0)
       react-pdf:
+<<<<<<< HEAD
         specifier: latest
+=======
+        specifier: ^10.1.0
+>>>>>>> develop
         version: 10.1.0(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       react-resizable-panels:
         specifier: latest

@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import type { QuotationProduct, ProjectCompliance, ClientCompliance } from "@/lib/types/quotation"
 
 // Initialize Firebase Storage
 const storage = getStorage()
@@ -125,6 +126,7 @@ export interface ServiceAssignment {
   alarmDate: Date | null
   alarmTime: string
   attachments: { name: string; type: string }[]
+  serviceExpenses: { name: string; amount: string }[]
   status: string
   created: any
   updated: any
@@ -190,28 +192,34 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
+  start_date?: Date | any // Made optional - supports both string and Timestamp
+  end_date?: Date | any // Made optional - supports both string and Timestamp
   total_amount: number
-  duration_days: number
+  duration_days: number // Overall duration for the quotation
   notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
-  created: any
-  updated?: any
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" | "reserved"
+  created: any // Firebase Timestamp
+  updated?: any // Firebase Timestamp
   created_by?: string
   created_by_first_name?: string
   created_by_last_name?: string
   client_name?: string
   client_email?: string
-  client_id?: string // Added client_id
+  client_id?: string
+  client_company_id?: string // Added client company ID
+  client_company_name?: string // Added client company name
+  client_designation?: string // Added client designation
+  client_address?: string // Added client address
+  client_phone?: string // Added client phone
   campaignId?: string
   proposalId?: string
-  valid_until?: any
+  company_id?: string // Added company ID
+  valid_until?: any // Firebase Timestamp
+  seller_id?: string
+  product_id?: string // Added to support legacy single product quotations
+  items: QuotationProduct // Changed from array to single object
+  projectCompliance?: ProjectCompliance
+  client_compliance?: ClientCompliance // Added client compliance
 }
 
 // PaginatedResult interface

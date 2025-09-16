@@ -30,13 +30,9 @@ import {
   Save,
   X,
   Building,
-  History,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
-import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
-import { getProposalActivities } from "@/lib/proposal-activity-service"
-import type { ProposalActivity } from "@/lib/types/proposal-activity"
 import {
   Dialog,
   DialogContent,
@@ -165,8 +161,6 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [proposal, setProposal] = useState<Proposal | null>(null)
-  const [activities, setActivities] = useState<ProposalActivity[]>([])
-  const [timelineOpen, setTimelineOpen] = useState(false)
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [ccEmail, setCcEmail] = useState("")
@@ -209,7 +203,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         endDate.setDate(startDate.getDate() + durationDays - 1)
 
         // Update pricing based on new duration
-        const price = editableQuotation.items?.[0]?.price || 0
+        const price = editableQuotation.items?.price || 0
         const dailyRate = price / 30
         const newTotalAmount = dailyRate * durationDays
 
@@ -217,10 +211,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           ...editableQuotation,
           duration_days: durationDays,
           end_date: endDate.toISOString(),
-          items:
-            editableQuotation.items?.map((item, index) =>
-              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
-            ) || [],
+          items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
 
         // Update temp values for contract period
@@ -240,7 +231,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
 
         // Update pricing based on new duration
-        const price = editableQuotation.items?.[0]?.price || 0
+        const price = editableQuotation.items?.price || 0
         const dailyRate = price / 30
         const newTotalAmount = dailyRate * durationDays
 
@@ -248,10 +239,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           ...editableQuotation,
           [fieldName]: newValue.toISOString(),
           duration_days: durationDays,
-          items:
-            editableQuotation.items?.map((item, index) =>
-              index === 0 ? { ...item, duration_days: durationDays, item_total_amount: newTotalAmount } : item,
-            ) || [],
+          items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
 
         // Update temp values for duration
@@ -260,16 +248,14 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           [fieldName]: newValue,
           duration_days: durationDays,
         }))
-      } else if (fieldName === "price" && editableQuotation.items?.[0]) {
-        const durationDays = editableQuotation.items[0].duration_days || 32
+      } else if (fieldName === "price" && editableQuotation.items) {
+        const durationDays = editableQuotation.items.duration_days || 32
         const dailyRate = newValue / 30 // Convert monthly price to daily rate
         const newTotalAmount = dailyRate * durationDays
 
         setEditableQuotation({
           ...editableQuotation,
-          items: editableQuotation.items.map((item, index) =>
-            index === 0 ? { ...item, price: newValue, item_total_amount: newTotalAmount } : item,
-          ),
+          items: { ...editableQuotation.items, price: newValue, item_total_amount: newTotalAmount },
         })
       } else {
         setEditableQuotation({
@@ -281,11 +267,11 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   }
 
   const fetchQuotationHistory = useCallback(async () => {
-    if (!quotation?.items?.[0]?.id || !quotation?.company_id) return
+    if (!quotation?.items?.product_id || !quotation?.company_id) return
 
     setLoadingHistory(true)
     try {
-      const productId = quotation.items[0].id
+      const productId = quotation.items.product_id
       const companyId = quotation.company_id
       const history = await getQuotationsByProductIdAndCompanyId(productId, companyId)
       // Filter out current quotation from history
@@ -296,7 +282,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     } finally {
       setLoadingHistory(false)
     }
-  }, [quotation?.items?.[0]?.id, quotation?.company_id, quotation?.id])
+  }, [quotation?.items?.product_id, quotation?.company_id, quotation?.id])
 
   const fetchCompanyData = useCallback(async () => {
     if (!user || !userData) {
@@ -338,7 +324,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         if (q) {
           console.log("[v0] Loaded quotation data:", q)
           console.log("[v0] Items array:", q.items)
-          console.log("[v0] First item:", q.items?.[0])
+          console.log("[v0] Item:", q.items)
 
           setQuotation(q)
           setEditableQuotation({ ...q }) // Create proper deep copy
@@ -349,8 +335,28 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
             const linkedProposal = await getProposal(q.proposalId)
             setProposal(linkedProposal)
           }
-          const qActivities = await getProposalActivities(quotationId) // Use quotationId
-          setActivities(qActivities)
+
+          // Fetch related quotations if this quotation has a page_id
+          if (q.page_id) {
+            console.log("[v0] Fetching related quotations for page_id:", q.page_id)
+            const relatedCEs = await getQuotationsByPageId(q.page_id)
+            console.log("[v0] Related quotations found:", relatedCEs.length, relatedCEs)
+
+            // Sort all quotations by page_number (including current)
+            const sortedRelated = relatedCEs.sort((a, b) => (a.page_number || 0) - (b.page_number || 0))
+
+            setRelatedQuotations(sortedRelated)
+
+            // Find current page index based on the current quotation's ID
+            const currentIndex = sortedRelated.findIndex((ce) => ce.id === q.id)
+            console.log("[v0] Current page index:", currentIndex)
+            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+          } else {
+            console.log("[v0] No page_id found for this quotation")
+            setRelatedQuotations([])
+            setCurrentPageIndex(0)
+          }
+
         } else {
           toast({
             title: "Quotation Not Found", // Updated title
@@ -383,7 +389,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   }, [user, userData, fetchCompanyData])
 
   useEffect(() => {
-    if (quotation?.items?.[0]?.id) {
+    if (quotation?.items?.product_id) {
       fetchQuotationHistory()
     }
   }, [fetchQuotationHistory])
@@ -418,7 +424,7 @@ The OH Plus Team`,
 
   const getCurrentItem = () => {
     const currentQuotation = getCurrentQuotation()
-    return currentQuotation?.items?.[0] || null
+    return currentQuotation?.items || null
   }
 
   const handleEditClick = () => {
@@ -527,21 +533,12 @@ The OH Plus Team`,
         })
       } else {
         // Single quotation - check if it has multiple items
-        if (quotation.items && quotation.items.length > 1) {
-          console.log("[v0] Downloading separate PDFs for multiple items:", quotation.items.length)
-          await generateSeparateQuotationPDFs(quotation, companyData)
-          toast({
-            title: "PDFs Generated",
-            description: `${quotation.items.length} separate PDF files have been downloaded for each item.`,
-          })
-        } else {
-          // Single quotation with single item
-          await generateQuotationPDF(quotation, companyData)
-          toast({
-            title: "Success",
-            description: "PDF downloaded successfully",
-          })
-        }
+        // Single quotation with single item
+        await generateQuotationPDF(quotation, companyData)
+        toast({
+          title: "Success",
+          description: "PDF downloaded successfully",
+        })
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
@@ -614,11 +611,11 @@ The OH Plus Team`,
     }
   }
 
-  const renderQuotationBlock = (siteName: string, items: QuotationProduct[], pageNumber: number) => {
+  const renderQuotationBlock = (siteName: string, items: QuotationProduct, pageNumber: number) => {
     const currentQuotation = editableQuotation || quotation
     if (!currentQuotation) return null
 
-    const item = items[0]
+    const item = items
     const monthlyRate = item?.price || 0
     const durationMonths = Math.ceil((Number(item?.duration_days) || 40) / 30)
     const totalLease = monthlyRate * durationMonths
@@ -645,7 +642,7 @@ The OH Plus Team`,
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{items[0]?.name || "Site Name"}</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"}</h1>
         </div>
 
         {/* Greeting */}
@@ -770,7 +767,7 @@ The OH Plus Team`,
                   value={tempValues.price || ""}
                   onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
                   className="w-32 h-6 text-sm"
-                  placeholder={items[0]?.price?.toString() || "0.00"}
+                  placeholder={item?.price?.toString() || "0.00"}
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>
@@ -784,7 +781,7 @@ The OH Plus Team`,
                 onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
                 title={isEditing ? "Click to edit lease rate" : ""}
               >
-                : PHP {safeFormatNumber(items[0]?.price || 0)} (Exclusive of VAT)
+                : PHP {safeFormatNumber(item?.price || 0)} (Exclusive of VAT)
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
@@ -796,8 +793,8 @@ The OH Plus Team`,
             <span className="text-gray-700">
               : PHP{" "}
               {safeFormatNumber(
-                isEditing && editableQuotation?.items?.[0]?.item_total_amount
-                  ? editableQuotation.items[0].item_total_amount
+                isEditing && editableQuotation?.items?.item_total_amount
+                  ? editableQuotation.items.item_total_amount
                   : item?.item_total_amount || 0,
               )}{" "}
               (Exclusive of VAT)
@@ -810,20 +807,20 @@ The OH Plus Team`,
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-700">Lease rate per month</span>
-              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.price || 0)}</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(item?.price || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">x {formatDuration(currentQuotation.duration_days || 180)}</span>
-              <span className="text-gray-900">PHP {safeFormatNumber(items[0]?.item_total_amount || 0)}</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(item?.item_total_amount || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">12% VAT</span>
-              <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 0.12)}</span>
+              <span className="text-gray-900">PHP {safeFormatNumber((item?.item_total_amount || 0) * 0.12)}</span>
             </div>
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between font-bold text-lg">
                 <span className="text-gray-900">TOTAL</span>
-                <span className="text-gray-900">PHP {safeFormatNumber((items[0]?.item_total_amount || 0) * 1.12)}</span>
+                <span className="text-gray-900">PHP {safeFormatNumber((item?.item_total_amount || 0) * 1.12)}</span>
               </div>
             </div>
           </div>
@@ -930,7 +927,7 @@ The OH Plus Team`,
   }
 
   const currentQuotation = isEditing ? editableQuotation : quotation
-  const hasMultipleSites = currentQuotation?.items && currentQuotation.items.length > 1
+  const hasMultipleSites = false
 
   const handleSendClick = () => {
     setIsSendOptionsDialogOpen(true)
@@ -963,17 +960,6 @@ The OH Plus Team`,
             </Badge>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Button
-              onClick={() => setTimelineOpen(true)}
-              variant="outline"
-              size="sm"
-              className="border-blue-300 text-blue-700 hover:bg-blue-50"
-            >
-              <History className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Activity</span>
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -1035,17 +1021,7 @@ The OH Plus Team`,
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
             </div>
-            {hasMultipleSites ? (
-              <>
-                {renderQuotationBlock(
-                  `Site ${currentProductIndex + 1}`,
-                  [currentQuotation.items[currentProductIndex]],
-                  currentProductIndex + 1,
-                )}
-              </>
-            ) : (
-              renderQuotationBlock("Single Site", currentQuotation?.items || [], 1)
-            )}
+            {renderQuotationBlock("Single Site", currentQuotation?.items, 1)}
 
             {proposal && (
               <div className="p-6 sm:p-8 border-t border-gray-200">
@@ -1076,7 +1052,7 @@ The OH Plus Team`,
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Quotation History</h3>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {quotation?.items?.[0]?.name || "Product"}
+                {quotation?.items?.name || "Product"}
               </div>
             </div>
 
@@ -1096,7 +1072,7 @@ The OH Plus Team`,
                       {historyItem.quotation_number || historyItem.id?.slice(-8) || "N/A"}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {safeFormatNumber(historyItem.items?.[0]?.item_total_amount || historyItem.total_amount || 0)}
+                      PHP {safeFormatNumber(historyItem.items?.item_total_amount || historyItem.total_amount || 0)}
                       /month
                     </div>
                     <div className="flex justify-end">
@@ -1108,18 +1084,6 @@ The OH Plus Team`,
                     </div>
                   </div>
                 ))}
-                {currentQuotation.client_phone && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_phone)}</p>
-                  </div>
-                )}
-                {currentQuotation.client_address && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500 mb-2">Address</Label>
-                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_address)}</p>
-                  </div>
-                )}
                 {currentQuotation.quotation_request_id && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
@@ -1236,20 +1200,6 @@ The OH Plus Team`,
         </div>
       )}
 
-      {/* Activity Timeline Dialog */}
-      <Dialog open={timelineOpen} onOpenChange={setTimelineOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Quotation Activity Timeline</DialogTitle>
-            <DialogDescription>Track all activities and changes for this quotation.</DialogDescription>
-          </DialogHeader>
-          <ProposalActivityTimeline
-            proposalId={quotationId}
-            currentUserId={user?.uid || ""}
-            currentUserName={`${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || "User"}
-          />
-        </DialogContent>
-      </Dialog>
 
       {quotation && (
         <SendQuotationOptionsDialog
@@ -1356,8 +1306,7 @@ The OH Plus Team`,
       {/* Quotation Sent Success Dialog */}
       <QuotationSentSuccessDialog
         isOpen={showSuccessDialog}
-        onClose={() => setShowSuccessDialog(false)}
-        clientName={quotation?.client_name || "Client"}
+        onDismissAndNavigate={() => setShowSuccessDialog(false)}
       />
     </div>
   )

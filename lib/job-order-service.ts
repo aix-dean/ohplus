@@ -76,14 +76,39 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
     }
     const quotation = { id: quotationDocSnap.id, ...quotationDocSnap.data() } as Quotation
     console.log("[getQuotationDetailsForJobOrder] Fetched raw quotation:", quotation) // Log raw quotation
+    console.log("[getQuotationDetailsForJobOrder] quotation.items:", quotation.items)
+    console.log("[getQuotationDetailsForJobOrder] quotation.items type:", typeof quotation.items)
+    console.log("[getQuotationDetailsForJobOrder] Array.isArray(quotation.items):", Array.isArray(quotation.items))
+    if (quotation.items && !Array.isArray(quotation.items)) {
+      console.log("[getQuotationDetailsForJobOrder] quotation.items.product_id:", quotation.items.product_id)
+    }
  
      const products: Product[] = []
-    let items: QuotationProduct[] = [] // Use QuotationProduct
+     let items: QuotationProduct[] = [] // Use QuotationProduct
 
-    // Check if quotation has items array (multiple products)
-    if (quotation.items && Array.isArray(quotation.items)) {
+     console.log("[DEBUG] Starting product fetching logic")
+     console.log("[DEBUG] quotation.items exists:", !!quotation.items)
+     console.log("[DEBUG] quotation.items is array:", Array.isArray(quotation.items))
+
+     // Check if quotation has items (single product - new format)
+    if (quotation.items && !Array.isArray(quotation.items) && quotation.items.product_id) {
+      console.log(`[getQuotationDetailsForJobOrder] Found single item in quotation with product_id: ${quotation.items.product_id}`)
+      items = [quotation.items] // Convert single item to array for consistency
+
+      // Fetch the product
+      const productDocRef = doc(db, PRODUCTS_COLLECTION, quotation.items.product_id)
+      const productDocSnap = await getDoc(productDocRef)
+      if (productDocSnap.exists()) {
+        const product = { id: productDocSnap.id, ...productDocSnap.data() } as Product
+        products.push(product)
+        console.log("[getQuotationDetailsForJobOrder] Fetched product:", product)
+      } else {
+        console.warn(`[getQuotationDetailsForJobOrder] Product with ID ${quotation.items.product_id} not found.`)
+      }
+    } else if (quotation.items && Array.isArray(quotation.items)) {
+      // Legacy: Check if quotation has items array (multiple products)
       console.log(`[getQuotationDetailsForJobOrder] Found ${quotation.items.length} items in quotation`)
-      items = quotation.items // No need for explicit cast if types align
+      items = quotation.items
 
       // Fetch all products for the items
       for (const item of items) {
@@ -100,8 +125,8 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
           }
         }
       }
-    } else if (quotation.product_id) { // Now product_id exists on Quotation type
-      // Single product (legacy format)
+    } else if (quotation.product_id) {
+      // Legacy: Single product (old format)
       console.log(`[getQuotationDetailsForJobOrder] Fetching single product with ID: ${quotation.product_id}`)
       const productDocRef = doc(db, PRODUCTS_COLLECTION, quotation.product_id)
       const productDocSnap = await getDoc(productDocRef)
