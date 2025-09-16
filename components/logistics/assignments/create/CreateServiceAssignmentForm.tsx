@@ -1,6 +1,9 @@
 import { ServiceAssignmentCard } from './ServiceAssignmentCard';
 import { ServiceExpenseCard } from './ServiceExpenseCard';
 import { ActionButtons } from './ActionButtons';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import type { Product } from "@/lib/firebase-service";
 import type { Team } from "@/lib/types/team";
 import type { JobOrder } from "@/lib/types/job-order";
@@ -25,15 +28,7 @@ interface FormData {
   alarmDate: Date | null;
   alarmTime: string;
   attachments: { name: string; type: string; file?: File }[];
-  serviceCost: {
-    crewFee: string;
-    overtimeFee: string;
-    transpo: string;
-    tollFee: string;
-    mealAllowance: string;
-    otherFees: { name: string; amount: string }[];
-    total: number;
-  };
+  serviceExpenses: { name: string; amount: string }[];
 }
 
 export function CreateServiceAssignmentForm({
@@ -48,12 +43,12 @@ export function CreateServiceAssignmentForm({
   teams,
   saNumber,
   jobOrderData,
-  handleServiceCostChange,
-  addOtherFee,
-  removeOtherFee,
-  updateOtherFee,
-  calculateServiceCostTotal,
+  addExpense,
+  removeExpense,
+  updateExpense,
+  calculateTotal,
   onOpenProductSelection,
+  onIdentifyJO,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -66,12 +61,12 @@ export function CreateServiceAssignmentForm({
   teams: Team[];
   saNumber: string;
   jobOrderData: JobOrder | null;
-  handleServiceCostChange: (field: string, value: string) => void;
-  addOtherFee: () => void;
-  removeOtherFee: (index: number) => void;
-  updateOtherFee: (index: number, field: "name" | "amount", value: string) => void;
-  calculateServiceCostTotal: () => number;
+  addExpense: () => void;
+  removeExpense: (index: number) => void;
+  updateExpense: (index: number, field: "name" | "amount", value: string) => void;
+  calculateTotal: () => number;
   onOpenProductSelection: () => void;
+  onIdentifyJO?: () => void;
 }) {
   return (
     <div className="flex flex-col lg:flex-row gap-6 p-4">
@@ -89,13 +84,22 @@ export function CreateServiceAssignmentForm({
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[30%]">
+        {onIdentifyJO && (
+          <Card className="w-full">
+            <CardContent className="flex justify-center items-center p-4">
+              <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={onIdentifyJO}>
+                <Search className="h-4 w-4 mr-2" />
+                Identify JO
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         <ServiceExpenseCard
-          serviceCost={formData.serviceCost}
-          handleServiceCostChange={handleServiceCostChange}
-          addOtherFee={addOtherFee}
-          removeOtherFee={removeOtherFee}
-          updateOtherFee={updateOtherFee}
-          calculateServiceCostTotal={calculateServiceCostTotal}
+          expenses={formData.serviceExpenses}
+          addExpense={addExpense}
+          removeExpense={removeExpense}
+          updateExpense={updateExpense}
+          calculateTotal={calculateTotal}
         />
         <ActionButtons onSaveAsDraft={onSaveAsDraft} onSubmit={onSubmit} loading={loading} />
       </div>

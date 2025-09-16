@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
@@ -47,6 +48,7 @@ export default function CreateServiceAssignmentPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const initialProjectSite = searchParams.get("projectSite")
   const jobOrderId = searchParams.get("jobOrderId") // Get jobOrderId from query params
 
@@ -90,16 +92,7 @@ export default function CreateServiceAssignmentPage() {
     alarmDate: null as Date | null,
     alarmTime: "",
     attachments: [] as { name: string; type: string; file?: File }[],
-    // Add service cost fields
-    serviceCost: {
-      crewFee: "",
-      overtimeFee: "",
-      transpo: "",
-      tollFee: "",
-      mealAllowance: "",
-      otherFees: [] as { name: string; amount: string }[],
-      total: 0,
-    },
+    serviceExpenses: [] as { name: string; amount: string }[],
   })
 
   // Auto-set sales field to current user's full name
@@ -229,15 +222,7 @@ export default function CreateServiceAssignmentPage() {
               alarmDate: draftData.alarmDate?.toDate() || null,
               alarmTime: draftData.alarmTime || "",
               attachments: draftData.attachments || [],
-              serviceCost: draftData.serviceCost || {
-                crewFee: "",
-                overtimeFee: "",
-                transpo: "",
-                tollFee: "",
-                mealAllowance: "",
-                otherFees: [],
-                total: 0,
-              },
+              serviceExpenses: draftData.serviceExpenses || [],
             })
 
             // Set the SA number from draft
@@ -383,7 +368,7 @@ export default function CreateServiceAssignmentPage() {
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
         attachments: convertAttachmentsForFirestore(formData.attachments),
-        serviceCost: formData.serviceCost,
+        serviceExpenses: formData.serviceExpenses,
         status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
@@ -447,7 +432,7 @@ export default function CreateServiceAssignmentPage() {
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
         attachments: convertAttachmentsForFirestore(formData.attachments),
-        serviceCost: formData.serviceCost,
+        serviceExpenses: formData.serviceExpenses,
         status: "Draft",
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
@@ -488,59 +473,32 @@ export default function CreateServiceAssignmentPage() {
     return options
   }, [])
 
-  // Calculate service cost total
-  const calculateServiceCostTotal = () => {
-    const { crewFee, overtimeFee, transpo, tollFee, mealAllowance, otherFees } = formData.serviceCost
-    const mainTotal = [crewFee, overtimeFee, transpo, tollFee, mealAllowance].reduce(
-      (sum, fee) => sum + (Number.parseFloat(fee) || 0),
-      0,
-    )
-    const otherTotal = otherFees.reduce((sum, fee) => sum + (Number.parseFloat(fee.amount) || 0), 0)
-    return mainTotal + otherTotal
+  // Calculate service expenses total
+  const calculateTotal = () => {
+    return formData.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0)
   }
 
-  // Handle service cost field changes
-  const handleServiceCostChange = (field: string, value: string) => {
+  // Add expense
+  const addExpense = () => {
     setFormData((prev) => ({
       ...prev,
-      serviceCost: {
-        ...prev.serviceCost,
-        [field]: value,
-        total: field === "total" ? Number.parseFloat(value) || 0 : calculateServiceCostTotal(),
-      },
+      serviceExpenses: [...prev.serviceExpenses, { name: "", amount: "" }],
     }))
   }
 
-  // Add other fee
-  const addOtherFee = () => {
+  // Remove expense
+  const removeExpense = (index: number) => {
     setFormData((prev) => ({
       ...prev,
-      serviceCost: {
-        ...prev.serviceCost,
-        otherFees: [...prev.serviceCost.otherFees, { name: "", amount: "" }],
-      },
+      serviceExpenses: prev.serviceExpenses.filter((_, i) => i !== index),
     }))
   }
 
-  // Remove other fee
-  const removeOtherFee = (index: number) => {
+  // Update expense
+  const updateExpense = (index: number, field: "name" | "amount", value: string) => {
     setFormData((prev) => ({
       ...prev,
-      serviceCost: {
-        ...prev.serviceCost,
-        otherFees: prev.serviceCost.otherFees.filter((_, i) => i !== index),
-      },
-    }))
-  }
-
-  // Update other fee
-  const updateOtherFee = (index: number, field: "name" | "amount", value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      serviceCost: {
-        ...prev.serviceCost,
-        otherFees: prev.serviceCost.otherFees.map((fee, i) => (i === index ? { ...fee, [field]: value } : fee)),
-      },
+      serviceExpenses: prev.serviceExpenses.map((expense, i) => (i === index ? { ...expense, [field]: value } : expense)),
     }))
   }
 
@@ -582,15 +540,7 @@ export default function CreateServiceAssignmentPage() {
       alarmDate: null,
       alarmTime: "",
       attachments: [],
-      serviceCost: {
-        crewFee: "",
-        overtimeFee: "",
-        transpo: "",
-        tollFee: "",
-        mealAllowance: "",
-        otherFees: [],
-        total: 0,
-      },
+      serviceExpenses: [],
     })
 
     // Generate new SA number
@@ -611,35 +561,31 @@ export default function CreateServiceAssignmentPage() {
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
         assignedTo: formData.assignedTo,
-        serviceDuration: formData.serviceDuration,
-        priority: formData.priority,
-        equipmentRequired: formData.equipmentRequired,
-        materialSpecs: formData.materialSpecs,
-        crew: formData.crew,
-        illuminationNits: formData.illuminationNits,
-        gondola: formData.gondola,
-        technology: formData.technology,
-        sales: formData.sales,
-        remarks: formData.remarks,
-        requestedBy: {
-          name:
-            userData?.first_name && userData?.last_name
-              ? `${userData.first_name} ${userData.last_name}`
-              : user?.displayName || "Unknown User",
-          department: "LOGISTICS",
-        },
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        alarmDate: formData.alarmDate,
-        alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
-        serviceCost: {
-          ...formData.serviceCost,
-          total: calculateServiceCostTotal(),
-        },
-        status: "Draft",
-        created: new Date(),
         serviceDuration: `${formData.serviceDuration} days`,
+         priority: formData.priority,
+         equipmentRequired: formData.equipmentRequired,
+         materialSpecs: formData.materialSpecs,
+         crew: formData.crew,
+         illuminationNits: formData.illuminationNits,
+         gondola: formData.gondola,
+         technology: formData.technology,
+         sales: formData.sales,
+         remarks: formData.remarks,
+         requestedBy: {
+           name:
+             userData?.first_name && userData?.last_name
+               ? `${userData.first_name} ${userData.last_name}`
+               : user?.displayName || "Unknown User",
+           department: "LOGISTICS",
+         },
+         startDate: formData.startDate,
+         endDate: formData.endDate,
+         alarmDate: formData.alarmDate,
+         alarmTime: formData.alarmTime,
+         attachments: formData.attachments,
+         serviceExpenses: formData.serviceExpenses,
+         status: "Draft",
+         created: new Date(),
       }
 
       if (action === "print") {
@@ -669,6 +615,23 @@ export default function CreateServiceAssignmentPage() {
   const handleProductSelect = (product: Product) => {
     handleInputChange("projectSite", product.id || "")
   }
+
+  // Handle identify JO
+  const handleIdentifyJO = () => {
+    // Check if a product is selected
+    if (!formData.projectSite) {
+      // Show error toast
+      toast({
+        title: "Site Selection Required",
+        description: "Please select a site first before identifying job orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Show the job order selection dialog
+    setIsJobOrderListDialogOpen(true);
+  };
 
   if (fetchingProducts) {
     return (
@@ -707,12 +670,12 @@ export default function CreateServiceAssignmentPage() {
         teams={teams}
         saNumber={saNumber}
         jobOrderData={jobOrderData}
-        handleServiceCostChange={handleServiceCostChange}
-        addOtherFee={addOtherFee}
-        removeOtherFee={removeOtherFee}
-        updateOtherFee={updateOtherFee}
-        calculateServiceCostTotal={calculateServiceCostTotal}
+        addExpense={addExpense}
+        removeExpense={removeExpense}
+        updateExpense={updateExpense}
+        calculateTotal={calculateTotal}
         onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
+        onIdentifyJO={handleIdentifyJO}
       />
 
 

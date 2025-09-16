@@ -185,21 +185,6 @@ export function ServiceAssignmentCard({
     }
   }, [formData.startDate, formData.endDate, formData.serviceType]);
 
-  const handleIdentifyJOClick = () => {
-    // Check if a product is selected
-    if (!productId) {
-      // Show error toast
-      toast({
-        title: "Site Selection Required",
-        description: "Please select a site first before identifying job orders.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Show the job order selection dialog
-    setShowJobOrderSelectionDialog(true);
-  };
 
   // Helper function to safely parse and validate dates
   const parseDateSafely = (dateValue: any): Date | null => {
@@ -525,7 +510,15 @@ export function ServiceAssignmentCard({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">New Material</Label>
-                      <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-full object-cover" />
+                      {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                        <img
+                          src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                          alt="New Material"
+                          className="rounded-md h-32 w-full object-cover"
+                        />
+                      ) : (
+                        <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-full object-cover" />
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -611,22 +604,14 @@ export function ServiceAssignmentCard({
           </CardContent>
         </div>
         <div className="flex flex-col gap-4 w-full lg:w-1/2">
-          {!showJobOrderDetails && (
-            <div className="flex justify-center items-center h-full">
-              <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={handleIdentifyJOClick}>
-                <Search className="h-4 w-4 mr-2" />
-                Identify JO
-              </Button>
-            </div>
-          )}
-          {showJobOrderDetails && selectedJobOrder && (
-            <JobOrderDetailsCard
-              jobOrder={selectedJobOrder}
-              onHide={handleHideJobOrderDetails}
-              onChange={handleChangeJobOrder}
-            />
-          )}
-        </div>
+           {showJobOrderDetails && selectedJobOrder && (
+             <JobOrderDetailsCard
+               jobOrder={selectedJobOrder}
+               onHide={handleHideJobOrderDetails}
+               onChange={handleChangeJobOrder}
+             />
+           )}
+         </div>
       </div>
 
       {/* Job Order Selection Dialog */}
