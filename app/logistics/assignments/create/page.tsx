@@ -417,6 +417,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
@@ -484,6 +485,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,

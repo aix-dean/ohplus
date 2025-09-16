@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -11,16 +11,19 @@ import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreVertical, Printer, X, Bell, FileText } from "lucide-react"
+import type { Team } from "@/lib/types/team"
 
 interface ServiceAssignment {
   id: string
   saNumber: string
+  projectSiteId: string
   projectSiteName: string
   projectSiteLocation: string
   serviceType: string
   assignedTo: string
   jobDescription: string
-  campaignName?: string
+  message: string
+  joNumber?: string
   requestedBy: {
     id: string
     name: string
@@ -30,7 +33,8 @@ interface ServiceAssignment {
   coveredDateStart: any
   coveredDateEnd: any
   created: any
-  company_id: string
+  updated: any
+  company_id?: string | null
 }
 
 interface ServiceAssignmentsTableProps {
@@ -41,8 +45,48 @@ interface ServiceAssignmentsTableProps {
 export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
   const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
+  const [teams, setTeams] = useState<Record<string, Team>>({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  // Function to fetch team data for assignments
+  const fetchTeamsForAssignments = async (assignmentsData: ServiceAssignment[]) => {
+    const teamIds = assignmentsData
+      .map(assignment => assignment.assignedTo)
+      .filter(teamId => teamId && !teams[teamId])
+
+    console.log("Team IDs to fetch:", teamIds)
+
+    if (teamIds.length === 0) return
+
+    const teamPromises = teamIds.map(async (teamId) => {
+      try {
+        console.log(`Fetching team ${teamId}`)
+        const teamDoc = await getDoc(doc(db, "logistics_teams", teamId))
+        if (teamDoc.exists()) {
+          console.log(`Team ${teamId} found:`, teamDoc.data())
+          return { id: teamId, data: teamDoc.data() as Team }
+        } else {
+          console.log(`Team ${teamId} not found in logistics_teams collection`)
+        }
+      } catch (error) {
+        console.error(`Error fetching team ${teamId}:`, error)
+      }
+      return null
+    })
+
+    const teamResults = await Promise.all(teamPromises)
+    const newTeams: Record<string, Team> = {}
+
+    teamResults.forEach(result => {
+      if (result) {
+        newTeams[result.id] = { ...result.data, id: result.id }
+      }
+    })
+
+    console.log("New teams fetched:", newTeams)
+    setTeams(prev => ({ ...prev, ...newTeams }))
+  }
 
   useEffect(() => {
     let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
@@ -52,15 +96,22 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
       q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
     }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
       const assignmentsData: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        console.log(`Assignment ${doc.id} data:`, data)
         assignmentsData.push({
           id: doc.id,
-          ...doc.data(),
+          ...data,
         } as ServiceAssignment)
       })
+      console.log("All assignments data:", assignmentsData)
       setAssignments(assignmentsData)
+
+      // Fetch team data for the assignments
+      await fetchTeamsForAssignments(assignmentsData)
+
       setLoading(false)
     })
 
@@ -133,9 +184,13 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
             </TableRow>
           ) : (
             filteredAssignments.map((assignment) => (
-              <TableRow key={assignment.id} className="cursor-pointer hover:bg-gray-50">
+              <TableRow
+                key={assignment.id}
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}
+              >
                 <TableCell className="font-medium">{assignment.saNumber}</TableCell>
-                <TableCell>{assignment.id.slice(0, 8)}</TableCell>
+                <TableCell>{assignment.joNumber || "N/A"}</TableCell>
                 <TableCell>{assignment.serviceType}</TableCell>
                 <TableCell>{assignment.projectSiteName}</TableCell>
                 <TableCell>
@@ -145,8 +200,8 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                     "Not specified"
                   )}
                 </TableCell>
-                <TableCell>{assignment.campaignName || assignment.jobDescription || "N/A"}</TableCell>
-                <TableCell>{assignment.assignedTo}</TableCell>
+                <TableCell>{assignment.message || assignment.jobDescription || "N/A"}</TableCell>
+                <TableCell>{assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "N/A"}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
                 </TableCell>
