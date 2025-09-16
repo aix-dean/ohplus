@@ -560,7 +560,15 @@ export function ServiceAssignmentCard({
 
             <div className="flex items-center space-x-4">
               <Label htmlFor="crew" className="w-32 flex-shrink-0">Crew:</Label>
-              <Select value={formData.crew} onValueChange={(value) => handleInputChange("crew", value)}>
+              <Select value={formData.crew} onValueChange={(value) => {
+                if (value === "add-new-team") {
+                  // This will be handled by the parent component
+                  handleInputChange("crew", value);
+                } else {
+                  handleInputChange("crew", value);
+                  handleInputChange("assignedTo", value);
+                }
+              }}>
                 <SelectTrigger id="crew" className="flex-1">
                   <SelectValue placeholder="Choose a Crew" />
                 </SelectTrigger>

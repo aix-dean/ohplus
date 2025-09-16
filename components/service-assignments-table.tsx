@@ -1,8 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { generateServiceAssignmentDetailsPDF } from "@/lib/pdf-service"
+import { teamsService } from "@/lib/teams-service"
+import type { Product } from "@/lib/firebase-service"
+import type { JobOrder } from "@/lib/types/job-order"
+import type { Team } from "@/lib/types/team"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
@@ -15,12 +20,14 @@ import { MoreVertical, Printer, X, Bell, FileText } from "lucide-react"
 interface ServiceAssignment {
   id: string
   saNumber: string
+  projectSiteId: string
   projectSiteName: string
   projectSiteLocation: string
   serviceType: string
   assignedTo: string
   jobDescription: string
-  campaignName?: string
+  message: string
+  joNumber?: string
   requestedBy: {
     id: string
     name: string
@@ -30,19 +37,100 @@ interface ServiceAssignment {
   coveredDateStart: any
   coveredDateEnd: any
   created: any
-  company_id: string
+  updated: any
+  company_id?: string | null
 }
 
 interface ServiceAssignmentsTableProps {
   onSelectAssignment?: (id: string) => void
   companyId?: string
+  searchQuery?: string
 }
 
-export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
+export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQuery }: ServiceAssignmentsTableProps) {
   const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
+  const [teams, setTeams] = useState<Record<string, Team>>({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  const handlePrint = async (assignment: ServiceAssignment) => {
+    try {
+      // Fetch full assignment data
+      const assignmentDoc = await getDoc(doc(db, "service_assignments", assignment.id))
+      if (!assignmentDoc.exists()) {
+        console.error("Assignment not found")
+        return
+      }
+      const fullAssignmentData: any = { id: assignmentDoc.id, ...assignmentDoc.data() }
+
+      // Fetch job order if present
+      let jobOrderData = null
+      if (fullAssignmentData.jobOrderId) {
+        const jobOrderDoc = await getDoc(doc(db, "job_orders", fullAssignmentData.jobOrderId))
+        if (jobOrderDoc.exists()) {
+          jobOrderData = { id: jobOrderDoc.id, ...jobOrderDoc.data() }
+        }
+      }
+
+      // Fetch products
+      const productsRef = collection(db, "products")
+      const q = query(productsRef, where("deleted", "==", false), orderBy("name", "asc"), limit(100))
+      const querySnapshot = await getDocs(q)
+      const products: Product[] = []
+      querySnapshot.forEach((doc) => {
+        products.push({ id: doc.id, ...doc.data() } as Product)
+      })
+
+      // Fetch teams
+      const teamsData = await teamsService.getAllTeams()
+      const teams = teamsData.filter((team) => team.status === "active")
+
+      // Generate PDF
+      await generateServiceAssignmentDetailsPDF(fullAssignmentData, jobOrderData, products, teams)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+    }
+  }
+
+  // Function to fetch team data for assignments
+  const fetchTeamsForAssignments = async (assignmentsData: ServiceAssignment[]) => {
+    const teamIds = assignmentsData
+      .map(assignment => assignment.assignedTo)
+      .filter(teamId => teamId && !teams[teamId])
+
+    console.log("Team IDs to fetch:", teamIds)
+
+    if (teamIds.length === 0) return
+
+    const teamPromises = teamIds.map(async (teamId) => {
+      try {
+        console.log(`Fetching team ${teamId}`)
+        const teamDoc = await getDoc(doc(db, "logistics_teams", teamId))
+        if (teamDoc.exists()) {
+          console.log(`Team ${teamId} found:`, teamDoc.data())
+          return { id: teamId, data: teamDoc.data() as Team }
+        } else {
+          console.log(`Team ${teamId} not found in logistics_teams collection`)
+        }
+      } catch (error) {
+        console.error(`Error fetching team ${teamId}:`, error)
+      }
+      return null
+    })
+
+    const teamResults = await Promise.all(teamPromises)
+    const newTeams: Record<string, Team> = {}
+
+    teamResults.forEach(result => {
+      if (result) {
+        newTeams[result.id] = { ...result.data, id: result.id }
+      }
+    })
+
+    console.log("New teams fetched:", newTeams)
+    setTeams(prev => ({ ...prev, ...newTeams }))
+  }
 
   useEffect(() => {
     let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
@@ -52,15 +140,22 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
       q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
     }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
       const assignmentsData: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        console.log(`Assignment ${doc.id} data:`, data)
         assignmentsData.push({
           id: doc.id,
-          ...doc.data(),
+          ...data,
         } as ServiceAssignment)
       })
+      console.log("All assignments data:", assignmentsData)
       setAssignments(assignmentsData)
+
+      // Fetch team data for the assignments
+      await fetchTeamsForAssignments(assignmentsData)
+
       setLoading(false)
     })
 
@@ -84,10 +179,15 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
     }
   }
 
-  // Filter assignments based on status
+  // Filter assignments based on status and search
   const filteredAssignments = assignments.filter(assignment => {
-    if (statusFilter === "all") return true
-    return assignment.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || assignment.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesSearch = !searchQuery ||
+      assignment.saNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.projectSiteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.serviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (assignment.message && assignment.message.toLowerCase().includes(searchQuery.toLowerCase()))
+    return matchesStatus && matchesSearch
   })
 
   if (loading) {
@@ -133,9 +233,13 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
             </TableRow>
           ) : (
             filteredAssignments.map((assignment) => (
-              <TableRow key={assignment.id} className="cursor-pointer hover:bg-gray-50">
+              <TableRow
+                key={assignment.id}
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}
+              >
                 <TableCell className="font-medium">{assignment.saNumber}</TableCell>
-                <TableCell>{assignment.id.slice(0, 8)}</TableCell>
+                <TableCell>{assignment.joNumber || "N/A"}</TableCell>
                 <TableCell>{assignment.serviceType}</TableCell>
                 <TableCell>{assignment.projectSiteName}</TableCell>
                 <TableCell>
@@ -145,8 +249,8 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                     "Not specified"
                   )}
                 </TableCell>
-                <TableCell>{assignment.campaignName || assignment.jobDescription || "N/A"}</TableCell>
-                <TableCell>{assignment.assignedTo}</TableCell>
+                <TableCell>{assignment.message || assignment.jobDescription || "N/A"}</TableCell>
+                <TableCell>{assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "N/A"}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
                 </TableCell>
@@ -158,19 +262,19 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => window.print()}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrint(assignment); }}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log("Cancel assignment", assignment.id)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Cancel assignment", assignment.id); }}>
                         <X className="mr-2 h-4 w-4" />
                         Cancel
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log("Set alarm for", assignment.id)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Set alarm for", assignment.id); }}>
                         <Bell className="mr-2 h-4 w-4" />
                         Set an Alarm
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/logistics/reports/create?assignment=${assignment.id}`)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/logistics/reports/create?assignment=${assignment.id}`); }}>
                         <FileText className="mr-2 h-4 w-4" />
                         Create a Report
                       </DropdownMenuItem>

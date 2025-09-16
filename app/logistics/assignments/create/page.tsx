@@ -214,12 +214,12 @@ export default function CreateServiceAssignmentPage() {
             setFormData({
               projectSite: draftData.projectSiteId || "",
               serviceType: draftData.serviceType || "",
-              assignedTo: draftData.assignedTo || "",
+              assignedTo: draftData.assignedTo || draftData.crew || "",
               serviceDuration: draftData.serviceDuration || "",
               priority: draftData.priority || "",
               equipmentRequired: draftData.equipmentRequired || "",
               materialSpecs: draftData.materialSpecs || "",
-              crew: draftData.crew || "",
+              crew: draftData.crew || draftData.assignedTo || "",
               illuminationNits: draftData.illuminationNits || "",
               gondola: draftData.gondola || "",
               technology: draftData.technology || "",
@@ -391,6 +391,7 @@ export default function CreateServiceAssignmentPage() {
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
 
       const assignmentData = {
         saNumber,
@@ -398,7 +399,8 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo,
+        assignedTo: formData.assignedTo || formData.crew,
+        assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
@@ -417,6 +419,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
@@ -458,6 +461,7 @@ export default function CreateServiceAssignmentPage() {
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
 
       const draftData = {
         saNumber,
@@ -465,7 +469,8 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo,
+        assignedTo: formData.assignedTo || formData.crew,
+        assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
         equipmentRequired: formData.equipmentRequired,
@@ -484,6 +489,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
@@ -813,6 +819,7 @@ export default function CreateServiceAssignmentPage() {
             setTeams((prev) => [...prev, newTeam])
             // Select the new team in the form
             handleInputChange("crew", newTeam.id)
+            handleInputChange("assignedTo", newTeam.id)
             // Close the dialog
             setIsNewTeamDialogOpen(false)
           } catch (error) {
