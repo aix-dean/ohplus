@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { getUsers, getRoles, getUserRoles, assignRoleToUser, removeRoleFromUser } from "@/lib/access-management-service"
 import type { User, Role } from "@/lib/access-management-service"
-import { Search, Shield } from "lucide-react"
+import { Search, Shield, Users } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -86,6 +86,21 @@ export function UserManagement() {
       user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()),
   )
+
+  // Group users by department
+  const usersByDepartment = useMemo(() => {
+    const grouped: Record<string, User[]> = {}
+
+    filteredUsers.forEach((user) => {
+      const department = user.department || "No Department"
+      if (!grouped[department]) {
+        grouped[department] = []
+      }
+      grouped[department].push(user)
+    })
+
+    return grouped
+  }, [filteredUsers])
 
   // Handle editing user roles
   const handleEditRoles = (user: User) => {
@@ -177,35 +192,41 @@ export function UserManagement() {
           <span className="ml-2">Loading users...</span>
         </div>
       ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6">
-                    No users found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.displayName || "No name"}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Object.keys(usersByDepartment).length === 0 ? (
+            <div className="col-span-full text-center py-6">
+              No users found
+            </div>
+          ) : (
+            Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
+              <Card key={department} className="h-fit">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {department}
+                    <Badge variant="secondary" className="ml-auto">
+                      {departmentUsers.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {departmentUsers.map((user) => (
+                    <div key={user.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h4 className="font-medium">{user.displayName || "No name"}</h4>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleEditRoles(user)}>
+                          Edit Roles
+                        </Button>
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         {userRolesMap[user.id]?.length > 0 ? (
                           userRolesMap[user.id].map((roleId) => {
                             const role = roles.find((r) => r.id === roleId)
                             return role ? (
-                              <Badge key={roleId} variant="outline" className="flex items-center gap-1">
+                              <Badge key={roleId} variant="outline" className="flex items-center gap-1 text-xs">
                                 <Shield className="h-3 w-3" />
                                 {role.name}
                               </Badge>
@@ -215,17 +236,12 @@ export function UserManagement() {
                           <span className="text-muted-foreground text-sm">No roles assigned</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleEditRoles(user)}>
-                        Edit Roles
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       )}
 
