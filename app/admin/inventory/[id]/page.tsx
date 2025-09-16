@@ -10,6 +10,9 @@ declare global {
 }
 import { notFound, useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
+import { DayPicker } from "react-day-picker"
+import { format } from "date-fns"
+import "react-day-picker/dist/style.css"
 import {
   Calendar,
   MapPin,
@@ -293,6 +296,33 @@ export default function SiteDetailsPage({ params }: Props) {
   const [complianceEditSuccessDialogOpen, setComplianceEditSuccessDialogOpen] = useState(false)
   const [complianceDeleteSuccessDialogOpen, setComplianceDeleteSuccessDialogOpen] = useState(false)
 
+  // Personnel dialog states
+  const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false)
+  const [personnelForm, setPersonnelForm] = useState({
+    name: '',
+    position: '',
+    contact: '',
+    start_date: new Date()
+  })
+  const [personnelFormError, setPersonnelFormError] = useState('')
+  const [isSubmittingPersonnel, setIsSubmittingPersonnel] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+
+  // View All Personnel dialog state
+  const [viewAllPersonnelDialogOpen, setViewAllPersonnelDialogOpen] = useState(false)
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDatePicker && !(event.target as Element).closest('.date-picker-container')) {
+        setShowDatePicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDatePicker])
+
   // Fetch product data and job orders
   useEffect(() => {
     const fetchData = async () => {
@@ -511,6 +541,70 @@ export default function SiteDetailsPage({ params }: Props) {
   const handleViewHistory = () => {
     setMaintenanceHistoryDialogOpen(true)
     fetchMaintenanceHistory()
+  }
+
+  // Personnel dialog handlers
+  const handleAddPersonnel = async () => {
+    // Clear previous error
+    setPersonnelFormError('')
+
+    // Validation
+    if (!personnelForm.name.trim()) {
+      setPersonnelFormError('Name is required')
+      return
+    }
+    if (!personnelForm.position.trim()) {
+      setPersonnelFormError('Position is required')
+      return
+    }
+    if (!personnelForm.contact.trim()) {
+      setPersonnelFormError('Contact number is required')
+      return
+    }
+
+    if (!product || !userData) {
+      setPersonnelFormError('Missing product or user information')
+      return
+    }
+
+    setIsSubmittingPersonnel(true)
+    try {
+      // Get existing personnel or create empty array
+      const existingPersonnel = Array.isArray(product.personnel) ? product.personnel : []
+
+      // Create new personnel entry with all required fields
+      const uploaderName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email || 'Unknown User'
+      const currentDate = new Date()
+      const newPersonnelEntry = {
+        status: true, // Active by default
+        name: personnelForm.name.trim(),
+        position: personnelForm.position.trim(),
+        contact: personnelForm.contact.trim(),
+        start_date: currentDate, // Current date as start date
+        created: currentDate, // Current date as created date
+        created_by: uploaderName // Current user as creator
+      }
+
+      // Add new personnel to the array
+      const updatedPersonnel = [...existingPersonnel, newPersonnelEntry]
+
+      // Update product with new personnel array
+      await updateProduct(product.id, { personnel: updatedPersonnel })
+
+      // Update local product state
+      setProduct({ ...product, personnel: updatedPersonnel })
+
+      // Reset form and close dialog
+      setPersonnelForm({ name: '', position: '', contact: '', start_date: new Date() })
+      setPersonnelDialogOpen(false)
+      setPersonnelFormError('')
+    } catch (error) {
+      console.error('Error adding personnel:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setPersonnelFormError(`Failed to add personnel: ${errorMessage}. Please try again.`)
+    } finally {
+      setIsSubmittingPersonnel(false)
+    }
   }
 
   if (loading) {
@@ -1250,101 +1344,72 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Crew */}
+ 
+ 
+            {/* Personnel Card Section*/}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle
-                  className="text-base flex items-center"
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '22px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Personnel
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log("Edit crew clicked")}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <CardHeader>
+                <CardTitle>Personnel</CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span
-                      style={{
-                        fontFamily: 'Inter',
-                        fontWeight: 600,
-                        fontSize: '16px',
-                        lineHeight: '120%',
-                        letterSpacing: '0%',
-                        color: '#000000'
-                      }}
-                    >
-                      Security:
-                    </span>{" "}
-                    <span
-                      style={{
-                        fontFamily: 'Inter',
-                        fontWeight: 400,
-                        fontSize: '16px',
-                        lineHeight: '120%',
-                        letterSpacing: '0%',
-                        color: '#333333'
-                      }}
-                    >
-                      {product.specs_rental?.security || ""}
-                    </span>
-                  </div>
-                  <div>
-                    <span
-                      style={{
-                        fontFamily: 'Inter',
-                        fontWeight: 600,
-                        fontSize: '16px',
-                        lineHeight: '120%',
-                        letterSpacing: '0%',
-                        color: '#000000'
-                      }}
-                    >
-                      Caretaker:
-                    </span>{" "}
-                    <span
-                      style={{
-                        fontFamily: 'Inter',
-                        fontWeight: 400,
-                        fontSize: '16px',
-                        lineHeight: '120%',
-                        letterSpacing: '0%',
-                        color: '#333333'
-                      }}
-                    >
-                      {product.specs_rental?.caretaker || ""}
-                    </span>
-                  </div>
+              <CardContent>
+                <div className="grid grid-cols-3 font-semibold mb-2 text-sm">
+                  <span>Name</span>
+                  <span>Position</span>
+                  <span>Contact #</span>
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 bg-transparent">
-                  <History className="h-4 w-4 mr-2" />
-                  View History
-                </Button>
+
+                {/* Personnel Data */}
+                <div className="space-y-2 mb-4">
+                  {(() => {
+                    if (!Array.isArray(product?.personnel) || product.personnel.length === 0) {
+                      return (
+                        <div className="text-sm text-gray-500 py-4 text-center">
+                          No personnel have been added yet
+                        </div>
+                      )
+                    }
+
+                    return product.personnel
+                      .sort((a: any, b: any) => {
+                        const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
+                        const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
+                        return timeB - timeA // Newest first
+                      })
+                      .slice(0, 3) // Show only first 3 personnel
+                      .map((person: any, index: number) => (
+                        <div key={index} className="grid grid-cols-3 text-sm py-2 border-b border-gray-100 last:border-b-0 items-center">
+                          <span className="truncate font-medium">{person.name}</span>
+                          <span className="truncate">{person.position}</span>
+                          <span className="truncate">{person.contact}</span>
+                        </div>
+                      ))
+                  })()}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-between mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPersonnelDialogOpen(true)}
+                    className="bg-transparent"
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-transparent"
+                    onClick={() => setViewAllPersonnelDialogOpen(true)}
+                  >
+                    View All
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          </div>
 
+ 
+            </div>
         </div>
       </div>
 
@@ -2483,6 +2548,238 @@ export default function SiteDetailsPage({ params }: Props) {
       </DialogContent>
     </Dialog>
 
-    </div>
-  )
+    {/* Add Personnel Dialog */}
+    <Dialog open={personnelDialogOpen} onOpenChange={setPersonnelDialogOpen}>
+      <DialogContent className="max-w-md mx-auto">
+        <DialogHeader>
+          <DialogTitle>Add Personnel</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 mt-2">
+          {/* Status */}
+          <div className="grid grid-cols-3 items-center">
+            <label className="text-sm font-medium col-span-1">Status:</label>
+            <span className="col-span-2 text-gray-600">Active</span>
+          </div>
+
+          {/* Name */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Name:</label>
+            <input
+              type="text"
+              value={personnelForm.name}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, name: e.target.value })
+              }
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Position */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Position:</label>
+            <input
+              type="text"
+              value={personnelForm.position}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, position: e.target.value })
+              }
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Contact */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Contact:</label>
+            <input
+              type="text"
+              value={personnelForm.contact}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, contact: e.target.value })
+              }
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Start Date */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Start Date:</label>
+            <div className="col-span-2 relative date-picker-container">
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="w-full px-2 py-1 border border-gray-300 rounded-md text-left focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {format(personnelForm.start_date, "PPP")}
+              </button>
+              {showDatePicker && (
+                <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="flex justify-between items-center p-2 border-b">
+                    <span className="text-sm font-medium">Select Start Date</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowDatePicker(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <DayPicker
+                    mode="single"
+                    selected={personnelForm.start_date}
+                    onSelect={(date) => {
+                      if (date) {
+                        setPersonnelForm({ ...personnelForm, start_date: date })
+                        setShowDatePicker(false)
+                      }
+                    }}
+                    className="p-3"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Error message */}
+          {personnelFormError && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+              {personnelFormError}
+            </div>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex justify-between gap-3 mt-6">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPersonnelDialogOpen(false)
+              setPersonnelForm({ name: "", position: "", contact: "", start_date: new Date() })
+              setPersonnelFormError("")
+            }}
+            className="flex-1"
+            disabled={isSubmittingPersonnel}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddPersonnel}
+            className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white"
+            disabled={
+              !personnelForm.name.trim() ||
+              !personnelForm.position.trim() ||
+              !personnelForm.contact.trim() ||
+              isSubmittingPersonnel
+            }
+          >
+            {isSubmittingPersonnel ? "Adding..." : "Apply"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* View All Personnel Dialog */}
+    <Dialog open={viewAllPersonnelDialogOpen} onOpenChange={setViewAllPersonnelDialogOpen}>
+      <DialogContent className="max-w-5xl mx-auto max-h-[80vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Personnel</DialogTitle>
+        </DialogHeader>
+
+        <div className="overflow-auto max-h-[60vh] mt-2">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead className="w-1/6">Status</TableHead>
+                <TableHead className="w-1/4">Name</TableHead>
+                <TableHead className="w-1/4">Position</TableHead>
+                <TableHead className="w-1/4">Contact #</TableHead>
+                <TableHead className="w-1/6">Start Date</TableHead>
+                <TableHead className="w-1/6">End Date</TableHead>
+                <TableHead className="w-1/6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.isArray(product?.personnel) && product.personnel.length > 0 ? (
+                product.personnel.map((person: any, index: number) => (
+                  <TableRow key={index} className="hover:bg-gray-50">
+                    {/* Status */}
+                    <TableCell>
+                      <span
+                        className={`text-sm font-medium ${
+                          person.status ? "text-green-600" : "text-gray-400"
+                        }`}
+                      >
+                        {person.status ? "Active" : "Inactive"}
+                      </span>
+                    </TableCell>
+
+                    {/* Name */}
+                    <TableCell className="font-medium">{person.name}</TableCell>
+
+                    {/* Position */}
+                    <TableCell>{person.position}</TableCell>
+
+                    {/* Contact */}
+                    <TableCell>{person.contact}</TableCell>
+
+                    {/* Start Date */}
+                    <TableCell className="text-sm text-gray-600">
+                      {formatFirebaseDate(person.start_date)}
+                    </TableCell>
+
+                    {/* End Date */}
+                    <TableCell className="text-sm text-gray-600">
+                      {person.end_date ? formatFirebaseDate(person.end_date) : "-"}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell>
+                      <button
+                        className="p-1 text-gray-500 hover:text-gray-700 rounded-md border border-gray-200 hover:border-gray-400"
+                        onClick={() => handleEditPersonnel(person)}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536M9 11l6-6m2 2L7 17H5v-2l10-10z"
+                          />
+                        </svg>
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                    No personnel have been added yet
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-center pt-6">
+          <Button
+            onClick={() => setViewAllPersonnelDialogOpen(false)}
+            className="bg-indigo-500 hover:bg-indigo-600 px-10"
+          >
+            OK
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+
+  </div>
+)
 }

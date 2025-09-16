@@ -91,6 +91,15 @@ export interface Product {
     condition?: string
     last_maintenance?: any
   }
+  personnel?: Array<{
+    status: boolean
+    name: string
+    position: string
+    contact: string
+    start_date: any
+    created: any
+    created_by: string
+  }>
 }
 
 // ServiceAssignment interface
