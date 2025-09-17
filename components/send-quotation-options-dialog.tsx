@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { Copy, Mail, MessageCircle, Phone, Facebook } from "lucide-react"
+import { Copy } from "lucide-react"
 import type { Quotation } from "@/lib/types/quotation"
 import Image from "next/image"
 
@@ -13,6 +13,10 @@ interface SendQuotationOptionsDialogProps {
   onOpenChange: (open: boolean) => void
   quotation: Quotation
   onEmailClick: () => void
+  companyData?: {
+    photo_url?: string
+    name?: string
+  }
 }
 
 export function SendQuotationOptionsDialog({
@@ -20,6 +24,7 @@ export function SendQuotationOptionsDialog({
   onOpenChange,
   quotation,
   onEmailClick,
+  companyData,
 }: SendQuotationOptionsDialogProps) {
   const { toast } = useToast()
 
@@ -50,10 +55,10 @@ export function SendQuotationOptionsDialog({
         <div className="grid gap-4 py-4">
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-              {quotation.items?.[0]?.image ? (
+              {companyData?.photo_url ? (
                 <Image
-                  src={quotation.items[0].image || "/placeholder.svg"}
-                  alt="Quotation Image"
+                  src={companyData.photo_url || "/placeholder.svg"}
+                  alt="Company Logo"
                   width={80}
                   height={80}
                   objectFit="contain"
@@ -71,7 +76,7 @@ export function SendQuotationOptionsDialog({
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-500">{quotation.quotation_number}</p>
               <h3 className="text-lg font-semibold text-gray-900 break-words">
-                {quotation.title || quotation.items?.[0]?.name || "Untitled Quotation"}
+                {quotation.client_name || quotation.client_company_name || quotation.items?.name || "Untitled Quotation"}
               </h3>
             </div>
           </div>
@@ -90,7 +95,13 @@ export function SendQuotationOptionsDialog({
               className="flex flex-col items-center justify-center h-auto p-2"
               onClick={onEmailClick}
             >
-              <Mail className="h-6 w-6 text-blue-500" />
+              <Image
+                src="/icons/email.png"
+                alt="Email"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xs mt-1">Email</span>
             </Button>
             <Button
@@ -98,7 +109,13 @@ export function SendQuotationOptionsDialog({
               className="flex flex-col items-center justify-center h-auto p-2"
               onClick={() => handleNotImplemented("WhatsApp")}
             >
-              <MessageCircle className="h-6 w-6 text-green-500" />
+              <Image
+                src="/icons/whatsapp.png"
+                alt="WhatsApp"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xs mt-1">Whatsapp</span>
             </Button>
             <Button
@@ -106,7 +123,13 @@ export function SendQuotationOptionsDialog({
               className="flex flex-col items-center justify-center h-auto p-2"
               onClick={() => handleNotImplemented("Viber")}
             >
-              <Phone className="h-6 w-6 text-purple-500" />
+              <Image
+                src="/icons/viber.png"
+                alt="Viber"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xs mt-1">Viber</span>
             </Button>
             <Button
@@ -114,7 +137,13 @@ export function SendQuotationOptionsDialog({
               className="flex flex-col items-center justify-center h-auto p-2"
               onClick={() => handleNotImplemented("Messenger")}
             >
-              <Facebook className="h-6 w-6 text-blue-700" />
+              <Image
+                src="/icons/messenger.png"
+                alt="Messenger"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xs mt-1">Messenger</span>
             </Button>
           </div>

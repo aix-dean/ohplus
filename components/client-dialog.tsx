@@ -14,6 +14,7 @@ import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import t
 import { useAuth } from "@/contexts/auth-context" // Import useAuth
 import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { loadGoogleMaps } from "@/lib/google-maps-loader" // Import Google Maps loader
 
 interface ClientDialogProps {
   client?: Client
@@ -46,6 +47,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const gisFileInputRef = useRef<HTMLInputElement>(null)
   const idFileInputRef = useRef<HTMLInputElement>(null)
 
+  // Address autocomplete ref
+  const addressInputRef = useRef<HTMLInputElement>(null)
+  const addressAutocompleteRef = useRef<any>(null)
+
   const [formData, setFormData] = useState({
     clientType: client?.clientType || "",
     partnerType: client?.partnerType || "",
@@ -58,9 +63,19 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     companyLogoUrl: client?.companyLogoUrl || "",
     name: client?.name || "", // Contact Person Name
     designation: client?.designation || "", // New field
-    contactPhone: client?.phone || "", // Separate field for contact phone
+    contactPhone: client?.phone || "+63", // Separate field for contact phone with +63 prefix
     email: client?.email || "", // Contact Details Email
     user_company_id: client?.user_company_id || userData?.company_id || "", // New field
+  })
+
+  // Validation error states
+  const [validationErrors, setValidationErrors] = useState({
+    clientType: false,
+    partnerType: false,
+    name: false,
+    contactPhone: false,
+    email: false,
+    phoneFormat: false,
   })
 
   const fetchCompanies = async () => {
@@ -111,7 +126,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         companyLogoUrl: client?.companyLogoUrl || "",
         name: client?.name || "",
         designation: client?.designation || "",
-        contactPhone: client?.phone || "",
+        contactPhone: client?.phone || "+63",
         email: client?.email || "",
         user_company_id: client?.user_company_id || userData?.company_id || "", // New field
       })
@@ -119,13 +134,57 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
       setShowNewCompanyInput(false)
       setNewCompanyName("")
+      // Reset validation errors
+      setValidationErrors({
+        clientType: false,
+        partnerType: false,
+        name: false,
+        contactPhone: false,
+        email: false,
+        phoneFormat: false,
+      })
       fetchCompanies()
+
+      // Initialize Google Places Autocomplete for address field
+      const initializeAutocomplete = async () => {
+        try {
+          await loadGoogleMaps()
+          if (window.google && window.google.maps && window.google.maps.places && addressInputRef.current) {
+            const { Autocomplete } = window.google.maps.places
+            addressAutocompleteRef.current = new Autocomplete(addressInputRef.current, {
+              componentRestrictions: { country: "ph" }, // Restrict to Philippines
+              fields: ["place_id", "geometry", "name", "formatted_address"],
+            })
+
+            addressAutocompleteRef.current.addListener("place_changed", () => {
+              const place = addressAutocompleteRef.current.getPlace()
+              if (place && place.formatted_address) {
+                setFormData((prev) => ({ ...prev, address: place.formatted_address }))
+              }
+            })
+          }
+        } catch (error) {
+          console.warn("Failed to initialize address autocomplete:", error)
+        }
+      }
+
+      // Small delay to ensure DOM is ready
+      setTimeout(initializeAutocomplete, 100)
     }
   }, [open, client, userData?.company_id]) // Added userData?.company_id to dependency array
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+
+    // Skip contactPhone as it's handled by handlePhoneInput
+    if (name === 'contactPhone') return
+
     setFormData((prev) => ({ ...prev, [name]: value }))
+
+    // Clear validation error when field is filled
+    if (value.trim() && validationErrors[name as keyof typeof validationErrors]) {
+      setValidationErrors((prev) => ({ ...prev, [name]: false }))
+    }
   }
 
   const handleSelectChange = (name: string, value: string) => {
@@ -133,6 +192,97 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
     if (name === "clientType" && value === "brand") {
       setFormData((prev) => ({ ...prev, partnerType: "" }))
+    }
+
+    // Clear validation error when field is filled
+    if (value && validationErrors[name as keyof typeof validationErrors]) {
+      setValidationErrors((prev) => ({ ...prev, [name]: false }))
+    }
+  }
+
+  const validatePhoneFormat = (phone: string): boolean => {
+    // Check if phone is exactly +63 followed by 9 digits (Philippines mobile format)
+    const phoneRegex = /^\+63\d{9}$/
+    return phoneRegex.test(phone.replace(/\s/g, ''))
+  }
+
+  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+
+    // Always ensure +63 prefix is present
+    if (!value.startsWith('+63')) {
+      if (value && /^\d/.test(value)) {
+        // If user types digits, add +63 prefix
+        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+      } else {
+        // If empty or doesn't start with digits, set to +63
+        value = '+63'
+      }
+    } else {
+      // If it starts with +63, ensure only digits after and limit to 9
+      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
+      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+    }
+
+    // Update form data
+    setFormData((prev) => ({ ...prev, contactPhone: value }))
+
+    // Clear validation errors when user types
+    if (validationErrors.phoneFormat || validationErrors.contactPhone) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        phoneFormat: false,
+        contactPhone: false
+      }))
+    }
+  }
+
+  const scrollToFirstError = () => {
+    // Define the order of fields to check for errors
+    const fieldOrder = [
+      'clientType',
+      'partnerType',
+      'name',
+      'contactPhone',
+      'phoneFormat',
+      'email'
+    ]
+
+    for (const fieldName of fieldOrder) {
+      if (validationErrors[fieldName as keyof typeof validationErrors]) {
+        // Find the corresponding DOM element
+        let element: HTMLElement | null = null
+
+        if (fieldName === 'clientType') {
+          element = document.getElementById('clientType')
+        } else if (fieldName === 'partnerType') {
+          element = document.getElementById('partnerType')
+        } else if (fieldName === 'name') {
+          element = document.getElementById('name')
+        } else if (fieldName === 'contactPhone') {
+          element = document.getElementById('contactPhone')
+        } else if (fieldName === 'email') {
+          element = document.getElementById('email')
+        } else if (fieldName === 'phoneFormat') {
+          element = document.getElementById('contactPhone')
+        }
+
+        if (element) {
+          // Scroll the element into view
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          })
+
+          // Focus on the element after a short delay to ensure scroll is complete
+          setTimeout(() => {
+            element?.focus()
+          }, 500)
+
+          break // Stop after finding the first error
+        }
+      }
     }
   }
 
@@ -285,6 +435,79 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     e.preventDefault()
     setLoading(true)
 
+    // Validation for new company creation
+    let hasErrors = false
+    const newValidationErrors = { ...validationErrors }
+
+    if (showNewCompanyInput) {
+      if (!formData.clientType) {
+        newValidationErrors.clientType = true
+        hasErrors = true
+      } else {
+        newValidationErrors.clientType = false
+      }
+
+      if (formData.clientType === "partner" && !formData.partnerType) {
+        newValidationErrors.partnerType = true
+        hasErrors = true
+      } else if (formData.clientType === "partner") {
+        newValidationErrors.partnerType = false
+      }
+    }
+
+    // Validate required contact fields
+    if (!formData.name.trim()) {
+      newValidationErrors.name = true
+      hasErrors = true
+    } else {
+      newValidationErrors.name = false
+    }
+
+    if (!formData.contactPhone.trim()) {
+      newValidationErrors.contactPhone = true
+      hasErrors = true
+    } else {
+      newValidationErrors.contactPhone = false
+    }
+
+    if (!formData.email.trim()) {
+      newValidationErrors.email = true
+      hasErrors = true
+    } else {
+      newValidationErrors.email = false
+    }
+
+    // Validate phone format (only if phone is provided and has content beyond +63)
+    if (formData.contactPhone.trim()) {
+      if (formData.contactPhone === '+63') {
+        // If only +63 is entered, it's incomplete
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else if (!validatePhoneFormat(formData.contactPhone)) {
+        // If format is invalid
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else {
+        newValidationErrors.phoneFormat = false
+      }
+    } else {
+      newValidationErrors.phoneFormat = false
+    }
+
+    setValidationErrors(newValidationErrors)
+
+    if (hasErrors) {
+      toast.error("Please fill in all required fields")
+      setLoading(false)
+
+      // Scroll to and focus on the first field with an error
+      setTimeout(() => {
+        scrollToFirstError()
+      }, 100)
+
+      return
+    }
+
     try {
       const userCompanyId = await fetchUserCompanyId()
 
@@ -430,9 +653,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="clientType">Client Type:</Label>
+                  <Label htmlFor="clientType">Client Type <span className="text-red-500">*</span></Label>
                   <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
-                    <SelectTrigger className="h-10">
+                    <SelectTrigger id="clientType" className={`h-10 ${validationErrors.clientType ? 'border-red-500 focus:border-red-500' : ''}`}>
                       <SelectValue placeholder="Select client type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -440,16 +663,19 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                       <SelectItem value="brand">Brand</SelectItem>
                     </SelectContent>
                   </Select>
+                  {validationErrors.clientType && (
+                    <p className="text-sm text-red-500">Client type is required</p>
+                  )}
                 </div>
 
                 {formData.clientType === "partner" && (
                   <div className="space-y-2">
-                    <Label htmlFor="partnerType">Partner Type:</Label>
+                    <Label htmlFor="partnerType">Partner Type <span className="text-red-500">*</span></Label>
                     <Select
                       value={formData.partnerType}
                       onValueChange={(value) => handleSelectChange("partnerType", value)}
                     >
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger id="partnerType" className={`h-10 ${validationErrors.partnerType ? 'border-red-500 focus:border-red-500' : ''}`}>
                         <SelectValue placeholder="Select partner type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -457,6 +683,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                         <SelectItem value="agency">Agency</SelectItem>
                       </SelectContent>
                     </Select>
+                    {validationErrors.partnerType && (
+                      <p className="text-sm text-red-500">Partner type is required</p>
+                    )}
                   </div>
                 )}
 
@@ -464,11 +693,12 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="address">Company Address:</Label>
                   <Input
+                    ref={addressInputRef}
                     id="address"
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    placeholder="Company Address"
+                    placeholder="Start typing to search for addresses..."
                     className="h-10"
                   />
                 </div>
@@ -538,7 +768,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                           className="text-xs bg-transparent"
                           onClick={() => handleComplianceUpload("dti")}
                         >
-                          {complianceFiles.dti ? "Document Selected" : "Upload Document"}
+                          {complianceFiles.dti ? complianceFiles.dti.name : "Upload Document"}
                         </Button>
                       </div>
                       <div className="flex justify-between items-center">
@@ -550,7 +780,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                           className="text-xs bg-transparent"
                           onClick={() => handleComplianceUpload("gis")}
                         >
-                          {complianceFiles.gis ? "Document Selected" : "Upload Document"}
+                          {complianceFiles.gis ? complianceFiles.gis.name : "Upload Document"}
                         </Button>
                       </div>
                       <div className="flex justify-between items-center">
@@ -562,7 +792,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                           className="text-xs bg-transparent"
                           onClick={() => handleComplianceUpload("id")}
                         >
-                          {complianceFiles.id ? "Document Selected" : "Upload Document"}
+                          {complianceFiles.id ? complianceFiles.id.name : "Upload Document"}
                         </Button>
                       </div>
                     </div>
@@ -575,8 +805,18 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
             {/* These fields are only shown when creating a new company (showNewCompanyInput = true) */}
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="name">Contact Person:</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
+              <Label htmlFor="name">Contact Person <span className="text-red-500">*</span></Label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Name"
+                className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {validationErrors.name && (
+                <p className="text-sm text-red-500">Contact person name is required</p>
+              )}
               <Input
                 id="designation"
                 name="designation"
@@ -588,23 +828,38 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
 
             <div className="space-y-2 md:col-span-2">
               <Label>Contact Details:</Label>
-              <Input
-                id="contactPhone"
-                name="contactPhone"
-                value={formData.contactPhone}
-                onChange={handleChange}
-                placeholder="Phone Number"
-                required
-              />
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Email Address"
-                required
-              />
+              <div className="space-y-2">
+                <div>
+                  <Input
+                    id="contactPhone"
+                    name="contactPhone"
+                    value={formData.contactPhone}
+                    onChange={handlePhoneInput}
+                    placeholder="Enter 9 digits"
+                    className={(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
+                  />
+                  {validationErrors.contactPhone && (
+                    <p className="text-sm text-red-500">Phone number is required</p>
+                  )}
+                  {validationErrors.phoneFormat && !validationErrors.contactPhone && (
+                    <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                  )}
+                </div>
+                <div>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Email Address"
+                    className={validationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+                  />
+                  {validationErrors.email && (
+                    <p className="text-sm text-red-500">Email address is required</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

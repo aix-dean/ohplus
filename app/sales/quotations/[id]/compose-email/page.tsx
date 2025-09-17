@@ -3,7 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -23,10 +24,12 @@ import { generateQuotationEmailPDF } from "@/lib/quotation-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { Quotation } from "@/lib/types/quotation"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 
 export default function ComposeEmailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const { user, userData } = useAuth()
 
@@ -54,11 +57,13 @@ export default function ComposeEmailPage() {
 
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
+  const [replyToEmail, setReplyToEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [companyName, setCompanyName] = useState<string>("")
 
   useEffect(() => {
     userDataRef.current = userData
@@ -183,22 +188,7 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(quotation, related)
 
       setToEmail(quotation.client_email || "")
-      setCcEmail("aixymbiosis@ohplus.ph")
-      setSubject(`Quotation: ${quotation.items?.[0]?.name || "Custom Quotation"} - OH Plus`)
-      setBody(`Hi ${quotation.client_name || "Valued Client"},
-
-I hope you're doing well!
-
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
-
-If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
-
-Best regards,
-${user?.displayName || "Sales Executive"}
-Sales Executive
-OH Plus
-${currentUserData?.phone_number || ""}
-${user?.email || ""}`)
+      setCcEmail("")
 
       const companyId = currentUserData?.company_id || quotation?.company_id
       console.log("[v0] Final companyId being used:", companyId)
@@ -250,12 +240,82 @@ ${user?.email || ""}`)
     }
   }, [userData, isInitialized, fetchData])
 
+  // Set subject and body when quotation and company name are available
+  useEffect(() => {
+    if (quotation && companyName && userData) {
+      setSubject(`Quotation: ${quotation.items?.name || "Custom Quotation"} - ${companyName}`)
+      setBody(`Hi ${quotation.client_name || "Valued Client"},
+
+I hope you're doing well!
+
+Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
+
+If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
+
+Best regards,
+${user?.displayName || "Sales Executive"}
+Sales Executive
+${companyName}
+${userData?.phone_number || ""}
+${user?.email || ""}`)
+    }
+  }, [quotation, companyName, userData, user?.displayName, user?.email])
+
+  // Query company name from Firebase
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (!user || !userData) {
+        console.log("[v0] fetchCompanyName: Missing user or userData", { user: !!user, userData: !!userData })
+        return
+      }
+
+      try {
+        console.log("[v0] fetchCompanyName: userData:", userData)
+        console.log("[v0] fetchCompanyName: userData.company_id:", userData.company_id)
+
+        if (!userData.company_id) {
+          console.warn("[v0] No company_id found in userData:", userData)
+          return
+        }
+
+        console.log("[v0] Fetching company name for company_id:", userData.company_id)
+        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+          const companyNameValue = companyData?.name || "Company"
+          setCompanyName(companyNameValue)
+          console.log("[v0] Company name loaded from Firebase:", companyNameValue)
+        } else {
+          console.warn("[v0] No company document found for company_id:", userData.company_id)
+          setCompanyName("Company")
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching company name from Firebase:", error)
+        setCompanyName("Company")
+      }
+    }
+
+    if (user && userData) {
+      fetchCompanyName()
+    }
+  }, [user, userData])
+
+  useEffect(() => {
+    if (showSuccessDialog) {
+      const timer = setTimeout(() => {
+        handleSuccessDialogClose()
+      }, 3000) // Auto-dismiss after 3 seconds
+      return () => clearTimeout(timer)
+    }
+  }, [showSuccessDialog])
+
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
-      "{title}": quotation?.items?.[0]?.name || "Custom Quotation",
+      "{title}": quotation?.items?.name || "Custom Quotation",
       "{clientName}": quotation?.client_name || "Valued Client",
       "{userName}": user?.displayName || "Sales Executive",
-      "{companyName}": "OH Plus",
+      "{companyName}": companyName || "Company",
       "{userContact}": user?.phoneNumber || "",
       "{userEmail}": user?.email || "",
     }
@@ -464,6 +524,8 @@ ${user?.email || ""}`)
         client: { name: quotation.client_name, company: quotation.client_company_name, email: quotation.client_email },
         currentUserEmail: user?.email,
         ccEmail: ccEmail,
+        replyToEmail: replyToEmail,
+        companyName: companyName,
         subject: subject,
         body: body,
         attachments: allAttachments,
@@ -557,7 +619,7 @@ ${user?.email || ""}`)
 
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false)
-    router.push(`/sales/quotations/${params.id}`)
+    router.push("/sales/quotations-list")
   }
 
   if (loading || userData === undefined) {
@@ -616,6 +678,18 @@ ${user?.email || ""}`)
                 <Label className="w-12 text-sm font-medium">Cc:</Label>
                 <div className="flex-1">
                   <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
+                </div>
+              </div>
+
+              {/* Reply To Field */}
+              <div className="flex items-center gap-4">
+                <Label className="w-12 text-sm font-medium">Reply to:</Label>
+                <div className="flex-1">
+                  <Input
+                    value={replyToEmail}
+                    onChange={(e) => setReplyToEmail(e.target.value)}
+                    placeholder="reply@example.com"
+                  />
                 </div>
               </div>
 
@@ -876,30 +950,11 @@ ${user?.email || ""}`)
       </Dialog>
 
       {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="sm:max-w-[400px] text-center">
-          <div className="space-y-4 pb-4">
-            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 2L3 7v11a2 2 0 002 2h10a2 2 0 002-2V7l-7-5z" />
-                    <path d="M9 9h2v6H9V9z" />
-                    <path d="M9 6h2v2H9V6z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
-              <p className="text-gray-600">You have successfully sent a quotation!</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSuccessDialogClose} className="w-full">
-              Close
-            </Button>
-          </DialogFooter>
+      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessDialogClose}>
+        <DialogContent className="sm:max-w-[425px] flex flex-col items-center justify-center text-center p-8">
+          <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
+          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-6" />
+          <p className="text-lg text-gray-700">You have successfully sent a quotation!</p>
         </DialogContent>
       </Dialog>
     </div>

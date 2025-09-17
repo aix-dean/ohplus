@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
 import { bookingService } from "@/lib/booking-service"
+import { searchQuotations } from "@/lib/algolia-service"
 
 export default function QuotationsListPage() {
   const router = useRouter()
@@ -101,6 +102,55 @@ export default function QuotationsListPage() {
     setLoading(true)
 
     try {
+      // If there's a search term, use Algolia search
+      if (searchTerm.trim()) {
+        const searchResults = await searchQuotations(searchTerm.trim(), userData?.company_id || undefined, page - 1, pageSize)
+
+        if (searchResults.error) {
+          console.error("Search error:", searchResults.error)
+          // Fallback to Firebase if search fails
+          await fetchFromFirebase(page, reset)
+          return
+        }
+
+        // Transform Algolia results to match the expected format
+        let transformedQuotations = searchResults.hits.map((hit: any) => ({
+          id: hit.objectID,
+          quotation_number: hit.quotation_number,
+          client_name: hit.client_name,
+          items: hit.items,
+          seller_id: hit.seller_id,
+          status: hit.status,
+          created: hit.created,
+          // Add other fields as needed
+        }))
+
+        // Apply status filter if not "all"
+        if (statusFilter !== "all") {
+          transformedQuotations = transformedQuotations.filter(q => q.status === statusFilter)
+        }
+
+        setAllQuotations(transformedQuotations)
+        setQuotations(transformedQuotations)
+        setHasMorePages(searchResults.page < searchResults.nbPages - 1)
+        setTotalCount(searchResults.nbHits)
+      } else {
+        // No search term, fetch from Firebase
+        await fetchFromFirebase(page, reset)
+      }
+    } catch (error) {
+      console.error("Error fetching quotations:", error)
+      // Fallback to Firebase on error
+      await fetchFromFirebase(page, reset)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchFromFirebase = async (page: number = 1, reset: boolean = false) => {
+    if (!user?.uid) return
+
+    try {
       const quotationsRef = collection(db, "quotations")
       let q = query(
         quotationsRef,
@@ -144,14 +194,19 @@ export default function QuotationsListPage() {
         }))
       }
 
-      setAllQuotations(currentPageData)
+      // Apply status filter if not "all"
+      let filteredData = currentPageData
+      if (statusFilter !== "all") {
+        filteredData = currentPageData.filter(q => q.status === statusFilter)
+      }
+
+      setAllQuotations(filteredData)
       setLastDoc(pageLastDoc)
       setHasMorePages(hasMore)
-      setQuotations(currentPageData)
+      setQuotations(filteredData)
+      setTotalCount(fetchedQuotations.length) // Approximate count
     } catch (error) {
-      console.error("Error fetching quotations:", error)
-    } finally {
-      setLoading(false)
+      console.error("Error fetching from Firebase:", error)
     }
   }
 
