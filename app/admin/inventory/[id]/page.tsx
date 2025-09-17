@@ -311,17 +311,39 @@ export default function SiteDetailsPage({ params }: Props) {
   // View All Personnel dialog state
   const [viewAllPersonnelDialogOpen, setViewAllPersonnelDialogOpen] = useState(false)
 
+  // Edit Personnel dialog states
+  const [editingPersonnelIndex, setEditingPersonnelIndex] = useState<number | null>(null)
+  const [editPersonnelDialogOpen, setEditPersonnelDialogOpen] = useState(false)
+  const [editPersonnelForm, setEditPersonnelForm] = useState({
+    name: '',
+    position: '',
+    contact: '',
+    start_date: new Date(),
+    end_date: null as Date | null,
+    status: true
+  })
+  const [editPersonnelFormError, setEditPersonnelFormError] = useState('')
+  const [isUpdatingPersonnel, setIsUpdatingPersonnel] = useState(false)
+  const [showEditStartDatePicker, setShowEditStartDatePicker] = useState(false)
+  const [showEditEndDatePicker, setShowEditEndDatePicker] = useState(false)
+
   // Close date picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showDatePicker && !(event.target as Element).closest('.date-picker-container')) {
         setShowDatePicker(false)
       }
+      if (showEditStartDatePicker && !(event.target as Element).closest('.edit-start-date-picker-container')) {
+        setShowEditStartDatePicker(false)
+      }
+      if (showEditEndDatePicker && !(event.target as Element).closest('.edit-end-date-picker-container')) {
+        setShowEditEndDatePicker(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showDatePicker])
+  }, [showDatePicker, showEditStartDatePicker, showEditEndDatePicker])
 
   // Fetch product data and job orders
   useEffect(() => {
@@ -604,6 +626,82 @@ export default function SiteDetailsPage({ params }: Props) {
       setPersonnelFormError(`Failed to add personnel: ${errorMessage}. Please try again.`)
     } finally {
       setIsSubmittingPersonnel(false)
+    }
+  }
+
+  // Edit Personnel dialog handlers
+  const handleEditPersonnel = (index: number) => {
+    if (!product?.personnel || !Array.isArray(product.personnel)) return
+
+    const person = product.personnel[index]
+    setEditingPersonnelIndex(index)
+    setEditPersonnelForm({
+      name: person.name || '',
+      position: person.position || '',
+      contact: person.contact || '',
+      start_date: person.start_date ? new Date(person.start_date.seconds * 1000) : new Date(),
+      end_date: person.end_date ? new Date(person.end_date.seconds * 1000) : null,
+      status: person.status ?? true
+    })
+    setEditPersonnelDialogOpen(true)
+  }
+
+  const handleUpdatePersonnel = async () => {
+    // Clear previous error
+    setEditPersonnelFormError('')
+
+    // Validation
+    if (!editPersonnelForm.name.trim()) {
+      setEditPersonnelFormError('Name is required')
+      return
+    }
+    if (!editPersonnelForm.position.trim()) {
+      setEditPersonnelFormError('Position is required')
+      return
+    }
+    if (!editPersonnelForm.contact.trim()) {
+      setEditPersonnelFormError('Contact number is required')
+      return
+    }
+
+    if (!product || !userData || editingPersonnelIndex === null) {
+      setEditPersonnelFormError('Missing product, user information, or editing index')
+      return
+    }
+
+    setIsUpdatingPersonnel(true)
+    try {
+      // Get existing personnel
+      const existingPersonnel = Array.isArray(product.personnel) ? [...product.personnel] : []
+
+      // Update the specific personnel entry
+      existingPersonnel[editingPersonnelIndex] = {
+        ...existingPersonnel[editingPersonnelIndex],
+        status: editPersonnelForm.status,
+        name: editPersonnelForm.name.trim(),
+        position: editPersonnelForm.position.trim(),
+        contact: editPersonnelForm.contact.trim(),
+        start_date: editPersonnelForm.start_date,
+        end_date: editPersonnelForm.end_date
+      }
+
+      // Update product with new personnel array
+      await updateProduct(product.id, { personnel: existingPersonnel })
+
+      // Update local product state
+      setProduct({ ...product, personnel: existingPersonnel })
+
+      // Reset form and close dialog
+      setEditPersonnelForm({ name: '', position: '', contact: '', start_date: new Date(), end_date: null, status: true })
+      setEditPersonnelDialogOpen(false)
+      setEditingPersonnelIndex(null)
+      setEditPersonnelFormError('')
+    } catch (error) {
+      console.error('Error updating personnel:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setEditPersonnelFormError(`Failed to update personnel: ${errorMessage}. Please try again.`)
+    } finally {
+      setIsUpdatingPersonnel(false)
     }
   }
 
@@ -2678,6 +2776,173 @@ export default function SiteDetailsPage({ params }: Props) {
       </DialogContent>
     </Dialog>
 
+    {/* Edit Personnel Dialog */}
+    <Dialog open={editPersonnelDialogOpen} onOpenChange={setEditPersonnelDialogOpen}>
+      <DialogContent className="max-w-md mx-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Personnel</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 mt-2">
+          {/* Status */}
+          <div className="grid grid-cols-3 items-center">
+            <label className="text-sm font-medium col-span-1">Status:</label>
+            <div className="col-span-2">
+              <Switch
+                checked={editPersonnelForm.status}
+                onCheckedChange={(checked) => setEditPersonnelForm({ ...editPersonnelForm, status: checked })}
+              />
+            </div>
+          </div>
+
+          {/* Name */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Name:</label>
+            <input
+              type="text"
+              value={editPersonnelForm.name}
+              onChange={(e) => setEditPersonnelForm({ ...editPersonnelForm, name: e.target.value })}
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Position */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Position:</label>
+            <input
+              type="text"
+              value={editPersonnelForm.position}
+              onChange={(e) => setEditPersonnelForm({ ...editPersonnelForm, position: e.target.value })}
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Contact */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Contact:</label>
+            <input
+              type="text"
+              value={editPersonnelForm.contact}
+              onChange={(e) => setEditPersonnelForm({ ...editPersonnelForm, contact: e.target.value })}
+              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Start Date */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">Start Date:</label>
+            <div className="col-span-2 relative edit-start-date-picker-container">
+              <button
+                type="button"
+                onClick={() => setShowEditStartDatePicker(!showEditStartDatePicker)}
+                className="w-full px-2 py-1 border border-gray-300 rounded-md text-left focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {format(editPersonnelForm.start_date, "PPP")}
+              </button>
+              {showEditStartDatePicker && (
+                <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="flex justify-between items-center p-2 border-b">
+                    <span className="text-sm font-medium">Select Start Date</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditStartDatePicker(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <DayPicker
+                    mode="single"
+                    selected={editPersonnelForm.start_date}
+                    onSelect={(date) => {
+                      if (date) {
+                        setEditPersonnelForm({ ...editPersonnelForm, start_date: date })
+                        setShowEditStartDatePicker(false)
+                      }
+                    }}
+                    className="p-3"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* End Date */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <label className="text-sm font-medium col-span-1">End Date:</label>
+            <div className="col-span-2 relative edit-end-date-picker-container">
+              <button
+                type="button"
+                onClick={() => setShowEditEndDatePicker(!showEditEndDatePicker)}
+                className="w-full px-2 py-1 border border-gray-300 rounded-md text-left focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {editPersonnelForm.end_date ? format(editPersonnelForm.end_date, "PPP") : "No end date"}
+              </button>
+              {showEditEndDatePicker && (
+                <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="flex justify-between items-center p-2 border-b">
+                    <span className="text-sm font-medium">Select End Date</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditEndDatePicker(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <DayPicker
+                    mode="single"
+                    selected={editPersonnelForm.end_date || undefined}
+                    onSelect={(date) => {
+                      setEditPersonnelForm({ ...editPersonnelForm, end_date: date || null })
+                      setShowEditEndDatePicker(false)
+                    }}
+                    className="p-3"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Error message */}
+          {editPersonnelFormError && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+              {editPersonnelFormError}
+            </div>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex justify-between gap-3 mt-6">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setEditPersonnelDialogOpen(false)
+              setEditPersonnelForm({ name: "", position: "", contact: "", start_date: new Date(), end_date: null, status: true })
+              setEditPersonnelFormError("")
+              setEditingPersonnelIndex(null)
+            }}
+            className="flex-1"
+            disabled={isUpdatingPersonnel}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdatePersonnel}
+            className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white"
+            disabled={
+              !editPersonnelForm.name.trim() ||
+              !editPersonnelForm.position.trim() ||
+              !editPersonnelForm.contact.trim() ||
+              isUpdatingPersonnel
+            }
+          >
+            {isUpdatingPersonnel ? "Updating..." : "Update"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     {/* View All Personnel Dialog */}
     <Dialog open={viewAllPersonnelDialogOpen} onOpenChange={setViewAllPersonnelDialogOpen}>
       <DialogContent className="max-w-5xl mx-auto max-h-[80vh] overflow-hidden">
@@ -2734,25 +2999,14 @@ export default function SiteDetailsPage({ params }: Props) {
 
                     {/* Actions */}
                     <TableCell>
-                      <button
-                        className="p-1 text-gray-500 hover:text-gray-700 rounded-md border border-gray-200 hover:border-gray-400"
-                        onClick={() => handleEditPersonnel(person)}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditPersonnel(index)}
+                        className="h-8 w-8 p-0"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15.232 5.232l3.536 3.536M9 11l6-6m2 2L7 17H5v-2l10-10z"
-                          />
-                        </svg>
-                      </button>
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -2768,7 +3022,7 @@ export default function SiteDetailsPage({ params }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-center pt-6">
+        <div className="flex justify-end pt-6">
           <Button
             onClick={() => setViewAllPersonnelDialogOpen(false)}
             className="bg-indigo-500 hover:bg-indigo-600 px-10"
