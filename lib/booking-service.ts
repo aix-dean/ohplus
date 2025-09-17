@@ -45,7 +45,9 @@ export interface Booking {
   media_order?: string[]
   payment_method: string
   product_id: string
+  product_name?: string
   product_owner: string
+  project_name?: string // Added project_name field
   promos?: {
     quotation_id: string
     rated: boolean
@@ -174,10 +176,10 @@ export class BookingService {
     return Timestamp.now()
   }
 
-  async createBooking(quotation: any, userId: string, companyId: string): Promise<string> {
-    console.log("[DEBUG] createBooking called with:", { quotation, userId, companyId })
+  async createBooking(quotation: any, userId: string, companyId: string, projectName?: string): Promise<string> {
+    console.log("[DEBUG] createBooking called with:", { quotation, userId, companyId, projectName })
     try {
-      const bookingData = {
+      const bookingData: any = {
         cancel_reason: "",
         category_id: quotation.category_id || "",
         client: {
@@ -204,9 +206,9 @@ export class BookingService {
         end_date: quotation.end_date ? this.convertToTimestamp(quotation.end_date) : null,
         media_order: quotation.media_order || [],
         payment_method: quotation.payment_method || "Manual Payment",
-        product_name: quotation.items?.name,
         product_id: quotation.items?.product_id || "",
         product_owner: quotation.product_owner || "",
+        project_name: projectName || "",
         promos: quotation.promos || {},
         projectCompliance: quotation.projectCompliance || undefined, // Copy projectCompliance from quotation
         requirements: quotation.requirements || [],
@@ -219,6 +221,11 @@ export class BookingService {
         updated: serverTimestamp(),
         user_id: userId,
         quotation_id: quotation.id,
+      }
+
+      // Only add product_name if it exists
+      if (quotation.items?.name) {
+        bookingData.product_name = quotation.items.name
       }
       console.log("[DEBUG] Booking data to be created:", bookingData)
 

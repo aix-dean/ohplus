@@ -652,7 +652,7 @@ export default function ReportPreviewPage() {
 
               {report.attachments && report.attachments.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {report.attachments.slice(0, 2).map((attachment, index) => (
+                  {report.attachments.map((attachment, index) => (
                     <div key={index} className="space-y-2">
                       <div
                         className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
