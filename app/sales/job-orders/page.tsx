@@ -31,7 +31,7 @@ const safeParseDate = (dateValue: string | Date | Timestamp | undefined): Date |
 };
 
 export default function JobOrdersPage() {
-  const { user } = useAuth()
+  const { user,userData } = useAuth()
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
@@ -48,7 +48,7 @@ export default function JobOrdersPage() {
       }
       try {
         setLoading(true)
-        const fetchedJOs = await getJobOrders(user.uid)
+        const fetchedJOs = await getJobOrders(userData?.company_id || "")
         setJobOrders(fetchedJOs)
       } catch (err) {
         console.error("Failed to fetch job orders:", err)
@@ -245,7 +245,6 @@ export default function JobOrdersPage() {
                   <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -277,7 +276,6 @@ export default function JobOrdersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                      <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
                       <TableCell className="text-right py-3">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -290,8 +288,6 @@ export default function JobOrdersPage() {
                             <DropdownMenuItem onClick={() => router.push(`/sales/job-orders/${jo.id}`)}>
                               View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => alert(`Delete JO ${jo.joNumber}`)}>Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

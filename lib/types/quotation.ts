@@ -13,6 +13,9 @@ export interface SpecsRental {
   location?: string // e.g., "manila"
   traffic_count?: number
   type?: string // e.g., "RENTAL"
+  height?: number
+  width?: number
+  content_type?: string // e.g., "Digital"
 }
 
 export interface QuotationProduct {

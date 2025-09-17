@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrderById } from "@/lib/job-order-service"
-import { generateJobOrderPDF } from "@/lib/pdf-service"
+import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 import type { JobOrder } from "@/lib/types/job-order"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -112,7 +112,7 @@ export default function JobOrderDetailsPage() {
 
   const handleDownloadPDF = async () => {
     try {
-      await generateJobOrderPDF(jobOrder)
+      await generateJobOrderPDF(jobOrder, 'download')
     } catch (error) {
       console.error("Error generating PDF:", error)
     }
@@ -217,8 +217,6 @@ export default function JobOrderDetailsPage() {
                       <p className="text-base text-gray-900">{jobOrder.requestedBy}</p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Assigned To</label>
-                      <p className="text-base text-gray-900">{jobOrder.assignTo || "Unassigned"}</p>
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-600 uppercase tracking-wide">Date Requested</label>
