@@ -14,6 +14,7 @@ import { Search, MoreVertical, Grid3X3, List, Plus, Loader2, Edit, Trash2 } from
 import { useAuth } from "@/contexts/auth-context"
 import { getTodosByUser, createTodo, updateTodo, toggleTodoComplete, createTodoHistory, getTodoHistory } from "@/lib/todo-service"
 import type { Todo } from "@/lib/types/todo"
+import { DEPARTMENTS } from "@/lib/types/access-management"
 import { FileUpload } from "@/components/file-upload"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -210,7 +211,7 @@ function DraggableTodoCard({
               variant="outline"
               className="flex-1"
             >
-              Back
+              Return
             </Button>
             <Button
               onClick={(e) => {
@@ -303,6 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("admin")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -378,9 +380,7 @@ export default function TodoApp() {
     try {
       setLoading(true)
       const fetchedTodos = await getTodosByUser(userData.uid, userData.company_id || undefined)
-      // Filter to only show admin department todos
-      const adminTodos = fetchedTodos.filter(todo => todo.department === "admin")
-      setTodos(adminTodos)
+      setTodos(fetchedTodos)
     } catch (error) {
       console.error("Error fetching todos:", error)
       toast.error("Failed to load todos")
@@ -390,9 +390,12 @@ export default function TodoApp() {
   }
 
   const filteredTodos = todos.filter(
-    (todo) =>
-      todo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      todo.description.toLowerCase().includes(searchTerm.toLowerCase()),
+    (todo) => {
+      const matchesSearch = todo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        todo.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesDepartment = selectedDepartment === "all" || todo.department === selectedDepartment
+      return matchesSearch && matchesDepartment
+    }
   )
 
   const handleCreateTodo = async () => {
@@ -580,20 +583,38 @@ export default function TodoApp() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">To-Do-List</h1>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Department:</label>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-gray-600">{todos.filter(t => t.status === "todo").length}</div>
+            <div className="text-2xl font-bold text-gray-600">{filteredTodos.filter(t => t.status === "todo").length}</div>
             <div className="text-sm text-gray-500">To Do</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-blue-600">{todos.filter(t => t.status === "in-progress").length}</div>
+            <div className="text-2xl font-bold text-blue-600">{filteredTodos.filter(t => t.status === "in-progress").length}</div>
             <div className="text-sm text-gray-500">In Progress</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-green-600">{todos.filter(t => t.status === "done").length}</div>
+            <div className="text-2xl font-bold text-green-600">{filteredTodos.filter(t => t.status === "done").length}</div>
             <div className="text-sm text-gray-500">Done</div>
           </div>
         </div>
@@ -610,11 +631,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="todo"
                 title="To Do"
-                count={todos.filter(t => t.status === "todo").length}
+                count={filteredTodos.filter(t => t.status === "todo").length}
                 {...getStatusColors("todo")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "todo").map((todo) => (
+                {filteredTodos.filter(t => t.status === "todo").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
@@ -631,11 +652,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="in-progress"
                 title="In Progress"
-                count={todos.filter(t => t.status === "in-progress").length}
+                count={filteredTodos.filter(t => t.status === "in-progress").length}
                 {...getStatusColors("in-progress")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "in-progress").map((todo) => (
+                {filteredTodos.filter(t => t.status === "in-progress").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
@@ -652,11 +673,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="done"
                 title="Done"
-                count={todos.filter(t => t.status === "done").length}
+                count={filteredTodos.filter(t => t.status === "done").length}
                 {...getStatusColors("done")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "done").map((todo) => (
+                {filteredTodos.filter(t => t.status === "done").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
