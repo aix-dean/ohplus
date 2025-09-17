@@ -1,6 +1,11 @@
 "use client"
 
 import { getProductById, uploadFileToFirebaseStorage, updateProduct, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
+import { getAllCostEstimates } from "@/lib/cost-estimate-service"
+import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
+import { getAllJobOrders } from "@/lib/job-order-service"
+import type { Booking } from "@/lib/booking-service"
+import type { CostEstimate } from "@/lib/types/cost-estimate"
 
 // Global type declarations for Google Maps
 declare global {
@@ -243,6 +248,16 @@ export default function SiteDetailsPage({ params }: Props) {
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]) // Keep service assignments for other parts if needed
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+
+  // New state variables for the four tabs
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [bookingsLoading, setBookingsLoading] = useState(true)
+  const [costEstimatesLoading, setCostEstimatesLoading] = useState(true)
+  const [quotationsLoading, setQuotationsLoading] = useState(true)
+  const [jobOrdersLoading, setJobOrdersLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("booking-summary")
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
   const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
   const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
@@ -392,6 +407,153 @@ export default function SiteDetailsPage({ params }: Props) {
 
     fetchData()
   }, [id])
+
+  // Fetch bookings for this product
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!id) return
+
+      setBookingsLoading(true)
+      try {
+        const bookingsQuery = query(
+          collection(db, "booking"),
+          where("product_id", "==", id),
+          orderBy("created", "desc")
+        )
+        const bookingsSnapshot = await getDocs(bookingsQuery)
+        const bookingsData: Booking[] = []
+
+        bookingsSnapshot.forEach((doc) => {
+          bookingsData.push({
+            id: doc.id,
+            ...doc.data(),
+          } as Booking)
+        })
+
+        setBookings(bookingsData)
+      } catch (error) {
+        console.error("Error fetching bookings:", error)
+      } finally {
+        setBookingsLoading(false)
+      }
+    }
+
+    fetchBookings()
+  }, [id])
+
+  // Fetch cost estimates for this product
+  useEffect(() => {
+    const fetchCostEstimates = async () => {
+      if (!id || !product) {
+        setCostEstimatesLoading(false)
+        return
+      }
+
+      setCostEstimatesLoading(true)
+      try {
+        const allCostEstimates = await getAllCostEstimates()
+        const productId = id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedEstimates = allCostEstimates.filter((estimate) =>
+          estimate.lineItems?.some(
+            (item) =>
+              item.id === productId ||
+              item.description?.toLowerCase().includes(productName.toLowerCase()) ||
+              (productLocation && item.notes?.toLowerCase().includes(productLocation.toLowerCase())),
+          ),
+        )
+
+        setCostEstimates(relatedEstimates)
+      } catch (error) {
+        console.error("Error fetching cost estimates:", error)
+      } finally {
+        setCostEstimatesLoading(false)
+      }
+    }
+
+    fetchCostEstimates()
+  }, [id, product])
+
+  // Fetch quotations for this product
+  useEffect(() => {
+    const fetchQuotations = async () => {
+      if (!id || !product) {
+        setQuotationsLoading(false)
+        return
+      }
+
+      setQuotationsLoading(true)
+      try {
+        const allQuotations = await getAllQuotations()
+
+        // Filter quotations that have products referencing this product
+        const productId = id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedQuotations = allQuotations.filter((quotation) =>
+          quotation.items && typeof quotation.items === 'object' &&
+          (quotation.items.product_id === productId ||
+           (quotation.items.name && quotation.items.name.toLowerCase().includes(productName.toLowerCase())) ||
+           (productLocation && quotation.items.location && quotation.items.location.toLowerCase().includes(productLocation.toLowerCase())))
+        )
+
+        setQuotations(relatedQuotations)
+      } catch (error) {
+        console.error("Error fetching quotations:", error)
+      } finally {
+        setQuotationsLoading(false)
+      }
+    }
+
+    fetchQuotations()
+  }, [id, product])
+
+  // Fetch job orders for this product
+  useEffect(() => {
+    const fetchJobOrders = async () => {
+      if (!id || !product) {
+        setJobOrdersLoading(false)
+        return
+      }
+
+      setJobOrdersLoading(true)
+      try {
+        const allJobOrders = await getAllJobOrders()
+
+        // Filter job orders that reference this product by site info
+        const productId = id
+        const productName = product?.name || ""
+        const productLocation =
+          product?.type?.toLowerCase() === "rental"
+            ? product.specs_rental?.location || ""
+            : product.light?.location || ""
+
+        const relatedJobOrders = allJobOrders.filter(
+          (jobOrder) =>
+            jobOrder.product_id === productId ||
+            jobOrder.siteName?.toLowerCase().includes(productName.toLowerCase()) ||
+            (productLocation && jobOrder.siteLocation?.toLowerCase().includes(productLocation.toLowerCase())),
+        )
+
+        setJobOrders(relatedJobOrders)
+      } catch (error) {
+        console.error("Error fetching job orders:", error)
+      } finally {
+        setJobOrdersLoading(false)
+      }
+    }
+
+    fetchJobOrders()
+  }, [id, product])
 
   const handleCreateServiceAssignment = () => {
     router.push(`/logistics/assignments/create?projectSite=${id}`)
@@ -1086,19 +1248,203 @@ export default function SiteDetailsPage({ params }: Props) {
           <Card className="rounded-xl shadow-sm border">
             <CardHeader className="p-0">
               <div className="flex border-b">
-                {["Booking Summary", "Cost Estimates", "Quotations", "Job Order"].map((tab, idx) => (
+                {[
+                  { key: "booking-summary", label: "Booking Summary", count: bookings.length },
+                  { key: "cost-estimates", label: "Cost Estimates", count: costEstimates.length },
+                  { key: "quotations", label: "Quotations", count: quotations.length },
+                  { key: "job-order", label: "Job Order", count: jobOrders.length }
+                ].map((tab, idx) => (
                   <button
                     key={idx}
-                    className="flex-1 px-6 py-3 text-sm font-semibold text-black hover:bg-gray-100 focus:outline-none"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex-1 px-6 py-3 text-sm font-semibold hover:bg-gray-100 focus:outline-none ${
+                      activeTab === tab.key ? "text-blue-600 border-b-2 border-blue-600" : "text-black"
+                    }`}
                   >
-                    {tab}
+                    {tab.label} ({tab.count})
                   </button>
                 ))}
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              {/* Content of the selected tab goes here */}
-              <p className="text-gray-500">Select a tab to view details...</p>
+              {activeTab === "booking-summary" && (
+                <div>
+                  {bookingsLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-gray-500">Loading bookings...</p>
+                    </div>
+                  ) : bookings.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No bookings found for this site.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {bookings.map((booking) => (
+                        <div key={booking.id} className="border rounded-lg p-4">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Client:</span> {booking.client?.name || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Status:</span>{" "}
+                              <Badge variant="outline" className="ml-1">
+                                {booking.status || "Unknown"}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="font-medium">Start Date:</span>{" "}
+                              {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">End Date:</span>{" "}
+                              {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Total Cost:</span> ₱{booking.total_cost?.toLocaleString() || "0"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "cost-estimates" && (
+                <div>
+                  {costEstimatesLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-gray-500">Loading cost estimates...</p>
+                    </div>
+                  ) : costEstimates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No cost estimates found for this site.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {costEstimates.map((estimate) => (
+                        <div
+                          key={estimate.id}
+                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => router.push(`/admin/cost-estimates/${estimate.id}`)}
+                        >
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Client:</span> {estimate.client?.company || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Status:</span>{" "}
+                              <Badge variant="outline" className="ml-1">
+                                {estimate.status || "Draft"}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="font-medium">Total Amount:</span> ₱{estimate.totalAmount?.toLocaleString() || "0"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Created:</span>{" "}
+                              {estimate.createdAt ? formatFirebaseDate(estimate.createdAt) : "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "quotations" && (
+                <div>
+                  {quotationsLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-gray-500">Loading quotations...</p>
+                    </div>
+                  ) : quotations.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No quotations found for this site.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {quotations.map((quotation) => (
+                        <div
+                          key={quotation.id}
+                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => router.push(`/admin/quotations/${quotation.id}`)}
+                        >
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Client:</span> {quotation.client_name || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Status:</span>{" "}
+                              <Badge variant="outline" className="ml-1">
+                                {quotation.status || "Draft"}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="font-medium">Total Amount:</span> ₱{quotation.total_amount?.toLocaleString() || "0"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Created:</span>{" "}
+                              {quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "job-order" && (
+                <div>
+                  {jobOrdersLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-gray-500">Loading job orders...</p>
+                    </div>
+                  ) : jobOrders.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No job orders found for this site.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {jobOrders.map((jobOrder) => (
+                        <div
+                          key={jobOrder.id}
+                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => router.push(`/admin/job-orders/${jobOrder.id}`)}
+                        >
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">JO Number:</span> {jobOrder.joNumber || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Status:</span>{" "}
+                              <Badge variant="outline" className="ml-1">
+                                {jobOrder.status || "Pending"}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="font-medium">Type:</span> {jobOrder.joType || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Client:</span> {jobOrder.clientName || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Created:</span>{" "}
+                              {jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
