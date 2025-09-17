@@ -79,14 +79,14 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#000000]">
+          <DialogTitle className="flex items-center gap-2 text-[#000000] text-lg md:text-xl">
             <span>+ Add Expense</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 md:space-y-6">
 
           <div>
             <label className="block text-sm font-medium text-[#000000] mb-2">
@@ -95,7 +95,7 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
             <Input
               value={formData.item}
               onChange={(e) => handleInputChange('item', e.target.value)}
-              className="border-[#c4c4c4]"
+              className="border-[#c4c4c4] h-10 md:h-11"
               placeholder="Enter item name"
             />
             {errors.item && <p className="text-red-500 text-xs mt-1">{errors.item}</p>}
@@ -109,7 +109,7 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
               type="number"
               value={formData.amount || ""}
               onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
-              className="border-[#c4c4c4]"
+              className="border-[#c4c4c4] h-10 md:h-11"
               placeholder="0.00"
               min="0"
               step="0.01"
@@ -124,7 +124,7 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
             <Input
               value={formData.requestedBy}
               onChange={(e) => handleInputChange('requestedBy', e.target.value)}
-              className="border-[#c4c4c4]"
+              className="border-[#c4c4c4] h-10 md:h-11"
               placeholder="Enter requester name"
             />
             {errors.requestedBy && <p className="text-red-500 text-xs mt-1">{errors.requestedBy}</p>}
@@ -145,7 +145,7 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
             <Button
               type="button"
               variant="outline"
-              className="w-full border-[#c4c4c4] text-[#a1a1a1] bg-[#efefef] justify-center hover:bg-[#e0e0e0]"
+              className="w-full border-[#c4c4c4] text-[#a1a1a1] bg-[#efefef] justify-center hover:bg-[#e0e0e0] h-10 md:h-11"
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -163,17 +163,17 @@ export function AddExpenseDialog({ isOpen, onClose, onSubmit }: AddExpenseDialog
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
           <Button
             variant="outline"
             onClick={handleClose}
-            className="border-[#c4c4c4] text-[#000000] bg-transparent hover:bg-[#f0f0f0]"
+            className="border-[#c4c4c4] text-[#000000] bg-transparent hover:bg-[#f0f0f0] w-full sm:w-auto h-10 md:h-11"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            className="bg-[#737fff] hover:bg-[#5a5fff] text-white"
+            className="bg-[#737fff] hover:bg-[#5a5fff] text-white w-full sm:w-auto h-10 md:h-11"
           >
             Confirm
           </Button>

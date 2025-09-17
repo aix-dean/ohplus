@@ -17,8 +17,10 @@ interface ExpenseCycle {
 import { Search, ChevronDown, ChevronUp, MoreVertical, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { ConfigurationDialog } from "@/components/configuration-dialog"
+import { ResponsiveTable } from "@/components/responsive-table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,10 +35,14 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { savePettyCashConfig, getPettyCashConfig, createPettyCashCycle, getNextCycleNo, getActivePettyCashCycle, completePettyCashCycle, getPettyCashCycles, getPettyCashExpenses, savePettyCashExpense, getLatestPettyCashCycle, updatePettyCashCycleTotal, uploadFileToFirebase } from "@/lib/petty-cash-service"
 import { useToast } from "@/hooks/use-toast"
+import { useResponsive } from "@/hooks/use-responsive"
+import { News_Cycle } from "next/font/google"
+import { on } from "events"
 
 export default function PettyCashPage() {
   const { userData } = useAuth()
   const { toast } = useToast()
+  const { isMobile, isTablet } = useResponsive()
   const [expandedCycles, setExpandedCycles] = useState<string[]>(["0012"])
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
@@ -410,39 +416,39 @@ export default function PettyCashPage() {
   }, [userData?.company_id])
 
   return (
-    <div className="h-screen bg-[#fafafa] overflow-hidden">
-      <div className="flex h-full">
+    <div className="min-h-screen bg-[#fafafa]">
+      <div className="flex min-h-screen">
         {/* Main Content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto h-full">
+        <main className="flex-1">
+          <div className="max-w-7xl mx-auto">
             {/* Header with Configuration Button */}
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-2xl font-semibold text-[#000000]">Petty Cash</h1>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+              <h1 className="text-xl md:text-2xl font-semibold text-[#000000]">Petty Cash</h1>
               <Button
                 variant="outline"
-                className="border-[#c4c4c4] text-[#000000] bg-transparent"
+                className="border-[#c4c4c4] text-[#000000] bg-transparent w-full sm:w-auto"
                 onClick={() => setIsConfigOpen(true)}
               >
                 Configuration
               </Button>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-8 h-full">
+            <div className="flex flex-col xl:flex-row gap-6 lg:gap-8">
               {/* On Hand Section */}
-              <div className="bg-white rounded-lg border border-[#e0e0e0] p-6 flex flex-col flex-1 min-h-auto">
-                <div className="flex-1 h-20">
+              <div className="bg-white rounded-lg border border-[#e0e0e0] p-4 md:p-6 flex flex-col min-h-[500px] xl:min-h-[600px] max-h-[700px]">
+                <div className="flex-1">
                   <h2 className="text-lg font-medium text-[#000000] mb-4">On Hand</h2>
-                  <div className={`text-4xl font-bold mb-4 flex items-center justify-center gap-2 ${isBalanceLow ? 'text-red-600' : 'text-[#30c71d]'}`}>
-                    {isBalanceLow && <AlertTriangle className="w-8 h-8 text-red-600" />}
+                  <div className={`text-2xl md:text-3xl lg:text-4xl font-bold mb-4 flex items-center justify-center gap-2 ${isBalanceLow ? 'text-red-600' : 'text-[#30c71d]'}`}>
+                    {isBalanceLow && <AlertTriangle className="w-6 h-6 md:w-8 md:h-8 text-red-600" />}
                     <span>₱{onHandAmount.toLocaleString()}</span>
                   </div>
                   {isBalanceLow && (
-                    <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md mb-4">
+                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md mb-4">
                       ⚠️ Petty cash balance is low! Consider replenishing.
                     </div>
                   )}
                   <div className="text-sm text-[#a1a1a1] space-y-1">
-                    <div className="text-center">Cycle#: 0012</div>
+                    <div className="text-center">Cycle#: {12}</div>
                     <div>Start: Nov 10, 2025</div>
                   </div>
                 </div>
@@ -457,20 +463,20 @@ export default function PettyCashPage() {
                         Replenish
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="sm:max-w-md">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-[#000000]">Create New Cycle</AlertDialogTitle>
                         <AlertDialogDescription className="text-[#666666]">
                           Do you want to make a New Cycle? This will archive the current cycle and start fresh with the configured petty cash amount.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="border-[#c4c4c4] text-[#000000] bg-transparent hover:bg-[#fafafa]">
+                      <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel className="border-[#c4c4c4] text-[#000000] bg-transparent hover:bg-[#fafafa] w-full sm:w-auto">
                           No
                         </AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleReplenishConfirm}
-                          className="bg-[#737fff] hover:bg-[#5a5fff] text-white"
+                          className="bg-[#737fff] hover:bg-[#5a5fff] text-white w-full sm:w-auto"
                         >
                           Yes
                         </AlertDialogAction>
@@ -487,17 +493,17 @@ export default function PettyCashPage() {
               </div>
 
               {/* Expenses Section */}
-              <div className="bg-white rounded-lg border border-[#e0e0e0] p-6 flex flex-col flex-1 min-h-0">
+              <div className="bg-white rounded-lg border border-[#e0e0e0] p-4 md:p-6 flex flex-col min-h-[500px] xl:min-h-[600px] w-full max-h-[700px]">
                 <h2 className="text-lg font-medium text-[#000000] mb-4">Expenses</h2>
 
                 {/* Search Bar */}
-                <div className="relative mb-6">
+                <div className="relative mb-4 md:mb-6">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4" />
                   <Input placeholder="Search" className="pl-10 border-[#e0e0e0] bg-[#fafafa]" />
                 </div>
 
                 {/* Expense Cycles List */}
-                <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full">
                   {isExpensesLoading ? (
                     <div className="text-center py-8 text-[#a1a1a1]">Loading expense cycles...</div>
                   ) : expenseCycles.length === 0 ? (
@@ -506,68 +512,75 @@ export default function PettyCashPage() {
                     expenseCycles.map((cycle, index) => {
                     const isExpanded = expandedCycles.includes(cycle.id)
                     return (
-                      <div key={cycle.id} className={`bg-[#f6f9ff] rounded-lg border border-[#b8d9ff] ${index > 0 ? 'mt-3' : ''}`}>
+                      <div key={cycle.id} className={`bg-[#f6f9ff] rounded-lg border border-[#b8d9ff] w-full ${index > 0 ? 'mt-3' : ''}`}>
                         <div
-                          className="flex items-center justify-between p-4 cursor-pointer"
+                          className="flex items-center justify-between p-3 md:p-4 cursor-pointer"
                           onClick={() => toggleCycle(cycle.id)}
                         >
-                          <div className="flex-1">
-                            <div className="font-medium text-[#000000] mb-1">Cycle#:{cycle.id}</div>
-                            <div className="text-sm text-[#a1a1a1]">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[#000000] mb-1 text-sm md:text-base">Cycle#:{cycle.id}</div>
+                            <div className="text-xs md:text-sm text-[#a1a1a1]">
                               <div>From: {cycle.from}</div>
                               <div>Until: {cycle.until}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 md:gap-3 ml-2">
                             <div className="text-right">
-                              <div className="font-medium text-[#000000]">{cycle.amount.toLocaleString()}</div>
-                              <div className="text-sm text-[#a1a1a1]">Total Amount</div>
+                              <div className="font-medium text-[#000000] text-sm md:text-base">{(cycle.amount).toLocaleString() }</div>
+                              <div className="text-xs md:text-sm text-[#a1a1a1]">Total Amount</div>
                             </div>
                             {isExpanded ? (
-                              <ChevronUp className="w-5 h-5 text-[#a1a1a1]" />
+                              <ChevronUp className="w-4 h-4 md:w-5 md:h-5 text-[#a1a1a1] flex-shrink-0" />
                             ) : (
-                              <ChevronDown className="w-5 h-5 text-[#a1a1a1]" />
+                              <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-[#a1a1a1] flex-shrink-0" />
                             )}
                           </div>
                         </div>
 
                         {isExpanded && cycle.expenses.length > 0 && (
-                          <div className="px-4 pb-4">
+                          <div className="mt-2">
                             <div className="bg-white rounded-lg border border-[#e0e0e0] overflow-hidden">
-                              <table className="w-full">
-                                <thead className="bg-[#fafafa] border-b border-[#e0e0e0]">
-                                  <tr>
-                                    <th className="text-left px-4 py-3 text-sm font-medium text-[#000000]">Item</th>
-                                    <th className="text-left px-4 py-3 text-sm font-medium text-[#000000]">Amount</th>
-                                    <th className="text-left px-4 py-3 text-sm font-medium text-[#000000]">Date</th>
-                                    <th className="text-left px-4 py-3 text-sm font-medium text-[#000000]">
-                                      Requested By
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-sm font-medium text-[#000000]">Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {cycle.expenses.map((expense, index) => (
-                                    <tr key={index} className="border-b border-[#e0e0e0] last:border-b-0">
-                                      <td className="px-4 py-3">
-                                        <a href="#" className="text-[#737fff] hover:underline text-sm">
-                                          {expense.item}
-                                        </a>
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#000000]">
-                                        {expense.amount.toLocaleString()}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#000000]">{expense.date}</td>
-                                      <td className="px-4 py-3 text-sm text-[#000000]">{expense.requestedBy}</td>
-                                      <td className="px-4 py-3">
-                                        <button className="text-[#a1a1a1] hover:text-[#000000]">
-                                          <MoreVertical className="w-4 h-4" />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              <ResponsiveTable
+                                data={cycle.expenses}
+                                columns={[
+                                  {
+                                    header: "Item",
+                                    accessorKey: "item",
+                                    cell: (row) => (
+                                      <a href="#" className="text-[#737fff] hover:underline text-sm">
+                                        {row.item}
+                                      </a>
+                                    ),
+                                    hideOnMobile: false,
+                                  },
+                                  {
+                                    header: "Amount",
+                                    accessorKey: "amount",
+                                    cell: (row) => row.amount.toLocaleString(),
+                                    hideOnMobile: false,
+                                  },
+                                  {
+                                    header: "Date",
+                                    accessorKey: "date",
+                                    hideOnMobile: true,
+                                  },
+                                  {
+                                    header: "Requested By",
+                                    accessorKey: "requestedBy",
+                                    hideOnMobile: true,
+                                  },
+                                  {
+                                    header: "Actions",
+                                    cell: () => (
+                                      <button className="text-[#a1a1a1] hover:text-[#000000]">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </button>
+                                    ),
+                                    hideOnMobile: false,
+                                  },
+                                ]}
+                                keyField="item"
+                              />
                             </div>
                           </div>
                         )}
