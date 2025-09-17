@@ -16,6 +16,7 @@ interface JobOrderSelectionDialogProps {
   productId: string
   companyId: string
   onSelectJobOrder: (jobOrder: JobOrder) => void
+  selectedJobOrderId?: string | null
 }
 
 export function JobOrderSelectionDialog({
@@ -24,11 +25,12 @@ export function JobOrderSelectionDialog({
   productId,
   companyId,
   onSelectJobOrder,
+  selectedJobOrderId,
 }: JobOrderSelectionDialogProps) {
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedJobOrderId, setSelectedJobOrderId] = useState<string | null>(null)
+  const [currentSelectedJobOrderId, setCurrentSelectedJobOrderId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<{
     hasNextPage: boolean
@@ -87,7 +89,7 @@ export function JobOrderSelectionDialog({
     if (open && productId) {
       console.log('Opening dialog with productId:', productId, 'companyId:', companyId)
       fetchJobOrders(1)
-      setSelectedJobOrderId(null) // Reset selection when dialog opens
+      setCurrentSelectedJobOrderId(selectedJobOrderId || null) // Reset selection when dialog opens
       setCurrentPage(1) // Reset page when dialog opens
     }
   }, [open, productId])
@@ -131,8 +133,8 @@ export function JobOrderSelectionDialog({
   }
 
   const handleSelectJobOrder = () => {
-    if (selectedJobOrderId) {
-      const selectedJobOrder = jobOrders.find(jo => jo.id === selectedJobOrderId)
+    if (currentSelectedJobOrderId) {
+      const selectedJobOrder = jobOrders.find(jo => jo.id === currentSelectedJobOrderId)
       if (selectedJobOrder) {
         onSelectJobOrder(selectedJobOrder)
         onOpenChange(false)
@@ -183,20 +185,20 @@ export function JobOrderSelectionDialog({
                 <div
                   key={jo.id}
                   className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                    selectedJobOrderId === jo.id
+                    currentSelectedJobOrderId === jo.id
                       ? "border-blue-500 bg-blue-50 shadow-md"
                       : "border-gray-200 hover:shadow-md hover:border-gray-300"
                   }`}
-                  onClick={() => setSelectedJobOrderId(jo.id)}
+                  onClick={() => setCurrentSelectedJobOrderId(jo.id)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        selectedJobOrderId === jo.id
+                        currentSelectedJobOrderId === jo.id
                           ? "border-blue-500 bg-blue-500"
                           : "border-gray-300"
                       }`}>
-                        {selectedJobOrderId === jo.id && (
+                        {currentSelectedJobOrderId === jo.id && (
                           <Check className="h-2.5 w-2.5 text-white" />
                         )}
                       </div>
@@ -281,7 +283,7 @@ export function JobOrderSelectionDialog({
           </Button>
           <Button
             onClick={handleSelectJobOrder}
-            disabled={!selectedJobOrderId}
+            disabled={!currentSelectedJobOrderId}
             className="bg-blue-600 hover:bg-blue-700"
           >
             Select Job Order

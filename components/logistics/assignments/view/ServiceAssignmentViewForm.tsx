@@ -1,10 +1,8 @@
-import { ServiceAssignmentCard } from './ServiceAssignmentCard';
-import { ServiceExpenseCard } from './ServiceExpenseCard';
-import { ActionButtons } from './ActionButtons';
+import { ServiceAssignmentViewCard } from './ServiceAssignmentViewCard';
+import { ServiceExpenseViewCard } from './ServiceExpenseViewCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Search, X } from 'lucide-react';
 import { format } from "date-fns";
 import type { Timestamp } from "firebase/firestore";
 import type { Product } from "@/lib/firebase-service";
@@ -14,10 +12,8 @@ import type { JobOrder } from "@/lib/types/job-order";
 // Job Order Details Card Component
 function JobOrderDetailsCard({
   jobOrder,
-  onChange
 }: {
   jobOrder: JobOrder;
-  onChange: () => void;
 }) {
   // Helper function to format date
   const formatDate = (date: string | Date | Timestamp | undefined) => {
@@ -33,12 +29,7 @@ function JobOrderDetailsCard({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span className="text-2xl font-bold">JOB ORDER</span>
-          <Button variant="ghost" size="sm" onClick={onChange}>
-            <X className="h-5 w-5" />
-          </Button>
-        </CardTitle>
+        <CardTitle className="text-2xl font-bold">JOB ORDER</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="flex justify-between items-center">
@@ -88,126 +79,41 @@ function JobOrderDetailsCard({
           <Label className="w-1/2">Requested by:</Label>
           <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
         </div>
-        <div className="flex justify-end">
-          <Button variant="link" size="sm" onClick={onChange}>Change</Button>
-        </div>
       </CardContent>
     </Card>
   );
 }
 
-interface FormData {
-  projectSite: string;
-  serviceType: string;
-  assignedTo: string;
-  serviceDuration: number;
-  priority: string;
-  equipmentRequired: string;
-  materialSpecs: string;
-  crew: string;
-  illuminationNits: string;
-  gondola: string;
-  technology: string;
-  sales: string;
-  remarks: string;
-  message: string;
-  startDate: Date | null;
-  endDate: Date | null;
-  alarmDate: Date | null;
-  alarmTime: string;
-  attachments: { name: string; type: string; file?: File }[];
-  serviceExpenses: { name: string; amount: string }[];
-  serviceCost: {
-    crewFee: string;
-    overtimeFee: string;
-    transpo: string;
-    tollFee: string;
-    mealAllowance: string;
-    otherFees: { name: string; amount: string }[];
-    total: number;
-  };
-}
-
-export function CreateServiceAssignmentForm({
-  onSaveAsDraft,
-  onSubmit,
-  loading,
-  companyId,
-  productId,
-  formData,
-  handleInputChange,
+export function ServiceAssignmentViewForm({
+  assignmentData,
   products,
   teams,
-  saNumber,
   jobOrderData,
-  addExpense,
-  removeExpense,
-  updateExpense,
-  calculateTotal,
-  onOpenProductSelection,
-  onIdentifyJO,
-  onChangeJobOrder,
 }: {
-  onSaveAsDraft: () => Promise<void>;
-  onSubmit: () => Promise<void>;
-  loading: boolean;
-  companyId: string | null;
-  productId: string;
-  formData: FormData;
-  handleInputChange: (field: string, value: any) => void;
+  assignmentData: any;
   products: Product[];
   teams: Team[];
-  saNumber: string;
   jobOrderData: JobOrder | null;
-  addExpense: () => void;
-  removeExpense: (index: number) => void;
-  updateExpense: (index: number, field: "name" | "amount", value: string) => void;
-  calculateTotal: () => number;
-  onOpenProductSelection: () => void;
-  onIdentifyJO?: () => void;
-  onChangeJobOrder?: () => void;
 }) {
   return (
-    <div className="flex flex-col lg:flex-row  p-4">
+    <div className="flex flex-col lg:flex-row p-4">
       <div className="flex flex-col gap-6 w-full lg:w-[60%]">
-        <ServiceAssignmentCard
-          companyId={companyId}
-          productId={productId}
-          formData={formData}
-          handleInputChange={handleInputChange}
+        <ServiceAssignmentViewCard
+          assignmentData={assignmentData}
           products={products}
           teams={teams}
-          saNumber={saNumber}
           jobOrderData={jobOrderData}
-          onOpenProductSelection={onOpenProductSelection}
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[40%]">
-        {jobOrderData ? (
+        {jobOrderData && (
           <JobOrderDetailsCard
             jobOrder={jobOrderData}
-            onChange={onChangeJobOrder || (() => {})}
           />
-        ) : (
-          onIdentifyJO && (
-            <Card className="w-full">
-              <CardContent className="flex justify-center items-center p-4">
-                <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={onIdentifyJO}>
-                  <Search className="h-4 w-4 mr-2" />
-                  Identify JO
-                </Button>
-              </CardContent>
-            </Card>
-          )
         )}
-        <ServiceExpenseCard
-          expenses={formData.serviceExpenses}
-          addExpense={addExpense}
-          removeExpense={removeExpense}
-          updateExpense={updateExpense}
-          calculateTotal={calculateTotal}
+        <ServiceExpenseViewCard
+          expenses={assignmentData.serviceExpenses || []}
         />
-        <ActionButtons onSaveAsDraft={onSaveAsDraft} onSubmit={onSubmit} loading={loading} />
       </div>
     </div>
   );

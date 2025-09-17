@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import type { QuotationProduct, ProjectCompliance, ClientCompliance } from "@/lib/types/quotation"
 
 // Initialize Firebase Storage
 const storage = getStorage()
@@ -54,7 +55,6 @@ export interface Product {
     spots_per_loop?: number
   } | null
   specs_rental?: {
-    audience_type?: string
     audience_types?: string[]
     geopoint?: [number, number]
     location?: string
@@ -62,7 +62,25 @@ export interface Product {
     elevation?: number | null
     height?: number | null
     width?: number | null
-    illumination?: string
+    site_orientation?: string | null
+    caretaker?: string | null
+    structure:{
+      color?: string | null
+      condition?: string | null
+      contractor?: string | null
+      last_maintenance?: Date | null
+    }
+    illumination:{
+      bottom_count?: number | null
+      bottom_lighting_specs?: string | null
+      left_count?: number | null
+      left_lighting_specs?: string | null
+      right_count?: number | null
+      right_lighting_specs?: string | null
+      upper_count?: number | null
+      upper_lighting_specs?: string | null
+      power_consumption_monthly?: number | null
+    }
   }
   type?: string
   status?: string
@@ -123,6 +141,7 @@ export interface ServiceAssignment {
   alarmDate: Date | null
   alarmTime: string
   attachments: { name: string; type: string }[]
+  serviceExpenses: { name: string; amount: string }[]
   status: string
   created: any
   updated: any
@@ -188,28 +207,34 @@ export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
+  start_date?: Date | any // Made optional - supports both string and Timestamp
+  end_date?: Date | any // Made optional - supports both string and Timestamp
   total_amount: number
-  duration_days: number
+  duration_days: number // Overall duration for the quotation
   notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
-  created: any
-  updated?: any
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" | "reserved"
+  created: any // Firebase Timestamp
+  updated?: any // Firebase Timestamp
   created_by?: string
   created_by_first_name?: string
   created_by_last_name?: string
   client_name?: string
   client_email?: string
-  client_id?: string // Added client_id
+  client_id?: string
+  client_company_id?: string // Added client company ID
+  client_company_name?: string // Added client company name
+  client_designation?: string // Added client designation
+  client_address?: string // Added client address
+  client_phone?: string // Added client phone
   campaignId?: string
   proposalId?: string
-  valid_until?: any
+  company_id?: string // Added company ID
+  valid_until?: any // Firebase Timestamp
+  seller_id?: string
+  product_id?: string // Added to support legacy single product quotations
+  items: QuotationProduct // Changed from array to single object
+  projectCompliance?: ProjectCompliance
+  client_compliance?: ClientCompliance // Added client compliance
 }
 
 // PaginatedResult interface
@@ -744,6 +769,23 @@ export async function updateServiceAssignment(
     await updateDoc(assignmentRef, updateData)
   } catch (error) {
     console.error("Error updating service assignment:", error)
+    throw error
+  }
+}
+
+export async function createServiceAssignment(assignmentData: Omit<ServiceAssignment, "id" | "created" | "updated">): Promise<string> {
+  try {
+    const newAssignment = {
+      ...assignmentData,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(collection(db, "service_assignments"), newAssignment)
+    console.log("Service assignment created with ID:", docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating service assignment:", error)
     throw error
   }
 }

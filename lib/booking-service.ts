@@ -9,6 +9,8 @@ import {
   startAfter,
   type DocumentSnapshot,
   addDoc,
+  updateDoc,
+  doc,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore"
@@ -188,13 +190,13 @@ export class BookingService {
         contract: quotation.contract || "",
         cost: quotation.items?.price || quotation.total_cost || 0,
         costDetails: {
-          basePrice: quotation.items[0]?.price || 0,
-          days: quotation.items[0]?.duration_days || 0,
+          basePrice: quotation.items?.price || 0,
+          days: quotation.items?.duration_days || 0,
           discount: quotation.discount || 0,
           months: quotation.months || 0,
           otherFees: quotation.other_fees || 0,
-          pricePerMonth: quotation.items[0]?.price || 0,
-          total: quotation.items[0]?.item_total_amount || quotation.total_cost || 0,
+          pricePerMonth: quotation.items?.price || 0,
+          total: quotation.items?.item_total_amount || quotation.total_cost || 0,
           vatAmount: quotation.vat_amount || 0,
           vatRate: quotation.vat_rate || 0,
         },
@@ -202,8 +204,8 @@ export class BookingService {
         end_date: quotation.end_date ? this.convertToTimestamp(quotation.end_date) : null,
         media_order: quotation.media_order || [],
         payment_method: quotation.payment_method || "Manual Payment",
-        product_name: quotation.items[0]?.name,
-        product_id: quotation.items[0]?.product_id || "",
+        product_name: quotation.items?.name,
+        product_id: quotation.items?.product_id || "",
         product_owner: quotation.product_owner || "",
         promos: quotation.promos || {},
         projectCompliance: quotation.projectCompliance || undefined, // Copy projectCompliance from quotation
@@ -225,6 +227,27 @@ export class BookingService {
       return docRef.id
     } catch (error) {
       console.error("[DEBUG] Error creating booking:", error)
+      throw error
+    }
+  }
+
+  async updateBookingProjectCompliance(quotationId: string, projectCompliance: ProjectCompliance): Promise<void> {
+    try {
+      const bookingsRef = collection(db, "booking")
+      const q = query(bookingsRef, where("quotation_id", "==", quotationId))
+      const querySnapshot = await getDocs(q)
+
+      const updates = querySnapshot.docs.map((document) =>
+        updateDoc(doc(db, "booking", document.id), {
+          projectCompliance,
+          updated: serverTimestamp(),
+        })
+      )
+
+      await Promise.all(updates)
+      console.log(`Updated projectCompliance for ${updates.length} booking(s) with quotation_id: ${quotationId}`)
+    } catch (error) {
+      console.error("Error updating booking projectCompliance:", error)
       throw error
     }
   }

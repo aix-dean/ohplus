@@ -49,6 +49,7 @@ interface CostEstimateSiteData {
   price: number
   type: string
   image?: string // Added image field for product images
+  specs_rental?: any // Added specs_rental field to match quotation structure
 }
 
 // Generate a secure password for cost estimate access
@@ -186,6 +187,7 @@ export async function createDirectCostEstimate(
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
           image: site.image || undefined, // Added image field to line items
+          specs: site.specs_rental, // Added specs field to match quotation structure
         })
       })
     }
@@ -636,6 +638,7 @@ export async function createMultipleCostEstimates(
         category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
         notes: `Location: ${site.location}`,
         image: site.image || undefined, // Added image field to line items for multiple cost estimates
+        specs: site.specs_rental, // Added specs field to match quotation structure
       })
 
       // Calculate total amount for this site
@@ -761,6 +764,65 @@ export async function getCostEstimatesByClientId(clientId: string): Promise<Cost
     })
   } catch (error) {
     console.error("Error fetching cost estimates by client ID:", error)
+    return []
+  }
+}
+
+// Get cost estimates by product ID and company ID for history sidebar
+export async function getCostEstimatesByProductIdAndCompanyId(productId: string, companyId: string, excludeId?: string): Promise<CostEstimate[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const costEstimatesRef = collection(db, COST_ESTIMATES_COLLECTION)
+    const q = query(costEstimatesRef, orderBy("createdAt", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const costEstimates: CostEstimate[] = []
+
+    querySnapshot.forEach((doc) => {
+      // Skip the excluded cost estimate if specified
+      if (excludeId && doc.id === excludeId) {
+        return
+      }
+
+      const data = doc.data()
+      const costEstimate = {
+        id: doc.id,
+        proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems || [],
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        company_id: data.company_id || "",
+        page_id: data.page_id || "",
+        page_number: data.page_number || 1,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+
+      // Check if the cost estimate matches the product ID and company ID
+      const hasMatchingProduct = costEstimate.lineItems.some((item) => item.id === productId)
+      const hasMatchingCompany = costEstimate.company_id === companyId
+
+      if (hasMatchingProduct && hasMatchingCompany) {
+        costEstimates.push(costEstimate)
+      }
+    })
+
+    return costEstimates
+  } catch (error) {
+    console.error("Error fetching cost estimates by product ID and company ID:", error)
     return []
   }
 }
