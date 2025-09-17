@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
       body: customBody,
       currentUserEmail,
       ccEmail,
+      replyToEmail,
+      companyName,
       preGeneratedPDFs,
       uploadedFiles,
     } = body
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Use custom subject and body if provided, otherwise fall back to default
     const finalSubject =
-      subject || `Quotation: ${quotation.items?.[0]?.name || "Custom Advertising Solution"} - OH Plus`
+      subject || `Quotation: ${quotation.items?.[0]?.name || "Custom Advertising Solution"} - ${companyName || "Company"}`
 
     // Format custom body as HTML if provided
     const formattedCustomBody = customBody
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Quotation from OH Plus</title>
+        <title>Quotation from ${companyName || "Company"}</title>
         <style>
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -227,8 +229,8 @@ export async function POST(request: NextRequest) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>OH Plus</h1>
-            <p>Professional Outdoor Advertising Solutions</p>
+            <h1>${companyName || "Company"}</h1>
+            <p>Professional Advertising Solutions</p>
           </div>
 
           <div class="content">
@@ -280,21 +282,21 @@ export async function POST(request: NextRequest) {
 
             <div class="contact-info">
               <strong>Ready to get started?</strong><br>
-              📧 Email: sales@ohplus.ph<br>
-              📞 Phone: +63 123 456 7890
+              📧 Email: ${currentUserEmail || "contact@company.com"}<br>
+              📞 Phone: ${currentUserEmail ? "Contact us for details" : "+63 123 456 7890"}
             </div>
 
-            <p>Thank you for considering OH Plus as your advertising partner. We look forward to creating something amazing together!</p>
+            <p>Thank you for considering ${companyName || "our company"} as your advertising partner. We look forward to creating something amazing together!</p>
 
             <p style="margin-bottom: 0;">
               Best regards,<br>
-              <strong>The OH Plus Team</strong>
+              <strong>The ${companyName || "Company"} Team</strong>
             </p>
           </div>
 
           <div class="footer">
             <p>This quotation is confidential and intended solely for ${quotation.client_company_name || "your company"}.</p>
-            <p>© ${new Date().getFullYear()} OH Plus. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ${companyName || "Company"}. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -336,11 +338,11 @@ export async function POST(request: NextRequest) {
 
     // Prepare email data with all attachments
     const emailData: any = {
-      from: "OH Plus <noreply@ohplus.ph>",
+      from: `${companyName || "Company"} <noreply@company.com>`,
       to: [clientEmail],
       subject: finalSubject,
       html: finalBody,
-      reply_to: currentUserEmail ? [currentUserEmail] : undefined,
+      reply_to: replyToEmail ? [replyToEmail] : (currentUserEmail ? [currentUserEmail] : undefined),
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
     }
 
