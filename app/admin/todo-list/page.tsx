@@ -17,6 +17,7 @@ import type { Todo } from "@/lib/types/todo"
 import { FileUpload } from "@/components/file-upload"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { Timestamp } from "firebase/firestore"
 import { toast } from "sonner"
 import {
   DndContext,
@@ -30,6 +31,22 @@ import {
   useDroppable,
 } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
+
+// Helper function to convert timestamp to ISO string
+const timestampToISOString = (timestamp: Timestamp | string): string => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate().toISOString()
+  }
+  return timestamp
+}
+
+// Helper function to convert ISO string to Date for display
+const getDateForDisplay = (timestamp: Timestamp | string): Date => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate()
+  }
+  return new Date(timestamp)
+}
 
 // Color mapping function for todo statuses
 const getStatusColors = (status: Todo["status"]) => {
@@ -126,8 +143,27 @@ function DraggableTodoCard({
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="font-medium">Date:</span>
-          <span>{todo.date}</span>
+          <span className="font-medium">Start:</span>
+          <span>{getDateForDisplay(todo.start_date).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-medium">End:</span>
+          <span>{getDateForDisplay(todo.end_date).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}</span>
         </div>
 
         <div className="flex justify-between items-center">
@@ -136,18 +172,17 @@ function DraggableTodoCard({
         </div>
 
         <div className="flex justify-between">
-          <span className="font-medium">Start:</span>
-          <span>{todo.startTime}</span>
-        </div>
-
-        <div className="flex justify-between">
-          <span className="font-medium">End:</span>
-          <span>{todo.endTime}</span>
-        </div>
-
-        <div className="flex justify-between">
           <span className="font-medium">Repeat:</span>
           <span>{todo.repeat}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-medium">Created:</span>
+          <span>{todo.created_at?.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}</span>
         </div>
       </div>
 
@@ -283,11 +318,11 @@ export default function TodoApp() {
   const [newTodo, setNewTodo] = useState({
     title: "",
     description: "",
-    date: new Date().toISOString().split("T")[0],
+    start_date: new Date().toISOString(),
+    end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
-    startTime: "09:00",
-    endTime: "10:00",
     repeat: "Once",
+    department: "admin",
   })
 
   const sensors = useSensors(
@@ -304,13 +339,48 @@ export default function TodoApp() {
     }
   }, [userData])
 
+  // Helper function to convert timestamp to ISO string
+  const timestampToISOString = (timestamp: Timestamp | string): string => {
+    if (timestamp instanceof Timestamp) {
+      return timestamp.toDate().toISOString()
+    }
+    return timestamp
+  }
+
+  // Helper function to convert ISO string to Date for display
+  const getDateForDisplay = (timestamp: Timestamp | string): Date => {
+    if (timestamp instanceof Timestamp) {
+      return timestamp.toDate()
+    }
+    return new Date(timestamp)
+  }
+
+  // Validation for start date/time not being after end date/time
+  useEffect(() => {
+    if (newTodo.start_date && newTodo.end_date) {
+      const startDateTime = new Date(timestampToISOString(newTodo.start_date))
+      const endDateTime = new Date(timestampToISOString(newTodo.end_date))
+
+      if (startDateTime > endDateTime) {
+        // Auto-adjust end date/time to be after start
+        const newEndDateTime = new Date(startDateTime.getTime() + (60 * 60 * 1000)) // Add 1 hour
+        setNewTodo(prev => ({
+          ...prev,
+          end_date: newEndDateTime.toISOString()
+        }))
+      }
+    }
+  }, [newTodo.start_date, newTodo.end_date])
+
   const fetchTodos = async () => {
     if (!userData?.uid) return
 
     try {
       setLoading(true)
       const fetchedTodos = await getTodosByUser(userData.uid, userData.company_id || undefined)
-      setTodos(fetchedTodos)
+      // Filter to only show admin department todos
+      const adminTodos = fetchedTodos.filter(todo => todo.department === "admin")
+      setTodos(adminTodos)
     } catch (error) {
       console.error("Error fetching todos:", error)
       toast.error("Failed to load todos")
@@ -342,36 +412,20 @@ export default function TodoApp() {
       }
 
       const todoData = {
-        title: newTodo.title || "New Task",
-        description: newTodo.description,
-        date: new Date(newTodo.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        allDay: newTodo.allDay,
-        startTime: newTodo.allDay
-          ? "-"
-          : new Date(`2000-01-01T${newTodo.startTime}`).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            }),
-        endTime: newTodo.allDay
-          ? "-"
-          : new Date(`2000-01-01T${newTodo.endTime}`).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            }),
-        repeat: newTodo.repeat,
-        completed: false,
-        status: "todo" as const,
-        company_id: userData.company_id,
-        user_id: userData.uid,
-        attachments: attachmentUrls,
-        isDeleted: false,
-      }
+         title: newTodo.title || "New Task",
+         description: newTodo.description,
+         start_date: Timestamp.fromDate(new Date(newTodo.start_date)),
+         end_date: Timestamp.fromDate(new Date(newTodo.end_date)),
+         allDay: newTodo.allDay,
+         repeat: newTodo.repeat,
+         completed: false,
+         status: "todo" as const,
+         company_id: userData.company_id,
+         user_id: userData.uid,
+         department: newTodo.department,
+         attachments: attachmentUrls,
+         isDeleted: false,
+       }
 
       const todoId = await createTodo(todoData)
       toast.success("Todo created successfully")
@@ -380,11 +434,11 @@ export default function TodoApp() {
       setNewTodo({
         title: "",
         description: "",
-        date: new Date().toISOString().split("T")[0],
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
-        startTime: "09:00",
-        endTime: "10:00",
         repeat: "Once",
+        department: "admin",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)
@@ -650,16 +704,6 @@ export default function TodoApp() {
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="font-medium">Date:</label>
-                  <Input
-                    type="date"
-                    value={newTodo.date}
-                    onChange={(e) => setNewTodo({ ...newTodo, date: e.target.value })}
-                    className="w-auto"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center">
                   <label className="font-medium">All Day:</label>
                   <Switch
                     checked={newTodo.allDay}
@@ -667,29 +711,27 @@ export default function TodoApp() {
                   />
                 </div>
 
-                {!newTodo.allDay && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">Start:</label>
-                      <Input
-                        type="time"
-                        value={newTodo.startTime}
-                        onChange={(e) => setNewTodo({ ...newTodo, startTime: e.target.value })}
-                        className="w-auto"
-                      />
-                    </div>
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Start Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={newTodo.start_date.slice(0, 16)}
+                    onChange={(e) => setNewTodo({ ...newTodo, start_date: e.target.value })}
+                    className="w-auto"
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
 
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">End:</label>
-                      <Input
-                        type="time"
-                        value={newTodo.endTime}
-                        onChange={(e) => setNewTodo({ ...newTodo, endTime: e.target.value })}
-                        className="w-auto"
-                      />
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">End Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={newTodo.end_date.slice(0, 16)}
+                    onChange={(e) => setNewTodo({ ...newTodo, end_date: e.target.value })}
+                    className="w-auto"
+                    min={newTodo.start_date.slice(0, 16)}
+                  />
+                </div>
 
                 <div className="flex justify-between items-center">
                   <label className="font-medium">Repeat:</label>
@@ -706,6 +748,7 @@ export default function TodoApp() {
                     </SelectContent>
                   </Select>
                 </div>
+
               </div>
 
               <div className="space-y-2">
@@ -755,19 +798,6 @@ export default function TodoApp() {
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="font-medium">Date:</label>
-                  <Input
-                    type="date"
-                    value={selectedTodo?.date || ""}
-                    onChange={(e) => {
-                      if (!selectedTodo) return
-                      setSelectedTodo({ ...selectedTodo, date: e.target.value })
-                    }}
-                    className="w-auto"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center">
                   <label className="font-medium">All Day:</label>
                   <Switch
                     checked={selectedTodo?.allDay || false}
@@ -778,35 +808,33 @@ export default function TodoApp() {
                   />
                 </div>
 
-                {!selectedTodo?.allDay && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">Start:</label>
-                      <Input
-                        type="time"
-                        value={selectedTodo?.startTime || ""}
-                        onChange={(e) => {
-                          if (!selectedTodo) return
-                          setSelectedTodo({ ...selectedTodo, startTime: e.target.value })
-                        }}
-                        className="w-auto"
-                      />
-                    </div>
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Start Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={selectedTodo?.start_date ? timestampToISOString(selectedTodo.start_date).slice(0, 16) : ""}
+                    onChange={(e) => {
+                      if (!selectedTodo) return
+                      setSelectedTodo({ ...selectedTodo, start_date: e.target.value })
+                    }}
+                    className="w-auto"
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
 
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">End:</label>
-                      <Input
-                        type="time"
-                        value={selectedTodo?.endTime || ""}
-                        onChange={(e) => {
-                          if (!selectedTodo) return
-                          setSelectedTodo({ ...selectedTodo, endTime: e.target.value })
-                        }}
-                        className="w-auto"
-                      />
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">End Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={selectedTodo?.end_date ? timestampToISOString(selectedTodo.end_date).slice(0, 16) : ""}
+                    onChange={(e) => {
+                      if (!selectedTodo) return
+                      setSelectedTodo({ ...selectedTodo, end_date: e.target.value })
+                    }}
+                    className="w-auto"
+                    min={selectedTodo?.start_date ? timestampToISOString(selectedTodo.start_date).slice(0, 16) : ""}
+                  />
+                </div>
 
                 <div className="flex justify-between items-center">
                   <label className="font-medium">Repeat:</label>
@@ -829,6 +857,7 @@ export default function TodoApp() {
                     </SelectContent>
                   </Select>
                 </div>
+
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -841,14 +870,14 @@ export default function TodoApp() {
 
                     try {
                       const updates = {
-                        title: selectedTodo.title,
-                        description: selectedTodo.description,
-                        date: selectedTodo.date,
-                        allDay: selectedTodo.allDay,
-                        startTime: selectedTodo.startTime,
-                        endTime: selectedTodo.endTime,
-                        repeat: selectedTodo.repeat,
-                      }
+                         title: selectedTodo.title,
+                         description: selectedTodo.description,
+                         start_date: Timestamp.fromDate(getDateForDisplay(selectedTodo.start_date)),
+                         end_date: Timestamp.fromDate(getDateForDisplay(selectedTodo.end_date)),
+                         allDay: selectedTodo.allDay,
+                         repeat: selectedTodo.repeat,
+                         department: selectedTodo.department,
+                       }
 
                       await updateTodo(selectedTodo.id, updates)
                       setTodos(todos.map((t) => (t.id === selectedTodo.id ? { ...t, ...updates } : t)))
@@ -910,8 +939,26 @@ export default function TodoApp() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <h4 className="font-semibold mb-1">Date</h4>
-                        <p>{selectedTodo.date}</p>
+                        <h4 className="font-semibold mb-1">Start Date & Time</h4>
+                        <p>{getDateForDisplay(selectedTodo.start_date).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1">End Date & Time</h4>
+                        <p>{getDateForDisplay(selectedTodo.end_date).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}</p>
                       </div>
                       <div>
                         <h4 className="font-semibold mb-1">Status</h4>
@@ -931,18 +978,10 @@ export default function TodoApp() {
                         <h4 className="font-semibold mb-1">Repeat</h4>
                         <p>{selectedTodo.repeat}</p>
                       </div>
-                      {!selectedTodo.allDay && (
-                        <>
-                          <div>
-                            <h4 className="font-semibold mb-1">Start Time</h4>
-                            <p>{selectedTodo.startTime}</p>
-                          </div>
-                          <div>
-                            <h4 className="font-semibold mb-1">End Time</h4>
-                            <p>{selectedTodo.endTime}</p>
-                          </div>
-                        </>
-                      )}
+                      <div>
+                        <h4 className="font-semibold mb-1">Department</h4>
+                        <p>Admin</p>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
