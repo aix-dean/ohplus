@@ -46,6 +46,8 @@ export function NotificationsPage({ config }: NotificationsPageProps) {
         return 'bg-blue-100 text-blue-600'
       case 'sky':
         return 'bg-sky-100 text-sky-600'
+      case 'purple':
+        return 'bg-purple-100 text-purple-600'
       default:
         return 'bg-blue-100 text-blue-600'
     }
@@ -57,6 +59,8 @@ export function NotificationsPage({ config }: NotificationsPageProps) {
         return 'bg-blue-100 text-blue-600'
       case 'sky':
         return 'bg-sky-100 text-sky-600'
+      case 'purple':
+        return 'bg-purple-100 text-purple-600'
       default:
         return 'bg-blue-100 text-blue-600'
     }
@@ -158,5 +162,13 @@ export function LogisticsNotificationsPage() {
     department: "Logistics",
     colorScheme: "sky",
     notificationsPath: "/logistics/notifications"
+  }} />
+}
+
+export function AdminNotificationsPage() {
+  return <NotificationsPage config={{
+    department: "Admin",
+    colorScheme: "purple",
+    notificationsPath: "/admin/notifications"
   }} />
 }

@@ -47,6 +47,8 @@ export function Notifications({ config }: NotificationsProps) {
         return 'bg-gradient-to-br from-blue-400 to-blue-500'
       case 'sky':
         return 'bg-gradient-to-br from-sky-300 to-sky-400'
+      case 'purple':
+        return 'bg-gradient-to-br from-purple-400 to-purple-500'
       default:
         return 'bg-gradient-to-br from-blue-400 to-blue-500'
     }
@@ -58,6 +60,8 @@ export function Notifications({ config }: NotificationsProps) {
         return 'bg-white/30'
       case 'sky':
         return 'bg-white/30'
+      case 'purple':
+        return 'bg-white/30'
       default:
         return 'bg-white/30'
     }
@@ -68,6 +72,8 @@ export function Notifications({ config }: NotificationsProps) {
       case 'blue':
         return 'bg-white/20'
       case 'sky':
+        return 'bg-white/20'
+      case 'purple':
         return 'bg-white/20'
       default:
         return 'bg-white/20'
@@ -167,5 +173,13 @@ export function LogisticsNotifications() {
     department: "Logistics",
     colorScheme: "sky",
     notificationsPath: "/logistics/notifications"
+  }} />
+}
+
+export function AdminNotifications() {
+  return <Notifications config={{
+    department: "Admin",
+    colorScheme: "purple",
+    notificationsPath: "/admin/notifications"
   }} />
 }
