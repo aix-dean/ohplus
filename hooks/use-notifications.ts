@@ -21,7 +21,7 @@ export interface Notification {
 
 export interface NotificationConfig {
   department: string
-  colorScheme: 'blue' | 'sky'
+  colorScheme: 'blue' | 'sky' | 'purple'
   notificationsPath: string
 }
 
@@ -115,5 +115,13 @@ export function useLogisticsNotifications() {
     department: "Logistics",
     colorScheme: "sky",
     notificationsPath: "/logistics/notifications"
+  })
+}
+
+export function useAdminNotifications() {
+  return useNotifications({
+    department: "Admin",
+    colorScheme: "purple",
+    notificationsPath: "/admin/notifications"
   })
 }
