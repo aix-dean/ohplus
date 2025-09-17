@@ -164,12 +164,6 @@ export default function SelectQuotationPage() {
             </Table>
           </ScrollArea>
         )}
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
       </Card>
     </div>
   )

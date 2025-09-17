@@ -9,7 +9,7 @@ import { createNotifications } from "@/lib/client-service"
 import { getJobOrderById } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useState, useEffect } from "react"
-import jsPDF from "jspdf"
+import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 
 interface JobOrderCreatedSuccessDialogProps {
   isOpen: boolean
@@ -58,93 +58,11 @@ export function JobOrderCreatedSuccessDialog({
 
     setIsLoadingPrint(true)
     try {
-      const pdf = new jsPDF()
-      let yPosition = 20
-
-      // Title
-      pdf.setFontSize(18)
-      pdf.text("Job Order Details", 20, yPosition)
-      yPosition += 20
-
-      jobOrders.forEach((jobOrder, index) => {
-        if (index > 0) {
-          pdf.addPage()
-          yPosition = 20
-        }
-
-        pdf.setFontSize(14)
-        pdf.text(`Job Order #${index + 1}`, 20, yPosition)
-        yPosition += 15
-
-        pdf.setFontSize(12)
-        pdf.text(`JO Number: ${jobOrder.joNumber}`, 20, yPosition)
-        yPosition += 10
-
-        pdf.text(`Site Name: ${jobOrder.siteName}`, 20, yPosition)
-        yPosition += 10
-
-        pdf.text(`JO Type: ${jobOrder.joType}`, 20, yPosition)
-        yPosition += 10
-
-        pdf.text(`Requested By: ${jobOrder.requestedBy}`, 20, yPosition)
-        yPosition += 10
-
-        pdf.text(`Date Requested: ${new Date(jobOrder.dateRequested).toLocaleDateString()}`, 20, yPosition)
-        yPosition += 10
-
-        if (jobOrder.deadline) {
-          pdf.text(`Deadline: ${new Date(jobOrder.deadline).toLocaleDateString()}`, 20, yPosition)
-          yPosition += 10
-        }
-
-        if (jobOrder.clientName) {
-          pdf.text(`Client Name: ${jobOrder.clientName}`, 20, yPosition)
-          yPosition += 10
-        }
-
-        if (jobOrder.clientCompany) {
-          pdf.text(`Client Company: ${jobOrder.clientCompany}`, 20, yPosition)
-          yPosition += 10
-        }
-
-        if (jobOrder.quotationNumber) {
-          pdf.text(`Quotation Number: ${jobOrder.quotationNumber}`, 20, yPosition)
-          yPosition += 10
-        }
-
-        if (jobOrder.remarks) {
-          pdf.text(`Remarks: ${jobOrder.remarks}`, 20, yPosition)
-          yPosition += 10
-        }
-
-        if (jobOrder.attachments && jobOrder.attachments.length > 0) {
-          pdf.text(`Attachments: ${jobOrder.attachments.length} file(s)`, 20, yPosition)
-          yPosition += 10
-        }
-      })
-
-      // Generate blob and create download link
-      const pdfBlob = pdf.output('blob')
-      const pdfUrl = URL.createObjectURL(pdfBlob)
-
-      // Create a temporary link to trigger print
-      const printWindow = window.open(pdfUrl, '_blank')
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print()
-        }
-      } else {
-        // Fallback: download the PDF
-        const link = document.createElement('a')
-        link.href = pdfUrl
-        link.download = `Job_Order_${new Date().toISOString().split('T')[0]}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+      // Generate PDF for each job order
+      for (const jobOrder of jobOrders) {
+        await generateJobOrderPDF(jobOrder, false)
       }
-
-      // Clean up
-      URL.revokeObjectURL(pdfUrl)
+      onClose()
     } catch (error) {
       console.error("Error generating PDF:", error)
     } finally {

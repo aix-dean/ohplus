@@ -17,7 +17,6 @@ export async function getQuotationsForSelection(userId: string, companyId?: stri
   try {
     let q = query(
       collection(db, QUOTATIONS_COLLECTION),
-      where("created_by", "==", userId),
       orderBy("created", "desc"),
     )
 
@@ -25,7 +24,6 @@ export async function getQuotationsForSelection(userId: string, companyId?: stri
     if (companyId) {
       q = query(q, where("company_id", "==", companyId))
     }
-
     // If status is provided, add filter
     if (status) {
       q = query(q, where("status", "==", status.toLowerCase()))
@@ -349,11 +347,11 @@ export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | nu
   }
 }
 
-export async function getJobOrders(userId: string): Promise<JobOrder[]> {
+export async function getJobOrders(companyId: string): Promise<JobOrder[]> {
   try {
     const q = query(
       collection(db, JOB_ORDERS_COLLECTION),
-      where("createdBy", "==", userId),
+      where("company_id", "==", companyId),
       orderBy("createdAt", "desc"),
     )
     const querySnapshot = await getDocs(q)

@@ -16,7 +16,8 @@ import {
   Package,
   CircleCheck,
   Upload,
-  ArrowRight
+  ArrowRight,
+  Printer
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +37,7 @@ import {
   getQuotationDetailsForJobOrder,
   generatePersonalizedJONumber,
 } from "@/lib/job-order-service"
+import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 import { updateQuotation } from "@/lib/quotation-service" // Import updateQuotation
 import type { QuotationProduct } from "@/lib/types/quotation" // Corrected import for QuotationProduct
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
@@ -70,6 +72,17 @@ interface JobOrderFormData {
   joTypeError: boolean
   dateRequestedError: boolean
 }
+
+// Helper function to safely parse date values
+const safeToDate = (dateValue: any): Date | undefined => {
+  if (!dateValue) return undefined;
+  if (dateValue instanceof Date) return dateValue;
+  if (typeof dateValue === 'object' && dateValue instanceof Timestamp) {
+    return dateValue.toDate();
+  }
+  const parsedDate = new Date(dateValue);
+  return isNaN(parsedDate.getTime()) ? undefined : parsedDate;
+};
 
 export default function CreateJobOrderPage() {
   const router = useRouter()
@@ -293,6 +306,17 @@ export default function CreateJobOrderPage() {
 
     const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"];
     return imageExtensions.some(ext => name.toLowerCase().endsWith(ext));
+  }, []);
+
+  const getFileNameFromUrl = useCallback((fileUrl: string | null) => {
+    if (!fileUrl) return null;
+
+    // Remove query params (?alt=...)
+    const cleanUrl = fileUrl.split("?")[0];
+    // Decode %20 etc.
+    const decodedUrl = decodeURIComponent(cleanUrl);
+    // Get the last part after /
+    return decodedUrl.split("/").pop() || null;
   }, []);
 
   const handleFileUpload = useCallback(
@@ -736,7 +760,7 @@ export default function CreateJobOrderPage() {
             joType: form.joType as JobOrderType,
             deadline: form.deadline!,
             campaignName: form.campaignName, // Added campaign name
-            requestedBy: userData?.first_name || "Auto-Generated",
+            requestedBy: `${userData?.first_name} ${userData?.last_name}` || "Auto-Generated",
             remarks: form.remarks,
             attachments: form.attachmentUrl
               ? [{
@@ -760,17 +784,15 @@ export default function CreateJobOrderPage() {
             contractDuration: totalDays.toString(), // Convert to string as expected by type
             contractPeriodStart: contractPeriodStart || undefined,
             contractPeriodEnd: contractPeriodEnd || undefined,
+            siteLocation: quotation.items?.specs?.location || "N/A", // Get from quotation items
             siteName: quotation.items?.name || "", // Get from quotation items
             siteCode: quotation.items?.site_code || "N/A", // Get from quotation items
-            siteType: quotation.items?.site_type || "N/A",
-            siteSize:
-              (quotation.items?.height && quotation.items?.width
-                ? `${quotation.items.width}x${quotation.items.height}ft`
-                : "N/A") || "N/A", // Use quotation items height and width
+            siteType: contentType || "N/A",
+            siteSize: `${quotationData.quotation.items?.specs?.height || 0}ft (h)  x ${quotationData.quotation.items?.specs?.width || 0}ft (w)`,
             siteIllumination: quotation.items?.light ? "Yes" : "No", // Use quotation items light as boolean
             illumination: typeof products[0]?.specs_rental?.illumination === 'object'
               ? "Custom Illumination Setup"
-              : products[0]?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)", // Use product illumination specs
+              : products[0]?.specs_rental?.illumination || "N/A", // Use product illumination specs
             leaseRatePerMonth:
               quotation.duration_days && quotation.duration_days > 0
                 ? subtotal / (quotation.duration_days / 30)
@@ -779,7 +801,7 @@ export default function CreateJobOrderPage() {
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
-            siteImageUrl: quotation.items?.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            siteImageUrl: quotation.items?.media_url || "/placeholder.svg?height=48&width=48",
             missingCompliance: missingCompliance,
             product_id: quotation.items.product_id || "",
             company_id: userData?.company_id || "",
@@ -830,14 +852,6 @@ export default function CreateJobOrderPage() {
           },
         ]
 
-        // DEBUG: Log the final jobOrdersData before sending to service
-        console.log("[DEBUG] Final jobOrdersData being sent to service:")
-        console.log("- created:", jobOrdersData[0].created, "Type:", typeof jobOrdersData[0].created)
-        console.log("- dateRequested:", jobOrdersData[0].dateRequested, "Type:", typeof jobOrdersData[0].dateRequested)
-        console.log("- deadline:", jobOrdersData[0].deadline, "Type:", typeof jobOrdersData[0].deadline)
-        console.log("- contractPeriodStart:", jobOrdersData[0].contractPeriodStart, "Type:", typeof jobOrdersData[0].contractPeriodStart)
-        console.log("- contractPeriodEnd:", jobOrdersData[0].contractPeriodEnd, "Type:", typeof jobOrdersData[0].contractPeriodEnd)
-
         const joIds = await createMultipleJobOrders(
           jobOrdersData.map((jo) => ({ ...jo, assignTo: "" })), // Add default assignTo
           user.uid,
@@ -871,6 +885,159 @@ export default function CreateJobOrderPage() {
       toast,
     ],
   )
+
+  const handlePrint = useCallback(async () => {
+    if (!quotationData || !user?.uid || !userData) {
+      toast({
+        title: "Missing Information",
+        description: "Cannot generate PDF due to missing data.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const quotation = quotationData.quotation
+      const products = quotationData.products
+      const client = quotationData.client
+      const form = jobOrderForms[0]
+
+      // Generate JO number if not provided
+      const joNumber = form.joNumber || await generatePersonalizedJONumber(userData)
+
+      // Create temporary JobOrder object
+      const tempJobOrder = {
+        id: "", // Not created yet
+        quotationId: quotation.id,
+        created: new Date(),
+        joNumber,
+        dateRequested: form.dateRequested || new Date(),
+        joType: form.joType as JobOrderType,
+        deadline: form.deadline || new Date(),
+        campaignName: form.campaignName,
+        requestedBy: userData?.first_name || "Auto-Generated",
+        remarks: form.remarks,
+        attachments: form.attachmentUrl
+          ? [{
+              url: form.attachmentUrl,
+              name: form.attachmentFile?.name || "Attachment",
+              type: form.attachmentFile?.type || "image",
+            }]
+          : [],
+        materialSpec: form.materialSpec,
+        materialSpecAttachmentUrl: form.materialSpecAttachmentUrl,
+        clientCompliance: {
+          dtiBirUrl: dtiBirUrl,
+          gisUrl: gisUrl,
+          idSignatureUrl: idSignatureUrl,
+        },
+        quotationNumber: quotation.quotation_number,
+        clientName: client?.name || "N/A",
+        clientCompany: quotation?.client_company_name || "N/A",
+        clientCompanyId: quotation.client_company_id || "",
+        clientId: client?.id || "",
+        contractDuration: totalDays.toString(),
+        contractPeriodStart: quotation.start_date ? safeToDate(quotation.start_date) : undefined,
+        contractPeriodEnd: quotation.end_date ? safeToDate(quotation.end_date) : undefined,
+        siteLocation: quotation.items?.specs?.location || "N/A",
+        siteName: quotation.items?.name || "",
+        siteCode: quotation.items?.site_code || "N/A",
+        siteType: contentType || "N/A",
+        siteSize: `${quotationData.quotation.items?.specs?.height || 0}ft (h) x ${quotationData.quotation.items?.specs?.width || 0}ft (w)`,
+        siteIllumination: quotation.items?.light ? "Yes" : "No",
+        illumination: typeof products[0]?.specs_rental?.illumination === 'object'
+          ? "Custom Illumination Setup"
+          : products[0]?.specs_rental?.illumination || "N/A",
+        leaseRatePerMonth: quotation.duration_days && quotation.duration_days > 0
+          ? (quotation.total_amount || 0) / (quotation.duration_days / 30)
+          : 0,
+        totalMonths: totalDays / 30,
+        totalLease: quotation.total_amount || 0,
+        vatAmount: (quotation.total_amount || 0) * 0.12,
+        totalAmount: (quotation.total_amount || 0) * 1.12,
+        siteImageUrl: quotation.items?.media_url || "/placeholder.svg?height=48&width=48",
+        missingCompliance: missingCompliance,
+        product_id: quotation.items.product_id || "",
+        company_id: userData?.company_id || "",
+        created_by: user.uid,
+        content_type: contentType,
+        status: "draft" as const,
+        assignTo: "",
+        projectCompliance: {
+          signedQuotation: {
+            fileName: signedQuotationFile?.name || null,
+            fileUrl: signedQuotationUrl,
+            notes: null,
+            uploadedAt: signedQuotationUrl ? serverTimestamp() : null,
+            uploadedBy: user?.uid || null,
+            status: (signedQuotationUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
+          },
+          signedContract: {
+            fileName: signedContractFile?.name || null,
+            fileUrl: signedContractUrl,
+            notes: null,
+            uploadedAt: signedContractUrl ? serverTimestamp() : null,
+            uploadedBy: user?.uid || null,
+            status: (signedContractUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
+          },
+          irrevocablePo: {
+            fileName: poMoFile?.name || null,
+            fileUrl: poMoUrl,
+            notes: null,
+            uploadedAt: poMoUrl ? serverTimestamp() : null,
+            uploadedBy: user?.uid || null,
+            status: (poMoUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
+          },
+          finalArtwork: {
+            fileName: finalArtworkFile?.name || null,
+            fileUrl: finalArtworkUrl,
+            notes: null,
+            uploadedAt: finalArtworkUrl ? serverTimestamp() : null,
+            uploadedBy: user?.uid || null,
+            status: (finalArtworkUrl ? "completed" : "pending") as "pending" | "completed" | "uploaded",
+          },
+          paymentAsDeposit: {
+            fileName: null,
+            fileUrl: null,
+            notes: null,
+            uploadedAt: paymentAdvanceConfirmed ? serverTimestamp() : null,
+            uploadedBy: user?.uid || null,
+            status: (paymentAdvanceConfirmed ? "completed" : "pending") as "pending" | "completed" | "uploaded",
+          },
+        },
+      }
+
+      await generateJobOrderPDF(tempJobOrder, 'print')
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: `Failed to generate PDF: ${error.message || "Unknown error"}.`,
+        variant: "destructive",
+      })
+    }
+  }, [
+    quotationData,
+    user,
+    userData,
+    jobOrderForms,
+    totalDays,
+    signedQuotationUrl,
+    signedContractUrl,
+    poMoUrl,
+    finalArtworkUrl,
+    paymentAdvanceConfirmed,
+    missingCompliance,
+    contentType,
+    dtiBirUrl,
+    gisUrl,
+    idSignatureUrl,
+    signedQuotationFile,
+    signedContractFile,
+    poMoFile,
+    finalArtworkFile,
+    toast,
+  ])
 
   const handleDismissAndNavigate = useCallback(() => {
     setShowJobOrderSuccessDialog(false)
@@ -1168,8 +1335,11 @@ export default function CreateJobOrderPage() {
                 <p className="text-sm">
                   <span className="font-semibold">Site Type:</span> {quotationData.quotation.items.content_type}
                 </p>
+                <p className="text-sm truncate">
+                  <span className="font-semibold">Site Location:</span> {quotationData.quotation.items.location || "N/A"}
+                </p>
                 <p className="text-sm">
-                  <span className="font-semibold">Size:</span> {"N/A"}
+                  <span className="font-semibold">Size:</span> {`${quotationData.quotation.items?.specs?.height || 0}ft (h) x ${quotationData.quotation.items?.specs?.width || 0}ft (w) `} 
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Illumination:</span> {"N/A"}
@@ -1217,7 +1387,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    DTI/BIR 2303
+                    {getFileNameFromUrl(dtiBirUrl) || "DTI/BIR 2303"}
                   </a>
                 ) : (
                   <input
@@ -1287,7 +1457,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    JMCL GIS.pdf
+                    {getFileNameFromUrl(gisUrl) || "GIS"}
                   </a>
                 ) : (
                   <input
@@ -1357,7 +1527,7 @@ export default function CreateJobOrderPage() {
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
                   >
-                    Jalvin_Castro_PRC.pdf
+                    {getFileNameFromUrl(idSignatureUrl) || "ID with Signature"}
                   </a>
                 ) : (
                   <input
@@ -2039,7 +2209,7 @@ export default function CreateJobOrderPage() {
                 <div className="flex items-center space-x-2">
                   <Label className="w-36 text-sm text-gray-800">Requested By</Label>
                   <Input
-                    value={userData?.first_name || "(Auto-Generated)"}
+                    value={`${userData?.first_name} ${userData?.last_name}` || "(Auto-Generated)"}
                     disabled
                     className="flex-1 bg-gray-100 text-gray-600 text-sm h-9"
                   />
@@ -2054,6 +2224,15 @@ export default function CreateJobOrderPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-2 pt-4 justify-end">
+              <Button
+                variant="outline"
+                onClick={handlePrint}
+                disabled={isSubmitting}
+                className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => handleCreateJobOrders("draft")}

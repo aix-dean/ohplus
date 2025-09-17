@@ -104,7 +104,7 @@ export default function QuotationsListPage() {
       const quotationsRef = collection(db, "quotations")
       let q = query(
         quotationsRef,
-        where("seller_id", "==", user.uid),
+        where("company_id", "==", userData.company_id),
         orderBy("created", "desc"),
         limit(pageSize + 1) // Fetch one extra to check if there are more pages
       )

@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getJobOrders } from "@/lib/job-order-service"
-import { generateJobOrderPDF } from "@/lib/pdf-service"
+import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 import type { JobOrder } from "@/lib/types/job-order"
 import { toast } from "sonner"
 import { auth } from "@/lib/firebase"
@@ -297,14 +297,6 @@ export default function JobOrderDetailPage() {
                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
                   <User className="h-4 w-4 text-gray-500" />
                   {jobOrder.requestedBy}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm text-gray-800">Assigned To</Label>
-                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
-                  <UserCheck className="h-4 w-4 text-gray-500" />
-                  {jobOrder.assignTo || "Unassigned"}
                 </div>
               </div>
 
