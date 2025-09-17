@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
-import { Search, MoreVertical, Grid3X3, List, Plus, Loader2, Edit, Trash2 } from "lucide-react"
+import { Search, MoreVertical, Grid3X3, List, Plus, Loader2, Edit, Trash2, Download } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { getTodosByUser, createTodo, updateTodo, toggleTodoComplete, createTodoHistory, getTodoHistory } from "@/lib/todo-service"
 import type { Todo } from "@/lib/types/todo"
@@ -314,8 +314,13 @@ export default function TodoApp() {
   const [todoToDelete, setTodoToDelete] = useState<Todo | null>(null)
   const [todoHistory, setTodoHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyHasMore, setHistoryHasMore] = useState(false)
+  const historyLimit = 5
   const [creating, setCreating] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [editSelectedFiles, setEditSelectedFiles] = useState<File[]>([])
   const [activeTodo, setActiveTodo] = useState<Todo | null>(null)
   const [newTodo, setNewTodo] = useState({
     title: "",
@@ -526,25 +531,35 @@ export default function TodoApp() {
     setActiveTodo(null)
   }
 
-  const handleTodoClick = async (todo: Todo) => {
-    setSelectedTodo(todo)
-    setIsDetailDialogOpen(true)
-
-    // Fetch todo history
+  const fetchTodoHistory = async (todoId: string, page: number = 1) => {
     try {
       setLoadingHistory(true)
-      const history = await getTodoHistory(todo.id)
-      setTodoHistory(history)
+      const result = await getTodoHistory(todoId, page, historyLimit)
+      setTodoHistory(result.history)
+      setHistoryTotal(result.total)
+      setHistoryHasMore(result.hasMore)
+      setHistoryPage(page)
     } catch (error) {
       console.error("Error fetching todo history:", error)
       setTodoHistory([])
+      setHistoryTotal(0)
+      setHistoryHasMore(false)
     } finally {
       setLoadingHistory(false)
     }
   }
 
+  const handleTodoClick = async (todo: Todo) => {
+    setSelectedTodo(todo)
+    setIsDetailDialogOpen(true)
+
+    // Fetch todo history
+    await fetchTodoHistory(todo.id, 1)
+  }
+
   const handleEditTodo = (todo: Todo) => {
     setSelectedTodo(todo)
+    setEditSelectedFiles([])
     setIsEditDialogOpen(true)
   }
 
@@ -881,6 +896,58 @@ export default function TodoApp() {
 
               </div>
 
+              <div className="space-y-2">
+                <label className="font-medium">Attachments (Optional)</label>
+                <FileUpload
+                  onFileSelect={setEditSelectedFiles}
+                  maxFiles={5}
+                  maxSize={10 * 1024 * 1024} // 10MB
+                />
+                {selectedTodo?.attachments && selectedTodo.attachments.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      Current attachments: {selectedTodo.attachments.length} file(s)
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {selectedTodo.attachments.map((attachment, index) => (
+                        <div key={index} className="border rounded-lg p-2 bg-gray-50">
+                          <img
+                            src={attachment}
+                            alt={`Attachment ${index + 1}`}
+                            className="w-full h-20 object-cover rounded mb-2"
+                            onError={(e) => {
+                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                            }}
+                          />
+                          <div className="flex space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(attachment, '_blank')}
+                              className="flex-1"
+                            >
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (!selectedTodo) return
+                                const newAttachments = selectedTodo.attachments?.filter((_, i) => i !== index) || []
+                                setSelectedTodo({ ...selectedTodo, attachments: newAttachments })
+                              }}
+                              className="flex-1"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="flex-1">
                   Cancel
@@ -890,6 +957,15 @@ export default function TodoApp() {
                     if (!selectedTodo) return
 
                     try {
+                      let newAttachmentUrls: string[] = []
+                      if (editSelectedFiles.length > 0) {
+                        toast.info("Uploading new files...")
+                        newAttachmentUrls = await uploadFiles(editSelectedFiles)
+                      }
+
+                      const currentAttachments = selectedTodo.attachments || []
+                      const updatedAttachments = [...currentAttachments, ...newAttachmentUrls]
+
                       const updates = {
                          title: selectedTodo.title,
                          description: selectedTodo.description,
@@ -898,12 +974,14 @@ export default function TodoApp() {
                          allDay: selectedTodo.allDay,
                          repeat: selectedTodo.repeat,
                          department: selectedTodo.department,
+                         attachments: updatedAttachments,
                        }
 
                       await updateTodo(selectedTodo.id, updates)
                       setTodos(todos.map((t) => (t.id === selectedTodo.id ? { ...t, ...updates } : t)))
                       toast.success("Todo updated successfully")
                       setIsEditDialogOpen(false)
+                      setEditSelectedFiles([])
                     } catch (error) {
                       console.error("Error updating todo:", error)
                       toast.error("Failed to update todo")
@@ -1031,12 +1109,40 @@ export default function TodoApp() {
                             <img
                               src={attachment}
                               alt={`Attachment ${index + 1}`}
-                              className="w-full h-48 object-cover rounded"
+                              className="w-full h-48 object-cover rounded mb-2"
                               onError={(e) => {
                                 // If image fails to load, show a placeholder
-                                e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                                e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
                               }}
                             />
+                            <div className="flex justify-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch(attachment)
+                                    const blob = await response.blob()
+                                    const url = window.URL.createObjectURL(blob)
+                                    const link = document.createElement('a')
+                                    link.href = url
+                                    link.download = `attachment_${index + 1}`
+                                    document.body.appendChild(link)
+                                    link.click()
+                                    document.body.removeChild(link)
+                                    window.URL.revokeObjectURL(url)
+                                  } catch (error) {
+                                    console.error('Download failed:', error)
+                                    // Fallback to opening in new tab
+                                    window.open(attachment, '_blank')
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1056,24 +1162,64 @@ export default function TodoApp() {
                         <span className="ml-2">Loading history...</span>
                       </div>
                     ) : todoHistory.length > 0 ? (
-                      <div className="space-y-3">
-                        {todoHistory.map((history, index) => (
-                          <div key={history.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div className="text-sm">
-                                <div className="font-medium text-gray-900">{history.user_full_name}</div>
-                                <div className="text-gray-600">
-                                  Moved from <span className="font-medium">{history.from_column.replace("-", " ")}</span> to{" "}
-                                  <span className="font-medium">{history.to_column.replace("-", " ")}</span>
+                      <>
+                        <div className="space-y-3">
+                          {todoHistory.map((history, index) => (
+                            <div key={history.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="text-sm">
+                                  <div className="font-medium text-gray-900">{history.user_full_name}</div>
+                                  <div className="text-gray-600">
+                                    Moved from <span className="font-medium">{history.from_column.replace("-", " ")}</span> to{" "}
+                                    <span className="font-medium">{history.to_column.replace("-", " ")}</span>
+                                  </div>
                                 </div>
                               </div>
+                              <div className="text-xs text-gray-500">
+                                {history.created_at?.toLocaleDateString()} {history.created_at?.toLocaleTimeString()}
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {history.created_at?.toLocaleDateString()} {history.created_at?.toLocaleTimeString()}
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {historyTotal > historyLimit && (
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="text-sm text-gray-500">
+                              Showing {((historyPage - 1) * historyLimit) + 1}-{Math.min(historyPage * historyLimit, historyTotal)} of {historyTotal} entries
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (selectedTodo && historyPage > 1) {
+                                    fetchTodoHistory(selectedTodo.id, historyPage - 1)
+                                  }
+                                }}
+                                disabled={historyPage <= 1 || loadingHistory}
+                              >
+                                Previous
+                              </Button>
+                              <span className="text-sm text-gray-600">
+                                Page {historyPage} of {Math.max(1, Math.ceil(historyTotal / historyLimit))}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (selectedTodo && historyHasMore) {
+                                    fetchTodoHistory(selectedTodo.id, historyPage + 1)
+                                  }
+                                }}
+                                disabled={!historyHasMore || loadingHistory}
+                              >
+                                Next
+                              </Button>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-4 text-gray-500">
                         No movement history found
