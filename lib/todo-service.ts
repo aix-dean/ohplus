@@ -1,5 +1,5 @@
 import { db } from "./firebase"
-import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy, limit, startAfter } from "firebase/firestore"
 import type { Todo } from "./types/todo"
 
 const TODOS_COLLECTION = "todos"
@@ -133,8 +133,9 @@ export async function createTodoHistory(
   }
 }
 
-export async function getTodoHistory(todoId: string): Promise<any[]> {
+export async function getTodoHistory(todoId: string, page: number = 1, limit: number = 5): Promise<{ history: any[], total: number, hasMore: boolean }> {
   try {
+    // Fetch all history for the todo
     const q = query(
       collection(db, "todos_history"),
       where("todo_id", "==", todoId),
@@ -142,12 +143,18 @@ export async function getTodoHistory(todoId: string): Promise<any[]> {
     )
 
     const querySnapshot = await getDocs(q)
-    const history: any[] = querySnapshot.docs.map((doc) => ({
+    const allHistory: any[] = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
       created_at: doc.data().created_at?.toDate(),
     }))
-    return history
+
+    const total = allHistory.length
+    const offset = (page - 1) * limit
+    const history = allHistory.slice(offset, offset + limit)
+    const hasMore = total > offset + limit
+
+    return { history, total, hasMore }
   } catch (error: any) {
     console.error("Error fetching todo history:", error)
     throw error

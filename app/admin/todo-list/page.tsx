@@ -10,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
-import { Search, MoreVertical, Grid3X3, List, Plus, Loader2, Edit, Trash2 } from "lucide-react"
+import { Search, MoreVertical, Grid3X3, List, Plus, Loader2, Edit, Trash2, Download } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { getTodosByUser, createTodo, updateTodo, toggleTodoComplete, createTodoHistory, getTodoHistory } from "@/lib/todo-service"
 import type { Todo } from "@/lib/types/todo"
+import { DEPARTMENTS } from "@/lib/types/access-management"
 import { FileUpload } from "@/components/file-upload"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { Timestamp } from "firebase/firestore"
 import { toast } from "sonner"
 import {
   DndContext,
@@ -30,6 +32,22 @@ import {
   useDroppable,
 } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
+
+// Helper function to convert timestamp to ISO string
+const timestampToISOString = (timestamp: Timestamp | string): string => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate().toISOString()
+  }
+  return timestamp
+}
+
+// Helper function to convert ISO string to Date for display
+const getDateForDisplay = (timestamp: Timestamp | string): Date => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate()
+  }
+  return new Date(timestamp)
+}
 
 // Color mapping function for todo statuses
 const getStatusColors = (status: Todo["status"]) => {
@@ -126,8 +144,27 @@ function DraggableTodoCard({
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="font-medium">Date:</span>
-          <span>{todo.date}</span>
+          <span className="font-medium">Start:</span>
+          <span>{getDateForDisplay(todo.start_date).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-medium">End:</span>
+          <span>{getDateForDisplay(todo.end_date).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}</span>
         </div>
 
         <div className="flex justify-between items-center">
@@ -136,18 +173,17 @@ function DraggableTodoCard({
         </div>
 
         <div className="flex justify-between">
-          <span className="font-medium">Start:</span>
-          <span>{todo.startTime}</span>
-        </div>
-
-        <div className="flex justify-between">
-          <span className="font-medium">End:</span>
-          <span>{todo.endTime}</span>
-        </div>
-
-        <div className="flex justify-between">
           <span className="font-medium">Repeat:</span>
           <span>{todo.repeat}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-medium">Created:</span>
+          <span>{todo.created_at?.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}</span>
         </div>
       </div>
 
@@ -175,7 +211,7 @@ function DraggableTodoCard({
               variant="outline"
               className="flex-1"
             >
-              Back
+              Return
             </Button>
             <Button
               onClick={(e) => {
@@ -268,6 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("admin")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -277,17 +314,22 @@ export default function TodoApp() {
   const [todoToDelete, setTodoToDelete] = useState<Todo | null>(null)
   const [todoHistory, setTodoHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyHasMore, setHistoryHasMore] = useState(false)
+  const historyLimit = 5
   const [creating, setCreating] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [editSelectedFiles, setEditSelectedFiles] = useState<File[]>([])
   const [activeTodo, setActiveTodo] = useState<Todo | null>(null)
   const [newTodo, setNewTodo] = useState({
     title: "",
     description: "",
-    date: new Date().toISOString().split("T")[0],
+    start_date: new Date().toISOString(),
+    end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
-    startTime: "09:00",
-    endTime: "10:00",
     repeat: "Once",
+    department: "admin",
   })
 
   const sensors = useSensors(
@@ -303,6 +345,39 @@ export default function TodoApp() {
       fetchTodos()
     }
   }, [userData])
+
+  // Helper function to convert timestamp to ISO string
+  const timestampToISOString = (timestamp: Timestamp | string): string => {
+    if (timestamp instanceof Timestamp) {
+      return timestamp.toDate().toISOString()
+    }
+    return timestamp
+  }
+
+  // Helper function to convert ISO string to Date for display
+  const getDateForDisplay = (timestamp: Timestamp | string): Date => {
+    if (timestamp instanceof Timestamp) {
+      return timestamp.toDate()
+    }
+    return new Date(timestamp)
+  }
+
+  // Validation for start date/time not being after end date/time
+  useEffect(() => {
+    if (newTodo.start_date && newTodo.end_date) {
+      const startDateTime = new Date(timestampToISOString(newTodo.start_date))
+      const endDateTime = new Date(timestampToISOString(newTodo.end_date))
+
+      if (startDateTime > endDateTime) {
+        // Auto-adjust end date/time to be after start
+        const newEndDateTime = new Date(startDateTime.getTime() + (60 * 60 * 1000)) // Add 1 hour
+        setNewTodo(prev => ({
+          ...prev,
+          end_date: newEndDateTime.toISOString()
+        }))
+      }
+    }
+  }, [newTodo.start_date, newTodo.end_date])
 
   const fetchTodos = async () => {
     if (!userData?.uid) return
@@ -320,9 +395,12 @@ export default function TodoApp() {
   }
 
   const filteredTodos = todos.filter(
-    (todo) =>
-      todo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      todo.description.toLowerCase().includes(searchTerm.toLowerCase()),
+    (todo) => {
+      const matchesSearch = todo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        todo.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesDepartment = selectedDepartment === "all" || todo.department === selectedDepartment
+      return matchesSearch && matchesDepartment
+    }
   )
 
   const handleCreateTodo = async () => {
@@ -342,36 +420,20 @@ export default function TodoApp() {
       }
 
       const todoData = {
-        title: newTodo.title || "New Task",
-        description: newTodo.description,
-        date: new Date(newTodo.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        allDay: newTodo.allDay,
-        startTime: newTodo.allDay
-          ? "-"
-          : new Date(`2000-01-01T${newTodo.startTime}`).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            }),
-        endTime: newTodo.allDay
-          ? "-"
-          : new Date(`2000-01-01T${newTodo.endTime}`).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            }),
-        repeat: newTodo.repeat,
-        completed: false,
-        status: "todo" as const,
-        company_id: userData.company_id,
-        user_id: userData.uid,
-        attachments: attachmentUrls,
-        isDeleted: false,
-      }
+         title: newTodo.title || "New Task",
+         description: newTodo.description,
+         start_date: Timestamp.fromDate(new Date(newTodo.start_date)),
+         end_date: Timestamp.fromDate(new Date(newTodo.end_date)),
+         allDay: newTodo.allDay,
+         repeat: newTodo.repeat,
+         completed: false,
+         status: "todo" as const,
+         company_id: userData.company_id,
+         user_id: userData.uid,
+         department: newTodo.department,
+         attachments: attachmentUrls,
+         isDeleted: false,
+       }
 
       const todoId = await createTodo(todoData)
       toast.success("Todo created successfully")
@@ -380,11 +442,11 @@ export default function TodoApp() {
       setNewTodo({
         title: "",
         description: "",
-        date: new Date().toISOString().split("T")[0],
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
-        startTime: "09:00",
-        endTime: "10:00",
         repeat: "Once",
+        department: "admin",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)
@@ -469,25 +531,35 @@ export default function TodoApp() {
     setActiveTodo(null)
   }
 
-  const handleTodoClick = async (todo: Todo) => {
-    setSelectedTodo(todo)
-    setIsDetailDialogOpen(true)
-
-    // Fetch todo history
+  const fetchTodoHistory = async (todoId: string, page: number = 1) => {
     try {
       setLoadingHistory(true)
-      const history = await getTodoHistory(todo.id)
-      setTodoHistory(history)
+      const result = await getTodoHistory(todoId, page, historyLimit)
+      setTodoHistory(result.history)
+      setHistoryTotal(result.total)
+      setHistoryHasMore(result.hasMore)
+      setHistoryPage(page)
     } catch (error) {
       console.error("Error fetching todo history:", error)
       setTodoHistory([])
+      setHistoryTotal(0)
+      setHistoryHasMore(false)
     } finally {
       setLoadingHistory(false)
     }
   }
 
+  const handleTodoClick = async (todo: Todo) => {
+    setSelectedTodo(todo)
+    setIsDetailDialogOpen(true)
+
+    // Fetch todo history
+    await fetchTodoHistory(todo.id, 1)
+  }
+
   const handleEditTodo = (todo: Todo) => {
     setSelectedTodo(todo)
+    setEditSelectedFiles([])
     setIsEditDialogOpen(true)
   }
 
@@ -526,20 +598,38 @@ export default function TodoApp() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">To-Do-List</h1>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Department:</label>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-gray-600">{todos.filter(t => t.status === "todo").length}</div>
+            <div className="text-2xl font-bold text-gray-600">{filteredTodos.filter(t => t.status === "todo").length}</div>
             <div className="text-sm text-gray-500">To Do</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-blue-600">{todos.filter(t => t.status === "in-progress").length}</div>
+            <div className="text-2xl font-bold text-blue-600">{filteredTodos.filter(t => t.status === "in-progress").length}</div>
             <div className="text-sm text-gray-500">In Progress</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-green-600">{todos.filter(t => t.status === "done").length}</div>
+            <div className="text-2xl font-bold text-green-600">{filteredTodos.filter(t => t.status === "done").length}</div>
             <div className="text-sm text-gray-500">Done</div>
           </div>
         </div>
@@ -556,11 +646,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="todo"
                 title="To Do"
-                count={todos.filter(t => t.status === "todo").length}
+                count={filteredTodos.filter(t => t.status === "todo").length}
                 {...getStatusColors("todo")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "todo").map((todo) => (
+                {filteredTodos.filter(t => t.status === "todo").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
@@ -577,11 +667,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="in-progress"
                 title="In Progress"
-                count={todos.filter(t => t.status === "in-progress").length}
+                count={filteredTodos.filter(t => t.status === "in-progress").length}
                 {...getStatusColors("in-progress")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "in-progress").map((todo) => (
+                {filteredTodos.filter(t => t.status === "in-progress").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
@@ -598,11 +688,11 @@ export default function TodoApp() {
               <DroppableColumn
                 id="done"
                 title="Done"
-                count={todos.filter(t => t.status === "done").length}
+                count={filteredTodos.filter(t => t.status === "done").length}
                 {...getStatusColors("done")}
                 onDrop={handleDrop}
               >
-                {todos.filter(t => t.status === "done").map((todo) => (
+                {filteredTodos.filter(t => t.status === "done").map((todo) => (
                   <DraggableTodoCard
                     key={todo.id}
                     todo={todo}
@@ -650,16 +740,6 @@ export default function TodoApp() {
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="font-medium">Date:</label>
-                  <Input
-                    type="date"
-                    value={newTodo.date}
-                    onChange={(e) => setNewTodo({ ...newTodo, date: e.target.value })}
-                    className="w-auto"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center">
                   <label className="font-medium">All Day:</label>
                   <Switch
                     checked={newTodo.allDay}
@@ -667,29 +747,27 @@ export default function TodoApp() {
                   />
                 </div>
 
-                {!newTodo.allDay && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">Start:</label>
-                      <Input
-                        type="time"
-                        value={newTodo.startTime}
-                        onChange={(e) => setNewTodo({ ...newTodo, startTime: e.target.value })}
-                        className="w-auto"
-                      />
-                    </div>
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Start Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={newTodo.start_date.slice(0, 16)}
+                    onChange={(e) => setNewTodo({ ...newTodo, start_date: e.target.value })}
+                    className="w-auto"
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
 
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">End:</label>
-                      <Input
-                        type="time"
-                        value={newTodo.endTime}
-                        onChange={(e) => setNewTodo({ ...newTodo, endTime: e.target.value })}
-                        className="w-auto"
-                      />
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">End Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={newTodo.end_date.slice(0, 16)}
+                    onChange={(e) => setNewTodo({ ...newTodo, end_date: e.target.value })}
+                    className="w-auto"
+                    min={newTodo.start_date.slice(0, 16)}
+                  />
+                </div>
 
                 <div className="flex justify-between items-center">
                   <label className="font-medium">Repeat:</label>
@@ -706,6 +784,7 @@ export default function TodoApp() {
                     </SelectContent>
                   </Select>
                 </div>
+
               </div>
 
               <div className="space-y-2">
@@ -755,19 +834,6 @@ export default function TodoApp() {
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="font-medium">Date:</label>
-                  <Input
-                    type="date"
-                    value={selectedTodo?.date || ""}
-                    onChange={(e) => {
-                      if (!selectedTodo) return
-                      setSelectedTodo({ ...selectedTodo, date: e.target.value })
-                    }}
-                    className="w-auto"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center">
                   <label className="font-medium">All Day:</label>
                   <Switch
                     checked={selectedTodo?.allDay || false}
@@ -778,35 +844,33 @@ export default function TodoApp() {
                   />
                 </div>
 
-                {!selectedTodo?.allDay && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">Start:</label>
-                      <Input
-                        type="time"
-                        value={selectedTodo?.startTime || ""}
-                        onChange={(e) => {
-                          if (!selectedTodo) return
-                          setSelectedTodo({ ...selectedTodo, startTime: e.target.value })
-                        }}
-                        className="w-auto"
-                      />
-                    </div>
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Start Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={selectedTodo?.start_date ? timestampToISOString(selectedTodo.start_date).slice(0, 16) : ""}
+                    onChange={(e) => {
+                      if (!selectedTodo) return
+                      setSelectedTodo({ ...selectedTodo, start_date: e.target.value })
+                    }}
+                    className="w-auto"
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
 
-                    <div className="flex justify-between items-center">
-                      <label className="font-medium">End:</label>
-                      <Input
-                        type="time"
-                        value={selectedTodo?.endTime || ""}
-                        onChange={(e) => {
-                          if (!selectedTodo) return
-                          setSelectedTodo({ ...selectedTodo, endTime: e.target.value })
-                        }}
-                        className="w-auto"
-                      />
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">End Date & Time:</label>
+                  <Input
+                    type="datetime-local"
+                    value={selectedTodo?.end_date ? timestampToISOString(selectedTodo.end_date).slice(0, 16) : ""}
+                    onChange={(e) => {
+                      if (!selectedTodo) return
+                      setSelectedTodo({ ...selectedTodo, end_date: e.target.value })
+                    }}
+                    className="w-auto"
+                    min={selectedTodo?.start_date ? timestampToISOString(selectedTodo.start_date).slice(0, 16) : ""}
+                  />
+                </div>
 
                 <div className="flex justify-between items-center">
                   <label className="font-medium">Repeat:</label>
@@ -829,6 +893,59 @@ export default function TodoApp() {
                     </SelectContent>
                   </Select>
                 </div>
+
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-medium">Attachments (Optional)</label>
+                <FileUpload
+                  onFileSelect={setEditSelectedFiles}
+                  maxFiles={5}
+                  maxSize={10 * 1024 * 1024} // 10MB
+                />
+                {selectedTodo?.attachments && selectedTodo.attachments.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      Current attachments: {selectedTodo.attachments.length} file(s)
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {selectedTodo.attachments.map((attachment, index) => (
+                        <div key={index} className="border rounded-lg p-2 bg-gray-50">
+                          <img
+                            src={attachment}
+                            alt={`Attachment ${index + 1}`}
+                            className="w-full h-20 object-cover rounded mb-2"
+                            onError={(e) => {
+                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                            }}
+                          />
+                          <div className="flex space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(attachment, '_blank')}
+                              className="flex-1"
+                            >
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (!selectedTodo) return
+                                const newAttachments = selectedTodo.attachments?.filter((_, i) => i !== index) || []
+                                setSelectedTodo({ ...selectedTodo, attachments: newAttachments })
+                              }}
+                              className="flex-1"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -840,20 +957,31 @@ export default function TodoApp() {
                     if (!selectedTodo) return
 
                     try {
-                      const updates = {
-                        title: selectedTodo.title,
-                        description: selectedTodo.description,
-                        date: selectedTodo.date,
-                        allDay: selectedTodo.allDay,
-                        startTime: selectedTodo.startTime,
-                        endTime: selectedTodo.endTime,
-                        repeat: selectedTodo.repeat,
+                      let newAttachmentUrls: string[] = []
+                      if (editSelectedFiles.length > 0) {
+                        toast.info("Uploading new files...")
+                        newAttachmentUrls = await uploadFiles(editSelectedFiles)
                       }
+
+                      const currentAttachments = selectedTodo.attachments || []
+                      const updatedAttachments = [...currentAttachments, ...newAttachmentUrls]
+
+                      const updates = {
+                         title: selectedTodo.title,
+                         description: selectedTodo.description,
+                         start_date: Timestamp.fromDate(getDateForDisplay(selectedTodo.start_date)),
+                         end_date: Timestamp.fromDate(getDateForDisplay(selectedTodo.end_date)),
+                         allDay: selectedTodo.allDay,
+                         repeat: selectedTodo.repeat,
+                         department: selectedTodo.department,
+                         attachments: updatedAttachments,
+                       }
 
                       await updateTodo(selectedTodo.id, updates)
                       setTodos(todos.map((t) => (t.id === selectedTodo.id ? { ...t, ...updates } : t)))
                       toast.success("Todo updated successfully")
                       setIsEditDialogOpen(false)
+                      setEditSelectedFiles([])
                     } catch (error) {
                       console.error("Error updating todo:", error)
                       toast.error("Failed to update todo")
@@ -910,8 +1038,26 @@ export default function TodoApp() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <h4 className="font-semibold mb-1">Date</h4>
-                        <p>{selectedTodo.date}</p>
+                        <h4 className="font-semibold mb-1">Start Date & Time</h4>
+                        <p>{getDateForDisplay(selectedTodo.start_date).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1">End Date & Time</h4>
+                        <p>{getDateForDisplay(selectedTodo.end_date).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}</p>
                       </div>
                       <div>
                         <h4 className="font-semibold mb-1">Status</h4>
@@ -931,18 +1077,10 @@ export default function TodoApp() {
                         <h4 className="font-semibold mb-1">Repeat</h4>
                         <p>{selectedTodo.repeat}</p>
                       </div>
-                      {!selectedTodo.allDay && (
-                        <>
-                          <div>
-                            <h4 className="font-semibold mb-1">Start Time</h4>
-                            <p>{selectedTodo.startTime}</p>
-                          </div>
-                          <div>
-                            <h4 className="font-semibold mb-1">End Time</h4>
-                            <p>{selectedTodo.endTime}</p>
-                          </div>
-                        </>
-                      )}
+                      <div>
+                        <h4 className="font-semibold mb-1">Department</h4>
+                        <p>Admin</p>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -971,12 +1109,40 @@ export default function TodoApp() {
                             <img
                               src={attachment}
                               alt={`Attachment ${index + 1}`}
-                              className="w-full h-48 object-cover rounded"
+                              className="w-full h-48 object-cover rounded mb-2"
                               onError={(e) => {
                                 // If image fails to load, show a placeholder
-                                e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                                e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
                               }}
                             />
+                            <div className="flex justify-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch(attachment)
+                                    const blob = await response.blob()
+                                    const url = window.URL.createObjectURL(blob)
+                                    const link = document.createElement('a')
+                                    link.href = url
+                                    link.download = `attachment_${index + 1}`
+                                    document.body.appendChild(link)
+                                    link.click()
+                                    document.body.removeChild(link)
+                                    window.URL.revokeObjectURL(url)
+                                  } catch (error) {
+                                    console.error('Download failed:', error)
+                                    // Fallback to opening in new tab
+                                    window.open(attachment, '_blank')
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -996,24 +1162,64 @@ export default function TodoApp() {
                         <span className="ml-2">Loading history...</span>
                       </div>
                     ) : todoHistory.length > 0 ? (
-                      <div className="space-y-3">
-                        {todoHistory.map((history, index) => (
-                          <div key={history.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div className="text-sm">
-                                <div className="font-medium text-gray-900">{history.user_full_name}</div>
-                                <div className="text-gray-600">
-                                  Moved from <span className="font-medium">{history.from_column.replace("-", " ")}</span> to{" "}
-                                  <span className="font-medium">{history.to_column.replace("-", " ")}</span>
+                      <>
+                        <div className="space-y-3">
+                          {todoHistory.map((history, index) => (
+                            <div key={history.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="text-sm">
+                                  <div className="font-medium text-gray-900">{history.user_full_name}</div>
+                                  <div className="text-gray-600">
+                                    Moved from <span className="font-medium">{history.from_column.replace("-", " ")}</span> to{" "}
+                                    <span className="font-medium">{history.to_column.replace("-", " ")}</span>
+                                  </div>
                                 </div>
                               </div>
+                              <div className="text-xs text-gray-500">
+                                {history.created_at?.toLocaleDateString()} {history.created_at?.toLocaleTimeString()}
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {history.created_at?.toLocaleDateString()} {history.created_at?.toLocaleTimeString()}
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {historyTotal > historyLimit && (
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="text-sm text-gray-500">
+                              Showing {((historyPage - 1) * historyLimit) + 1}-{Math.min(historyPage * historyLimit, historyTotal)} of {historyTotal} entries
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (selectedTodo && historyPage > 1) {
+                                    fetchTodoHistory(selectedTodo.id, historyPage - 1)
+                                  }
+                                }}
+                                disabled={historyPage <= 1 || loadingHistory}
+                              >
+                                Previous
+                              </Button>
+                              <span className="text-sm text-gray-600">
+                                Page {historyPage} of {Math.max(1, Math.ceil(historyTotal / historyLimit))}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (selectedTodo && historyHasMore) {
+                                    fetchTodoHistory(selectedTodo.id, historyPage + 1)
+                                  }
+                                }}
+                                disabled={!historyHasMore || loadingHistory}
+                              >
+                                Next
+                              </Button>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-4 text-gray-500">
                         No movement history found
