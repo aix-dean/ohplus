@@ -22,7 +22,7 @@ import {
   Minus,
   Send,
 } from "lucide-react"
-import { getProposalById, updateProposal } from "@/lib/proposal-service"
+import { getProposalById, updateProposal, downloadProposalPDF } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
@@ -32,7 +32,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
@@ -144,13 +144,15 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
 
 const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
   const { userData } = useAuth()
+  const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
     const fetchCompanyLogo = async () => {
       if (!userData?.company_id) {
-        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
         setLoading(false)
         return
       }
@@ -163,15 +165,10 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
           const companyData = companyDocSnap.data()
           if (companyData.photo_url && companyData.photo_url.trim() !== "") {
             setCompanyLogo(companyData.photo_url)
-          } else {
-            setCompanyLogo("/ohplus-new-logo.png") // Default fallback
           }
-        } else {
-          setCompanyLogo("/ohplus-new-logo.png") // Default fallback
         }
       } catch (error) {
         console.error("Error fetching company logo:", error)
-        setCompanyLogo("/ohplus-new-logo.png") // Default fallback
       } finally {
         setLoading(false)
       }
@@ -179,6 +176,66 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
 
     fetchCompanyLogo()
   }, [userData?.company_id])
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload only image files (JPEG, PNG, GIF, WebP)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedFile(file)
+    await uploadFile(file)
+  }
+
+  const uploadFile = async (file: File) => {
+    if (!userData?.company_id) return
+
+    setUploading(true)
+    try {
+      const uploadPath = `companies/logos/${Date.now()}_${file.name}`
+      const logoUrl = await uploadFileToFirebaseStorage(file, uploadPath)
+
+      const companyDocRef = doc(db, "companies", userData.company_id)
+      await updateDoc(companyDocRef, {
+        photo_url: logoUrl,
+      })
+
+      setCompanyLogo(logoUrl)
+      setSelectedFile(null)
+
+      toast({
+        title: "Success",
+        description: "Company logo uploaded successfully",
+      })
+    } catch (error) {
+      console.error("Error uploading company logo:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload company logo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -188,17 +245,45 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
     )
   }
 
+  if (companyLogo) {
+    return (
+      <img
+        src={companyLogo || "/placeholder.svg"}
+        alt="Company logo"
+        className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
+        onError={(e) => {
+          // If image fails to load, clear it so upload button shows
+          setCompanyLogo("")
+        }}
+      />
+    )
+  }
+
   return (
-    <img
-      src={companyLogo || "/placeholder.svg"}
-      alt="Company logo"
-      className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
-      onError={(e) => {
-        // Fallback to default logo if image fails to load
-        const target = e.target as HTMLImageElement
-        target.src = "/ohplus-new-logo.png"
-      }}
-    />
+    <div className={`border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors ${className}`}>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleFileUpload}
+        className="hidden"
+        id="company-logo-upload"
+        disabled={uploading}
+      />
+      <label htmlFor="company-logo-upload" className="cursor-pointer">
+        {uploading ? (
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+            <p className="text-sm text-gray-600">Uploading...</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center">
+            <Upload className="h-8 w-8 text-gray-400 mb-2" />
+            <p className="text-sm text-gray-600">Upload Company Logo</p>
+            <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+          </div>
+        )}
+      </label>
+    </div>
   )
 }
 
@@ -211,6 +296,7 @@ export default function ProposalDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [isEditingPrice, setIsEditingPrice] = useState(false)
   const [editablePrice, setEditablePrice] = useState<string>("")
+  const [individualPrices, setIndividualPrices] = useState<{[key: string]: string}>({})
   const [savingPrice, setSavingPrice] = useState(false)
   const [showTemplatesPanel, setShowTemplatesPanel] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -527,6 +613,15 @@ export default function ProposalDetailsPage() {
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
     setCurrentEditingPage(pageNum)
+
+    // Initialize individual prices for multi-product pages
+    if (getSitesPerPage(selectedLayout) > 1) {
+      const prices: {[key: string]: string} = {}
+      currentPageContent.forEach((product) => {
+        prices[product.id] = (product.price || 0).toString()
+      })
+      setIndividualPrices(prices)
+    }
   }
 
   const handleSavePrice = async () => {
@@ -539,30 +634,55 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    const newPrice = Number.parseFloat(editablePrice)
-    if (isNaN(newPrice) || newPrice < 0) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid price",
-        variant: "destructive",
-      })
-      return
-    }
-
     setSavingPrice(true)
     try {
       const currentPageContent = getPageContent(currentEditingPage || 1, selectedLayout)
       if (currentPageContent.length > 0) {
-        const updatedProducts = proposal.products.map((product: any) => {
-          // Update price for all products on the current page
-          const productOnCurrentPage = currentPageContent.find((p) => p.id === product.id)
-          if (productOnCurrentPage) {
-            // If multiple products on page, distribute the price evenly
-            const pricePerProduct = newPrice / currentPageContent.length
-            return { ...product, price: pricePerProduct }
+        let updatedProducts = proposal.products
+
+        if (getSitesPerPage(selectedLayout) === 1) {
+          // Single product per page - use total price
+          const newPrice = Number.parseFloat(editablePrice)
+          if (isNaN(newPrice) || newPrice < 0) {
+            toast({
+              title: "Error",
+              description: "Please enter a valid price",
+              variant: "destructive",
+            })
+            return
           }
-          return product
-        })
+
+          updatedProducts = proposal.products.map((product: any) => {
+            const productOnCurrentPage = currentPageContent.find((p) => p.id === product.id)
+            if (productOnCurrentPage) {
+              return { ...product, price: newPrice }
+            }
+            return product
+          })
+        } else {
+          // Multiple products per page - use individual prices
+          const invalidPrices = Object.values(individualPrices).some(price => {
+            const numPrice = Number.parseFloat(price)
+            return isNaN(numPrice) || numPrice < 0
+          })
+
+          if (invalidPrices) {
+            toast({
+              title: "Error",
+              description: "Please enter valid prices for all products",
+              variant: "destructive",
+            })
+            return
+          }
+
+          updatedProducts = proposal.products.map((product: any) => {
+            const productOnCurrentPage = currentPageContent.find((p) => p.id === product.id)
+            if (productOnCurrentPage && individualPrices[product.id] !== undefined) {
+              return { ...product, price: Number.parseFloat(individualPrices[product.id]) }
+            }
+            return product
+          })
+        }
 
         await updateProposal(
           proposal.id,
@@ -576,6 +696,7 @@ export default function ProposalDetailsPage() {
 
       setIsEditingPrice(false)
       setCurrentEditingPage(null)
+      setIndividualPrices({})
 
       toast({
         title: "Success",
@@ -596,6 +717,7 @@ export default function ProposalDetailsPage() {
   const handleCancelPriceEdit = () => {
     setIsEditingPrice(false)
     setCurrentEditingPage(null)
+    setIndividualPrices({})
     const currentPageContent = getPageContent(currentEditingPage || 1, selectedLayout)
     const currentPagePrice = getPagePrice(currentPageContent)
     setEditablePrice(currentPagePrice.toString())
@@ -616,47 +738,7 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    toast({
-      title: "Download",
-      description: "Generating PDF...",
-    })
-
-    try {
-      const response = await fetch("/api/proposals/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ proposal }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF")
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.style.display = "none"
-      a.href = url
-      a.download = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
-    } catch (error) {
-      console.error("Error downloading PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to download PDF. Please try again.",
-        variant: "destructive",
-      })
-    }
+    await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
   }
 
   const handleTemplateSelect = (template: any) => {
@@ -700,9 +782,6 @@ export default function ProposalDetailsPage() {
 
     let orientationStyles = ""
     switch (orientation) {
-      case "Square":
-        orientationStyles = "max-w-[600px] min-h-[600px]"
-        break
       case "Landscape":
         orientationStyles = "max-w-[800px] min-h-[500px]"
         break
@@ -870,20 +949,6 @@ export default function ProposalDetailsPage() {
         sizeStyles = "w-full max-w-4xl min-h-[600px]"
     }
 
-    // Square orientation for any paper size
-    if (orientation === "Square") {
-      switch (size) {
-        case "A4":
-          sizeStyles = "w-[210mm] min-h-[210mm]" // A4 Square
-          break
-        case "Letter size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Letter Square
-          break
-        case "Legal size":
-          sizeStyles = "w-[8.5in] min-h-[8.5in]" // Legal Square
-          break
-      }
-    }
 
     return `${baseStyles} ${sizeStyles}`
   }
@@ -1141,9 +1206,8 @@ export default function ProposalDetailsPage() {
 
                       <div>
                         <Label className="text-sm font-medium text-gray-900 mb-3 block">Orientation:</Label>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           {[
-                            { name: "Square", aspect: "aspect-square" },
                             { name: "Landscape", aspect: "aspect-video" },
                             { name: "Portrait", aspect: "aspect-[3/4]" },
                           ].map((orientation) => (
@@ -1329,63 +1393,65 @@ export default function ProposalDetailsPage() {
                   {/* Content */}
                   <div className="relative z-10 p-4 md:p-6 bg-transparent">
                     <div className="flex justify-between items-start mb-4 md:mb-6">
-                      <CompanyLogo className="w-16 h-12 md:w-20 md:h-14" />
+                      <CompanyLogo className="w-16 h-16 md:w-20 md:h-20" />
                       <div className="text-right">
                         <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
                           {getPageTitle(pageContent)}
                         </h1>
 
-                        {isEditingPrice ? (
-                          <div className="flex items-center gap-2 justify-end">
-                            <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
-                              <span className="text-gray-600 mr-1">₱</span>
-                              <Input
-                                type="number"
-                                value={
-                                  currentEditingPage === pageNumber
-                                    ? editablePrice
-                                    : getPagePrice(pageContent).toString()
-                                }
-                                onChange={(e) => {
-                                  if (currentEditingPage !== pageNumber) {
-                                    setCurrentEditingPage(pageNumber)
-                                    setEditablePrice(e.target.value)
-                                  } else {
-                                    setEditablePrice(e.target.value)
+                        {getSitesPerPage(selectedLayout) === 1 ? (
+                          isEditingPrice ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <div className="flex items-center bg-white border border-gray-300 rounded-md px-2 py-1">
+                                <span className="text-gray-600 mr-1">₱</span>
+                                <Input
+                                  type="number"
+                                  value={
+                                    currentEditingPage === pageNumber
+                                      ? editablePrice
+                                      : getPagePrice(pageContent).toString()
                                   }
-                                }}
-                                onFocus={() => {
-                                  setCurrentEditingPage(pageNumber)
-                                  setEditablePrice(getPagePrice(pageContent).toString())
-                                }}
-                                className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
-                                min="0"
-                                step="0.01"
-                                disabled={savingPrice}
-                              />
-                            </div>
-                            {isEditingPrice && currentEditingPage && (
-                              <div className="flex items-center gap-2 ml-4">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setIsEditingPrice(false)
-                                    setCurrentEditingPage(null)
-                                    setEditablePrice("")
+                                  onChange={(e) => {
+                                    if (currentEditingPage !== pageNumber) {
+                                      setCurrentEditingPage(pageNumber)
+                                      setEditablePrice(e.target.value)
+                                    } else {
+                                      setEditablePrice(e.target.value)
+                                    }
                                   }}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
+                                  onFocus={() => {
+                                    setCurrentEditingPage(pageNumber)
+                                    setEditablePrice(getPagePrice(pageContent).toString())
+                                  }}
+                                  className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none w-32"
+                                  min="0"
+                                  step="0.01"
+                                  disabled={savingPrice}
+                                />
                               </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                          </div>
-                        )}
+                              {isEditingPrice && currentEditingPage && (
+                                <div className="flex items-center gap-2 ml-4">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setIsEditingPrice(false)
+                                      setCurrentEditingPage(null)
+                                      setEditablePrice("")
+                                    }}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
+                              ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                            </div>
+                          )
+                        ) : null}
                       </div>
                     </div>
 
@@ -1473,6 +1539,40 @@ export default function ProposalDetailsPage() {
                               </div>
                             </div>
                           </div>
+
+                          {getSitesPerPage(selectedLayout) > 1 && (
+                            <div className="mt-3 flex justify-center">
+                              {isEditingPrice ? (
+                                <div className="p-2 bg-white border border-gray-300 rounded-md w-full">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-600 text-xs font-medium">Price:</span>
+                                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded px-2 py-1 flex-1">
+                                      <span className="text-gray-500 text-xs mr-1">₱</span>
+                                      <Input
+                                        type="number"
+                                        value={individualPrices[product.id] || ""}
+                                        onChange={(e) => {
+                                          setIndividualPrices(prev => ({
+                                            ...prev,
+                                            [product.id]: e.target.value
+                                          }))
+                                        }}
+                                        className="border-0 p-0 h-auto text-right font-semibold text-green-600 bg-transparent focus:ring-0 focus:outline-none text-sm"
+                                        min="0"
+                                        step="0.01"
+                                        disabled={savingPrice}
+                                        placeholder="0.00"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-green-500 text-white h-8 px-2 pb-2.5 rounded-md font-semibold text-xs flex items-center justify-center">
+                                  ₱{product.price?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) || "0.00"}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1495,6 +1595,7 @@ export default function ProposalDetailsPage() {
                 : null
             }
             useProposalViewer={true}
+            excludeProposalId={params.id as string}
           />
         </div>
       </div>

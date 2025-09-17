@@ -20,9 +20,10 @@ interface ProposalHistoryProps {
   } | null
   onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
+  excludeProposalId?: string
 }
 
-export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false }: ProposalHistoryProps) {
+export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false, excludeProposalId }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
@@ -52,10 +53,11 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
   const filteredProposals = selectedClient
     ? proposals.filter(
         (proposal) =>
-          proposal.client.company.toLowerCase().includes(selectedClient.company.toLowerCase()) ||
-          proposal.client.contactPerson.toLowerCase().includes(selectedClient.contactPerson.toLowerCase()),
+          (proposal.client.company.toLowerCase().includes(selectedClient.company.toLowerCase()) ||
+          proposal.client.contactPerson.toLowerCase().includes(selectedClient.contactPerson.toLowerCase())) &&
+          proposal.id !== excludeProposalId
       )
-    : proposals
+    : proposals.filter((proposal) => proposal.id !== excludeProposalId)
 
   const handleProposalClick = (proposal: Proposal) => {
     setSelectedProposal(proposal)
@@ -125,7 +127,6 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
         onClose={handleCloseModal}
         onCopySites={onCopySites}
         useProposalViewer={useProposalViewer}
-        client={selectedClient}
       />
     </>
   )

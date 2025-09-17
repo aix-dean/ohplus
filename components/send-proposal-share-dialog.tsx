@@ -81,8 +81,7 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
               )}
             </div>
             <div className="flex-1">
-              <div className="text-xs font-medium text-gray-400 mb-1">{proposal.proposalNumber || proposal.id}</div>
-              <div className="text-sm font-medium text-gray-500">{proposal.proposalNumber}</div>
+              <div className="text-xs font-medium text-gray-400 mb-1">{proposal.client?.company || "Client"}</div>
               <div className="text-sm font-semibold text-gray-900">
                 {proposal.products && proposal.products.length > 0
                   ? `${proposal.products[0].name} (${proposal.products.length} Site${proposal.products.length !== 1 ? "s" : ""})`
