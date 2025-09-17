@@ -369,6 +369,23 @@ export default function ProposalDetailsPage() {
     fetchProposal()
   }, [params.id])
 
+  // Handle automatic download when page loads with action=download
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const action = searchParams.get("action")
+
+    if (action === "download" && proposal && !loading) {
+      // Small delay to ensure the proposal is fully rendered
+      setTimeout(() => {
+        handleDownload()
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000)
+    }
+  }, [proposal, loading])
+
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
       toast({

@@ -28,9 +28,10 @@ import {
   Calculator,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getPaginatedProposalsByUserId, getProposalsCountByUserId } from "@/lib/proposal-service"
+import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
+import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Pagination } from "@/components/ui/pagination"
@@ -51,6 +52,7 @@ function ProposalsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("proposals")
 
   useEffect(() => {
@@ -169,8 +171,10 @@ function ProposalsPageContent() {
     router.push(`/sales/proposals/${proposalId}`)
   }
 
-  const handleDownloadPDF = (proposal: Proposal) => {
-    console.log("Download PDF for proposal:", proposal.id)
+  const handleDownloadPDF = async (proposal: Proposal) => {
+    // Navigate to detail page and trigger download there
+    // This ensures the proposal is rendered and can be captured by html2canvas
+    router.push(`/sales/proposals/${proposal.id}?action=download`)
   }
 
   return (
