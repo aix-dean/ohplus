@@ -33,12 +33,14 @@ interface Attachment {
 
 interface ProposalEmailTemplate extends EmailTemplate {
   template_type: "proposal" | "quotation" | "CE" | "report"
+  company_id: string
+  userId: string
 }
 
 export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const { user, userData } = useAuth()
+  const { user, userData, projectData } = useAuth()
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -47,6 +49,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const [emailData, setEmailData] = useState({
     to: "",
     cc: "",
+    replyTo: "",
     subject: "",
     message: `Hi AAA,
 
@@ -77,7 +80,7 @@ OH PLUS
   })
 
   const fetchProposalTemplates = async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     try {
       setTemplatesLoading(true)
@@ -85,7 +88,7 @@ OH PLUS
       const templatesRef = collection(db, "email_templates")
       const q = query(
         templatesRef,
-        where("userId", "==", user.uid),
+        where("company_id", "==", userData.company_id),
         where("template_type", "==", "proposal"),
         orderBy("created", "desc"),
       )
@@ -101,6 +104,7 @@ OH PLUS
           subject: data.subject,
           body: data.body,
           userId: data.userId,
+          company_id: data.company_id,
           created: data.created,
           template_type: data.template_type || "proposal",
         })
@@ -117,6 +121,7 @@ OH PLUS
             subject: data.subject,
             body: data.body,
             userId: data.userId,
+            company_id: data.company_id,
             created: data.created,
             template_type: data.template_type || "proposal",
           })
@@ -137,7 +142,7 @@ OH PLUS
   }
 
   const createDefaultProposalTemplates = async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     const defaultProposalTemplates = [
       {
@@ -166,7 +171,7 @@ Best regards,
 [Your Position]
 OH PLUS
 [Contact Information]`,
-        userId: user.uid,
+        company_id: userData.company_id,
         template_type: "proposal" as const,
       },
       {
@@ -189,7 +194,7 @@ Best regards,
 [Your Position]
 OH PLUS
 [Contact Information]`,
-        userId: user.uid,
+        company_id: userData.company_id,
         template_type: "proposal" as const,
       },
     ]
@@ -220,6 +225,7 @@ OH PLUS
           ...prev,
           to: proposalData.client.email,
           cc: "",
+          replyTo: userData?.email || user?.email || "",
           subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
         }))
 
@@ -240,10 +246,10 @@ OH PLUS
   }, [params.id, toast])
 
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProposalTemplates()
     }
-  }, [user?.uid])
+  }, [userData?.company_id])
 
   const generateProposalPDFs = async (proposalData: Proposal) => {
     try {
@@ -257,7 +263,7 @@ OH PLUS
 
       if (response.ok) {
         const pdfBlob = await response.blob()
-        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
+        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
         const pdfFile = new File([pdfBlob], fileName, {
           type: "application/pdf",
         })
@@ -277,7 +283,7 @@ OH PLUS
       }
     } catch (error) {
       console.error("Error generating proposal PDFs:", error)
-      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.code}.pdf`
+      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
       const fallbackPDFs: Attachment[] = [
         {
           name: fallbackFileName,
@@ -339,10 +345,27 @@ OH PLUS
       if (ccEmails.length > 0) {
         formData.append("cc", JSON.stringify(ccEmails))
       }
+      if (emailData.replyTo.trim()) {
+        formData.append("replyTo", emailData.replyTo.trim())
+      }
       formData.append("subject", emailData.subject)
       formData.append("body", emailData.message)
       if (userData?.phone_number) {
         formData.append("currentUserPhoneNumber", userData.phone_number)
+      }
+
+      // Pass company information
+      if (userData?.company_id) {
+        formData.append("companyId", userData.company_id)
+      }
+      if (projectData?.company_name) {
+        formData.append("companyName", projectData.company_name)
+      }
+      if (projectData?.company_website) {
+        formData.append("companyWebsite", projectData.company_website)
+      }
+      if (userData?.displayName) {
+        formData.append("userDisplayName", userData.displayName)
       }
 
       for (let i = 0; i < attachments.length; i++) {
@@ -368,6 +391,31 @@ OH PLUS
         body: formData,
       })
 
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+        try {
+          // Read the response body once
+          const responseText = await response.text()
+          // Try to parse as JSON first
+          try {
+            const errorData = JSON.parse(responseText)
+            errorMessage = errorData.error || errorMessage
+          } catch (jsonParseError) {
+            // If it's not JSON, check if it's HTML
+            if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+              errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
+            } else {
+              errorMessage = responseText || errorMessage
+            }
+          }
+        } catch (readError) {
+          // If we can't read the response at all
+          errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
+        }
+        throw new Error(errorMessage)
+      }
+
       const result = await response.json()
 
       if (!response.ok) {
@@ -385,8 +433,10 @@ OH PLUS
           subject: emailData.subject,
           to: toEmails,
           cc: ccEmails.length > 0 ? ccEmails : null,
+          replyTo: emailData.replyTo || null,
           updated: serverTimestamp(),
           userId: user?.uid || null,
+          company_id: userData?.company_id || null,
           email_type: "proposal",
           attachments: attachments.map((att) => ({
             fileName: att.name,
@@ -472,10 +522,10 @@ OH PLUS
   }
 
   const handleAddTemplate = async () => {
-    if (!user?.uid) {
+    if (!userData?.company_id) {
       toast({
         title: "Error",
-        description: "You must be logged in to create templates",
+        description: "Company information not available",
         variant: "destructive",
       })
       return
@@ -487,7 +537,8 @@ OH PLUS
         name: templateName,
         subject: "New Proposal Template",
         body: "Enter your proposal template content here...",
-        userId: user.uid,
+        userId: user!.uid,
+        company_id: userData.company_id,
         template_type: "proposal" as const,
       }
 
@@ -656,6 +707,16 @@ OH PLUS
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
+                    <Input
+                      value={emailData.replyTo}
+                      onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
+                      placeholder="Enter reply-to email"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
                     <Input
                       value={emailData.subject}
@@ -692,23 +753,6 @@ OH PLUS
                           </Button>
                         </div>
                       ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-blue-600 bg-transparent"
-                        onClick={handleAddAttachment}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Add Attachment
-                      </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={handleFileSelect}
-                        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-                      />
                     </div>
                   </div>
                 </div>
@@ -778,6 +822,31 @@ OH PLUS
             {sending ? "Sending..." : "Send Email"}
           </Button>
         </div>
+
+        {/* Floating Attachment Button */}
+        <div className="fixed left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 z-50">
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleAddAttachment}
+              variant="outline"
+              size="lg"
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
+            >
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
+            </Button>
+            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Add File</span>
+          </div>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+        />
+
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

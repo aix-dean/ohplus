@@ -1,9 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-function createEmailTemplate(body: string, userPhoneNumber?: string): string {
+function createEmailTemplate(
+  body: string,
+  userPhoneNumber?: string,
+  companyName?: string,
+  companyWebsite?: string,
+  userDisplayName?: string
+): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
   const processedBody = body
@@ -19,7 +27,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OH Plus - Proposal</title>
+    <title>${companyName || "Company"} - Proposal</title>
     <style>
         body {
             margin: 0;
@@ -145,7 +153,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
 <body>
     <div class="email-container">
         <div class="header">
-            <h1 class="logo">OH PLUS</h1>
+            <h1 class="logo">${companyName || "Company"}</h1>
             <p class="tagline">Premium Outdoor Advertising Solutions</p>
         </div>
         
@@ -164,21 +172,21 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
             
             <div class="cta-section">
                 <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
-                <a href="mailto:noreply@ohplus.ph" class="cta-button">Get In Touch</a>
+                <a href="mailto:${userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply'}@ohplus.ph" class="cta-button">Get In Touch</a>
             </div>
         </div>
         
         <div class="footer">
             <div class="signature">
-                <div class="signature-name">Sales Executive</div>
-                <div class="signature-title">OH PLUS - Outdoor Advertising</div>
+                <div class="signature-name">${userDisplayName || "Sales Executive"}</div>
+                <div class="signature-title">${companyName || "Company"} - Outdoor Advertising</div>
             </div>
-            
+
             <div class="contact-info">
-                <strong>OH PLUS</strong><br>
+                <strong>${companyName || "Company"}</strong><br>
                 📞 ${phoneNumber}<br>
-                📧 noreply@ohplus.ph<br>
-                🌐 www.ohplus.ph
+                📧 ${userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply'}@ohplus.ph<br>
+                🌐 ${companyWebsite || 'www.ohplus.ph'}
             </div>
             
             <div class="divider"></div>
@@ -200,12 +208,43 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
 
     // Extract email data
-    const from = "OH Plus <noreply@ohplus.ph>"
     const toJson = formData.get("to") as string
     const ccJson = formData.get("cc") as string
+    const replyTo = formData.get("replyTo") as string
     const subject = formData.get("subject") as string
     const body = formData.get("body") as string
     const currentUserPhoneNumber = formData.get("currentUserPhoneNumber") as string
+    const companyId = formData.get("companyId") as string
+    const companyName = formData.get("companyName") as string
+    const companyWebsite = formData.get("companyWebsite") as string
+    const userDisplayName = formData.get("userDisplayName") as string
+
+    // Get actual company name from database if companyId is provided
+    let actualCompanyName = companyName || "Company"
+    let actualCompanyWebsite = companyWebsite
+
+    if (companyId) {
+      try {
+        const companyDocRef = doc(db, "companies", companyId)
+        const companyDocSnap = await getDoc(companyDocRef)
+
+        if (companyDocSnap.exists()) {
+          const companyData = companyDocSnap.data()
+          if (companyData.name) {
+            actualCompanyName = companyData.name
+          }
+          if (companyData.website) {
+            actualCompanyWebsite = companyData.website
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching company data:", error)
+        // Continue with fallback values
+      }
+    }
+
+    // Create from address using company information
+    const from = `${actualCompanyName} <noreply@ohplus.ph>`
 
     console.log("[v0] Email sending - Subject:", subject)
     console.log("[v0] Email sending - Body length:", body?.length)
@@ -252,11 +291,15 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), currentUserPhoneNumber),
+      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, userDisplayName),
     }
 
     if (cc && cc.length > 0) {
       emailData.cc = cc
+    }
+
+    if (replyTo && replyTo.trim()) {
+      emailData.reply_to = replyTo.trim()
     }
 
     if (attachments.length > 0) {
