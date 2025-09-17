@@ -39,6 +39,12 @@ import {
   Loader2,
   Pencil,
   Trash2,
+  FileText,
+  Mail,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Clock3,
 } from "lucide-react"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { useRef, useState, useEffect, use } from "react"
@@ -201,6 +207,94 @@ export const formatFirebaseDate = (timestamp: any): string => {
   } catch (error) {
     console.error("Error formatting date:", error)
     return ""
+  }
+}
+
+const getQuotationStatusConfig = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "draft":
+      return {
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+        icon: <FileText className="h-3.5 w-3.5" />,
+        label: "Draft",
+      }
+    case "sent":
+      return {
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+        icon: <Mail className="h-3.5 w-3.5" />,
+        label: "Sent",
+      }
+    case "viewed":
+      return {
+        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        icon: <Eye className="h-3.5 w-3.5" />,
+        label: "Viewed",
+      }
+    case "accepted":
+      return {
+        color: "bg-green-100 text-green-800 border-green-200",
+        icon: <CheckCircle className="h-3.5 w-3.5" />,
+        label: "Accepted",
+      }
+    case "rejected":
+      return {
+        color: "bg-red-100 text-red-800 border-red-200",
+        icon: <XCircle className="h-3.5 w-3.5" />,
+        label: "Rejected",
+      }
+    case "expired":
+      return {
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        icon: <AlertCircle className="h-3.5 w-3.5" />,
+        label: "Expired",
+      }
+    default:
+      return {
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+        icon: <Clock3 className="h-3.5 w-3.5" />,
+        label: "Unknown",
+      }
+  }
+}
+
+const getJobOrderStatusConfig = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "draft":
+      return {
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+        icon: <FileText className="h-3.5 w-3.5" />,
+        label: "Draft",
+      }
+    case "pending":
+      return {
+        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        icon: <Clock3 className="h-3.5 w-3.5" />,
+        label: "Pending",
+      }
+    case "approved":
+      return {
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+        icon: <CheckCircle className="h-3.5 w-3.5" />,
+        label: "Approved",
+      }
+    case "completed":
+      return {
+        color: "bg-green-100 text-green-800 border-green-200",
+        icon: <CheckCircle className="h-3.5 w-3.5" />,
+        label: "Completed",
+      }
+    case "cancelled":
+      return {
+        color: "bg-red-100 text-red-800 border-red-200",
+        icon: <XCircle className="h-3.5 w-3.5" />,
+        label: "Cancelled",
+      }
+    default:
+      return {
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+        icon: <Clock3 className="h-3.5 w-3.5" />,
+        label: "Unknown",
+      }
   }
 }
 
@@ -562,9 +656,9 @@ export default function SiteDetailsPage({ params }: Props) {
   const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // Check if file is image or PDF
-      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-        alert('Please select an image or PDF file')
+      // Check if file is image only
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file only')
         return
       }
 
@@ -737,12 +831,34 @@ export default function SiteDetailsPage({ params }: Props) {
       setPersonnelFormError('Name is required')
       return
     }
+    if (personnelForm.name.trim().length < 2) {
+      setPersonnelFormError('Name must be at least 2 characters long')
+      return
+    }
+    if (personnelForm.name.trim().length > 100) {
+      setPersonnelFormError('Name must be less than 100 characters')
+      return
+    }
     if (!personnelForm.position.trim()) {
       setPersonnelFormError('Position is required')
       return
     }
+    if (personnelForm.position.trim().length < 2) {
+      setPersonnelFormError('Position must be at least 2 characters long')
+      return
+    }
+    if (personnelForm.position.trim().length > 100) {
+      setPersonnelFormError('Position must be less than 100 characters')
+      return
+    }
     if (!personnelForm.contact.trim()) {
       setPersonnelFormError('Contact number is required')
+      return
+    }
+    // Validate contact number format (should be exactly 10 digits for Philippine mobile)
+    const contactRegex = /^\d{10}$/
+    if (!contactRegex.test(personnelForm.contact.trim())) {
+      setPersonnelFormError('Contact number must be exactly 10 digits (e.g., 9123456789)')
       return
     }
 
@@ -796,13 +912,16 @@ export default function SiteDetailsPage({ params }: Props) {
     if (!product?.personnel || !Array.isArray(product.personnel)) return
 
     const person = product.personnel[index]
+    // Clean contact number - remove +63 prefix and non-digits
+    const cleanContact = (person.contact || '').replace(/^\+63/, '').replace(/\D/g, '')
+
     setEditingPersonnelIndex(index)
     setEditPersonnelForm({
       name: person.name || '',
       position: person.position || '',
-      contact: person.contact || '',
-      start_date: person.start_date ? new Date(person.start_date.seconds * 1000) : new Date(),
-      end_date: person.end_date ? new Date(person.end_date.seconds * 1000) : null,
+      contact: cleanContact,
+      start_date: person.start_date && person.start_date.seconds ? new Date(person.start_date.seconds * 1000) : new Date(),
+      end_date: person.end_date && person.end_date.seconds ? new Date(person.end_date.seconds * 1000) : null,
       status: person.status ?? true
     })
     setEditPersonnelDialogOpen(true)
@@ -817,12 +936,39 @@ export default function SiteDetailsPage({ params }: Props) {
       setEditPersonnelFormError('Name is required')
       return
     }
+    if (editPersonnelForm.name.trim().length < 2) {
+      setEditPersonnelFormError('Name must be at least 2 characters long')
+      return
+    }
+    if (editPersonnelForm.name.trim().length > 100) {
+      setEditPersonnelFormError('Name must be less than 100 characters')
+      return
+    }
     if (!editPersonnelForm.position.trim()) {
       setEditPersonnelFormError('Position is required')
       return
     }
+    if (editPersonnelForm.position.trim().length < 2) {
+      setEditPersonnelFormError('Position must be at least 2 characters long')
+      return
+    }
+    if (editPersonnelForm.position.trim().length > 100) {
+      setEditPersonnelFormError('Position must be less than 100 characters')
+      return
+    }
     if (!editPersonnelForm.contact.trim()) {
       setEditPersonnelFormError('Contact number is required')
+      return
+    }
+    // Validate contact number format (should be exactly 10 digits for Philippine mobile)
+    const contactRegex = /^\d{10}$/
+    if (!contactRegex.test(editPersonnelForm.contact.trim())) {
+      setEditPersonnelFormError('Contact number must be exactly 10 digits (e.g., 9123456789)')
+      return
+    }
+    // Validate date logic
+    if (editPersonnelForm.end_date && editPersonnelForm.start_date > editPersonnelForm.end_date) {
+      setEditPersonnelFormError('End date must be after start date')
       return
     }
 
@@ -1004,7 +1150,11 @@ export default function SiteDetailsPage({ params }: Props) {
               >
                 {product.name}
               </h3>
-              <Button variant="outline" className="mt-2 w-[440px] h-[47px]">
+              <Button
+                variant="outline"
+                className="mt-2 w-[440px] h-[47px]"
+                onClick={() => router.push(`/admin/planner?site=${id}&view=bookings`)}
+              >
                 <Calendar className="mr-2 h-4 w-4" />
                 Site Calendar
               </Button>
@@ -1225,20 +1375,6 @@ export default function SiteDetailsPage({ params }: Props) {
 
             {/* Action Buttons */}
             <div className="border-t pt-4 space-y-2">
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                style={{
-                  fontFamily: 'Inter',
-                  fontWeight: 600,
-                  fontSize: '16px',
-                  lineHeight: '120%',
-                  letterSpacing: '0%',
-                  color: '#FFFFFF'
-                }}
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
             </div>
           </div>
         </div>
@@ -1279,33 +1415,64 @@ export default function SiteDetailsPage({ params }: Props) {
                       <p>No bookings found for this site.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {bookings.map((booking) => (
-                        <div key={booking.id} className="border rounded-lg p-4">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">Client:</span> {booking.client?.name || "N/A"}
+                    <div>
+                      <div className="grid grid-cols-7 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Date</div>
+                        <div>Project ID</div>
+                        <div>Client</div>
+                        <div>Content</div>
+                        <div>Price</div>
+                        <div>Total</div>
+                        <div>Status</div>
+                      </div>
+
+                      <div className="divide-y divide-gray-100">
+                        {bookings.map((booking) => {
+                          const getStatusLabel = (status: string) => {
+                            switch (status?.toUpperCase()) {
+                              case "COMPLETED":
+                                return "Completed"
+                              case "RESERVED":
+                                return "Ongoing"
+                              default:
+                                return status || "Unknown"
+                            }
+                          }
+
+                          const getStatusBadge = (status: string) => {
+                            const label = getStatusLabel(status)
+                            if (label === "Completed") {
+                              return <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
+                            } else if (label === "Ongoing") {
+                              return <Badge className="bg-red-100 text-red-800 border-red-200">Ongoing</Badge>
+                            } else {
+                              return <Badge variant="outline">{label}</Badge>
+                            }
+                          }
+
+                          return (
+                            <div key={booking.id} className="grid grid-cols-7 gap-4 p-4 text-sm">
+                              <div className="text-gray-600">
+                                {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"} to
+                                <br />
+                                {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
+                              </div>
+                              <div className="text-gray-900 font-medium">{booking.reservation_id || booking.id}</div>
+                              <div className="text-gray-900">{booking.client?.name || "N/A"}</div>
+                              <div className="text-gray-900">{booking.project_name || booking.product_name || "N/A"}</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{booking.costDetails?.pricePerMonth?.toLocaleString() || "0"}
+                                <br />
+                                <span className="text-xs">/month</span>
+                              </div>
+                              <div className="text-red-600 font-bold">₱{booking.total_cost?.toLocaleString() || "0"}</div>
+                              <div>
+                                {getStatusBadge(booking.status)}
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-medium">Status:</span>{" "}
-                              <Badge variant="outline" className="ml-1">
-                                {booking.status || "Unknown"}
-                              </Badge>
-                            </div>
-                            <div>
-                              <span className="font-medium">Start Date:</span>{" "}
-                              {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"}
-                            </div>
-                            <div>
-                              <span className="font-medium">End Date:</span>{" "}
-                              {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
-                            </div>
-                            <div>
-                              <span className="font-medium">Total Cost:</span> ₱{booking.total_cost?.toLocaleString() || "0"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1323,33 +1490,41 @@ export default function SiteDetailsPage({ params }: Props) {
                       <p>No cost estimates found for this site.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {costEstimates.map((estimate) => (
-                        <div
-                          key={estimate.id}
-                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => router.push(`/admin/cost-estimates/${estimate.id}`)}
-                        >
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">Client:</span> {estimate.client?.company || "N/A"}
+                    <div>
+                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Date</div>
+                        <div>Project ID</div>
+                        <div>Type</div>
+                        <div>Client</div>
+                        <div>Status</div>
+                        <div>Price</div>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {costEstimates.map((estimate) => (
+                          <div
+                            key={estimate.id}
+                            className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => router.push(`/admin/cost-estimates/${estimate.id}`)}
+                          >
+                            <div className="text-gray-600">{estimate.createdAt ? formatFirebaseDate(estimate.createdAt) : "N/A"}</div>
+                            <div className="text-gray-900 font-medium">
+                              {estimate.costEstimateNumber || estimate.id.slice(-8)}
+                            </div>
+                            <div className="text-gray-600">Cost Estimate</div>
+                            <div className="text-gray-900">
+                              {estimate.client?.company || (estimate.client as any)?.name || "Unknown Client"}
                             </div>
                             <div>
-                              <span className="font-medium">Status:</span>{" "}
-                              <Badge variant="outline" className="ml-1">
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
                                 {estimate.status || "Draft"}
                               </Badge>
                             </div>
-                            <div>
-                              <span className="font-medium">Total Amount:</span> ₱{estimate.totalAmount?.toLocaleString() || "0"}
-                            </div>
-                            <div>
-                              <span className="font-medium">Created:</span>{" "}
-                              {estimate.createdAt ? formatFirebaseDate(estimate.createdAt) : "N/A"}
+                            <div className="text-red-600 font-medium">
+                              ₱{estimate.totalAmount?.toLocaleString() || "0"}/month
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1367,33 +1542,45 @@ export default function SiteDetailsPage({ params }: Props) {
                       <p>No quotations found for this site.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {quotations.map((quotation) => (
-                        <div
-                          key={quotation.id}
-                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => router.push(`/admin/quotations/${quotation.id}`)}
-                        >
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">Client:</span> {quotation.client_name || "N/A"}
+                    <div>
+                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Date</div>
+                        <div>Project ID</div>
+                        <div>Type</div>
+                        <div>Client</div>
+                        <div>Status</div>
+                        <div>Price</div>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {quotations.map((quotation) => {
+                          const statusConfig = getQuotationStatusConfig(quotation.status)
+                          return (
+                            <div
+                              key={quotation.id}
+                              className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => router.push(`/admin/quotations/${quotation.id}`)}
+                            >
+                              <div className="text-gray-600">{quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}</div>
+                              <div className="text-gray-900 font-medium">
+                                {quotation.quotation_number || quotation.id?.slice(-8) || "N/A"}
+                              </div>
+                              <div className="text-gray-600">Quotation</div>
+                              <div className="text-gray-900">
+                                {quotation.client_name || "Unknown Client"}
+                              </div>
+                              <div>
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
+                                >
+                                  {statusConfig.icon}
+                                  {statusConfig.label}
+                                </span>
+                              </div>
+                              <div className="text-red-600 font-medium">₱{quotation.total_amount?.toLocaleString() || "0"}/month</div>
                             </div>
-                            <div>
-                              <span className="font-medium">Status:</span>{" "}
-                              <Badge variant="outline" className="ml-1">
-                                {quotation.status || "Draft"}
-                              </Badge>
-                            </div>
-                            <div>
-                              <span className="font-medium">Total Amount:</span> ₱{quotation.total_amount?.toLocaleString() || "0"}
-                            </div>
-                            <div>
-                              <span className="font-medium">Created:</span>{" "}
-                              {quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1411,36 +1598,43 @@ export default function SiteDetailsPage({ params }: Props) {
                       <p>No job orders found for this site.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {jobOrders.map((jobOrder) => (
-                        <div
-                          key={jobOrder.id}
-                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => router.push(`/admin/job-orders/${jobOrder.id}`)}
-                        >
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">JO Number:</span> {jobOrder.joNumber || "N/A"}
+                    <div>
+                      <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Date</div>
+                        <div>Project ID</div>
+                        <div>Type</div>
+                        <div>Client</div>
+                        <div>Status</div>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {jobOrders.map((jobOrder) => {
+                          const statusConfig = getJobOrderStatusConfig(jobOrder.status)
+                          return (
+                            <div
+                              key={jobOrder.id}
+                              className="grid grid-cols-5 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => router.push(`/admin/job-orders/${jobOrder.id}`)}
+                            >
+                              <div className="text-gray-600">{jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}</div>
+                              <div className="text-gray-900 font-medium">
+                                {jobOrder.joNumber || jobOrder.id.slice(-8)}
+                              </div>
+                              <div className="text-gray-600">Job Order</div>
+                              <div className="text-gray-900">
+                                {jobOrder.clientName || "Unknown Client"}
+                              </div>
+                              <div>
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
+                                >
+                                  {statusConfig.icon}
+                                  {statusConfig.label}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-medium">Status:</span>{" "}
-                              <Badge variant="outline" className="ml-1">
-                                {jobOrder.status || "Pending"}
-                              </Badge>
-                            </div>
-                            <div>
-                              <span className="font-medium">Type:</span> {jobOrder.joType || "N/A"}
-                            </div>
-                            <div>
-                              <span className="font-medium">Client:</span> {jobOrder.clientName || "N/A"}
-                            </div>
-                            <div>
-                              <span className="font-medium">Created:</span>{" "}
-                              {jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1646,16 +1840,32 @@ export default function SiteDetailsPage({ params }: Props) {
                     color: '#000000'
                   }}>
                     <span>Color:</span>{" "}
-                    <span style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '18px',
-                      lineHeight: '132%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}>
-                      {product.structure?.color || "Not Available"}
-                    </span>
+                    {product.structure?.color ? (
+                      <div
+                        style={{
+                          display: 'inline-block',
+                          width: '24px',
+                          height: '24px',
+                          backgroundColor: product.structure.color,
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          marginLeft: '8px',
+                          verticalAlign: 'middle'
+                        }}
+                        title={product.structure.color}
+                      />
+                    ) : (
+                      <span style={{
+                        fontFamily: 'Inter',
+                        fontWeight: 400,
+                        fontSize: '18px',
+                        lineHeight: '132%',
+                        letterSpacing: '0%',
+                        color: '#333333'
+                      }}>
+                        Not Available
+                      </span>
+                    )}
                   </div>
                   <div style={{
                     fontFamily: 'Inter',
@@ -1824,7 +2034,7 @@ export default function SiteDetailsPage({ params }: Props) {
                         <div key={index} className="grid grid-cols-3 text-sm py-2 border-b border-gray-100 last:border-b-0 items-center">
                           <span className="truncate font-medium">{person.name}</span>
                           <span className="truncate">{person.position}</span>
-                          <span className="truncate">{person.contact}</span>
+                          <span className="truncate">+63{person.contact}</span>
                         </div>
                       ))
                   })()}
@@ -2001,7 +2211,7 @@ export default function SiteDetailsPage({ params }: Props) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.pdf"
+              accept="image/*"
               onChange={handleBlueprintFileSelect}
               className="hidden"
             />
@@ -2184,13 +2394,21 @@ export default function SiteDetailsPage({ params }: Props) {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
-              <input
-                type="text"
-                value={structureForm.color}
-                onChange={(e) => setStructureForm({ ...structureForm, color: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter structure color"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={structureForm.color || '#ffffff'}
+                  onChange={(e) => setStructureForm({ ...structureForm, color: e.target.value })}
+                  className="w-12 h-10 border border-gray-300 rounded-md cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={structureForm.color || ''}
+                  onChange={(e) => setStructureForm({ ...structureForm, color: e.target.value })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter color name or hex code"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Contractor</label>
@@ -2204,13 +2422,18 @@ export default function SiteDetailsPage({ params }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Condition</label>
-              <input
-                type="text"
+              <select
                 value={structureForm.condition}
                 onChange={(e) => setStructureForm({ ...structureForm, condition: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter structure condition"
-              />
+              >
+                <option value="">Select condition</option>
+                <option value="Excellent">Excellent</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+                <option value="Poor">Poor</option>
+                <option value="Critical">Critical</option>
+              </select>
             </div>
           </div>
           <div className="flex gap-2 mt-6">
@@ -3035,14 +3258,21 @@ export default function SiteDetailsPage({ params }: Props) {
           {/* Contact */}
           <div className="grid grid-cols-3 items-center gap-2">
             <label className="text-sm font-medium col-span-1">Contact:</label>
-            <input
-              type="text"
-              value={personnelForm.contact}
-              onChange={(e) =>
-                setPersonnelForm({ ...personnelForm, contact: e.target.value })
-              }
-              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="col-span-2 flex">
+              <span className="inline-flex items-center px-1 py-1 border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-l-md min-w-[35px] justify-center">
+                +63
+              </span>
+              <input
+                type="text"
+                value={personnelForm.contact}
+                onChange={(e) =>
+                  setPersonnelForm({ ...personnelForm, contact: e.target.value.replace(/\D/g, '') })
+                }
+                placeholder="9123456789"
+                maxLength={10}
+                className="flex-1 px-2 py-1 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Start Date */}
@@ -3166,12 +3396,21 @@ export default function SiteDetailsPage({ params }: Props) {
           {/* Contact */}
           <div className="grid grid-cols-3 items-center gap-2">
             <label className="text-sm font-medium col-span-1">Contact:</label>
-            <input
-              type="text"
-              value={editPersonnelForm.contact}
-              onChange={(e) => setEditPersonnelForm({ ...editPersonnelForm, contact: e.target.value })}
-              className="col-span-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="col-span-2 flex">
+              <span className="inline-flex items-center px-1 py-1 border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-l-md min-w-[35px] justify-center">
+                +63
+              </span>
+              <input
+                type="text"
+                value={editPersonnelForm.contact}
+                onChange={(e) =>
+                  setEditPersonnelForm({ ...editPersonnelForm, contact: e.target.value.replace(/\D/g, '') })
+                }
+                placeholder="9123456789"
+                maxLength={10}
+                className="flex-1 px-2 py-1 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Start Date */}
@@ -3331,7 +3570,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     <TableCell>{person.position}</TableCell>
 
                     {/* Contact */}
-                    <TableCell>{person.contact}</TableCell>
+                    <TableCell>+63{person.contact}</TableCell>
 
                     {/* Start Date */}
                     <TableCell className="text-sm text-gray-600">
