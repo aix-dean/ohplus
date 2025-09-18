@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
+import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,8 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [usersByDepartment, setUsersByDepartment] = useState<Record<string, User[]>>({})
+  const [isUserAddedSuccessDialogOpen, setIsUserAddedSuccessDialogOpen] = useState(false)
+  const [addedUserData, setAddedUserData] = useState<{ email: string; name: string; role: string } | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
@@ -468,13 +471,14 @@ export default function UserManagementPage() {
 
       <AddUserDialog
         open={isAddUserDialogOpen}
-        onOpenChange={setIsAddUserDialogOpen}
-        onSuccess={() => {
-          console.log("User invitation sent successfully")
+        onOpenChange={(open) => setIsAddUserDialogOpen(open)}
+        onSuccess={(userData) => {
+          setAddedUserData(userData)
+          setIsUserAddedSuccessDialogOpen(true)
         }}
       />
 
-      <Dialog open={isEditRolesDialogOpen} onOpenChange={setIsEditRolesDialogOpen}>
+      <Dialog open={isEditRolesDialogOpen} onOpenChange={(open) => setIsEditRolesDialogOpen(open)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit User Roles</DialogTitle>
@@ -530,6 +534,20 @@ export default function UserManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {addedUserData && isUserAddedSuccessDialogOpen && (
+        <UserAddedSuccessDialog
+          isOpen={isUserAddedSuccessDialogOpen}
+          onClose={(_?: any) => setIsUserAddedSuccessDialogOpen(false)}
+          onAddAnother={() => {
+            setIsUserAddedSuccessDialogOpen(false)
+            setIsAddUserDialogOpen(true)
+          }}
+          userEmail={addedUserData.email}
+          userName={addedUserData.name}
+          userRole={addedUserData.role}
+        />
+      )}
 
     </div>
   )

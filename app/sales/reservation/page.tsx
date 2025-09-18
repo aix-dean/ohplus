@@ -10,10 +10,6 @@ import { Search, MoreHorizontal, FileText, Calculator, ChevronDown, ChevronRight
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { CreateReportDialog } from "@/components/create-report-dialog"
-import { createJobOrder, generatePersonalizedJONumber, getQuotationDetailsForJobOrder } from "@/lib/job-order-service"
-import { createReport } from "@/lib/report-service"
-import type { JobOrderStatus } from "@/lib/types/job-order"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -98,10 +94,6 @@ export default function ReservationsPage() {
   const [pageLastDocs, setPageLastDocs] = useState<{ [page: number]: any }>({})
   const [hasMore, setHasMore] = useState(true)
 
-  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
-  const [selectedProductForReport, setSelectedProductForReport] = useState<string>("")
-  const [isCreatingJobOrder, setIsCreatingJobOrder] = useState(false)
-  const [isCreatingReport, setIsCreatingReport] = useState(false)
   const [totalReservationsCount, setTotalReservationsCount] = useState<number>(0)
 
   const fetchTotalReservationsCount = async () => {
@@ -280,10 +272,6 @@ export default function ReservationsPage() {
     })
   }
 
-  const handleCreateReport = (productId: string) => {
-    setSelectedProductForReport(productId)
-    setCreateReportDialogOpen(true)
-  }
 
   const getProjectCompliance = (booking: Booking) => {
     const compliance = booking.projectCompliance || {}
@@ -352,74 +340,6 @@ export default function ReservationsPage() {
     })
   }
 
-  const handleCreateJobOrder = async (booking: Booking) => {
-    if (!user?.uid || !userData?.company_id || !booking.quotation_id) {
-      toast({
-        title: "Error",
-        description: "Missing required information (user, company, or quotation ID) to create Job Order.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCreatingJobOrder(true)
-    try {
-      // Fetch quotation details
-      const quotationDetails = await getQuotationDetailsForJobOrder(booking.quotation_id);
-
-      if (!quotationDetails) {
-        toast({
-          title: "Error",
-          description: "Quotation details not found for the selected reservation.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { quotation, products: quotationProducts, client } = quotationDetails;
-      const mainProduct = quotationProducts[0]; // Assuming the first product is the main one for job order creation
-      const siteCode = getSiteCode(mainProduct);
-
-      const joNumber = await generatePersonalizedJONumber(userData); // Generate personalized JO number
-
-      const jobOrderData = {
-        joNumber: joNumber,
-        siteName: mainProduct?.name || "N/A",
-        siteLocation: mainProduct?.specs_rental?.location || mainProduct?.light?.location || "N/A",
-        joType: "Installation", // Default type, can be made dynamic later
-        requestedBy: `${userData.first_name} ${userData.last_name}`,
-        assignTo: user.uid, // Assign to the current user for now
-        dateRequested: quotation.created?.toDate() || new Date(), // Use quotation creation date
-        deadline: quotation.end_date ? new Date(quotation.end_date) : new Date(), // Use quotation end date as deadline
-        jobDescription: `Job Order for reservation of site ${siteCode} by client ${quotation.client_name}.`,
-        message: `This Job Order is linked to quotation ID: ${quotation.id}.`,
-        attachments: [],
-        company_id: userData.company_id,
-        quotation_id: quotation.id, // Link to the actual quotation ID
-        product_id: mainProduct?.id,
-        clientName: quotation.client_name || "N/A",
-        siteCode: siteCode || "N/A",
-        created_by: user.uid,
-        total_amount: quotation.total_amount, // Add total_amount from quotation
-      };
-
-      const jobOrderId = await createJobOrder(jobOrderData, user.uid, "pending" as JobOrderStatus);
-      toast({
-        title: "Job Order Created",
-        description: `Job Order ${jobOrderId} has been created successfully.`,
-      });
-      router.push(`/sales/job-orders/create?quotationId=${quotation.id}`);
-    } catch (error) {
-      console.error("Error creating Job Order:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create Job Order. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingJobOrder(false);
-    }
-  };
 
   const handleFileUpload = async (bookingId: string, complianceType: string, file: File) => {
     const uploadKey = `${bookingId}-${complianceType}`
@@ -854,26 +774,10 @@ export default function ReservationsPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCreateJobOrder(booking);
+                                router.push(`/sales/job-orders/create?quotationId=${booking.quotation_id}`);
                               }}
-                              disabled={isCreatingJobOrder}
                             >
-                              {isCreatingJobOrder ? "Creating JO..." : "Create JO"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCreateReport(booking.product_id || "");
-                              }}
-                              disabled={isCreatingReport}
-                            >
-                              {isCreatingReport ? "Creating Report..." : "Create Report"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Cancel
+                              Create JO
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -935,12 +839,6 @@ export default function ReservationsPage() {
         </div>
       </div>
 
-      <CreateReportDialog
-        open={createReportDialogOpen}
-        onOpenChange={setCreateReportDialogOpen}
-        siteId={selectedProductForReport}
-        module="sales"
-      />
     </div>
   )
 }

@@ -54,6 +54,25 @@ export class CompanyService {
     }
   }
 
+  // Check if company information is complete
+  static async isCompanyInfoComplete(companyId: string): Promise<boolean> {
+    try {
+      const companyData = await CompanyService.getCompanyData(companyId)
+      if (!companyData) {
+        return false
+      }
+
+      // Only require company name for basic completeness
+      // This allows users to upload products once they have a company name
+      const hasCompanyName = Boolean(companyData.name?.trim() && companyData.name.trim().length > 0)
+
+      return hasCompanyName
+    } catch (error) {
+      console.error("Error checking company info completeness:", error)
+      return false
+    }
+  }
+
   static async updateCompanyData(
     companyId: string,
     userId: string,
