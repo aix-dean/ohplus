@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -125,8 +124,9 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   }
 }
 
-export default function CostEstimatePage({ params }: { params: { id: string } }) {
-  const { id: costEstimateId } = params
+export default function CostEstimatePage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params)
+  const { id: costEstimateId } = resolvedParams
   const router = useRouter()
   const { user, userData } = useAuth()
 
@@ -163,6 +163,62 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
+  const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
+    console.log("[v0] All line items:", lineItems)
+
+    const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
+
+    // Group line items by site based on the site rental items
+    lineItems.forEach((item) => {
+      if (item.category.includes("Billboard Rental")) {
+        // This is a site rental item - use its description as the site name
+        const siteName = item.description
+        if (!siteGroups[siteName]) {
+          siteGroups[siteName] = []
+        }
+        siteGroups[siteName].push(item)
+
+        // Find related production, installation, and maintenance items for this site
+        const siteId = item.id
+        const relatedItems = lineItems.filter(
+          (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+        )
+        siteGroups[siteName].push(...relatedItems)
+      }
+    })
+
+    if (Object.keys(siteGroups).length === 0) {
+      console.log("[v0] No billboard rental items found, treating as single site with all items")
+      siteGroups["Single Site"] = lineItems
+    } else {
+      // Check for orphaned items (items not associated with any site)
+      const groupedItemIds = new Set()
+      Object.values(siteGroups).forEach((items) => {
+        items.forEach((item) => groupedItemIds.add(item.id))
+      })
+
+      const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
+      if (orphanedItems.length > 0) {
+        console.log("[v0] Found orphaned items:", orphanedItems)
+        const siteNames = Object.keys(siteGroups)
+        siteNames.forEach((siteName) => {
+          // Create copies of orphaned items for each site to avoid reference issues
+          const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
+          siteGroups[siteName].push(...orphanedCopies)
+        })
+      }
+    }
+
+    console.log("[v0] Final site groups:", siteGroups)
+    return siteGroups
+  }
+
+  // Memoize siteGroups to ensure it updates when costEstimate.lineItems changes
+  const siteGroups = React.useMemo(() => groupLineItemsBySite(costEstimate?.lineItems || []), [costEstimate?.lineItems])
+  const siteNames = Object.keys(siteGroups)
+  const hasMultipleSites = siteNames.length > 1
+  const totalPages = hasMultipleSites ? siteNames.length : 1
+
   useEffect(() => {
     console.log("[v0] Save button visibility check:", {
       isEditing,
@@ -174,7 +230,18 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
-    setTempValues({ ...tempValues, [fieldName]: currentValue })
+
+    if (fieldName === "contractPeriod") {
+      // For contract period, set individual date fields
+      setTempValues({
+        ...tempValues,
+        startDate: currentValue.startDate || tempValues.startDate,
+        endDate: currentValue.endDate || tempValues.endDate
+      })
+    } else {
+      setTempValues({ ...tempValues, [fieldName]: currentValue })
+    }
+
     setHasUnsavedChanges(true)
   }
 
@@ -206,6 +273,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const handleSaveAllChanges = async () => {
     console.log("[v0] handleSaveAllChanges called")
     console.log("[v0] Current state:", {
+      isEditing,
       editableCostEstimate: !!costEstimate,
       tempValuesCount: Object.keys(tempValues).length,
       tempValues,
@@ -221,6 +289,16 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       return
     }
 
+    if (!isEditing) {
+      console.log("[v0] Not in edit mode, cannot save changes")
+      toast({
+        title: "Error",
+        description: "Please enter edit mode to save changes",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (Object.keys(tempValues).length === 0) {
       console.log("[v0] No temp values to save, returning")
       toast({
@@ -231,7 +309,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
       return
     }
 
-    const updatedCostEstimate = { ...costEstimate }
+    // Create a deep copy of the cost estimate to ensure React detects changes
+    const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
 
     const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
     const siteNames = Object.keys(siteGroups)
@@ -281,23 +360,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           }
           break
 
-        case "illumination":
-          const illuminationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
-            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (belongsToCurrentSite) {
-              console.log("[v0] Updating illumination for item:", item.id, "from", item.quantity, "to", newValue)
-              return { ...item, quantity: newValue }
-            }
-            return item
-          })
-          updatedCostEstimate.lineItems = illuminationUpdatedItems
-          break
 
         case "startDate":
         case "endDate":
           updatedCostEstimate[fieldName] = newValue
           if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
-            const diffTime = Math.abs(updatedCostEstimate.endDate.getTime() - updatedCostEstimate.startDate.getTime())
+            const diffTime = Math.abs(new Date(updatedCostEstimate.endDate).getTime() - new Date(updatedCostEstimate.startDate).getTime())
             const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
             updatedCostEstimate.durationDays = newDurationDays
 
@@ -315,30 +383,46 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
           }
           break
 
-        case "size":
-          updatedCostEstimate.size = newValue
-          break
+        case "height":
+        case "width":
+          // Update the specs of the billboard rental item for the current site only
+          // Find the billboard rental item that belongs to the current site
+          const billboardItemToUpdate = updatedCostEstimate.lineItems.find((item) => {
+            if (!item.category.includes("Billboard Rental")) return false
 
-        case "signatureName":
-          updatedCostEstimate.signatureName = newValue
-          break
+            // Check if this item belongs to the current site by checking if it exists in currentSiteItems
+            return currentSiteItems.some((siteItem) => siteItem.id === item.id)
+          })
 
-        case "signaturePosition":
-          updatedCostEstimate.signaturePosition = newValue
+          if (billboardItemToUpdate) {
+            if (!billboardItemToUpdate.specs) {
+              billboardItemToUpdate.specs = {}
+            }
+            if (fieldName === "height") {
+              billboardItemToUpdate.specs.height = newValue
+              console.log(`[v0] Updated height to ${newValue} for item:`, billboardItemToUpdate.id)
+            } else if (fieldName === "width") {
+              billboardItemToUpdate.specs.width = newValue
+              console.log(`[v0] Updated width to ${newValue} for item:`, billboardItemToUpdate.id)
+            }
+          } else {
+            console.log(`[v0] Could not find billboard item to update for field: ${fieldName}`)
+          }
           break
       }
     })
 
     try {
-      const updateData = {
-        ...updatedCostEstimate,
-        updatedAt: new Date(),
-      }
+      // Remove the id field from update data as it's not needed for Firestore update
+      const { id, ...updateDataWithoutId } = updatedCostEstimate
 
-      await updateCostEstimate(updatedCostEstimate.id, updateData)
+      await updateCostEstimate(updatedCostEstimate.id, updateDataWithoutId)
 
+      // Update state with the new data
       setEditableCostEstimate(updatedCostEstimate)
       setCostEstimate(updatedCostEstimate)
+
+      // Force a re-render by updating the key or triggering a state change
       setEditingField(null)
       setTempValues({})
       setHasUnsavedChanges(false)
@@ -349,6 +433,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         description: `Changes saved successfully for ${currentSiteName}`,
       })
       console.log("[v0] Save completed successfully for site:", currentSiteName)
+      console.log("[v0] Updated cost estimate:", updatedCostEstimate)
     } catch (error) {
       console.error("[v0] Save failed:", error)
       toast({
@@ -551,7 +636,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   }, [isSendEmailDialogOpen, costEstimate])
 
   const handleSendEmail = () => {
-    router.push(`/sales/cost-estimates/${params.id}/compose`)
+    router.push(`/sales/cost-estimates/${costEstimateId}/compose-email`)
   }
 
   const handleSendEmailConfirm = async () => {
@@ -821,6 +906,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
   const handleCancelEdit = () => {
     setEditableCostEstimate(costEstimate)
     setIsEditing(false)
+    setTempValues({})
+    setHasUnsavedChanges(false)
     toast({
       title: "Cancelled",
       description: "Editing cancelled. Changes were not saved.",
@@ -832,12 +919,10 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
 
     setIsSaving(true)
     try {
-      await updateCostEstimate(
-        editableCostEstimate.id,
-        editableCostEstimate,
-        // user.uid, // These arguments are not part of the updateCostEstimate signature
-        // user.displayName || "Unknown User",
-      )
+      // Remove the id field from update data as it's not needed for Firestore update
+      const { id, ...updateDataWithoutId } = editableCostEstimate
+
+      await updateCostEstimate(editableCostEstimate.id, updateDataWithoutId)
       setCostEstimate(editableCostEstimate)
       setIsEditing(false)
       toast({
@@ -1013,63 +1098,27 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
     )
   }
 
-  const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
-    console.log("[v0] All line items:", lineItems)
-
-    const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
-
-    // Group line items by site based on the site rental items
-    lineItems.forEach((item) => {
-      if (item.category.includes("Billboard Rental")) {
-        // This is a site rental item - use its description as the site name
-        const siteName = item.description
-        if (!siteGroups[siteName]) {
-          siteGroups[siteName] = []
-        }
-        siteGroups[siteName].push(item)
-
-        // Find related production, installation, and maintenance items for this site
-        const siteId = item.id
-        const relatedItems = lineItems.filter(
-          (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
-        )
-        siteGroups[siteName].push(...relatedItems)
-      }
-    })
-
-    if (Object.keys(siteGroups).length === 0) {
-      console.log("[v0] No billboard rental items found, treating as single site with all items")
-      siteGroups["Single Site"] = lineItems
-    } else {
-      // Check for orphaned items (items not associated with any site)
-      const groupedItemIds = new Set()
-      Object.values(siteGroups).forEach((items) => {
-        items.forEach((item) => groupedItemIds.add(item.id))
-      })
-
-      const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
-      if (orphanedItems.length > 0) {
-        console.log("[v0] Found orphaned items:", orphanedItems)
-        const siteNames = Object.keys(siteGroups)
-        siteNames.forEach((siteName) => {
-          // Create copies of orphaned items for each site to avoid reference issues
-          const orphanedCopies = orphanedItems.map((item) => ({ ...item }))
-          siteGroups[siteName].push(...orphanedCopies)
-        })
-      }
-    }
-
-    console.log("[v0] Final site groups:", siteGroups)
-    return siteGroups
-  }
-
-  const siteGroups = groupLineItemsBySite(costEstimate?.lineItems || [])
-  const siteNames = Object.keys(siteGroups)
-  const hasMultipleSites = siteNames.length > 1
-  const totalPages = hasMultipleSites ? siteNames.length : 1
-
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
-    const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
+    // Calculate preview total using tempValues if available
+    const previewSiteTotal = siteLineItems.reduce((sum, item) => {
+      let itemTotal = item.total
+
+      // Apply unitPrice changes
+      if (tempValues.unitPrice !== undefined && item.category.includes("Billboard Rental")) {
+        const duration = tempValues.durationDays !== undefined ? tempValues.durationDays : (costEstimate?.durationDays || 30)
+        itemTotal = tempValues.unitPrice * (duration / 30)
+      }
+
+      // Apply duration changes
+      if (tempValues.durationDays !== undefined && item.category.includes("Billboard Rental") && tempValues.unitPrice === undefined) {
+        itemTotal = item.unitPrice * (tempValues.durationDays / 30)
+      }
+
+
+      return sum + itemTotal
+    }, 0)
+
+    const siteTotal = Object.keys(tempValues).length > 0 ? previewSiteTotal : siteLineItems.reduce((sum, item) => sum + item.total, 0)
     const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
@@ -1116,8 +1165,8 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
               </p>
               <div className="space-y-1">
-                <p className="font-semibold text-gray-900">{costEstimate?.client.name}</p>
-                <p className="text-gray-700">{costEstimate?.client.company}</p>
+                <p className="font-semibold text-gray-900">{costEstimate?.client.company}</p>
+                <p className="text-gray-700">{costEstimate?.client.contactPerson}</p>
               </div>
             </div>
             <div className="text-right">
@@ -1148,12 +1197,12 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Site Location</span>
-              <span className="text-gray-700">: {siteLineItems[0]?.notes || siteName}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.specs?.location || siteName}</span>
             </div>
             <div className="flex">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Type</span>
-              <span className="text-gray-700">: {siteLineItems[0]?.description || "Billboard"}</span>
+              <span className="text-gray-700">: {siteLineItems[0]?.content_type || "sdaf"}</span>
             </div>
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
@@ -1162,12 +1211,27 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               {isEditing && editingField === "size" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
-                    type="text"
-                    value={tempValues.size || ""}
-                    onChange={(e) => updateTempValues("size", e.target.value)}
-                    className="w-48 h-6 text-sm"
-                    placeholder="Enter size"
+                    type="number"
+                    value={tempValues.height !== undefined ? tempValues.height : (() => {
+                      const billboardItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+                      return billboardItem?.specs?.height || ""
+                    })()}
+                    onChange={(e) => updateTempValues("height", Number.parseFloat(e.target.value) || 0)}
+                    className="w-20 h-6 text-sm"
+                    placeholder="Height"
                   />
+                  <span className="text-sm text-gray-600">ft (h) x</span>
+                  <Input
+                    type="number"
+                    value={tempValues.width !== undefined ? tempValues.width : (() => {
+                      const billboardItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+                      return billboardItem?.specs?.width || ""
+                    })()}
+                    onChange={(e) => updateTempValues("width", Number.parseFloat(e.target.value) || 0)}
+                    className="w-20 h-6 text-sm"
+                    placeholder="Width"
+                  />
+                  <span className="text-sm text-gray-600">ft (w)</span>
                 </div>
               ) : (
                 <span
@@ -1176,10 +1240,34 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                       ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
                       : ""
                   }`}
-                  onClick={() => isEditing && handleFieldEdit("size", costEstimate?.size || "")}
+                  onClick={() => {
+                    if (isEditing) {
+                      const billboardItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+                      const currentHeight = billboardItem?.specs?.height || 0
+                      const currentWidth = billboardItem?.specs?.width || 0
+
+                      // Initialize both values in tempValues to ensure they persist during editing
+                      setTempValues(prev => ({
+                        ...prev,
+                        height: prev.height !== undefined ? prev.height : currentHeight,
+                        width: prev.width !== undefined ? prev.width : currentWidth
+                      }))
+
+                      setEditingField("size")
+                      setHasUnsavedChanges(true)
+                    }
+                  }}
                   title={isEditing ? "Click to edit size" : ""}
                 >
-                  {costEstimate?.size || ""}
+                  {(() => {
+                    const billboardItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+                    const height = tempValues.height !== undefined ? tempValues.height : billboardItem?.specs?.height
+                    const width = tempValues.width !== undefined ? tempValues.width : billboardItem?.specs?.width
+                    if (height && width) {
+                      return `${height} ft (h) x ${width} ft (w)`
+                    }
+                    return ""
+                  })()}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1192,15 +1280,25 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 <div className="flex items-center gap-2 ml-1">
                   <Input
                     type="date"
-                    value={tempValues.startDate ? format(tempValues.startDate, "yyyy-MM-dd") : ""}
-                    onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
+                    value={tempValues.startDate ? tempValues.startDate.toISOString().split('T')[0] : (costEstimate?.startDate ? costEstimate.startDate.toISOString().split('T')[0] : "")}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        updateTempValues("startDate", new Date(dateValue + 'T12:00:00'))
+                      }
+                    }}
                     className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
                   <span className="text-gray-500">-</span>
                   <Input
                     type="date"
-                    value={tempValues.endDate ? format(tempValues.endDate, "yyyy-MM-dd") : ""}
-                    onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
+                    value={tempValues.endDate ? tempValues.endDate.toISOString().split('T')[0] : (costEstimate?.endDate ? costEstimate.endDate.toISOString().split('T')[0] : "")}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        updateTempValues("endDate", new Date(dateValue + 'T12:00:00'))
+                      }
+                    }}
                     className="w-36 h-8 text-sm border-gray-300 rounded-md"
                   />
                 </div>
@@ -1220,9 +1318,17 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   }
                   title={isEditing ? "Click to edit contract period" : ""}
                 >
-                  {costEstimate?.startDate ? format(costEstimate.startDate, "MMMM d, yyyy") : ""}
-                  {costEstimate?.startDate && costEstimate?.endDate ? " - " : ""}
-                  {costEstimate?.endDate ? format(costEstimate.endDate, "MMMM d, yyyy") : ""}
+                  {(() => {
+                    const startDate = tempValues.startDate || costEstimate?.startDate
+                    const endDate = tempValues.endDate || costEstimate?.endDate
+                    if (!startDate && !endDate) {
+                      return "N/A"
+                    }
+                    const startDateStr = startDate ? format(startDate, "MMMM d, yyyy") : ""
+                    const endDateStr = endDate ? format(endDate, "MMMM d, yyyy") : ""
+                    const separator = startDateStr && endDateStr ? " - " : ""
+                    return startDateStr + separator + endDateStr
+                  })()}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1236,32 +1342,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex items-center">
                 <span className="w-4 text-center">•</span>
                 <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">: </span>
-                {isEditing && editingField === "illumination" ? (
-                  <div className="flex items-center gap-2 ml-1">
-                    <Input
-                      type="number"
-                      value={tempValues.illumination || ""}
-                      onChange={(e) => updateTempValues("illumination", Number.parseInt(e.target.value) || 0)}
-                      className="w-16 h-6 text-sm"
-                      placeholder="Units"
-                    />
-                    <span className="text-sm text-gray-600">units of lighting system</span>
-                  </div>
-                ) : (
-                  <span
-                    className={`text-gray-700 ${
-                      isEditing
-                        ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                        : ""
-                    }`}
-                    onClick={() => isEditing && handleFieldEdit("illumination", siteLineItems[0].quantity)}
-                    title={isEditing ? "Click to edit illumination" : ""}
-                  >
-                    {siteLineItems[0].quantity} units of lighting system
-                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                  </span>
-                )}
+                <span className="text-gray-700">: {siteLineItems[0].quantity} units of lighting system</span>
               </div>
             )}
             <div className="flex items-center">
@@ -1289,7 +1370,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                   onClick={() => isEditing && handleFieldEdit("unitPrice", monthlyRate)}
                   title={isEditing ? "Click to edit lease rate" : ""}
                 >
-                  {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                  {(tempValues.unitPrice !== undefined ? tempValues.unitPrice : monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}
@@ -1308,11 +1389,11 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <div className="flex justify-between">
                 <span className="text-gray-700">Lease rate per month</span>
                 <span className="text-gray-900">
-                  PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  PHP {(tempValues.unitPrice !== undefined ? tempValues.unitPrice : monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-700">x {formatDurationDisplay(costEstimate?.durationDays)}</span>
+                <span className="text-gray-700">x {formatDurationDisplay(tempValues.durationDays !== undefined ? tempValues.durationDays : costEstimate?.durationDays)}</span>
                 <span className="text-gray-900">
                   PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
@@ -1358,12 +1439,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             )}
           </div>
         </div>
-        {process.env.NODE_ENV === "development" && (
-          <div className="text-xs text-gray-500 mt-2">
-            Debug: isEditing={isEditing.toString()}, hasUnsavedChanges={hasUnsavedChanges.toString()}, tempValues=
-            {Object.keys(tempValues).length}
-          </div>
-        )}
         {!isEditing && (
           <div className="fixed bottom-6 right-6 flex gap-3 bg-white p-4 rounded-lg shadow-lg border z-50">
             <Button
@@ -1373,25 +1448,6 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
               <FileText className="h-4 w-4" />
               Save as Draft
             </Button>
-            {hasUnsavedChanges && (
-              <Button
-                onClick={(e) => {
-                  console.log("[v0] Save button clicked - event:", e)
-                  console.log("[v0] Save button state check:", {
-                    hasUnsavedChanges,
-                    tempValuesCount: Object.keys(tempValues).length,
-                    tempValues,
-                  })
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleSaveAllChanges()
-                }}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Save className="h-4 w-4" />
-                Save Changes
-              </Button>
-            )}
           </div>
         )}
       </div>
@@ -1413,6 +1469,32 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         }
       `}</style>
 
+      {/* Header with Back Button and Status */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/sales/cost-estimates")}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Cost Estimates
+            </Button>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Status:</span>
+              <Badge className={`${statusConfig.color} border`}>
+                {statusConfig.icon}
+                <span className="ml-1">{statusConfig.label}</span>
+              </Badge>
+            </div>
+          </div>
+          <div className="text-sm text-gray-600">
+            {costEstimate?.costEstimateNumber || costEstimate?.id}
+          </div>
+        </div>
+      </div>
 
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
@@ -1457,7 +1539,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
         <div className="flex gap-6 items-start">
           <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
             <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
+              <div className="flex items-center justify-center mb-4 pt-6">
                 {companyData?.photo_url ? (
                   <img
                     src={companyData.photo_url || "/placeholder.svg"}
@@ -1542,7 +1624,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
                 </Button>
               </div>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {costEstimate?.client?.company || costEstimate?.client?.name || "Client"}
+                {costEstimate?.client?.company || "Client"}
               </div>
             </div>
 
@@ -1603,7 +1685,7 @@ export default function CostEstimatePage({ params }: { params: { id: string } })
             Cancel
           </Button>
           <Button
-            onClick={handleSaveEdit}
+            onClick={handleSaveAllChanges}
             disabled={isSaving}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
           >

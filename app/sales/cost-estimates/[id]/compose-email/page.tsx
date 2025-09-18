@@ -23,6 +23,7 @@ import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { ProposalSentSuccessDialog } from "@/components/proposal-sent-success-dialog"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
@@ -54,6 +55,7 @@ export default function ComposeEmailPage() {
 
   const [toEmail, setToEmail] = useState("")
   const [ccEmail, setCcEmail] = useState("")
+  const [replyToEmail, setReplyToEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
@@ -77,7 +79,7 @@ export default function ComposeEmailPage() {
               first_name: currentUserData.first_name || user?.displayName?.split(" ")[0] || "",
               last_name: currentUserData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
               email: currentUserData.email || user?.email || "",
-              company_id: currentUserData.company_id,
+              company_id: currentUserData.company_id || undefined,
             }
           : undefined
 
@@ -85,7 +87,7 @@ export default function ComposeEmailPage() {
 
         // Generate PDF for main estimate
         try {
-          const mainPdfBase64 = await generateCostEstimateEmailPDF(mainEstimate, true, userDataForPDF)
+          const mainPdfBase64 = await generateCostEstimateEmailPDF(mainEstimate, userDataForPDF)
           if (typeof mainPdfBase64 === "string") {
             const mainFilename = `QU-SU-${mainEstimate.costEstimateNumber}_${mainEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
             allPDFs.push({
@@ -106,7 +108,7 @@ export default function ComposeEmailPage() {
           const estimate = uniqueRelatedEstimates[i]
           try {
             console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedEstimates.length} for estimate:`, estimate.id)
-            const pdfBase64 = await generateCostEstimateEmailPDF(estimate, true, userDataForPDF)
+            const pdfBase64 = await generateCostEstimateEmailPDF(estimate, userDataForPDF)
             if (typeof pdfBase64 === "string") {
               const filename = `QU-SU-${estimate.costEstimateNumber}_${estimate.client?.company || "Client"}_Cost_Estimate_Page_${estimate.page_number || i + 2}.pdf`
               allPDFs.push({
@@ -184,9 +186,10 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(estimate, related)
 
       setToEmail(estimate.client?.email || "")
-      setCcEmail(user?.email || "")
-      setSubject(`Cost Estimate: ${estimate.title || "Custom Cost Estimate"} - OH Plus`)
-      setBody(`Hi ${estimate.client?.contactPerson || estimate.client?.company || "Valued Client"},
+      setCcEmail("")
+      setReplyToEmail(user?.email || "")
+      setSubject(`${estimate?.title || "Custom Cost Estimate"}`)
+      setBody(`Hi ${estimate?.client?.contactPerson || estimate?.client?.company || "Valued Client"},
 
 I hope you're doing well!
 
@@ -208,13 +211,9 @@ ${user?.email || ""}`)
         try {
           console.log("[v0] Using company_id:", companyId)
           const userTemplates = await emailService.getEmailTemplates(companyId)
-          if (userTemplates.length === 0) {
-            await emailService.createDefaultTemplates(companyId)
-            const newTemplates = await emailService.getEmailTemplates(companyId)
-            setTemplates(newTemplates)
-          } else {
-            setTemplates(userTemplates)
-          }
+          console.log("[v0] Fetched user templates:", userTemplates)
+          setTemplates(userTemplates)
+          
         } catch (error) {
           console.error("Error fetching templates:", error)
           setTemplates([])
@@ -465,11 +464,13 @@ ${user?.email || ""}`)
         client: costEstimate.client,
         currentUserEmail: user?.email,
         ccEmail: ccEmail,
+        replyToEmail: replyToEmail,
         subject: subject,
         body: body,
         attachments: allAttachments,
         preGeneratedPDFs: preGeneratedPDFs, // Send all pre-generated PDFs
         uploadedFiles: uploadedFilesData,
+        userData: userData, // Send userData for PDF generation fallback
       }
 
       console.log("[v0] Sending request with body:", {
@@ -563,7 +564,7 @@ ${user?.email || ""}`)
 
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false)
-    router.push(`/sales/cost-estimates/${params.id}`)
+    router.push('/sales/cost-estimates')
   }
 
   if (loading || userData === undefined) {
@@ -622,6 +623,18 @@ ${user?.email || ""}`)
                 <Label className="w-12 text-sm font-medium">Cc:</Label>
                 <div className="flex-1">
                   <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
+                </div>
+              </div>
+
+              {/* Reply-To Field */}
+              <div className="flex items-center gap-4">
+                <Label className="w-12 text-sm font-medium">Reply-To:</Label>
+                <div className="flex-1">
+                  <Input
+                    value={replyToEmail}
+                    onChange={(e) => setReplyToEmail(e.target.value)}
+                    placeholder="reply-to@example.com"
+                  />
                 </div>
               </div>
 
@@ -723,7 +736,7 @@ ${user?.email || ""}`)
           {/* Templates Sidebar */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="font-medium mb-4">Templates:</h3>
-            <div className="space-y-3">
+            <div className="max-h-96 overflow-y-auto space-y-3">
               {templates.map((template) => (
                 <div
                   key={template.id}
@@ -755,6 +768,8 @@ ${user?.email || ""}`)
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-4 pt-4 border-t">
               <Button
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white"
                 onClick={() => setShowAddTemplateDialog(true)}
@@ -770,13 +785,18 @@ ${user?.email || ""}`)
           <Button
             onClick={handleSendEmail}
             disabled={sending || !toEmail || !subject || pdfGenerating}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sending
-              ? "Sending..."
-              : pdfGenerating
-                ? `Preparing ${relatedCostEstimates.length} PDF(s)...`
-                : "Send Email"}
+            {sending ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Sending Email...
+              </div>
+            ) : pdfGenerating ? (
+              `Preparing ${relatedCostEstimates.length} PDF(s)...`
+            ) : (
+              "Send Email"
+            )}
           </Button>
         </div>
       </div>
@@ -888,32 +908,10 @@ ${user?.email || ""}`)
       </Dialog>
 
       {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="sm:max-w-[400px] text-center">
-          <div className="space-y-4 pb-4">
-            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 2L3 7v11a2 2 0 002 2h10a2 2 0 002-2V7l-7-5z" />
-                    <path d="M9 9h2v6H9V9z" />
-                    <path d="M9 6h2v2H9V6z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
-              <p className="text-gray-600">You have successfully sent a cost estimate!</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSuccessDialogClose} className="w-full">
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProposalSentSuccessDialog
+        isOpen={showSuccessDialog}
+        onDismissAndNavigate={handleSuccessDialogClose}
+      />
     </div>
   )
 }

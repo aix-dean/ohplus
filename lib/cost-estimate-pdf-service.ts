@@ -435,10 +435,10 @@ async function generatePDFInternal(
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
 
-    // Extract size information from line items or use default
-    const sizeInfo = siteLineItems[0]?.notes?.includes("Location:")
-      ? "100ft (H) x 60ft (W)"
-      : siteLineItems[0]?.notes || "100ft (H) x 60ft (W)"
+    // Extract size information from line items specs or use default
+    const height = siteLineItems[0]?.specs?.height
+    const width = siteLineItems[0]?.specs?.width
+    const sizeInfo = height && width ? `${height}ft (h) x ${width}ft (w)` : "100ft (H) x 60ft (W)"
 
     const bulletPoints = [
       { label: "Site Location", value: siteLocation },

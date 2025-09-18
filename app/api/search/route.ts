@@ -64,6 +64,10 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID
       apiKey = process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
       finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME
+    } else if (indexName === 'cost_estimates') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
+      apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_INDEX_NAME
     } else if (indexName === 'quotations') {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_APP_ID || process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_QUOTATIONS_ADMIN_API_KEY || process.env.ALGOLIA_ADMIN_API_KEY
@@ -107,6 +111,9 @@ export async function POST(request: Request) {
     if (indexName === 'service_assignments') {
       attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
       attributesToHighlight = "saNumber,projectSiteName,serviceType"
+    } else if (indexName === 'cost_estimates') {
+      attributesToRetrieve = "id,title,client_company,client_contact,status,totalAmount,createdAt,company_id"
+      attributesToHighlight = "title,client_company,client_contact"
     } else if (indexName === 'quotations') {
       attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created"
       attributesToHighlight = "quotation_number,client_name"

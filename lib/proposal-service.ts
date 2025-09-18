@@ -584,7 +584,7 @@ export async function getPaginatedProposalsByUserId(
       throw new Error("Firestore not initialized")
     }
 
-    let q = query(collection(db, "proposals"), where("createdBy", "==", userId), orderBy("createdAt", "desc"))
+    let q = query(collection(db, "proposals"), where("companyId", "==", userId), orderBy("createdAt", "desc"))
 
     if (statusFilter && statusFilter !== "all") {
       q = query(q, where("status", "==", statusFilter))

@@ -187,14 +187,14 @@ export async function searchServiceAssignments(query: string, companyId?: string
   }
 }
 
-// Function to search quotations
-export async function searchQuotations(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
+// Function to search cost estimates
+export async function searchCostEstimates(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
-    console.log(`Searching quotations for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
+    console.log(`Searching cost estimates for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
 
     // Create the request body
-    const requestBody: any = { query, indexName: 'quotations', page, hitsPerPage }
+    const requestBody: any = { query, indexName: 'cost_estimates', page, hitsPerPage }
 
     // Add filters if companyId is provided
     if (companyId) {
@@ -253,7 +253,7 @@ export async function searchQuotations(query: string, companyId?: string, page: 
 
     return data
   } catch (error) {
-    console.error("Error searching quotations:", error)
+    console.error("Error searching cost estimates:", error)
     // Return empty results instead of throwing
     return {
       hits: [],

@@ -1,9 +1,96 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { emailService, type EmailAttachment } from "@/lib/email-service"
+import { Timestamp, doc, getDoc } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { storage, db } from "@/lib/firebase"
 
-function createEmailTemplate(body: string, userPhoneNumber?: string): string {
-  const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
+async function uploadFileToStorage(fileBuffer: Buffer, fileName: string, fileType: string, companyId: string): Promise<string> {
+  try {
+    const timestamp = Date.now()
+    const fileExtension = fileName.split('.').pop() || 'file'
+    const storageFileName = `emails/${companyId}/${timestamp}_${fileName}`
+
+    const storageRef = ref(storage, storageFileName)
+
+    // Upload the file
+    await uploadBytes(storageRef, fileBuffer, {
+      contentType: fileType,
+    })
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(storageRef)
+
+    return downloadURL
+  } catch (error) {
+    console.error("Error uploading file to storage:", error)
+    throw new Error(`Failed to upload file: ${fileName}`)
+  }
+}
+
+async function fetchCompanyData(companyId: string) {
+  try {
+    const companyDoc = await getDoc(doc(db, "companies", companyId))
+
+    if (companyDoc.exists()) {
+      const data = companyDoc.data()
+
+      // Always use ohplus.ph domain for sending emails (verified domain)
+      const verifiedEmail = "noreply@ohplus.ph"
+
+      // Log if company has a different email domain
+      if (data.email) {
+        const companyEmailDomain = data.email.split('@')[1]
+        if (companyEmailDomain !== 'ohplus.ph') {
+          console.log(`Using ohplus.ph domain for sending. Company email: ${data.email}`)
+        }
+      }
+
+      return {
+        company_name: data.company_name || data.name || "OH Plus",
+        company_location: data.company_location || data.address || "No. 727 General Solano St., San Miguel, Manila 1005",
+        phone: data.phone || data.telephone || data.contact_number || "+639XXXXXXXXX",
+        email: verifiedEmail,
+        website: data.website || "www.ohplus.ph",
+      }
+    }
+
+    return {
+      company_name: "OH Plus",
+      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+      phone: "+639XXXXXXXXX",
+      email: "noreply@ohplus.ph",
+      website: "www.ohplus.ph",
+    }
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    return {
+      company_name: "OH Plus",
+      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+      phone: "+639XXXXXXXXX",
+      email: "noreply@ohplus.ph",
+      website: "www.ohplus.ph",
+    }
+  }
+}
+
+function createEmailTemplate(
+  body: string,
+  userPhoneNumber?: string,
+  companyData?: {
+    company_name?: string
+    company_location?: string
+    phone?: string
+    email?: string
+    website?: string
+  }
+): string {
+  const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
+  const companyName = companyData?.company_name || ""
+  const companyLocation = companyData?.company_location || ""
+  const companyEmail = companyData?.email || "noreply@ohplus.ph"
+  const companyWebsite = companyData?.website || "www.ohplus.ph"
 
   const processedBody = body
     .split("\n")
@@ -18,7 +105,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OH Plus - Cost Estimate</title>
+    <title>${companyName} - Cost Estimate</title>
     <style>
         body {
             margin: 0;
@@ -144,7 +231,7 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
 <body>
     <div class="email-container">
         <div class="header">
-            <h1 class="logo">OH PLUS</h1>
+            <h1 class="logo">${companyName}</h1>
             <p class="tagline">Premium Outdoor Advertising Solutions</p>
         </div>
 
@@ -163,21 +250,22 @@ function createEmailTemplate(body: string, userPhoneNumber?: string): string {
 
             <div class="cta-section">
                 <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
-                <a href="mailto:noreply@ohplus.ph" class="cta-button">Get In Touch</a>
+                <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
             </div>
         </div>
 
         <div class="footer">
             <div class="signature">
                 <div class="signature-name">Sales Executive</div>
-                <div class="signature-title">OH PLUS - Outdoor Advertising</div>
+                <div class="signature-title">${companyName} - Outdoor Advertising</div>
             </div>
 
             <div class="contact-info">
-                <strong>OH PLUS</strong><br>
+                <strong>${companyName}</strong><br>
+                📍 ${companyLocation}<br>
                 📞 ${phoneNumber}<br>
-                📧 noreply@ohplus.ph<br>
-                🌐 www.ohplus.ph
+                📧 ${companyEmail}<br>
+                🌐 ${companyWebsite}
             </div>
 
             <div class="divider"></div>
@@ -208,8 +296,12 @@ export async function POST(request: NextRequest) {
       client,
       currentUserEmail,
       ccEmail,
+      replyToEmail,
       subject,
-      body
+      body,
+      preGeneratedPDFs,
+      uploadedFiles,
+      userData
     } = await request.json()
 
     console.log("[v0] Cost estimate email sending - Subject:", subject)
@@ -231,31 +323,115 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Client email cannot be empty" }, { status: 400 })
     }
 
-    // Generate PDF attachment
-    console.log("[v0] Generating cost estimate PDF...")
-    const pdfBuffer = await generateCostEstimatePDF(costEstimate, undefined, false)
-    if (!pdfBuffer) {
-      console.error("[v0] Failed to generate PDF")
-      return NextResponse.json({ error: "Failed to generate PDF attachment" }, { status: 500 })
+    // Use pre-generated PDFs from frontend or generate fallback
+    console.log("[v0] Using pre-generated PDFs from frontend...")
+    let attachments: Array<{ filename: string; content: any }> = []
+    let attachmentDetails: EmailAttachment[] = []
+
+    const companyId = userData?.company_id || costEstimate.company_id || "unknown"
+
+    if (preGeneratedPDFs && preGeneratedPDFs.length > 0) {
+      // Use pre-generated PDFs from frontend
+      console.log(`[v0] Using ${preGeneratedPDFs.length} pre-generated PDFs`)
+      attachments = preGeneratedPDFs.map((pdf: any) => ({
+        filename: pdf.filename,
+        content: Buffer.from(pdf.content, 'base64'),
+      }))
+
+      // Upload pre-generated PDFs to storage and create attachment details
+      for (const pdf of preGeneratedPDFs) {
+        try {
+          const fileUrl = await uploadFileToStorage(
+            Buffer.from(pdf.content, 'base64'),
+            pdf.filename,
+            'application/pdf',
+            companyId
+          )
+          attachmentDetails.push({
+            fileName: pdf.filename,
+            fileSize: Buffer.from(pdf.content, 'base64').length,
+            fileType: 'application/pdf',
+            fileUrl: fileUrl,
+          })
+        } catch (error) {
+          console.error(`Failed to upload PDF ${pdf.filename}:`, error)
+        }
+      }
+    } else {
+      // Fallback: Generate PDF on server with userData
+      console.log("[v0] No pre-generated PDFs, generating on server...")
+      const pdfBuffer = await generateCostEstimatePDF(costEstimate, undefined, false, userData)
+      if (!pdfBuffer) {
+        console.error("[v0] Failed to generate PDF")
+        return NextResponse.json({ error: "Failed to generate PDF attachment" }, { status: 500 })
+      }
+      const filename = `cost-estimate-${costEstimate.costEstimateNumber || costEstimate.id}.pdf`
+      attachments = [{
+        filename: filename,
+        content: pdfBuffer,
+      }]
+
+      // Upload generated PDF to storage
+      try {
+        const pdfBufferData = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
+        const fileUrl = await uploadFileToStorage(pdfBufferData, filename, 'application/pdf', companyId)
+        attachmentDetails.push({
+          fileName: filename,
+          fileSize: pdfBufferData.length,
+          fileType: 'application/pdf',
+          fileUrl: fileUrl,
+        })
+      } catch (error) {
+        console.error(`Failed to upload generated PDF ${filename}:`, error)
+      }
     }
 
+    // Add uploaded files as attachments
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      console.log(`[v0] Adding ${uploadedFiles.length} uploaded files`)
+      const uploadedAttachments = uploadedFiles.map((file: any) => ({
+        filename: file.filename,
+        content: Buffer.from(file.content, 'base64'),
+        type: file.type,
+      }))
+      attachments.push(...uploadedAttachments)
+
+      // Upload uploaded files to storage and create attachment details
+      for (const file of uploadedFiles) {
+        try {
+          const fileBuffer = Buffer.from(file.content, 'base64')
+          const fileUrl = await uploadFileToStorage(
+            fileBuffer,
+            file.filename,
+            file.type,
+            companyId
+          )
+          attachmentDetails.push({
+            fileName: file.filename,
+            fileSize: fileBuffer.length,
+            fileType: file.type,
+            fileUrl: fileUrl,
+          })
+        } catch (error) {
+          console.error(`Failed to upload file ${file.filename}:`, error)
+        }
+      }
+    }
+
+    // Fetch company data for email template
+    const companyData = await fetchCompanyData(companyId)
+
     // Prepare email data
-    const from = "OH Plus <noreply@ohplus.ph>"
+    const from = `${companyData.company_name} <${companyData.email}>`
     const to = [clientEmail]
     const cc = ccEmail ? ccEmail.split(",").map((email: string) => email.trim()).filter(Boolean) : []
-
-    // Prepare attachments
-    const attachments = [{
-      filename: `cost-estimate-${costEstimate.costEstimateNumber || costEstimate.id}.pdf`,
-      content: pdfBuffer,
-    }]
 
     // Send email using Resend
     const emailData: any = {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim()),
+      html: createEmailTemplate(body.trim(), userData?.phone_number, companyData),
       attachments,
     }
 
@@ -264,8 +440,10 @@ export async function POST(request: NextRequest) {
       emailData.cc = cc
     }
 
-    // Add reply-to if current user email is provided
-    if (currentUserEmail && currentUserEmail.trim().length > 0) {
+    // Add reply-to if replyToEmail is provided, otherwise use current user email
+    if (replyToEmail && replyToEmail.trim().length > 0) {
+      emailData.reply_to = replyToEmail.trim()
+    } else if (currentUserEmail && currentUserEmail.trim().length > 0) {
       emailData.reply_to = currentUserEmail.trim()
     }
 
@@ -278,6 +456,32 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[v0] Cost estimate email sent successfully:", data?.id)
+
+    // Create email document in emails collection
+    try {
+      const emailDocument = {
+        from: from,
+        to: to,
+        cc: cc.length > 0 ? cc : undefined,
+        reply_to: emailData.reply_to,
+        subject: subject.trim(),
+        body: body.trim(),
+        attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
+        templateId: undefined, // No template used for cost estimates
+        reportId: undefined,
+        status: "sent" as const,
+        userId: userData?.email || currentUserEmail || "unknown",
+        company_id: userData?.company_id || costEstimate.company_id,
+        sent: Timestamp.fromDate(new Date()),
+      }
+
+      const emailId = await emailService.createEmail(emailDocument)
+      console.log("[v0] Email document created successfully:", emailId)
+    } catch (emailDocError) {
+      console.error("[v0] Failed to create email document:", emailDocError)
+      // Don't fail the entire request if email document creation fails
+    }
+
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error("[v0] Send cost estimate email error:", error)
