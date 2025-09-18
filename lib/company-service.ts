@@ -54,6 +54,36 @@ export class CompanyService {
     }
   }
 
+  // Check if company information is complete
+  static async isCompanyInfoComplete(companyId: string): Promise<boolean> {
+    try {
+      const companyData = await CompanyService.getCompanyData(companyId)
+      if (!companyData) {
+        return false
+      }
+
+      // Check required fields for company completeness
+      const requiredFields = [
+        companyData.name?.trim(),
+        companyData.business_type?.trim(),
+        companyData.position?.trim(),
+      ]
+
+      // Check if address has at least street, city, and province
+      const address = companyData.address || {}
+      const hasAddress = Boolean(
+        address.street?.trim() &&
+        address.city?.trim() &&
+        address.province?.trim()
+      )
+
+      return requiredFields.every(field => Boolean(field && field.length > 0)) && hasAddress
+    } catch (error) {
+      console.error("Error checking company info completeness:", error)
+      return false
+    }
+  }
+
   static async updateCompanyData(
     companyId: string,
     userId: string,

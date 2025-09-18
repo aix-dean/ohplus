@@ -28,7 +28,7 @@ import { getAllRoles, type HardcodedRole } from "@/lib/hardcoded-access-service"
 interface AddUserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess?: () => void
+  onSuccess?: (userData: { email: string; name: string; role: string }) => void
 }
 
 export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogProps) {
@@ -131,7 +131,11 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
         validityDays: 30,
       })
 
-      onSuccess?.()
+      onSuccess?.({
+        email: formData.recipientEmail,
+        name: formData.recipientName,
+        role: formData.role,
+      })
       onOpenChange(false)
     } catch (error) {
       console.error("Error sending invitation:", error)

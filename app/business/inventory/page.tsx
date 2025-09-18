@@ -14,6 +14,8 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
+import { CompanyUpdateDialog } from "@/components/company-update-dialog"
+import { CompanyService } from "@/lib/company-service"
 import Image from "next/image"
 import {
   Dialog,
@@ -40,6 +42,9 @@ export default function BusinessInventoryPage() {
 
   // Company registration dialog state
   const [showCompanyDialog, setShowCompanyDialog] = useState(false)
+
+  // Company update dialog state
+  const [showCompanyUpdateDialog, setShowCompanyUpdateDialog] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -278,6 +283,21 @@ export default function BusinessInventoryPage() {
       return
     }
 
+    // Check if company information is complete
+    try {
+      const isCompanyComplete = await CompanyService.isCompanyInfoComplete(userData.company_id)
+      if (!isCompanyComplete) {
+        console.log("Company information incomplete, showing company update dialog")
+        setShowCompanyUpdateDialog(true)
+        return
+      }
+    } catch (error) {
+      console.error("Error checking company completeness:", error)
+      setSubscriptionLimitMessage("Error checking company information. Please try again or contact support.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
     // Query subscription by company ID
     let currentSubscription = null
     try {
@@ -391,6 +411,69 @@ export default function BusinessInventoryPage() {
       console.log("All checks passed after company registration, redirecting to create product")
       router.push("/admin/products/create")
     }, 1000) // Wait 1 second for userData to refresh
+  }
+
+  const handleCompanyUpdateSuccess = async () => {
+    console.log("Company update successful")
+    setShowCompanyUpdateDialog(false)
+
+    // Wait a bit for any updates to propagate
+    setTimeout(async () => {
+      // Continue with the subscription checks after company update
+      let currentSubscription = null
+      try {
+        if (userData?.company_id) {
+          console.log("Fetching subscription after company update for company_id:", userData.company_id)
+          currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+          console.log("Subscription after company update:", currentSubscription)
+        }
+      } catch (error) {
+        console.error("Error fetching subscription after company update:", error)
+        setSubscriptionLimitMessage("Error fetching subscription data. Please try again or contact support.")
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Check if user has license key
+      if (!userData?.license_key) {
+        console.log("No license key found after company update")
+        setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Check if subscription exists and is active
+      if (!currentSubscription) {
+        console.log("No subscription found after company update")
+        setSubscriptionLimitMessage("No active subscription found. Please choose a plan to start adding sites.")
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      if (currentSubscription.status !== "active") {
+        console.log("Subscription not active after company update, status:", currentSubscription.status)
+        setSubscriptionLimitMessage(
+          `Your subscription is ${currentSubscription.status}. Please activate your subscription to continue.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Check product limit
+      console.log("Checking product limit after company update:", { totalItems, maxProducts: currentSubscription.maxProducts })
+      if (totalItems >= currentSubscription.maxProducts) {
+        console.log("Product limit reached after company update")
+        setSubscriptionLimitMessage(
+          `You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Only redirect if all checks pass
+      console.log("All checks passed after company update, redirecting to create product")
+      router.push("/business/products/create")
+    }, 500) // Wait 0.5 seconds for updates to propagate
   }
 
   // Show loading only on initial load
@@ -588,6 +671,13 @@ export default function BusinessInventoryPage() {
         isOpen={showCompanyDialog}
         onClose={() => setShowCompanyDialog(false)}
         onSuccess={handleCompanyRegistrationSuccess}
+      />
+
+      {/* Company Update Dialog */}
+      <CompanyUpdateDialog
+        isOpen={showCompanyUpdateDialog}
+        onClose={() => setShowCompanyUpdateDialog(false)}
+        onSuccess={handleCompanyUpdateSuccess}
       />
     </div>
   )
