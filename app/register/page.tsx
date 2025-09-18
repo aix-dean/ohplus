@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FirebaseError } from "firebase/app"
 import { Eye, EyeOff } from "lucide-react"
@@ -86,6 +87,18 @@ You may not transmit any Content that is unlawful, offensive, upsetting, intende
 - Infringing on any proprietary rights of any party, including patent, trademark, trade secret, copyright, right of publicity or other rights.
 
 The Company reserves the right, but not the obligation, to, in its sole discretion, determine whether or not any Content is appropriate and complies with this Terms, refuse or remove this Content. The Company further reserves the right to make formatting and edits and change the manner any Content. The Company can also limit or revoke the use of the Service if You post such objectionable Content.
+
+## Intellectual Property
+
+The Service and its original content, features and functionality are and will remain the exclusive property of the Company and its licensors. The Service is protected by copyright, trademark, and other laws of both the Country and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of the Company.
+
+## Links to Other Websites
+
+Our Service may contain links to third-party web sites or services that are not owned or controlled by the Company.
+
+The Company has no control over, and assumes no responsibility for, the content, privacy policies, or practices of any third party web sites or services. You further acknowledge and agree that the Company shall not be responsible or liable, directly or indirectly, for any damage or loss caused or alleged to be caused by or in connection with the use of or reliance on any such content, goods or services available on or through any such web sites or services.
+
+We strongly advise You to read the terms and conditions and privacy policies of any third-party web sites or services that You visit.
 
 ## Termination
 
@@ -423,8 +436,7 @@ You are advised to review this Privacy Policy periodically for any changes. Chan
 Contact Us
 If you have any questions about this Privacy Policy, You can contact us:
 
-
-I only have a content of the privacy policy while you generate the terms & condition and the rules and regulations`
+By email: support@ohplus.com`
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -440,20 +452,15 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
-  const [currentStep, setCurrentStep] = useState(0) // 0: Terms, 1: Privacy, 2: Rules, 3: Registration
   const [agreements, setAgreements] = useState({
     terms: false,
     privacy: false,
     rules: false,
   })
-  const [scrollAreaRefs, setScrollAreaRefs] = useState<{
-    terms: HTMLDivElement | null
-    privacy: HTMLDivElement | null
-    rules: HTMLDivElement | null
-  }>({
-    terms: null,
-    privacy: null,
-    rules: null,
+  const [dialogOpen, setDialogOpen] = useState({
+    terms: false,
+    privacy: false,
+    rules: false,
   })
 
   const { register, user, userData, getRoleDashboardPath } = useAuth()
@@ -501,35 +508,18 @@ export default function RegisterPage() {
     fetchInvitationDetails()
   }, [orgCode])
 
-  // Scroll detection for policy agreements
+  // Check for stored agreements on component mount
   useEffect(() => {
-    const handleScroll = (policyType: keyof typeof agreements) => {
-      return () => {
-        const scrollArea = scrollAreaRefs[policyType]
-        if (scrollArea) {
-          const { scrollTop, scrollHeight, clientHeight } = scrollArea
-          const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10 // 10px tolerance
-          if (isAtBottom && !agreements[policyType]) {
-            setAgreements(prev => ({ ...prev, [policyType]: true }))
-          }
-        }
-      }
-    }
+    const termsAgreed = sessionStorage.getItem('termsAgreed') === 'true'
+    const privacyAgreed = sessionStorage.getItem('privacyAgreed') === 'true'
+    const rulesAgreed = sessionStorage.getItem('rulesAgreed') === 'true'
 
-    const cleanup: (() => void)[] = []
-
-    Object.keys(scrollAreaRefs).forEach((key) => {
-      const policyType = key as keyof typeof agreements
-      const scrollArea = scrollAreaRefs[policyType]
-      if (scrollArea) {
-        const scrollHandler = handleScroll(policyType)
-        scrollArea.addEventListener('scroll', scrollHandler)
-        cleanup.push(() => scrollArea.removeEventListener('scroll', scrollHandler))
-      }
+    setAgreements({
+      terms: termsAgreed,
+      privacy: privacyAgreed,
+      rules: rulesAgreed,
     })
-
-    return () => cleanup.forEach(cleanupFn => cleanupFn())
-  }, [scrollAreaRefs, agreements])
+  }, [])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     if (error instanceof FirebaseError) {
@@ -603,7 +593,7 @@ export default function RegisterPage() {
     }
 
     if (!agreements.terms || !agreements.privacy || !agreements.rules) {
-      setErrorMessage("Please read and agree to all Terms and Conditions, Privacy Policy, and Rules and Regulations.")
+      setErrorMessage("Please read and agree to the Terms and Conditions, Privacy Policy, and Rules and Regulations.")
       return
     }
 
@@ -725,366 +715,298 @@ export default function RegisterPage() {
             )}
           </CardHeader>
           <CardContent>
-            {/* Step Indicator */}
-            <div className="flex justify-center mb-6">
-              <div className="flex items-center space-x-4">
-                {[0, 1, 2, 3].map((step) => (
-                  <div key={step} className="flex items-center">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        step <= currentStep
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-300 text-gray-600"
-                      }`}
-                    >
-                      {step + 1}
-                    </div>
-                    {step < 3 && (
+            <div className="space-y-6">
+              {/* Registration Form */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                <Input
+                  id="middleName"
+                  placeholder=""
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Cellphone number</Label>
+                <Input
+                  id="phoneNumber"
+                  placeholder="+63 9XXXXXXXXX"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
+                  required
+                />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
                       <div
-                        className={`w-12 h-0.5 mx-2 ${
-                          step < currentStep ? "bg-blue-600" : "bg-gray-300"
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
                         }`}
                       />
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Step Content */}
-            {currentStep === 0 && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold mb-2">Terms and Conditions</h2>
-                  <p className="text-gray-600 dark:text-gray-400">Please read the terms and conditions carefully</p>
-                </div>
-                <div className="border rounded-md p-4 max-h-96 overflow-hidden">
-                  <ScrollArea
-                    className="h-80 w-full"
-                    ref={(el) => {
-                      if (el && !scrollAreaRefs.terms) {
-                        setScrollAreaRefs(prev => ({
-                          ...prev,
-                          terms: el.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement
-                        }))
-                      }
-                    }}
-                  >
-                    <div className="pr-4">
-                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                        {TERMS_AND_CONDITIONS}
-                      </div>
-                    </div>
-                  </ScrollArea>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="terms-agreement"
-                    checked={agreements.terms}
-                    onCheckedChange={() => {}} // Read-only, auto-checked by scroll
-                    disabled={!agreements.terms}
-                  />
-                  <Label htmlFor="terms-agreement" className="text-sm">
-                    I have read and agree to the Terms and Conditions
-                  </Label>
-                </div>
-                <Button
-                  className={`w-full text-white ${
-                    agreements.terms
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-gray-400 cursor-not-allowed"
-                  }`}
-                  onClick={() => setCurrentStep(1)}
-                  disabled={!agreements.terms}
-                >
-                  Next: Privacy Policy
-                </Button>
-              </div>
-            )}
-
-            {currentStep === 1 && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold mb-2">Privacy Policy</h2>
-                  <p className="text-gray-600 dark:text-gray-400">Please read the privacy policy carefully</p>
-                </div>
-                <div className="border rounded-md p-4 max-h-96 overflow-hidden">
-                  <ScrollArea
-                    className="h-80 w-full"
-                    ref={(el) => {
-                      if (el && !scrollAreaRefs.privacy) {
-                        setScrollAreaRefs(prev => ({
-                          ...prev,
-                          privacy: el.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement
-                        }))
-                      }
-                    }}
-                  >
-                    <div className="pr-4">
-                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                        {PRIVACY_POLICY}
-                      </div>
-                    </div>
-                  </ScrollArea>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="privacy-agreement"
-                    checked={agreements.privacy}
-                    onCheckedChange={() => {}} // Read-only, auto-checked by scroll
-                    disabled={!agreements.privacy}
-                  />
-                  <Label htmlFor="privacy-agreement" className="text-sm">
-                    I have read and agree to the Privacy Policy
-                  </Label>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(0)}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    className={`flex-1 text-white ${
-                      agreements.privacy
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
-                    onClick={() => setCurrentStep(2)}
-                    disabled={!agreements.privacy}
-                  >
-                    Next: Rules & Regulations
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {currentStep === 2 && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold mb-2">Rules and Regulations</h2>
-                  <p className="text-gray-600 dark:text-gray-400">Please read the rules and regulations carefully</p>
-                </div>
-                <div className="border rounded-md p-4 max-h-96 overflow-hidden">
-                  <ScrollArea
-                    className="h-80 w-full"
-                    ref={(el) => {
-                      if (el && !scrollAreaRefs.rules) {
-                        setScrollAreaRefs(prev => ({
-                          ...prev,
-                          rules: el.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement
-                        }))
-                      }
-                    }}
-                  >
-                    <div className="pr-4">
-                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                        {RULES_AND_REGULATIONS}
-                      </div>
-                    </div>
-                  </ScrollArea>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="rules-agreement"
-                    checked={agreements.rules}
-                    onCheckedChange={() => {}} // Read-only, auto-checked by scroll
-                    disabled={!agreements.rules}
-                  />
-                  <Label htmlFor="rules-agreement" className="text-sm">
-                    I have read and agree to the Rules and Regulations
-                  </Label>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(1)}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    className={`flex-1 text-white ${
-                      agreements.rules
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
-                    onClick={() => setCurrentStep(3)}
-                    disabled={!agreements.rules}
-                  >
-                    Next: Registration
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {currentStep === 3 && (
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <h2 className="text-xl font-semibold mb-2">Complete Registration</h2>
-                  <p className="text-gray-600 dark:text-gray-400">Fill in your details to create your account</p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                  <Input
-                    id="middleName"
-                    placeholder=""
-                    value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Cellphone number</Label>
-                  <Input
-                    id="phoneNumber"
-                    placeholder="+63 9XXXXXXXXX"
-                    value={phoneNumber}
-                    onChange={handlePhoneNumberChange}
-                    className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
-                    required
-                  />
-                  {!isPhoneNumberValid() && phoneNumber.length > 4 && (
-                    <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <div className="relative">
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                      <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                    </button>
-                  </div>
-                  <div className="mt-2">
-                    <div className="flex gap-1 h-1">
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className={`flex-1 ${
-                            i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {getStrengthText(passwordStrengthScore)}
-                    </p>
-                    {passwordStrengthScore < 5 && password.length > 0 && (
-                      <ul className="list-inside text-sm mt-1">
-                        {!passwordCriteria.minLength && (
-                          <li className="text-red-500">Password should be at least 8 characters long</li>
-                        )}
-                        {!passwordCriteria.hasLowerCase && (
-                          <li className="text-red-500">Password should contain at least one lowercase letter</li>
-                        )}
-                        {!passwordCriteria.hasUpperCase && (
-                          <li className="text-red-500">Password should contain at least one uppercase letter</li>
-                        )}
-                        {!passwordCriteria.hasNumber && (
-                          <li className="text-red-500">Password should contain at least one number</li>
-                        )}
-                        {!passwordCriteria.hasSpecialChar && (
-                          <li className="text-red-500">Password should contain at least one special character</li>
-                        )}
-                      </ul>
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
                     )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                      <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(2)}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                    type="submit"
-                    onClick={handleRegister}
-                    disabled={loading || loadingInvitation}
-                  >
-                    {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
-                  </Button>
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
+                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Policy Agreements Section */}
+              <div className="space-y-3 border-t pt-6">
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="agreements-checkbox"
+                    checked={agreements.terms && agreements.privacy && agreements.rules}
+                    disabled
+                  />
+                  <Label htmlFor="agreements-checkbox" className="text-sm cursor-pointer flex-1 leading-relaxed">
+                    By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                    <Dialog open={dialogOpen.terms} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, terms: open }))}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-blue-600 hover:text-blue-800 underline font-medium"
+                        >
+                          Terms and Conditions
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                        <DialogHeader>
+                          <DialogTitle>Terms and Conditions</DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="h-96 w-full">
+                          <div className="pr-4">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                              {TERMS_AND_CONDITIONS}
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end space-x-4 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setDialogOpen(prev => ({ ...prev, terms: false }))}
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => {
+                              sessionStorage.setItem('termsAgreed', 'true')
+                              setAgreements(prev => ({ ...prev, terms: true }))
+                              setDialogOpen(prev => ({ ...prev, terms: false }))
+                            }}
+                          >
+                            I Agree
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    ,{" "}
+                    <Dialog open={dialogOpen.privacy} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, privacy: open }))}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-green-600 hover:text-green-800 underline font-medium"
+                        >
+                          Privacy Policy
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                        <DialogHeader>
+                          <DialogTitle>Privacy Policy</DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="h-96 w-full">
+                          <div className="pr-4">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                              {PRIVACY_POLICY}
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end space-x-4 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setDialogOpen(prev => ({ ...prev, privacy: false }))}
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              sessionStorage.setItem('privacyAgreed', 'true')
+                              setAgreements(prev => ({ ...prev, privacy: true }))
+                              setDialogOpen(prev => ({ ...prev, privacy: false }))
+                            }}
+                          >
+                            I Agree
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    , and all platform{" "}
+                    <Dialog open={dialogOpen.rules} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, rules: open }))}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-purple-600 hover:text-purple-800 underline font-medium"
+                        >
+                          Rules and Regulations
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                        <DialogHeader>
+                          <DialogTitle>Rules and Regulations</DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="h-96 w-full">
+                          <div className="pr-4">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                              {RULES_AND_REGULATIONS}
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end space-x-4 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setDialogOpen(prev => ({ ...prev, rules: false }))}
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                            onClick={() => {
+                              sessionStorage.setItem('rulesAgreed', 'true')
+                              setAgreements(prev => ({ ...prev, rules: true }))
+                              setDialogOpen(prev => ({ ...prev, rules: false }))
+                            }}
+                          >
+                            I Agree
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>{" "}
+                    set by OH!Plus.
+                  </Label>
+                </div>
+              </div>
+
+              {/* Sign Up Button */}
+              <Button
+                className={`w-full text-white ${
+                  agreements.terms && agreements.privacy && agreements.rules
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
+                type="submit"
+                onClick={handleRegister}
+                disabled={loading || loadingInvitation || !agreements.terms || !agreements.privacy || !agreements.rules}
+              >
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
+              </Button>
+            </div>
 
             {errorMessage && (
               <div className="text-red-500 text-sm mt-4 text-center" role="alert">
