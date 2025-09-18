@@ -32,6 +32,9 @@ interface Booking {
   quotation_id?: string
   cost?: number
   total_cost?: number
+  costDetails?: {
+    total?: number
+  }
   payment_method?: string
   projectCompliance?: {
     signedContract?: { status: string; fileUrl?: string; fileName?: string };
@@ -394,7 +397,7 @@ export default function BookingDetailPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-base font-medium text-gray-700">Total Cost</span>
                       <span className="text-xl font-bold text-gray-900">
-                        ₱{booking.total_cost?.toLocaleString() || booking.cost?.toLocaleString() || "0"}
+                        ₱{booking.costDetails?.total?.toLocaleString() || booking.total_cost?.toLocaleString() || booking.cost?.toLocaleString() || "0"}
                       </span>
                     </div>
                   </div>
