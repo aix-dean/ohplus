@@ -47,7 +47,7 @@ function ProposalsPageContent() {
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const itemsPerPage = 10
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
@@ -82,7 +82,7 @@ function ProposalsPageContent() {
     try {
       const lastDocToUse = resetLastDoc ? null : lastDoc
       const result = await getPaginatedProposalsByUserId(
-        user.uid,
+        userData?.company_id || "",
         itemsPerPage,
         lastDocToUse,
         searchTerm,

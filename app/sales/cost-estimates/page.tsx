@@ -26,6 +26,7 @@ import {
   XCircle,
   Send,
   Calculator,
+  X,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
@@ -34,6 +35,8 @@ import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
+import { searchCostEstimates } from "@/lib/algolia-service"
+import { useDebounce } from "@/hooks/use-debounce"
 
 function CostEstimatesPageContent() {
   const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
@@ -43,11 +46,19 @@ function CostEstimatesPageContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false) // Assuming this might be used for CE
 
+  // Algolia search states
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [lastDocId, setLastDocId] = useState<string | null>(null)
   const [hasMorePages, setHasMorePages] = useState(true)
   const itemsPerPage = 10
+
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const { user, userData } = useAuth()
   const router = useRouter()
@@ -66,9 +77,18 @@ function CostEstimatesPageContent() {
       setCurrentPage(1)
       setLastDocId(null)
       setHasMorePages(true)
-      loadCostEstimates(1, true)
+
+      // Use Algolia search if there's a search term or status filter
+      if (debouncedSearchTerm || statusFilter !== "all") {
+        performAlgoliaSearch(debouncedSearchTerm, statusFilter, 0)
+      } else {
+        // Load all cost estimates if no search/filter
+        loadCostEstimates(1, true)
+        setIsSearching(false)
+        setSearchResults([])
+      }
     }
-  }, [searchTerm, statusFilter])
+  }, [debouncedSearchTerm, statusFilter, user?.uid])
 
   // Assuming a success dialog might be relevant for cost estimates too
   useEffect(() => {
@@ -87,7 +107,7 @@ function CostEstimatesPageContent() {
     setLoading(true)
     try {
       const result = await getPaginatedCostEstimatesByCreatedBy(
-        user.uid,
+        userData?.company_id || "",
         itemsPerPage,
         reset ? null : lastDocId
       )
@@ -106,6 +126,46 @@ function CostEstimatesPageContent() {
       console.error("Error loading cost estimates:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const performAlgoliaSearch = async (query: string, status: string, page: number = 0) => {
+    if (!user?.uid || !userData?.company_id) {
+      console.log("No user or company_id, skipping search")
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      console.log("Performing Algolia search with:", { query, status, companyId: userData.company_id })
+
+      let filters = `company_id:${userData.company_id}`
+
+      // Add status filter if not "all"
+      if (status !== "all") {
+        filters += ` AND status:${status}`
+      }
+
+      console.log("Search filters:", filters)
+
+      const result = await searchCostEstimates(query, userData.company_id, page, itemsPerPage)
+
+      console.log("Algolia search result:", result)
+
+      if (result.error) {
+        console.error("Algolia search error:", result.error)
+        setSearchResults([])
+        return
+      }
+
+      console.log("Search hits:", result.hits)
+      setSearchResults(result.hits)
+      setIsSearching(query.length > 0 || status !== "all")
+    } catch (error) {
+      console.error("Error performing Algolia search:", error)
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
     }
   }
 
@@ -195,20 +255,28 @@ function CostEstimatesPageContent() {
 
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="p-5">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search cost estimates or clients..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-400" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search cost estimates or clients..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-10 w-full sm:w-80"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40 border-gray-200 rounded-lg">
+                    <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -220,13 +288,22 @@ function CostEstimatesPageContent() {
                       <SelectItem value="declined">Declined</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {(searchTerm || statusFilter !== "all") && (
+                    <Button variant="outline" onClick={() => {
+                      setSearchTerm("")
+                      setStatusFilter("all")
+                    }} size="sm">
+                      Clear Filters
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {loading ? (
+        {(loading || searchLoading) ? (
           <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
             <Table>
               <TableHeader>
@@ -276,21 +353,21 @@ function CostEstimatesPageContent() {
               </TableBody>
             </Table>
           </Card>
-        ) : costEstimates.length === 0 ? (
+        ) : (isSearching ? searchResults.length === 0 : costEstimates.length === 0) ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || statusFilter !== "all" ? "No cost estimates found" : "No cost estimates yet"}
+                {isSearching ? "No cost estimates found" : "No cost estimates yet"}
               </h3>
               <p className="text-gray-600 mb-6">
-                {searchTerm || statusFilter !== "all"
+                {isSearching
                   ? "Try adjusting your search or filter criteria"
                   : "Create your first cost estimate to get started"}
               </p>
-              {!searchTerm && statusFilter === "all" && (
+              {!isSearching && (
                 <Button
                   onClick={() => router.push("/sales/cost-estimates/compose/new")}
                   className="bg-blue-600 hover:bg-blue-700"
@@ -316,7 +393,7 @@ function CostEstimatesPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {costEstimates.map((costEstimate) => {
+                {(isSearching ? searchResults : costEstimates).map((costEstimate) => {
                   const statusConfig = getStatusConfig(costEstimate.status)
                   const StatusIcon = statusConfig.icon
 
@@ -329,7 +406,6 @@ function CostEstimatesPageContent() {
                       <TableCell className="py-3">
                         <div>
                           <div className="font-semibold text-gray-900 mb-1">{costEstimate.title}</div>
-                          <div className="text-sm text-gray-500">ID: {costEstimate.id.slice(0, 8)}...</div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
@@ -338,8 +414,8 @@ function CostEstimatesPageContent() {
                             <Building2 className="h-4 w-4 text-gray-600" />
                           </div>
                           <div>
-                            <div className="font-medium text-gray-900">{costEstimate.client.company}</div>
-                            <div className="text-sm text-gray-500">{costEstimate.client.contactPerson}</div>
+                            <div className="font-medium text-gray-900">{costEstimate.client?.company || costEstimate.client_company}</div>
+                            <div className="text-sm text-gray-500">{costEstimate.client?.contactPerson || costEstimate.client_contact}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -351,19 +427,19 @@ function CostEstimatesPageContent() {
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-center">
-                          <div className="font-semibold text-gray-900">{costEstimate.lineItems.length}</div>
+                          <div className="font-semibold text-gray-900">{costEstimate.lineItems?.length || 0}</div>
                           <div className="text-xs text-gray-500">
-                            item{costEstimate.lineItems.length !== 1 ? "s" : ""}
+                            item{(costEstimate.lineItems?.length || 0) !== 1 ? "s" : ""}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="font-bold text-gray-900">₱{costEstimate.totalAmount.toLocaleString()}</div>
+                        <div className="font-bold text-gray-900">₱{(costEstimate.totalAmount || 0).toLocaleString()}</div>
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(costEstimate.createdAt, "MMM d, yyyy")}
+                          {costEstimate.createdAt ? format(new Date(costEstimate.createdAt), "MMM d, yyyy") : "N/A"}
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
@@ -398,38 +474,46 @@ function CostEstimatesPageContent() {
         )}
 
         {/* Pagination Controls */}
-        {!loading && costEstimates.length > 0 && (
+        {!loading && !searchLoading && (isSearching ? searchResults.length > 0 : costEstimates.length > 0) && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-xl">
             <div className="text-sm text-gray-600">
-              Page {currentPage}
+              {isSearching ? `Found ${(isSearching ? searchResults : costEstimates).length} results` : `Page ${currentPage}`}
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (currentPage > 1) {
-                    setCurrentPage(currentPage - 1)
-                    loadCostEstimates(currentPage - 1, false)
-                  }
-                }}
-                disabled={currentPage === 1 || loading}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (hasMorePages) {
-                    setCurrentPage(currentPage + 1)
-                    loadCostEstimates(currentPage + 1, false)
-                  }
-                }}
-                disabled={!hasMorePages || loading}
-              >
-                Next
-              </Button>
+              {!isSearching ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (currentPage > 1) {
+                        setCurrentPage(currentPage - 1)
+                        loadCostEstimates(currentPage - 1, false)
+                      }
+                    }}
+                    disabled={currentPage === 1 || loading}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (hasMorePages) {
+                        setCurrentPage(currentPage + 1)
+                        loadCostEstimates(currentPage + 1, false)
+                      }
+                    }}
+                    disabled={!hasMorePages || loading}
+                  >
+                    Next
+                  </Button>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Search results
+                </div>
+              )}
             </div>
           </div>
         )}
