@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -36,7 +36,7 @@ import {
   type Booking,
 } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, getDoc, doc, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
 import type { SearchResult } from "@/lib/algolia-service"
@@ -112,6 +112,7 @@ function SalesDashboardContent() {
 
   const { user, userData } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
 
   // Proposal Creation Flow State
@@ -229,6 +230,87 @@ function SalesDashboardContent() {
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  // Handle URL parameters for auto-activation of modes and client selection
+  useEffect(() => {
+    const mode = searchParams.get('mode')
+    const clientId = searchParams.get('clientId')
+
+    if (mode && clientId && userData?.company_id) {
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // Fetch and select the client
+      const fetchClient = async () => {
+        try {
+          const clientsRef = collection(db, "client_company")
+          const clientDoc = await getDoc(doc(clientsRef, clientId))
+
+          if (clientDoc.exists()) {
+            const clientData = clientDoc.data()
+            const client: Client = {
+              id: clientDoc.id,
+              name: clientData.contactPersons?.[0]?.name || clientData.name || "",
+              company: clientData.name || "",
+              email: clientData.contactPersons?.[0]?.email || "",
+              phone: clientData.contactPersons?.[0]?.phone || "",
+              address: clientData.address || "",
+              industry: clientData.industry || "",
+              designation: clientData.contactPersons?.[0]?.position || "",
+              company_id: clientData.user_company_id || "",
+              status: "lead",
+              created: new Date(),
+              updated: new Date(),
+            }
+
+            // Select the client first
+            handleClientSelectOnDashboard(client)
+
+            // Then activate the appropriate mode
+            setTimeout(() => {
+              if (mode === 'proposal') {
+                setProposalCreationMode(true)
+                setCeQuoteMode(false)
+              } else if (mode === 'cost_estimate') {
+                // Activate CE mode without resetting the client
+                setCeMode(true)
+                setQuoteMode(false)
+                setCeQuoteMode(true)
+                setProposalCreationMode(false)
+                setSelectedSites([])
+                setDashboardClientSearchTerm(client.company || client.name || "")
+              } else if (mode === 'quotation') {
+                // Activate Quotation mode without resetting the client
+                setQuoteMode(true)
+                setCeMode(false)
+                setCeQuoteMode(true)
+                setProposalCreationMode(false)
+                setSelectedSites([])
+                setDashboardClientSearchTerm(client.company || client.name || "")
+              }
+            }, 100)
+
+            // Clean up URL parameters
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete('mode')
+            newUrl.searchParams.delete('clientId')
+            window.history.replaceState({}, '', newUrl.toString())
+          }
+        } catch (error) {
+          console.error("Error fetching client for auto-selection:", error)
+        }
+      }
+
+      fetchClient()
+    }
+  }, [searchParams, userData?.company_id])
 
   // Check for ongoing bookings
   const checkOngoingBookings = useCallback(
