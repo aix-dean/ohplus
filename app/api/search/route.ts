@@ -3,14 +3,22 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   console.log("Search API route called")
 
+  // Default values for pagination
+  let page = 0
+  let hitsPerPage = 10
+
   try {
     // Parse the request body
     let query = ""
     let filters = undefined
+    let indexName = undefined
     try {
       const body = await request.json()
       query = body.query || ""
       filters = body.filters
+      indexName = body.indexName
+      page = body.page || 0
+      hitsPerPage = body.hitsPerPage || 10
     } catch (error) {
       console.error("Error parsing request body:", error)
       return NextResponse.json(
@@ -18,9 +26,9 @@ export async function POST(request: Request) {
           error: "Invalid request body",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query: "",
         },
@@ -37,9 +45,9 @@ export async function POST(request: Request) {
           error: "Query parameter is required and must be a string",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query: "",
         },
@@ -48,20 +56,34 @@ export async function POST(request: Request) {
     }
 
     // Check if environment variables are available
-    const appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
-    const apiKey = process.env.ALGOLIA_ADMIN_API_KEY
-    const indexName = process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+    let appId: string | undefined
+    let apiKey: string | undefined
+    let finalIndexName: string | undefined
 
-    if (!appId || !apiKey || !indexName) {
+    if (indexName === 'service_assignments') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID
+      apiKey = process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME
+    } else if (indexName === 'quotations') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_APP_ID || process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_QUOTATIONS_ADMIN_API_KEY || process.env.ALGOLIA_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_INDEX_NAME || process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+    } else {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+    }
+
+    if (!appId || !apiKey || !finalIndexName) {
       console.error("Missing Algolia environment variables")
       return NextResponse.json(
         {
           error: "Algolia configuration is incomplete. Please check your environment variables.",
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query,
         },
@@ -71,7 +93,7 @@ export async function POST(request: Request) {
 
     // Use the Algolia REST API directly instead of the JS client
     // This avoids issues with importing the client in Next.js server components
-    const url = `https://${appId}-dsn.algolia.net/1/indexes/${indexName}/query`
+    const url = `https://${appId}-dsn.algolia.net/1/indexes/${finalIndexName}/query`
     const headers = {
       "X-Algolia-API-Key": apiKey,
       "X-Algolia-Application-Id": appId,
@@ -79,11 +101,23 @@ export async function POST(request: Request) {
     }
 
     // Prepare search parameters
-    const searchParams = {
+    let attributesToRetrieve = "name,type,location,price,site_code,image_url,category,seller_id"
+    let attributesToHighlight = "name,location"
+
+    if (indexName === 'service_assignments') {
+      attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
+      attributesToHighlight = "saNumber,projectSiteName,serviceType"
+    } else if (indexName === 'quotations') {
+      attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created"
+      attributesToHighlight = "quotation_number,client_name"
+    }
+
+    const searchParams: any = {
       query,
-      hitsPerPage: "10",
-      attributesToRetrieve: "name,type,location,price,site_code,image_url,category,seller_id",
-      attributesToHighlight: "name,location",
+      hitsPerPage: hitsPerPage.toString(),
+      page: page.toString(),
+      attributesToRetrieve,
+      attributesToHighlight,
     }
 
     // Add filters if provided
@@ -113,9 +147,9 @@ export async function POST(request: Request) {
           details: errorText,
           hits: [],
           nbHits: 0,
-          page: 0,
+          page: page,
           nbPages: 0,
-          hitsPerPage: 0,
+          hitsPerPage: hitsPerPage,
           processingTimeMS: 0,
           query,
         },
@@ -137,9 +171,9 @@ export async function POST(request: Request) {
         details: error instanceof Error ? error.message : "Unknown error",
         hits: [],
         nbHits: 0,
-        page: 0,
+        page: page,
         nbPages: 0,
-        hitsPerPage: 0,
+        hitsPerPage: hitsPerPage,
         processingTimeMS: 0,
         query: "",
       },

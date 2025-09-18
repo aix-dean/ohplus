@@ -560,7 +560,7 @@ export default function ReportPreviewPage() {
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => (
+              {report.attachments.map((attachment, index) => (
                 <div key={index} className="space-y-2">
                   <div
                     className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
@@ -600,13 +600,6 @@ export default function ReportPreviewPage() {
             </div>
           )}
 
-          {/* Debug info for attachments */}
-          {process.env.NODE_ENV === "development" && report.attachments && (
-            <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
-              <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
-            </div>
-          )}
         </div>
 
         {/* Footer */}

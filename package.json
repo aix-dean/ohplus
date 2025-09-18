@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.12",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "latest",
     "@neondatabase/serverless": "^0.10.1",
@@ -53,6 +56,7 @@
     "date-fns": "latest",
     "embla-carousel-react": "latest",
     "firebase": "latest",
+    "html2canvas": "^1.4.1",
     "https": "latest",
     "input-otp": "latest",
     "jspdf": "latest",
@@ -80,6 +84,7 @@
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.1",
+    "@types/html2canvas": "^1.0.0",
     "@types/node": "^22",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19",

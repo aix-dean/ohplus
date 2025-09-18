@@ -97,12 +97,27 @@ export interface Product {
     uploaded_by: string
     created: any
   }>
-  compliance?: {
-    lease_agreement?: string
-    mayors_permit?: string
-    bir_registration?: string
-    structural_approval?: string
+  compliance?: Array<{
+    name: string
+    doc_url: string
+    created: any
+    created_by: string
+  }>
+  structure?: {
+    color?: string
+    contractor?: string
+    condition?: string
+    last_maintenance?: any
   }
+  personnel?: Array<{
+    status: boolean
+    name: string
+    position: string
+    contact: string
+    start_date: any
+    created: any
+    created_by: string
+  }>
 }
 
 // ServiceAssignment interface
@@ -754,6 +769,23 @@ export async function updateServiceAssignment(
     await updateDoc(assignmentRef, updateData)
   } catch (error) {
     console.error("Error updating service assignment:", error)
+    throw error
+  }
+}
+
+export async function createServiceAssignment(assignmentData: Omit<ServiceAssignment, "id" | "created" | "updated">): Promise<string> {
+  try {
+    const newAssignment = {
+      ...assignmentData,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(collection(db, "service_assignments"), newAssignment)
+    console.log("Service assignment created with ID:", docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating service assignment:", error)
     throw error
   }
 }

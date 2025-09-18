@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, getDocs, query, where, deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
+import { ClientDialog } from "@/components/client-dialog"
 
 interface Company {
   id: string
@@ -40,6 +41,9 @@ export default function ClientsPage() {
   const [operatorSearch, setOperatorSearch] = useState("")
   const [agencySearch, setAgencySearch] = useState("")
   const [brandSearch, setBrandSearch] = useState("")
+
+  // State for client dialog
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   // Load companies on initial render
   useEffect(() => {
@@ -312,12 +316,22 @@ export default function ClientsPage() {
       {/* Add Client Button */}
       <div className="fixed bottom-6 right-6">
         <Button
-          onClick={() => router.push("/sales/clients/add")}
+          onClick={() => setIsDialogOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg"
         >
           + Add Client
         </Button>
       </div>
+
+      {/* Client Dialog */}
+      <ClientDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSuccess={(client) => {
+          loadCompanies()
+          setIsDialogOpen(false)
+        }}
+      />
     </div>
   )
 }

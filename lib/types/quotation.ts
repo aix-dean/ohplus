@@ -13,6 +13,9 @@ export interface SpecsRental {
   location?: string // e.g., "manila"
   traffic_count?: number
   type?: string // e.g., "RENTAL"
+  height?: number
+  width?: number
+  content_type?: string // e.g., "Digital"
 }
 
 export interface QuotationProduct {
@@ -105,4 +108,7 @@ export interface Quotation {
   items: QuotationProduct // Renamed from 'products' to 'items'
   projectCompliance?: ProjectCompliance
   client_compliance?: ClientCompliance // Added client compliance
+  signature_position?: string // Position of the person signing the quotation
+  signature_name?: string // Name of the person signing the quotation
+  size?: string // Size specification
 }

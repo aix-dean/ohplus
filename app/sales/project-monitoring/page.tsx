@@ -364,7 +364,7 @@ export default function ProjectMonitoringPage() {
             className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-lg font-medium">Project Bulletins</span>
+            <span className="text-lg font-medium">Project Bulletin</span>
           </button>
         </div>
       </div>

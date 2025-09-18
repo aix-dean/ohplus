@@ -198,7 +198,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
       if (fieldName === "duration_days") {
         // When duration changes, update contract period and pricing
         const durationDays = newValue
-        const startDate = editableQuotation.start_date ? new Date(editableQuotation.start_date) : new Date()
+        const startDate = getDateObject(editableQuotation.start_date) || new Date()
         const endDate = new Date(startDate)
         endDate.setDate(startDate.getDate() + durationDays - 1)
 
@@ -223,9 +223,9 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
       } else if (fieldName === "start_date" || fieldName === "end_date") {
         // When contract period changes, update duration and pricing
         const startDate =
-          fieldName === "start_date" ? new Date(newValue) : new Date(editableQuotation.start_date || new Date())
+          fieldName === "start_date" ? new Date(newValue) : (getDateObject(editableQuotation.start_date) || new Date())
         const endDate =
-          fieldName === "end_date" ? new Date(newValue) : new Date(editableQuotation.end_date || new Date())
+          fieldName === "end_date" ? new Date(newValue) : (getDateObject(editableQuotation.end_date) || new Date())
 
         const timeDiff = endDate.getTime() - startDate.getTime()
         const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
@@ -463,6 +463,10 @@ The OH Plus Team`,
       )
 
       setQuotation(editableQuotation)
+      // Update the quotation in relatedQuotations if it exists there
+      setRelatedQuotations(prev =>
+        prev.map(q => q.id === editableQuotation.id ? editableQuotation : q)
+      )
       setIsEditing(false)
       setHasUnsavedChanges(false)
       toast({
@@ -642,7 +646,7 @@ The OH Plus Team`,
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"}</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"} - Quotation</h1>
         </div>
 
         {/* Greeting */}
@@ -861,14 +865,35 @@ The OH Plus Team`,
                   ? `${currentQuotation.created_by_first_name} ${currentQuotation.created_by_last_name}`
                   : "AIX Xymbiosis"}
               </p>
-              <p className="text-sm">Position</p>
+              {isEditing && editingField === "signature_position" ? (
+                <Input
+                  type="text"
+                  value={tempValues.signature_position || ""}
+                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
+                  className="w-32 h-6 text-sm"
+                  placeholder={currentQuotation?.signature_position || "Position"}
+                />
+              ) : (
+                <p
+                  className={`text-sm ${
+                    isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                  }`}
+                  onClick={() => isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")}
+                  title={isEditing ? "Click to edit position" : ""}
+                >
+                  {currentQuotation?.signature_position || "Account Manager"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </p>
+              )}
             </div>
           </div>
           <div className="text-left">
             <p className="mb-16">Conforme:</p>
             <div className="border-b border-gray-400 w-48 mb-2"></div>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
-            <p className="text-sm">{currentQuotation?.client_company_name || "COMPANY NAME"}</p>
+            <p className="text-sm">{currentQuotation?.client_designation || "Client Designation"}</p>
             <p className="text-xs mt-4 text-gray-600 italic">
               This signed quotation serves as an
               <br />
@@ -908,7 +933,7 @@ The OH Plus Team`,
     )
   }
 
-  if (!quotation || !editableQuotation) {
+  if (!quotation) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
@@ -926,7 +951,7 @@ The OH Plus Team`,
     )
   }
 
-  const currentQuotation = isEditing ? editableQuotation : quotation
+  const currentQuotation = isEditing ? editableQuotation : getCurrentQuotation()
   const hasMultipleSites = false
 
   const handleSendClick = () => {
@@ -935,7 +960,7 @@ The OH Plus Team`,
 
   const handleEmailClick = () => {
     setIsSendOptionsDialogOpen(false)
-    // Navigate to compose email page like the current implementation
+    // Navigate to compose email page
     router.push(`/sales/quotations/${quotationId}/compose-email`)
   }
 
@@ -943,7 +968,7 @@ The OH Plus Team`,
     <div className="min-h-screen bg-gray-50">
       {/* Word-style Toolbar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="px-4 py-2 flex items-center">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -959,7 +984,6 @@ The OH Plus Team`,
               {quotation.status || "Draft"}
             </Badge>
           </div>
-
         </div>
       </div>
 
@@ -1005,8 +1029,8 @@ The OH Plus Team`,
 
         <div className="flex gap-6 items-start">
           <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
+           <div className="text-center mb-8">
+             <div className="flex items-center justify-center mb-4 mt-6">
                 {companyData?.photo_url ? (
                   <img
                     src={companyData.photo_url || "/placeholder.svg"}
@@ -1021,7 +1045,7 @@ The OH Plus Team`,
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
             </div>
-            {renderQuotationBlock("Single Site", currentQuotation?.items, 1)}
+            {currentQuotation?.items && renderQuotationBlock("Single Site", currentQuotation.items, 1)}
 
             {proposal && (
               <div className="p-6 sm:p-8 border-t border-gray-200">
@@ -1084,7 +1108,7 @@ The OH Plus Team`,
                     </div>
                   </div>
                 ))}
-                {currentQuotation.quotation_request_id && (
+                {currentQuotation?.quotation_request_id && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
                     <p className="text-base text-gray-900 font-mono">
@@ -1092,13 +1116,13 @@ The OH Plus Team`,
                     </p>
                   </div>
                 )}
-                {currentQuotation.proposalId && (
+                {currentQuotation?.proposalId && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Related Proposal ID</Label>
                     <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.proposalId)}</p>
                   </div>
                 )}
-                {currentQuotation.campaignId && (
+                {currentQuotation?.campaignId && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Related Campaign ID</Label>
                     <p className="text-base text-gray-900 font-mono">{safeString(currentQuotation.campaignId)}</p>
@@ -1207,6 +1231,7 @@ The OH Plus Team`,
           onOpenChange={setIsSendOptionsDialogOpen}
           quotation={quotation}
           onEmailClick={handleEmailClick}
+          companyData={companyData || undefined}
         />
       )}
 

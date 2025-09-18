@@ -33,7 +33,7 @@ import {
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
-import { LogisticsNotifications, SalesNotifications } from "@/components/notifications"
+import { LogisticsNotifications, SalesNotifications, AdminNotifications } from "@/components/notifications"
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -1074,18 +1074,7 @@ export function SideNavigation() {
           </>
         ) : currentSection === "admin" ? (
           <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs text-white/90">No notification for now.</p>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
+            <AdminNotifications />
 
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
@@ -1190,7 +1179,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-                  { title: "Project Bulletins", href: "/sales/project-monitoring", icon: Monitor },
+                  { title: "Project Bulletin", href: "/sales/project-monitoring", icon: Monitor },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)

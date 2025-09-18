@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { useSalesNotifications, useLogisticsNotifications, useAdminNotifications } from "@/hooks/use-notifications"
 import { cn } from "@/lib/utils"
 import {
   Breadcrumb,
@@ -46,6 +47,15 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const { user, userData } = useAuth() // Removed signOut as it's no longer in this component's direct interaction
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
+
+  // Get notifications based on user role
+  const { notifications: salesNotifications, unreadCount: salesUnreadCount } = useSalesNotifications()
+  const { notifications: logisticsNotifications, unreadCount: logisticsUnreadCount } = useLogisticsNotifications()
+  const { notifications: adminNotifications, unreadCount: adminUnreadCount } = useAdminNotifications()
+
+  // Determine which notifications to show
+  const currentNotifications = isAdmin ? adminNotifications : (userData?.roles?.includes('logistics') ? logisticsNotifications : salesNotifications)
+  const currentUnreadCount = isAdmin ? adminUnreadCount : (userData?.roles?.includes('logistics') ? logisticsUnreadCount : salesUnreadCount)
 
   // --- Debugging Logs ---
   console.log("Current Pathname:", pathname)
@@ -234,18 +244,37 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
             )}
           >
             <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
+            {currentUnreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                {unreadCount}
+                {currentUnreadCount}
               </span>
             )}
             <span className="sr-only">Notifications</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-80">
           <DropdownMenuLabel>Notifications</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>No new notifications</DropdownMenuItem>
+          {currentNotifications.length === 0 ? (
+            <DropdownMenuItem>No new notifications</DropdownMenuItem>
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              {currentNotifications.slice(0, 5).map((notification) => (
+                <DropdownMenuItem key={notification.id} className="flex flex-col items-start p-3 cursor-pointer">
+                  <div className="font-medium text-sm">{notification.title}</div>
+                  <div className="text-xs text-gray-600 mt-1">{notification.description}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {notification.created && new Date(notification.created.toDate()).toLocaleDateString()}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              {currentNotifications.length > 5 && (
+                <DropdownMenuItem className="text-center text-blue-600">
+                  View all notifications
+                </DropdownMenuItem>
+              )}
+            </div>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Directly link the profile icon to the /account page */}

@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
 import { bookingService } from "@/lib/booking-service"
+import { searchQuotations } from "@/lib/algolia-service"
 
 export default function QuotationsListPage() {
   const router = useRouter()
@@ -74,6 +75,18 @@ export default function QuotationsListPage() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [projectNameDialogOpen, setProjectNameDialogOpen] = useState(false)
+  const [selectedQuotationForProject, setSelectedQuotationForProject] = useState<any>(null)
+  const [projectName, setProjectName] = useState("")
+
+  const handleProjectNameDialogClose = (open: boolean) => {
+    if (!open) {
+      // Dialog is being closed without submitting
+      setProjectNameDialogOpen(false)
+      setSelectedQuotationForProject(null)
+      setProjectName("")
+    }
+  }
   const pageSize = 10
   const { toast } = useToast()
 
@@ -89,10 +102,59 @@ export default function QuotationsListPage() {
     setLoading(true)
 
     try {
+      // If there's a search term, use Algolia search
+      if (searchTerm.trim()) {
+        const searchResults = await searchQuotations(searchTerm.trim(), userData?.company_id || undefined, page - 1, pageSize)
+
+        if (searchResults.error) {
+          console.error("Search error:", searchResults.error)
+          // Fallback to Firebase if search fails
+          await fetchFromFirebase(page, reset)
+          return
+        }
+
+        // Transform Algolia results to match the expected format
+        let transformedQuotations = searchResults.hits.map((hit: any) => ({
+          id: hit.objectID,
+          quotation_number: hit.quotation_number,
+          client_name: hit.client_name,
+          items: hit.items,
+          seller_id: hit.seller_id,
+          status: hit.status,
+          created: hit.created,
+          // Add other fields as needed
+        }))
+
+        // Apply status filter if not "all"
+        if (statusFilter !== "all") {
+          transformedQuotations = transformedQuotations.filter(q => q.status === statusFilter)
+        }
+
+        setAllQuotations(transformedQuotations)
+        setQuotations(transformedQuotations)
+        setHasMorePages(searchResults.page < searchResults.nbPages - 1)
+        setTotalCount(searchResults.nbHits)
+      } else {
+        // No search term, fetch from Firebase
+        await fetchFromFirebase(page, reset)
+      }
+    } catch (error) {
+      console.error("Error fetching quotations:", error)
+      // Fallback to Firebase on error
+      await fetchFromFirebase(page, reset)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchFromFirebase = async (page: number = 1, reset: boolean = false) => {
+    if (!user?.uid) return
+
+    try {
       const quotationsRef = collection(db, "quotations")
       let q = query(
         quotationsRef,
-        where("seller_id", "==", user.uid),
+        where("company_id", "==", userData.company_id),
         orderBy("created", "desc"),
         limit(pageSize + 1) // Fetch one extra to check if there are more pages
       )
@@ -132,14 +194,19 @@ export default function QuotationsListPage() {
         }))
       }
 
-      setAllQuotations(currentPageData)
+      // Apply status filter if not "all"
+      let filteredData = currentPageData
+      if (statusFilter !== "all") {
+        filteredData = currentPageData.filter(q => q.status === statusFilter)
+      }
+
+      setAllQuotations(filteredData)
       setLastDoc(pageLastDoc)
       setHasMorePages(hasMore)
-      setQuotations(currentPageData)
+      setQuotations(filteredData)
+      setTotalCount(fetchedQuotations.length) // Approximate count
     } catch (error) {
-      console.error("Error fetching quotations:", error)
-    } finally {
-      setLoading(false)
+      console.error("Error fetching from Firebase:", error)
     }
   }
 
@@ -363,6 +430,32 @@ export default function QuotationsListPage() {
         throw new Error("File size must be less than 10MB")
       }
 
+      // Special handling for signed contract - don't upload yet, show dialog first
+      if (complianceType === "signedContract") {
+        // For signed contract, store the file locally and show dialog
+        // Don't upload to Firebase Storage yet
+        const quotationRef = doc(db, "quotations", quotationId)
+        const currentQuotationDoc = await getDoc(quotationRef)
+        if (!currentQuotationDoc.exists()) {
+          throw new Error("Quotation not found")
+        }
+        const currentQuotationData = { id: quotationId, ...currentQuotationDoc.data() }
+
+        console.log("[DEBUG] Preparing signed contract upload for quotation:", quotationId)
+        console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
+
+        // Show project name dialog with the file stored temporarily
+        setSelectedQuotationForProject({
+          ...currentQuotationData,
+          tempFile: file, // Store the file locally
+          tempComplianceType: complianceType
+        })
+        setProjectName("")
+        setProjectNameDialogOpen(true)
+        return // Exit early, don't continue with normal upload flow
+      }
+
+      // Normal upload flow for other compliance types
       // Create storage reference
       const fileName = `${Date.now()}-${file.name}`
       const storageRef = ref(storage, `quotations/${quotationId}/compliance/${complianceType}/${fileName}`)
@@ -382,52 +475,6 @@ export default function QuotationsListPage() {
           uploadedBy: user?.uid,
         },
         updated: serverTimestamp(),
-      }
-
-      if (complianceType === "signedContract") {
-        updateData.status = "reserved" // Update the main status of the quotation
-        console.log("[DEBUG] Status set to RESERVED for quotation:", quotationId)
-
-        // Create a booking document
-        // First, update the quotation document with the new compliance data
-        await updateDoc(quotationRef, updateData) // Move updateDoc here
-
-        // Then, fetch the updated quotation data
-        const updatedQuotationDoc = await getDoc(quotationRef)
-        if (!updatedQuotationDoc.exists()) {
-          throw new Error("Updated quotation not found after compliance upload.")
-        }
-        const fullQuotationData = { id: quotationId, ...updatedQuotationDoc.data() }
-
-        console.log("[DEBUG] Full quotation data (after update):", fullQuotationData)
-        console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
-
-        if (fullQuotationData && user?.uid && userData?.company_id) {
-          try {
-            // Pass quotation dates directly to booking - the booking service will handle them properly
-            const bookingData = {
-              ...fullQuotationData,
-              start_date: fullQuotationData.start_date,
-              end_date: fullQuotationData.end_date,
-            }
-
-            const bookingId = await bookingService.createBooking(bookingData, user.uid, userData.company_id)
-            console.log("[DEBUG] Booking created with ID:", bookingId)
-            toast({
-              title: "Booking Created",
-              description: `A new booking document has been created with ID: ${bookingId}.`,
-            })
-          } catch (bookingError) {
-            console.error("[DEBUG] Error creating booking:", bookingError)
-            toast({
-              title: "Booking Creation Failed",
-              description: "Failed to create booking document. Please check console for details.",
-              variant: "destructive",
-            })
-          }
-        } else {
-          console.warn("[DEBUG] Booking not created: Missing fullQuotationData, user UID, or user company ID.")
-        }
       }
 
       await updateDoc(quotationRef, updateData)
@@ -835,6 +882,87 @@ export default function QuotationsListPage() {
 
     // Navigate to JO creation with the quotation ID
     router.push(`/sales/job-orders/create?quotationId=${quotationId}`)
+  }
+
+  const handleProjectNameSubmit = async () => {
+    if (!selectedQuotationForProject || !user?.uid || !userData?.company_id || !projectName.trim()) {
+      toast({
+        title: "Error",
+        description: "Project name is required.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const quotationRef = doc(db, "quotations", selectedQuotationForProject.id)
+      let downloadURL = ""
+
+      // Upload the file to Firebase Storage
+      if (selectedQuotationForProject.tempFile && selectedQuotationForProject.tempComplianceType) {
+        const file = selectedQuotationForProject.tempFile
+        const complianceType = selectedQuotationForProject.tempComplianceType
+
+        // Create storage reference
+        const fileName = `${Date.now()}-${file.name}`
+        const storageRef = ref(storage, `quotations/${selectedQuotationForProject.id}/compliance/${complianceType}/${fileName}`)
+
+        // Upload file
+        const snapshot = await uploadBytes(storageRef, file)
+        downloadURL = await getDownloadURL(snapshot.ref)
+      }
+
+      // Update quotation with compliance data including the file URL
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${selectedQuotationForProject.tempComplianceType}`]: {
+          status: "completed",
+          fileUrl: downloadURL,
+          fileName: selectedQuotationForProject.tempFile?.name || "",
+          uploadedAt: serverTimestamp(),
+          uploadedBy: user?.uid,
+        },
+        status: "reserved", // Update the main status of the quotation
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      // Then, fetch the updated quotation data
+      const updatedQuotationDoc = await getDoc(quotationRef)
+      if (!updatedQuotationDoc.exists()) {
+        throw new Error("Updated quotation not found after compliance upload.")
+      }
+      const fullQuotationData = { id: selectedQuotationForProject.id, ...updatedQuotationDoc.data() } as any
+
+      // Pass quotation dates directly to booking - the booking service will handle them properly
+      const bookingData = {
+        ...fullQuotationData,
+        start_date: fullQuotationData.start_date,
+        end_date: fullQuotationData.end_date,
+      }
+
+      const bookingId = await bookingService.createBooking(bookingData, user.uid, userData.company_id, projectName.trim())
+      console.log("[DEBUG] Booking created with ID:", bookingId)
+      toast({
+        title: "Reservation Created",
+        description: `A new reservation document has been created with ID: ${bookingId}.`,
+      })
+
+      // Close dialog and refresh
+      setProjectNameDialogOpen(false)
+      setSelectedQuotationForProject(null)
+      setProjectName("")
+
+      // Refresh quotations list
+      await fetchQuotations(1, true)
+    } catch (bookingError) {
+      console.error("[DEBUG] Error creating booking:", bookingError)
+      toast({
+        title: "Booking Creation Failed",
+        description: "Failed to create booking document. Please check console for details.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -1406,6 +1534,52 @@ export default function QuotationsListPage() {
               <div className="flex justify-end pt-2">
                 <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
                   Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={projectNameDialogOpen} onOpenChange={handleProjectNameDialogClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Project Name</DialogTitle>
+            <DialogDescription>
+              Please enter a name for this project. This will be saved with the reservation.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedQuotationForProject && (
+            <div className="space-y-4">
+              {/* Quotation Info */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-900">
+                  {selectedQuotationForProject.quotation_number || "New Quotation"}
+                </div>
+                <div className="text-xs text-gray-600">
+                  {selectedQuotationForProject.client_name} • {selectedQuotationForProject.items?.name || "Service"}
+                </div>
+              </div>
+
+              {/* Project Name Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Project Name *</label>
+                <Input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Enter project name"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setProjectNameDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleProjectNameSubmit} disabled={!projectName.trim()}>
+                  Create Reservation
                 </Button>
               </div>
             </div>

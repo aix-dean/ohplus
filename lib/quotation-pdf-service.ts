@@ -79,10 +79,10 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
   pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
   yPosition += 10
 
-  const item = quotation.items?.[0]
+  const item = quotation.items
   pdf.setFontSize(14)
   pdf.setFont("helvetica", "bold")
-  pdf.text(item?.name || "Site Name", pageWidth / 2, yPosition, { align: "center" })
+  pdf.text(`${item?.name || "Site Name"} - Quotation`, pageWidth / 2, yPosition, { align: "center" })
   yPosition += 10
 
   pdf.setFontSize(10)
@@ -332,27 +332,8 @@ export const generateQuotationPDFsWithMultiPageSupport = async (
 }
 
 export const generateSeparateQuotationPDFs = async (quotation: Quotation, companyData?: any) => {
-  // If quotation has multiple items, generate separate PDF for each item
-  if (quotation.items && quotation.items.length > 1) {
-    for (let i = 0; i < quotation.items.length; i++) {
-      const item = quotation.items[i]
-      const singleItemQuotation: Quotation = {
-        ...quotation,
-        items: [item],
-        quotation_number: `${quotation.quotation_number || quotation.id?.slice(-8)}-${String.fromCharCode(65 + i)}`,
-      }
-
-      await generateQuotationPDF(singleItemQuotation, companyData)
-
-      // Add small delay between downloads
-      if (i < quotation.items.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-    }
-  } else {
-    // Single item, generate normal PDF
-    return generateQuotationPDF(quotation, companyData)
-  }
+  // Single item quotation, generate normal PDF
+  return generateQuotationPDF(quotation, companyData)
 }
 
 export const generateQuotationEmailPDF = async (
@@ -384,10 +365,10 @@ export const generateQuotationEmailPDF = async (
   pdf.text(quotation.client_company_name || "COMPANY NAME", margin, yPosition)
   yPosition += 10
 
-  const item = quotation.items?.[0]
+  const item = quotation.items
   pdf.setFontSize(14)
   pdf.setFont("helvetica", "bold")
-  pdf.text(item?.name || "Site Name", pageWidth / 2, yPosition, { align: "center" })
+  pdf.text(`${item?.name || "Site Name"} - Quotation`, pageWidth / 2, yPosition, { align: "center" })
   yPosition += 10
 
   pdf.setFontSize(10)

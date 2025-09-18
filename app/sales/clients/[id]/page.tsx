@@ -20,7 +20,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, updateDoc, deleteDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore" // Import updateDoc, collection, query, where, getDocs
+import { doc, getDoc, updateDoc, deleteDoc, addDoc, collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore" // Import updateDoc, collection, query, where, getDocs
 import { db } from "@/lib/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
@@ -83,7 +83,7 @@ interface Quotation {
   start_date: string;
   end_date: string;
   duration_days: number;
-  items: Array<{ name: string; location: string }>; // To get site information
+  items: { name: string; location: string }; // Single object, not array
   projectCompliance: {
     signedQuotation: {
       status: string;
@@ -118,6 +118,7 @@ interface Quotation {
   media_order: string[];
   payment_method: string;
   product_id: string;
+  product_name: string;
   product_owner: string;
   promos: {
     quotation_id: string;
@@ -132,6 +133,7 @@ interface Quotation {
     type: string;
     uploadStatus: string;
   }>;
+  reservation_id: string;
   seller_id: string;
   start_date: string;
   status: string;
@@ -178,6 +180,44 @@ interface Quotation {
      email: "",
    })
 
+   // Validation states for contact forms
+   const [addContactValidationErrors, setAddContactValidationErrors] = useState({
+     name: false,
+     phone: false,
+     email: false,
+     phoneFormat: false,
+   })
+
+   const [editContactValidationErrors, setEditContactValidationErrors] = useState({
+     name: false,
+     phone: false,
+     email: false,
+     phoneFormat: false,
+   })
+
+   // Pagination states
+   const [proposalsPage, setProposalsPage] = useState(1)
+   const [proposalsTotalPages, setProposalsTotalPages] = useState(1)
+   const [proposalsTotalItems, setProposalsTotalItems] = useState(0)
+   const [loadingProposals, setLoadingProposals] = useState(false)
+
+   const [costEstimatesPage, setCostEstimatesPage] = useState(1)
+   const [costEstimatesTotalPages, setCostEstimatesTotalPages] = useState(1)
+   const [costEstimatesTotalItems, setCostEstimatesTotalItems] = useState(0)
+   const [loadingCostEstimates, setLoadingCostEstimates] = useState(false)
+
+   const [quotationsPage, setQuotationsPage] = useState(1)
+   const [quotationsTotalPages, setQuotationsTotalPages] = useState(1)
+   const [quotationsTotalItems, setQuotationsTotalItems] = useState(0)
+   const [loadingQuotations, setLoadingQuotations] = useState(false)
+
+   const [reservationsPage, setReservationsPage] = useState(1)
+   const [reservationsTotalPages, setReservationsTotalPages] = useState(1)
+   const [reservationsTotalItems, setReservationsTotalItems] = useState(0)
+   const [loadingReservations, setLoadingReservations] = useState(false)
+
+   const ITEMS_PER_PAGE = 10
+
   // Refs for hidden file inputs
   const dtiBirFileInputRef = useRef<HTMLInputElement>(null)
   const gisFileInputRef = useRef<HTMLInputElement>(null)
@@ -186,19 +226,59 @@ interface Quotation {
   useEffect(() => {
     if (clientId && userData?.company_id) {
       loadClientData()
-      loadProposals()
-      loadCostEstimates()
-      loadQuotations()
-      loadBookings() // Load bookings
+      loadProposals(proposalsPage)
+      loadCostEstimates(costEstimatesPage)
+      loadQuotations(quotationsPage)
+      loadBookings(reservationsPage) // Load bookings
       console.log("Calling loadBookings in useEffect"); // Log for useEffect
     }
-  }, [clientId, userData?.company_id])
+  }, [clientId, userData?.company_id, proposalsPage, costEstimatesPage, quotationsPage, reservationsPage])
 
-  const loadCostEstimates = async () => {
+  const loadCostEstimates = async (page: number = 1) => {
+    setLoadingCostEstimates(true)
     try {
       const costEstimatesCollectionRef = collection(db, "cost_estimates")
-      const q = query(costEstimatesCollectionRef, where("client.company_id", "==", clientId))
-      const querySnapshot = await getDocs(q)
+
+      // First, get total count
+      const countQuery = query(costEstimatesCollectionRef, where("client.company_id", "==", clientId))
+      const countSnapshot = await getDocs(countQuery)
+      const totalItems = countSnapshot.size
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+      setCostEstimatesTotalItems(totalItems)
+      setCostEstimatesTotalPages(totalPages)
+
+      // Then get paginated data
+      let paginatedQuery = query(
+        costEstimatesCollectionRef,
+        where("client.company_id", "==", clientId),
+        orderBy("createdAt", "desc"),
+        limit(ITEMS_PER_PAGE)
+      )
+  
+      // If not first page, add offset
+      if (page > 1) {
+        const offsetQuery = query(
+          costEstimatesCollectionRef,
+          where("client.company_id", "==", clientId),
+          orderBy("createdAt", "desc"),
+          limit((page - 1) * ITEMS_PER_PAGE)
+        )
+        const offsetSnapshot = await getDocs(offsetQuery)
+        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1]
+  
+        if (lastDoc) {
+          paginatedQuery = query(
+            costEstimatesCollectionRef,
+            where("client.company_id", "==", clientId),
+            orderBy("createdAt", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE)
+          )
+        }
+      }
+
+      const querySnapshot = await getDocs(paginatedQuery)
 
       const fetchedCostEstimates: CostEstimate[] = querySnapshot.docs.map((doc) => {
         const data = doc.data()
@@ -229,6 +309,7 @@ interface Quotation {
       console.error("Error loading cost estimates:", error)
       toast.error("Failed to load cost estimates")
     } finally {
+      setLoadingCostEstimates(false)
       setLoading(false)
     }
   }
@@ -269,11 +350,51 @@ interface Quotation {
     }
   }
 
-  const loadProposals = async () => {
+  const loadProposals = async (page: number = 1) => {
+    setLoadingProposals(true)
     try {
       const proposalsCollectionRef = collection(db, "proposals")
-      const q = query(proposalsCollectionRef, where("client.company_id", "==", clientId))
-      const querySnapshot = await getDocs(q)
+
+      // First, get total count
+      const countQuery = query(proposalsCollectionRef, where("client.company_id", "==", clientId))
+      const countSnapshot = await getDocs(countQuery)
+      const totalItems = countSnapshot.size
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+      setProposalsTotalItems(totalItems)
+      setProposalsTotalPages(totalPages)
+
+      // Then get paginated data
+      let paginatedQuery = query(
+        proposalsCollectionRef,
+        where("client.company_id", "==", clientId),
+        orderBy("createdAt", "desc"),
+        limit(ITEMS_PER_PAGE)
+      )
+
+      // If not first page, add offset
+      if (page > 1) {
+        const offsetQuery = query(
+          proposalsCollectionRef,
+          where("client.company_id", "==", clientId),
+          orderBy("createdAt", "desc"),
+          limit((page - 1) * ITEMS_PER_PAGE)
+        )
+        const offsetSnapshot = await getDocs(offsetQuery)
+        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1]
+
+        if (lastDoc) {
+          paginatedQuery = query(
+            proposalsCollectionRef,
+            where("client.company_id", "==", clientId),
+            orderBy("createdAt", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE)
+          )
+        }
+      }
+
+      const querySnapshot = await getDocs(paginatedQuery)
 
       const fetchedProposals: Proposal[] = querySnapshot.docs.map((doc) => {
         const data = doc.data()
@@ -300,19 +421,60 @@ interface Quotation {
       console.error("Error loading proposals:", error)
       toast.error("Failed to load proposals")
     } finally {
+      setLoadingProposals(false)
       setLoading(false)
     }
   }
 
-  const loadQuotations = async () => {
+  const loadQuotations = async (page: number = 1) => {
+    setLoadingQuotations(true)
     try {
       const quotationsCollectionRef = collection(db, "quotations")
-      const q = query(quotationsCollectionRef, where("client_company_id", "==", clientId))
-      const querySnapshot = await getDocs(q)
+
+      // First, get total count
+      const countQuery = query(quotationsCollectionRef, where("client_company_id", "==", clientId))
+      const countSnapshot = await getDocs(countQuery)
+      const totalItems = countSnapshot.size
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+      setQuotationsTotalItems(totalItems)
+      setQuotationsTotalPages(totalPages)
+
+      // Then get paginated data
+      let paginatedQuery = query(
+        quotationsCollectionRef,
+        where("client_company_id", "==", clientId),
+        orderBy("created", "desc"),
+        limit(ITEMS_PER_PAGE)
+      )
+
+      // If not first page, add offset
+      if (page > 1) {
+        const offsetQuery = query(
+          quotationsCollectionRef,
+          where("client_company_id", "==", clientId),
+          orderBy("created", "desc"),
+          limit((page - 1) * ITEMS_PER_PAGE)
+        )
+        const offsetSnapshot = await getDocs(offsetQuery)
+        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1]
+
+        if (lastDoc) {
+          paginatedQuery = query(
+            quotationsCollectionRef,
+            where("client_company_id", "==", clientId),
+            orderBy("created", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE)
+          )
+        }
+      }
+
+      const querySnapshot = await getDocs(paginatedQuery)
 
       const fetchedQuotations: Quotation[] = querySnapshot.docs.map((doc) => {
         const data = doc.data()
-        
+
         return {
           id: doc.id,
           quotation_number: data.quotation_number || "",
@@ -334,15 +496,56 @@ interface Quotation {
       console.error("Error loading quotations:", error)
       toast.error("Failed to load quotations")
     } finally {
+      setLoadingQuotations(false)
       setLoading(false)
     }
   }
  
-  const loadBookings = async () => {
+  const loadBookings = async (page: number = 1) => {
+    setLoadingReservations(true)
     try {
       const bookingsCollectionRef = collection(db, "booking")
-      const q = query(bookingsCollectionRef, where("client.company_id", "==", clientId))
-      const querySnapshot = await getDocs(q)
+
+      // First, get total count
+      const countQuery = query(bookingsCollectionRef, where("client.company_id", "==", clientId))
+      const countSnapshot = await getDocs(countQuery)
+      const totalItems = countSnapshot.size
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+      setReservationsTotalItems(totalItems)
+      setReservationsTotalPages(totalPages)
+
+      // Then get paginated data
+      let paginatedQuery = query(
+        bookingsCollectionRef,
+        where("client.company_id", "==", clientId),
+        orderBy("created", "desc"),
+        limit(ITEMS_PER_PAGE)
+      )
+
+      // If not first page, add offset
+      if (page > 1) {
+        const offsetQuery = query(
+          bookingsCollectionRef,
+          where("client.company_id", "==", clientId),
+          orderBy("created", "desc"),
+          limit((page - 1) * ITEMS_PER_PAGE)
+        )
+        const offsetSnapshot = await getDocs(offsetQuery)
+        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1]
+
+        if (lastDoc) {
+          paginatedQuery = query(
+            bookingsCollectionRef,
+            where("client.company_id", "==", clientId),
+            orderBy("created", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE)
+          )
+        }
+      }
+
+      const querySnapshot = await getDocs(paginatedQuery)
 
       const fetchedBookings: Booking[] = querySnapshot.docs.map((doc) => {
         const data = doc.data()
@@ -367,25 +570,39 @@ interface Quotation {
           },
           created: data.created ? data.created.toDate() : new Date(),
           end_date: data.end_date
-            ? new Date(data.end_date.toDate()).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
+            ? (data.end_date.toDate
+                ? new Date(data.end_date.toDate()).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : new Date(data.end_date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }))
             : "",
           media_order: data.media_order || [],
           payment_method: data.payment_method || "",
           product_id: data.product_id || "",
           product_owner: data.product_owner || "",
+          product_name: data.product_name || "",
           promos: data.promos || { quotation_id: "", rated: false },
           requirements: data.requirements || [],
+          reservation_id: data.reservation_id || "",
           seller_id: data.seller_id || "",
           start_date: data.start_date
-            ? new Date(data.start_date.toDate()).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
+            ? (data.start_date.toDate
+                ? new Date(data.start_date.toDate()).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : new Date(data.start_date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }))
             : "",
           status: data.status || "",
           total_cost: data.total_cost || 0,
@@ -400,6 +617,7 @@ interface Quotation {
       console.error("Error loading bookings:", error)
       toast.error("Failed to load bookings")
     } finally {
+      setLoadingReservations(false)
       setLoading(false)
     }
   }
@@ -449,6 +667,13 @@ interface Quotation {
       phone: contact.phone || "",
       email: contact.email || "",
     })
+    // Reset validation errors
+    setEditContactValidationErrors({
+      name: false,
+      phone: false,
+      email: false,
+      phoneFormat: false,
+    })
     setShowEditContactDialog(true)
   }
 
@@ -459,6 +684,55 @@ interface Quotation {
 
   const handleSaveContactEdit = async () => {
     if (!editingContact) return
+
+    // Validation
+    let hasErrors = false
+    const newValidationErrors = { ...editContactValidationErrors }
+
+    if (!editFormData.name.trim()) {
+      newValidationErrors.name = true
+      hasErrors = true
+    } else {
+      newValidationErrors.name = false
+    }
+
+    if (!editFormData.phone.trim()) {
+      newValidationErrors.phone = true
+      hasErrors = true
+    } else {
+      newValidationErrors.phone = false
+    }
+
+    if (!editFormData.email.trim()) {
+      newValidationErrors.email = true
+      hasErrors = true
+    } else {
+      newValidationErrors.email = false
+    }
+
+    // Validate phone format (only if phone is provided and has content beyond +63)
+    if (editFormData.phone.trim()) {
+      if (editFormData.phone === '+63') {
+        // If only +63 is entered, it's incomplete
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else if (!validatePhoneFormat(editFormData.phone)) {
+        // If format is invalid
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else {
+        newValidationErrors.phoneFormat = false
+      }
+    } else {
+      newValidationErrors.phoneFormat = false
+    }
+
+    setEditContactValidationErrors(newValidationErrors)
+
+    if (hasErrors) {
+      toast.error("Please fill in all required fields correctly")
+      return
+    }
 
     try {
       const contactRef = doc(db, "client_db", editingContact.id)
@@ -520,15 +794,145 @@ interface Quotation {
       phone: "",
       email: "",
     })
+    // Reset validation errors
+    setAddContactValidationErrors({
+      name: false,
+      phone: false,
+      email: false,
+      phoneFormat: false,
+    })
     setShowAddContactDialog(true)
+  }
+
+  // Phone validation function
+  const validatePhoneFormat = (phone: string): boolean => {
+    // Check if phone is exactly +63 followed by 9 digits (Philippines mobile format)
+    const phoneRegex = /^\+63\d{9}$/
+    return phoneRegex.test(phone.replace(/\s/g, ''))
+  }
+
+  // Format industry text from snake_case to Title Case
+  const formatIndustryText = (industry: string | undefined): string => {
+    if (!industry) return "Advertising"
+    return industry
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  // Handle phone input for add contact form
+  const handleAddContactPhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+
+    // Always ensure +63 prefix is present
+    if (!value.startsWith('+63')) {
+      if (value && /^\d/.test(value)) {
+        // If user types digits, add +63 prefix
+        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+      } else {
+        // If empty or doesn't start with digits, set to +63
+        value = '+63'
+      }
+    } else {
+      // If it starts with +63, ensure only digits after and limit to 9
+      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
+      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+    }
+
+    // Update form data
+    setAddContactFormData((prev) => ({ ...prev, phone: value }))
+
+    // Clear validation errors when user types
+    if (addContactValidationErrors.phoneFormat || addContactValidationErrors.phone) {
+      setAddContactValidationErrors((prev) => ({
+        ...prev,
+        phoneFormat: false,
+        phone: false
+      }))
+    }
+  }
+
+  // Handle phone input for edit contact form
+  const handleEditContactPhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+
+    // Always ensure +63 prefix is present
+    if (!value.startsWith('+63')) {
+      if (value && /^\d/.test(value)) {
+        // If user types digits, add +63 prefix
+        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+      } else {
+        // If empty or doesn't start with digits, set to +63
+        value = '+63'
+      }
+    } else {
+      // If it starts with +63, ensure only digits after and limit to 9
+      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
+      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+    }
+
+    // Update form data
+    setEditFormData((prev) => ({ ...prev, phone: value }))
+
+    // Clear validation errors when user types
+    if (editContactValidationErrors.phoneFormat || editContactValidationErrors.phone) {
+      setEditContactValidationErrors((prev) => ({
+        ...prev,
+        phoneFormat: false,
+        phone: false
+      }))
+    }
   }
 
   const handleSaveNewContact = async () => {
     if (!company) return
 
-    // Basic validation
-    if (!addContactFormData.name.trim() || !addContactFormData.email.trim()) {
-      toast.error("Name and email are required")
+    // Validation
+    let hasErrors = false
+    const newValidationErrors = { ...addContactValidationErrors }
+
+    if (!addContactFormData.name.trim()) {
+      newValidationErrors.name = true
+      hasErrors = true
+    } else {
+      newValidationErrors.name = false
+    }
+
+    if (!addContactFormData.phone.trim()) {
+      newValidationErrors.phone = true
+      hasErrors = true
+    } else {
+      newValidationErrors.phone = false
+    }
+
+    if (!addContactFormData.email.trim()) {
+      newValidationErrors.email = true
+      hasErrors = true
+    } else {
+      newValidationErrors.email = false
+    }
+
+    // Validate phone format (only if phone is provided and has content beyond +63)
+    if (addContactFormData.phone.trim()) {
+      if (addContactFormData.phone === '+63') {
+        // If only +63 is entered, it's incomplete
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else if (!validatePhoneFormat(addContactFormData.phone)) {
+        // If format is invalid
+        newValidationErrors.phoneFormat = true
+        hasErrors = true
+      } else {
+        newValidationErrors.phoneFormat = false
+      }
+    } else {
+      newValidationErrors.phoneFormat = false
+    }
+
+    setAddContactValidationErrors(newValidationErrors)
+
+    if (hasErrors) {
+      toast.error("Please fill in all required fields correctly")
       return
     }
 
@@ -733,7 +1137,7 @@ interface Quotation {
                  </div>
                  <div>
                    <span className="font-semibold text-gray-900">Industry: </span>
-                   <span className="text-gray-700">{company.industry || "Advertising"}</span>
+                   <span className="text-gray-700">{formatIndustryText(company.industry)}</span>
                  </div>
                  {primaryContact && (
                    <>
@@ -1009,13 +1413,22 @@ interface Quotation {
            <div className="py-4">
              <div className="grid grid-cols-1 gap-4">
                <div className="space-y-2">
-                 <Label htmlFor="edit-name">Name</Label>
+                 <Label htmlFor="edit-name">Name *</Label>
                  <Input
                    id="edit-name"
                    value={editFormData.name}
-                   onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                   onChange={(e) => {
+                     setEditFormData({ ...editFormData, name: e.target.value })
+                     if (editContactValidationErrors.name) {
+                       setEditContactValidationErrors({ ...editContactValidationErrors, name: false })
+                     }
+                   }}
                    placeholder="Contact name"
+                   className={editContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
                  />
+                 {editContactValidationErrors.name && (
+                   <p className="text-sm text-red-500">Name is required</p>
+                 )}
                </div>
 
                <div className="space-y-2">
@@ -1029,24 +1442,40 @@ interface Quotation {
                </div>
 
                <div className="space-y-2">
-                 <Label htmlFor="edit-phone">Phone</Label>
+                 <Label htmlFor="edit-phone">Phone *</Label>
                  <Input
                    id="edit-phone"
                    value={editFormData.phone}
-                   onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                   placeholder="Phone number"
+                   onChange={handleEditContactPhoneInput}
+                   placeholder="Enter 9 digits"
+                   className={(editContactValidationErrors.phone || editContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
                  />
+                 {editContactValidationErrors.phone && (
+                   <p className="text-sm text-red-500">Phone number is required</p>
+                 )}
+                 {editContactValidationErrors.phoneFormat && !editContactValidationErrors.phone && (
+                   <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                 )}
                </div>
 
                <div className="space-y-2">
-                 <Label htmlFor="edit-email">Email</Label>
+                 <Label htmlFor="edit-email">Email *</Label>
                  <Input
                    id="edit-email"
                    type="email"
                    value={editFormData.email}
-                   onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                   onChange={(e) => {
+                     setEditFormData({ ...editFormData, email: e.target.value })
+                     if (editContactValidationErrors.email) {
+                       setEditContactValidationErrors({ ...editContactValidationErrors, email: false })
+                     }
+                   }}
                    placeholder="Email address"
+                   className={editContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
                  />
+                 {editContactValidationErrors.email && (
+                   <p className="text-sm text-red-500">Email address is required</p>
+                 )}
                </div>
              </div>
            </div>
@@ -1111,10 +1540,19 @@ interface Quotation {
                  <Input
                    id="add-name"
                    value={addContactFormData.name}
-                   onChange={(e) => setAddContactFormData({ ...addContactFormData, name: e.target.value })}
+                   onChange={(e) => {
+                     setAddContactFormData({ ...addContactFormData, name: e.target.value })
+                     if (addContactValidationErrors.name) {
+                       setAddContactValidationErrors({ ...addContactValidationErrors, name: false })
+                     }
+                   }}
                    placeholder="Contact name"
+                   className={addContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
                    required
                  />
+                 {addContactValidationErrors.name && (
+                   <p className="text-sm text-red-500">Name is required</p>
+                 )}
                </div>
 
                <div className="space-y-2">
@@ -1128,13 +1566,20 @@ interface Quotation {
                </div>
 
                <div className="space-y-2">
-                 <Label htmlFor="add-phone">Phone</Label>
+                 <Label htmlFor="add-phone">Phone *</Label>
                  <Input
                    id="add-phone"
                    value={addContactFormData.phone}
-                   onChange={(e) => setAddContactFormData({ ...addContactFormData, phone: e.target.value })}
-                   placeholder="Phone number"
+                   onChange={handleAddContactPhoneInput}
+                   placeholder="Enter 9 digits"
+                   className={(addContactValidationErrors.phone || addContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
                  />
+                 {addContactValidationErrors.phone && (
+                   <p className="text-sm text-red-500">Phone number is required</p>
+                 )}
+                 {addContactValidationErrors.phoneFormat && !addContactValidationErrors.phone && (
+                   <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                 )}
                </div>
 
                <div className="space-y-2">
@@ -1143,10 +1588,19 @@ interface Quotation {
                    id="add-email"
                    type="email"
                    value={addContactFormData.email}
-                   onChange={(e) => setAddContactFormData({ ...addContactFormData, email: e.target.value })}
+                   onChange={(e) => {
+                     setAddContactFormData({ ...addContactFormData, email: e.target.value })
+                     if (addContactValidationErrors.email) {
+                       setAddContactValidationErrors({ ...addContactValidationErrors, email: false })
+                     }
+                   }}
                    placeholder="Email address"
+                   className={addContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
                    required
                  />
+                 {addContactValidationErrors.email && (
+                   <p className="text-sm text-red-500">Email address is required</p>
+                 )}
                </div>
              </div>
            </div>
@@ -1170,24 +1624,33 @@ interface Quotation {
            </TabsTrigger>
            <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
            <TabsTrigger value="quotations">Quotations</TabsTrigger>
-           <TabsTrigger value="bookings">Bookings</TabsTrigger>
+           <TabsTrigger value="reservations">Reservations</TabsTrigger>
          </TabsList>
  
          <TabsContent value="proposals" className="space-y-4">
            <Card>
              <CardContent className="p-6">
                <div className="flex items-center justify-between mb-4">
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                   <Input
-                     placeholder="Search proposals..."
-                     value={searchTerm}
-                     onChange={(e) => setSearchTerm(e.target.value)}
-                     className="pl-10 w-64"
-                   />
+                 <div className="flex items-center space-x-4">
+                   <div className="relative">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                     <Input
+                       placeholder="Search proposals..."
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                       className="pl-10 w-64"
+                     />
+                   </div>
+                   <Button
+                     onClick={() => router.push(`/sales/dashboard?mode=proposal&clientId=${clientId}`)}
+                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                   >
+                     <Plus className="h-4 w-4" />
+                     <span>Create New Proposal</span>
+                   </Button>
                  </div>
                  <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {proposals.length}</span>
+                   <span className="text-sm text-gray-500">Total: {proposalsTotalItems}</span>
                    <span className="text-sm text-gray-500">All Time</span>
                  </div>
                </div>
@@ -1195,10 +1658,9 @@ interface Quotation {
                <Table>
                  <TableHeader>
                    <TableRow>
-                     <TableHead>Project ID</TableHead>
                      <TableHead>Proposal ID</TableHead>
                      <TableHead>Date</TableHead>
-                     <TableHead>Sites</TableHead>
+                     <TableHead>Site Name</TableHead>
                      <TableHead>Sent To</TableHead>
                      <TableHead>Status</TableHead>
                    </TableRow>
@@ -1206,7 +1668,6 @@ interface Quotation {
                  <TableBody>
                    {filteredProposals.map((proposal) => (
                      <TableRow key={proposal.id}>
-                       <TableCell className="text-blue-600 font-medium">{proposal.id}</TableCell>
                        <TableCell>{proposal.proposalNumber}</TableCell>
                        <TableCell>{proposal.date}</TableCell>
                        <TableCell>({proposal.sites}) Sites</TableCell>
@@ -1216,17 +1677,33 @@ interface Quotation {
                    ))}
                  </TableBody>
                </Table>
- 
-               <div className="flex items-center justify-between mt-6">
-                 <Button variant="outline" className="flex items-center space-x-2 bg-transparent">
-                   <Printer className="h-4 w-4" />
-                   <span>Print</span>
-                 </Button>
-                 <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2">
-                   <Plus className="h-4 w-4" />
-                   <span>Create New Proposal</span>
-                 </Button>
-               </div>
+
+               {/* Pagination */}
+               {proposalsTotalPages > 1 && (
+                 <div className="flex items-center justify-center mt-6">
+                   <div className="flex items-center space-x-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setProposalsPage(prev => Math.max(1, prev - 1))}
+                       disabled={proposalsPage === 1 || loadingProposals}
+                     >
+                       Previous
+                     </Button>
+                     <span className="text-sm text-gray-600">
+                       Page {proposalsPage} of {proposalsTotalPages}
+                     </span>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setProposalsPage(prev => Math.min(proposalsTotalPages, prev + 1))}
+                       disabled={proposalsPage === proposalsTotalPages || loadingProposals}
+                     >
+                       Next
+                     </Button>
+                   </div>
+                 </div>
+               )}
              </CardContent>
            </Card>
          </TabsContent>
@@ -1235,17 +1712,26 @@ interface Quotation {
            <Card>
              <CardContent className="p-6">
                <div className="flex items-center justify-between mb-4">
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                   <Input
-                     placeholder="Search cost estimates..."
-                     value={searchTerm}
-                     onChange={(e) => setSearchTerm(e.target.value)}
-                     className="pl-10 w-64"
-                   />
+                 <div className="flex items-center space-x-4">
+                   <div className="relative">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                     <Input
+                       placeholder="Search cost estimates..."
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                       className="pl-10 w-64"
+                     />
+                   </div>
+                   <Button
+                     onClick={() => router.push(`/sales/dashboard?mode=cost_estimate&clientId=${clientId}`)}
+                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                   >
+                     <Plus className="h-4 w-4" />
+                     <span>Create New Cost Estimate</span>
+                   </Button>
                  </div>
                  <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {costEstimates.length}</span>
+                   <span className="text-sm text-gray-500">Total: {costEstimatesTotalItems}</span>
                    <span className="text-sm text-gray-500">All Time</span>
                  </div>
                </div>
@@ -1254,7 +1740,7 @@ interface Quotation {
                  <TableHeader>
                    <TableRow>
                      <TableHead>Cost Estimate ID</TableHead>
-                     <TableHead>Title</TableHead>
+                     <TableHead>Site Name</TableHead>
                      <TableHead>Start Date</TableHead>
                      <TableHead>End Date</TableHead>
                      <TableHead>Total Amount</TableHead>
@@ -1278,17 +1764,33 @@ interface Quotation {
                    ))}
                  </TableBody>
                </Table>
- 
-               <div className="flex items-center justify-between mt-6">
-                 <Button variant="outline" className="flex items-center space-x-2 bg-transparent">
-                   <Printer className="h-4 w-4" />
-                   <span>Print</span>
-                 </Button>
-                 <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2">
-                   <Plus className="h-4 w-4" />
-                   <span>Create New Cost Estimate</span>
-                 </Button>
-               </div>
+
+               {/* Pagination */}
+               {costEstimatesTotalPages > 1 && (
+                 <div className="flex items-center justify-center mt-6">
+                   <div className="flex items-center space-x-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setCostEstimatesPage(prev => Math.max(1, prev - 1))}
+                       disabled={costEstimatesPage === 1 || loadingCostEstimates}
+                     >
+                       Previous
+                     </Button>
+                     <span className="text-sm text-gray-600">
+                       Page {costEstimatesPage} of {costEstimatesTotalPages}
+                     </span>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setCostEstimatesPage(prev => Math.min(costEstimatesTotalPages, prev + 1))}
+                       disabled={costEstimatesPage === costEstimatesTotalPages || loadingCostEstimates}
+                     >
+                       Next
+                     </Button>
+                   </div>
+                 </div>
+               )}
              </CardContent>
            </Card>
          </TabsContent>
@@ -1297,17 +1799,26 @@ interface Quotation {
            <Card>
              <CardContent className="p-6">
                <div className="flex items-center justify-between mb-4">
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                   <Input
-                     placeholder="Search quotations..."
-                     value={searchTerm}
-                     onChange={(e) => setSearchTerm(e.target.value)}
-                     className="pl-10 w-64"
-                   />
+                 <div className="flex items-center space-x-4">
+                   <div className="relative">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                     <Input
+                       placeholder="Search quotations..."
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                       className="pl-10 w-64"
+                     />
+                   </div>
+                   <Button
+                     onClick={() => router.push(`/sales/dashboard?mode=quotation&clientId=${clientId}`)}
+                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                   >
+                     <Plus className="h-4 w-4" />
+                     <span>Create New Quotation</span>
+                   </Button>
                  </div>
                  <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {quotations.length}</span>
+                   <span className="text-sm text-gray-500">Total: {quotationsTotalItems}</span>
                    <span className="text-sm text-gray-500">All Time</span>
                  </div>
                </div>
@@ -1315,10 +1826,9 @@ interface Quotation {
                <Table>
                  <TableHeader>
                    <TableRow>
-                     <TableHead>Project ID</TableHead>
                      <TableHead>Quotation ID</TableHead>
                      <TableHead>Date</TableHead>
-                     <TableHead>Site</TableHead>
+                     <TableHead>Site Name</TableHead>
                      <TableHead>Duration</TableHead>
                      <TableHead>Amount</TableHead>
                      <TableHead>Status</TableHead>
@@ -1331,7 +1841,6 @@ interface Quotation {
                        quotation.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
                    ).map((quotation) => (
                      <TableRow key={quotation.id}>
-                       <TableCell className="text-blue-600 font-medium">{quotation.id}</TableCell>
                        <TableCell>{quotation.quotation_number}</TableCell>
                        <TableCell>
                          {new Date(quotation.created).toLocaleDateString("en-US", {
@@ -1340,7 +1849,7 @@ interface Quotation {
                            year: "numeric",
                          })}
                        </TableCell>
-                       <TableCell>{quotation.items?.[0]?.location || "N/A"}</TableCell>
+                       <TableCell>{quotation.items?.name || "N/A"}</TableCell>
                        <TableCell>
                          {new Date(quotation.start_date).toLocaleDateString("en-US", {
                            month: "short",
@@ -1372,36 +1881,52 @@ interface Quotation {
                    ))}
                  </TableBody>
                </Table>
- 
-               <div className="flex items-center justify-between mt-6">
-                 <Button variant="outline" className="flex items-center space-x-2 bg-transparent">
-                   <Printer className="h-4 w-4" />
-                   <span>Print</span>
-                 </Button>
-                 <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2">
-                   <Plus className="h-4 w-4" />
-                   <span>Create New Quotation</span>
-                 </Button>
-               </div>
+
+               {/* Pagination */}
+               {quotationsTotalPages > 1 && (
+                 <div className="flex items-center justify-center mt-6">
+                   <div className="flex items-center space-x-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setQuotationsPage(prev => Math.max(1, prev - 1))}
+                       disabled={quotationsPage === 1 || loadingQuotations}
+                     >
+                       Previous
+                     </Button>
+                     <span className="text-sm text-gray-600">
+                       Page {quotationsPage} of {quotationsTotalPages}
+                     </span>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setQuotationsPage(prev => Math.min(quotationsTotalPages, prev + 1))}
+                       disabled={quotationsPage === quotationsTotalPages || loadingQuotations}
+                     >
+                       Next
+                     </Button>
+                   </div>
+                 </div>
+               )}
              </CardContent>
            </Card>
          </TabsContent>
  
-         <TabsContent value="bookings">
+         <TabsContent value="reservations">
            <Card>
              <CardContent className="p-6">
                <div className="flex items-center justify-between mb-4">
                  <div className="relative">
                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                    <Input
-                     placeholder="Search bookings..."
+                     placeholder="Search reservations..."
                      value={searchTerm}
                      onChange={(e) => setSearchTerm(e.target.value)}
                      className="pl-10 w-64"
                    />
                  </div>
                  <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {bookings.length}</span>
+                   <span className="text-sm text-gray-500">Total: {reservationsTotalItems}</span>
                    <span className="text-sm text-gray-500">All Time</span>
                  </div>
                </div>
@@ -1409,10 +1934,9 @@ interface Quotation {
                <Table>
                  <TableHeader>
                    <TableRow>
-                     <TableHead>Project ID</TableHead>
-                     <TableHead>JO #</TableHead>
+                     <TableHead>Reservation ID</TableHead>
                      <TableHead>Date</TableHead>
-                     <TableHead>Site</TableHead>
+                     <TableHead>Site Name</TableHead>
                      <TableHead>Duration</TableHead>
                      <TableHead>Amount</TableHead>
                      <TableHead>Status</TableHead>
@@ -1429,12 +1953,11 @@ interface Quotation {
 
                      return (
                        <TableRow key={booking.id}>
-                         <TableCell className="text-blue-600 font-medium">{booking.id}</TableCell>
-                         <TableCell>{booking.product_id}</TableCell>
+                         <TableCell className="text-blue-600 font-medium">{booking.reservation_id}</TableCell>
                          <TableCell>
                            {booking.start_date}
                          </TableCell>
-                         <TableCell>{"Petplans"}</TableCell> {/* Placeholder for Site */}
+                         <TableCell>{booking.product_name}</TableCell>
                          <TableCell>
                            {startDate.toLocaleDateString("en-US", {
                              month: "short",
@@ -1449,24 +1972,40 @@ interface Quotation {
                            <br />
                            ({diffMonths} months and {remainingDays} days)
                          </TableCell>
-                         <TableCell>{booking.total_cost.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
+                         <TableCell>{booking.costDetails.total.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
                          <TableCell>{getStatusBadge(booking.status)}</TableCell>
                        </TableRow>
                      );
                    })}
                  </TableBody>
                </Table>
- 
-               <div className="flex items-center justify-between mt-6">
-                 <Button variant="outline" className="flex items-center space-x-2 bg-transparent">
-                   <Printer className="h-4 w-4" />
-                   <span>Print</span>
-                 </Button>
-                 <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2">
-                   <Plus className="h-4 w-4" />
-                   <span>Create New Booking</span>
-                 </Button>
-               </div>
+
+               {/* Pagination */}
+               {reservationsTotalPages > 1 && (
+                 <div className="flex items-center justify-center mt-6">
+                   <div className="flex items-center space-x-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setReservationsPage(prev => Math.max(1, prev - 1))}
+                       disabled={reservationsPage === 1 || loadingReservations}
+                     >
+                       Previous
+                     </Button>
+                     <span className="text-sm text-gray-600">
+                       Page {reservationsPage} of {reservationsTotalPages}
+                     </span>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setReservationsPage(prev => Math.min(reservationsTotalPages, prev + 1))}
+                       disabled={reservationsPage === reservationsTotalPages || loadingReservations}
+                     >
+                       Next
+                     </Button>
+                   </div>
+                 </div>
+               )}
              </CardContent>
            </Card>
          </TabsContent>
