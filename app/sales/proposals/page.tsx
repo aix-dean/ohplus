@@ -33,7 +33,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Pagination } from "@/components/ui/pagination"
 
 function ProposalsPageContent() {
@@ -411,6 +411,7 @@ function ProposalsPageContent() {
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
+          <DialogTitle className="sr-only">Success</DialogTitle>
           <div className="py-6">
             <div className="mb-4">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Congratulations!</h2>

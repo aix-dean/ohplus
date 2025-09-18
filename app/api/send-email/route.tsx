@@ -10,7 +10,8 @@ function createEmailTemplate(
   userPhoneNumber?: string,
   companyName?: string,
   companyWebsite?: string,
-  userDisplayName?: string
+  userDisplayName?: string,
+  replyTo?: string
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
@@ -172,7 +173,7 @@ function createEmailTemplate(
             
             <div class="cta-section">
                 <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
-                <a href="mailto:${userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply'}@ohplus.ph" class="cta-button">Get In Touch</a>
+                <a href="mailto:${replyTo || (userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply') + '@ohplus.ph'}" class="cta-button">Get In Touch</a>
             </div>
         </div>
         
@@ -185,8 +186,8 @@ function createEmailTemplate(
             <div class="contact-info">
                 <strong>${companyName || "Company"}</strong><br>
                 📞 ${phoneNumber}<br>
-                📧 ${userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply'}@ohplus.ph<br>
-                🌐 ${companyWebsite || 'www.ohplus.ph'}
+                📧 ${replyTo || (userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply') + '@ohplus.ph'}<br>
+                ${companyWebsite && companyWebsite !== 'www.ohplus.ph' ? `🌐 ${companyWebsite}` : ''}
             </div>
             
             <div class="divider"></div>
@@ -291,7 +292,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, userDisplayName),
+      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, userDisplayName, replyTo),
     }
 
     if (cc && cc.length > 0) {

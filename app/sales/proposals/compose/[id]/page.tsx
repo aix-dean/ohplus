@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
@@ -15,12 +15,13 @@ import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalById } from "@/lib/proposal-service"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { CompanyService } from "@/lib/company-service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 
 interface ComposeEmailPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 interface Attachment {
@@ -41,9 +42,11 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
+  const resolvedParams = React.use(params)
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [companyName, setCompanyName] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [emailData, setEmailData] = useState({
@@ -61,9 +64,9 @@ If you have any questions or would like to explore other options, feel free to r
 
 Best regards,
 Sales Executive
-Sales Executive
-OH PLUS
-+639XXXXXXXXX`,
+[Company Name]
+📞 +639XXXXXXXXX
+📧 [Reply-To Email]`,
   })
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -144,33 +147,39 @@ OH PLUS
   const createDefaultProposalTemplates = async () => {
     if (!userData?.company_id) return
 
+    const templateCompanyName = companyName || projectData?.company_name || 'Your Company'
+    const contactDetails = [
+      '[Your Name]',
+      templateCompanyName,
+      `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
+      `📧 ${userData?.email || user?.email || 'noreply@ohplus.ph'}`,
+      ...(projectData?.company_website ? [`🌐 ${projectData.company_website}`] : [])
+    ].join('\n')
+
     const defaultProposalTemplates = [
       {
         name: "Standard Proposal",
         subject: "Proposal: [Project Name] - [Company Name]",
         body: `Dear [Client Name],
 
-I hope this email finds you well.
+   I hope this email finds you well.
 
-Please find attached our detailed proposal for your upcoming project. We've carefully reviewed your requirements and prepared a comprehensive solution that aligns with your objectives.
+   Please find attached our detailed proposal for your upcoming project. We've carefully reviewed your requirements and prepared a comprehensive solution that aligns with your objectives.
 
-The proposal includes:
-- Detailed project scope and deliverables
-- Timeline and milestones
-- Pricing and payment terms
-- Our team's qualifications and experience
+   The proposal includes:
+   - Detailed project scope and deliverables
+   - Timeline and milestones
+   - Pricing and payment terms
+   - Our team's qualifications and experience
 
-We're excited about the opportunity to work with you and are confident that our approach will deliver exceptional results for your project.
+   We're excited about the opportunity to work with you and are confident that our approach will deliver exceptional results for your project.
 
-Please review the attached proposal and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
+   Please review the attached proposal and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
 
-Looking forward to your feedback!
+   Looking forward to your feedback!
 
-Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
+   Best regards,
+${contactDetails}`,
         company_id: userData.company_id,
         template_type: "proposal" as const,
       },
@@ -179,21 +188,18 @@ OH PLUS
         subject: "Follow-up: Proposal for [Project Name]",
         body: `Dear [Client Name],
 
-I wanted to follow up on the proposal we sent for [Project Name].
+   I wanted to follow up on the proposal we sent for [Project Name].
 
-I hope you've had a chance to review the attached proposal. We're very interested in working with you on this project and believe our solution offers excellent value for your investment.
+   I hope you've had a chance to review the attached proposal. We're very interested in working with you on this project and believe our solution offers excellent value for your investment.
 
-If you have any questions about our approach, timeline, or pricing, I'd be happy to schedule a call to discuss them in detail.
+   If you have any questions about our approach, timeline, or pricing, I'd be happy to schedule a call to discuss them in detail.
 
-We're also flexible and open to adjusting our proposal based on your feedback or any changes in your requirements.
+   We're also flexible and open to adjusting our proposal based on your feedback or any changes in your requirements.
 
-Please let me know your thoughts or if you need any additional information.
+   Please let me know your thoughts or if you need any additional information.
 
-Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
+   Best regards,
+${contactDetails}`,
         company_id: userData.company_id,
         template_type: "proposal" as const,
       },
@@ -214,22 +220,97 @@ OH PLUS
   useEffect(() => {
     const fetchProposal = async () => {
       try {
-        const proposalData = await getProposalById(params.id)
+        const proposalData = await getProposalById(resolvedParams.id)
 
         if (!proposalData) {
           throw new Error("Proposal not found")
         }
 
         setProposal(proposalData)
+
+        // Determine company name - prioritize proposal's companyId, fallback to projectData
+        let finalCompanyName = 'Your Company'
+
+        console.log('Company name resolution:', {
+          projectDataCompanyName: projectData?.company_name,
+          proposalCompanyId: proposalData.companyId
+        })
+
+        // First try to get company name from proposal's companyId
+        let companyIdToUse = proposalData.companyId
+
+        if (!companyIdToUse && proposalData.client?.company_id) {
+          companyIdToUse = proposalData.client.company_id
+          console.log('Using client company_id instead:', companyIdToUse)
+        }
+
+        if (companyIdToUse && typeof companyIdToUse === 'string') {
+          try {
+            console.log('Fetching company data for ID:', companyIdToUse)
+            const companyData = await CompanyService.getCompanyData(companyIdToUse)
+            if (companyData?.name && companyData.name.trim()) {
+              finalCompanyName = companyData.name.trim()
+              console.log('Found company name from proposal:', finalCompanyName)
+            } else {
+              console.log('Company found but no name for ID:', companyIdToUse, 'companyData:', companyData)
+            }
+          } catch (companyError) {
+            console.error("Error fetching company data for ID:", companyIdToUse, companyError)
+          }
+        } else {
+          console.log('No valid companyId in proposal or client:', {
+            proposalCompanyId: proposalData.companyId,
+            clientCompanyId: proposalData.client?.company_id
+          })
+        }
+
+        // If we still don't have a company name, try projectData
+        if (finalCompanyName === 'Your Company' && projectData?.company_name) {
+          finalCompanyName = projectData.company_name
+          console.log('Using company name from projectData:', finalCompanyName)
+        }
+
+        console.log('Final company name:', finalCompanyName)
+
+        setCompanyName(finalCompanyName)
+
+        // Create the contact details section
+        const replyToEmail = emailData.replyTo || userData?.email || user?.email || 'noreply@ohplus.ph'
+        const contactDetails = [
+          'Sales Executive',
+          finalCompanyName,
+          `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
+          `📧 ${replyToEmail}`,
+          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : [])
+        ].join('\n')
+
+        console.log('Contact details construction:', {
+          replyToEmail,
+          userDataEmail: userData?.email,
+          userEmail: user?.email,
+          companyWebsite: projectData?.company_website,
+          finalContactDetails: contactDetails
+        })
+
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
           cc: "",
           replyTo: userData?.email || user?.email || "",
-          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
+          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - ${finalCompanyName}`,
+          message: `Hi AAA,
+
+I hope you're doing well!
+
+Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site details and pricing details based on our recent discussion.
+
+If you have any questions or would like to explore other options, feel free to reach out to us. I'll be happy to assist you further. Looking forward to your feedback!
+
+Best regards,
+${contactDetails}`,
         }))
 
-        await generateProposalPDFs(proposalData)
+        await generateProposalPDFs(proposalData, finalCompanyName)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
@@ -243,7 +324,7 @@ OH PLUS
     }
 
     fetchProposal()
-  }, [params.id, toast])
+  }, [resolvedParams.id, toast])
 
   useEffect(() => {
     if (userData?.company_id) {
@@ -251,7 +332,7 @@ OH PLUS
     }
   }, [userData?.company_id])
 
-  const generateProposalPDFs = async (proposalData: Proposal) => {
+  const generateProposalPDFs = async (proposalData: Proposal, companyNameOverride?: string) => {
     try {
       const response = await fetch(`/api/proposals/generate-pdf`, {
         method: "POST",
@@ -263,7 +344,9 @@ OH PLUS
 
       if (response.ok) {
         const pdfBlob = await response.blob()
-        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
+        const effectiveCompanyName = companyNameOverride || companyName || 'COMPANY'
+        const companyNameSlug = effectiveCompanyName.replace(/\s+/g, '_').toUpperCase()
+        const fileName = `${companyNameSlug}_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
         const pdfFile = new File([pdfBlob], fileName, {
           type: "application/pdf",
         })
@@ -283,7 +366,9 @@ OH PLUS
       }
     } catch (error) {
       console.error("Error generating proposal PDFs:", error)
-      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
+      const effectiveCompanyName = companyNameOverride || companyName || 'COMPANY'
+      const companyNameSlug = effectiveCompanyName.replace(/\s+/g, '_').toUpperCase()
+      const fallbackFileName = `${companyNameSlug}_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
       const fallbackPDFs: Attachment[] = [
         {
           name: fallbackFileName,
@@ -427,7 +512,7 @@ OH PLUS
           body: emailData.message,
           created: serverTimestamp(),
           from: user?.email || "noreply@ohplus.ph",
-          proposalId: params.id,
+          proposalId: resolvedParams.id,
           sentAt: serverTimestamp(),
           status: "sent",
           subject: emailData.subject,
