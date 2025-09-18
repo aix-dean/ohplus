@@ -62,22 +62,11 @@ export class CompanyService {
         return false
       }
 
-      // Check required fields for company completeness
-      const requiredFields = [
-        companyData.name?.trim(),
-        companyData.business_type?.trim(),
-        companyData.position?.trim(),
-      ]
+      // Only require company name for basic completeness
+      // This allows users to upload products once they have a company name
+      const hasCompanyName = Boolean(companyData.name?.trim() && companyData.name.trim().length > 0)
 
-      // Check if address has at least street, city, and province
-      const address = companyData.address || {}
-      const hasAddress = Boolean(
-        address.street?.trim() &&
-        address.city?.trim() &&
-        address.province?.trim()
-      )
-
-      return requiredFields.every(field => Boolean(field && field.length > 0)) && hasAddress
+      return hasCompanyName
     } catch (error) {
       console.error("Error checking company info completeness:", error)
       return false

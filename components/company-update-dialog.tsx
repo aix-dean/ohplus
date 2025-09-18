@@ -93,10 +93,10 @@ export function CompanyUpdateDialog({ isOpen, onClose, onSuccess }: CompanyUpdat
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.name || !formData.business_type || !formData.position) {
+    if (!formData.name?.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Company name is required.",
         variant: "destructive",
       })
       return
@@ -139,7 +139,7 @@ export function CompanyUpdateDialog({ isOpen, onClose, onSuccess }: CompanyUpdat
         <DialogHeader>
           <DialogTitle>Complete Your Company Information</DialogTitle>
           <DialogDescription>
-            Please complete your company information to continue uploading products.
+            Please provide your company name to continue uploading products. Other fields are optional but recommended.
           </DialogDescription>
         </DialogHeader>
         {loading ? (
@@ -164,11 +164,11 @@ export function CompanyUpdateDialog({ isOpen, onClose, onSuccess }: CompanyUpdat
 
             <div className="space-y-2">
               <Label htmlFor="business-type">
-                Business Type <span className="text-red-500">*</span>
+                Business Type
               </Label>
               <Select value={formData.business_type} onValueChange={(value) => handleInputChange("business_type", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select business type" />
+                  <SelectValue placeholder="Select business type (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Operator">Operator</SelectItem>
@@ -182,14 +182,13 @@ export function CompanyUpdateDialog({ isOpen, onClose, onSuccess }: CompanyUpdat
 
             <div className="space-y-2">
               <Label htmlFor="position">
-                Your Position <span className="text-red-500">*</span>
+                Your Position
               </Label>
               <Input
                 id="position"
                 value={formData.position}
                 onChange={(e) => handleInputChange("position", e.target.value)}
-                placeholder="e.g., Manager, Director, Owner"
-                required
+                placeholder="e.g., Manager, Director, Owner (optional)"
               />
             </div>
 
