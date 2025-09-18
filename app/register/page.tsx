@@ -462,6 +462,7 @@ export default function RegisterPage() {
     privacy: false,
     rules: false,
   })
+  const [manualAgreement, setManualAgreement] = useState(false)
 
   const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
@@ -519,6 +520,11 @@ export default function RegisterPage() {
       privacy: privacyAgreed,
       rules: rulesAgreed,
     })
+
+    // If all agreements were previously accepted, auto-check the manual checkbox
+    if (termsAgreed && privacyAgreed && rulesAgreed) {
+      setManualAgreement(true)
+    }
   }, [])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
@@ -592,8 +598,8 @@ export default function RegisterPage() {
       return
     }
 
-    if (!agreements.terms || !agreements.privacy || !agreements.rules) {
-      setErrorMessage("Please read and agree to the Terms and Conditions, Privacy Policy, and Rules and Regulations.")
+    if (!manualAgreement) {
+      setErrorMessage("Please check the agreement checkbox to proceed with registration.")
       return
     }
 
@@ -861,8 +867,8 @@ export default function RegisterPage() {
                 <div className="flex items-start space-x-3">
                   <Checkbox
                     id="agreements-checkbox"
-                    checked={agreements.terms && agreements.privacy && agreements.rules}
-                    disabled
+                    checked={manualAgreement}
+                    onCheckedChange={(checked) => setManualAgreement(checked as boolean)}
                   />
                   <Label htmlFor="agreements-checkbox" className="text-sm cursor-pointer flex-1 leading-relaxed">
                     By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
@@ -892,16 +898,6 @@ export default function RegisterPage() {
                             onClick={() => setDialogOpen(prev => ({ ...prev, terms: false }))}
                           >
                             Close
-                          </Button>
-                          <Button
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => {
-                              sessionStorage.setItem('termsAgreed', 'true')
-                              setAgreements(prev => ({ ...prev, terms: true }))
-                              setDialogOpen(prev => ({ ...prev, terms: false }))
-                            }}
-                          >
-                            I Agree
                           </Button>
                         </div>
                       </DialogContent>
@@ -934,16 +930,6 @@ export default function RegisterPage() {
                           >
                             Close
                           </Button>
-                          <Button
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => {
-                              sessionStorage.setItem('privacyAgreed', 'true')
-                              setAgreements(prev => ({ ...prev, privacy: true }))
-                              setDialogOpen(prev => ({ ...prev, privacy: false }))
-                            }}
-                          >
-                            I Agree
-                          </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -975,16 +961,6 @@ export default function RegisterPage() {
                           >
                             Close
                           </Button>
-                          <Button
-                            className="bg-purple-600 hover:bg-purple-700 text-white"
-                            onClick={() => {
-                              sessionStorage.setItem('rulesAgreed', 'true')
-                              setAgreements(prev => ({ ...prev, rules: true }))
-                              setDialogOpen(prev => ({ ...prev, rules: false }))
-                            }}
-                          >
-                            I Agree
-                          </Button>
                         </div>
                       </DialogContent>
                     </Dialog>{" "}
@@ -996,13 +972,13 @@ export default function RegisterPage() {
               {/* Sign Up Button */}
               <Button
                 className={`w-full text-white ${
-                  agreements.terms && agreements.privacy && agreements.rules
+                  manualAgreement
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-gray-400 cursor-not-allowed"
                 }`}
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading || loadingInvitation || !agreements.terms || !agreements.privacy || !agreements.rules}
+                disabled={loading || loadingInvitation || !manualAgreement}
               >
                 {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>
