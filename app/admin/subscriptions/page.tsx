@@ -290,9 +290,6 @@ export default function SubscriptionPage() {
                     </p>
                     <p className="text-lg font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Extend
-                  </Button>
                 </CardContent>
               </Card>
 
@@ -318,9 +315,11 @@ export default function SubscriptionPage() {
                       </>
                     )}
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Manage Users
-                  </Button>
+                  <Link href="/admin/user-management">
+                    <Button variant="outline" className="mt-4 w-full bg-transparent">
+                      Manage Users
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -346,9 +345,11 @@ export default function SubscriptionPage() {
                       </>
                     )}
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    View Inventory
-                  </Button>
+                  <Link href="/admin/inventory">
+                    <Button variant="outline" className="mt-4 w-full bg-transparent">
+                      View Inventory
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
