@@ -509,7 +509,7 @@ export default function RegisterPage() {
     fetchInvitationDetails()
   }, [orgCode])
 
-  // Check for stored agreements on component mount
+  // Check for stored agreements on component mount (for reference only)
   useEffect(() => {
     const termsAgreed = sessionStorage.getItem('termsAgreed') === 'true'
     const privacyAgreed = sessionStorage.getItem('privacyAgreed') === 'true'
@@ -520,11 +520,6 @@ export default function RegisterPage() {
       privacy: privacyAgreed,
       rules: rulesAgreed,
     })
-
-    // If all agreements were previously accepted, auto-check the manual checkbox
-    if (termsAgreed && privacyAgreed && rulesAgreed) {
-      setManualAgreement(true)
-    }
   }, [])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
