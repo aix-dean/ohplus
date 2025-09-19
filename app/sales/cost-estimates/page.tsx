@@ -30,12 +30,12 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
-import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
+import type { CostEstimate, CostEstimateStatus } from "@/lib/types/cost-estimate" // Import CostEstimate type
 import { generateCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
-import { searchCostEstimates } from "@/lib/algolia-service"
+import { searchCostEstimates, SearchResult } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
 
 function CostEstimatesPageContent() {
@@ -47,7 +47,7 @@ function CostEstimatesPageContent() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false) // Assuming this might be used for CE
 
   // Algolia search states
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
 
@@ -220,7 +220,8 @@ function CostEstimatesPageContent() {
   const handleDownloadPDF = async (costEstimate: CostEstimate) => {
     try {
       // Fetch the full cost estimate data first
-      const fullCostEstimate = await getCostEstimate(costEstimate.id)
+      const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+      const fullCostEstimate = await getCostEstimate(costEstimateId)
       if (!fullCostEstimate) {
         throw new Error("Cost estimate not found")
       }
@@ -393,15 +394,17 @@ function CostEstimatesPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(isSearching ? searchResults : costEstimates).map((costEstimate) => {
+                {(isSearching ? searchResults : costEstimates).map((item, index) => {
+                  // Handle both CostEstimate and SearchResult types
+                  const costEstimate = item as any
                   const statusConfig = getStatusConfig(costEstimate.status)
                   const StatusIcon = statusConfig.icon
 
                   return (
                     <TableRow
-                      key={costEstimate.id}
+                      key={costEstimate.id || costEstimate.objectID || `cost-estimate-${index}`}
                       className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                      onClick={() => handleViewCostEstimate(costEstimate.id)}
+                      onClick={() => handleViewCostEstimate(costEstimate.id || costEstimate.objectID)}
                     >
                       <TableCell className="py-3">
                         <div>
@@ -414,8 +417,7 @@ function CostEstimatesPageContent() {
                             <Building2 className="h-4 w-4 text-gray-600" />
                           </div>
                           <div>
-                            <div className="font-medium text-gray-900">{costEstimate.client?.company || costEstimate.client_company}</div>
-                            <div className="text-sm text-gray-500">{costEstimate.client?.contactPerson || costEstimate.client_contact}</div>
+                            <div className="font-medium text-gray-900">{costEstimate.client?.company || costEstimate.client?.company  || "N/A"}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -427,9 +429,9 @@ function CostEstimatesPageContent() {
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-center">
-                          <div className="font-semibold text-gray-900">{costEstimate.lineItems?.length || 0}</div>
+                          <div className="font-semibold text-gray-900">{costEstimate.lineItems?.length || costEstimate.lineItemsCount || 0}</div>
                           <div className="text-xs text-gray-500">
-                            item{(costEstimate.lineItems?.length || 0) !== 1 ? "s" : ""}
+                            item{(costEstimate.lineItems?.length || costEstimate.lineItemsCount || 0) !== 1 ? "s" : ""}
                           </div>
                         </div>
                       </TableCell>
@@ -454,11 +456,11 @@ function CostEstimatesPageContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewCostEstimate(costEstimate.id)}>
+                            <DropdownMenuItem onClick={() => handleViewCostEstimate(costEstimate.id || costEstimate.objectID)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate)}>
+                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate as CostEstimate)}>
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>

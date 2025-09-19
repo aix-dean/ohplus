@@ -36,6 +36,8 @@ async function indexCostEstimate(costEstimate: any) {
     totalAmount: costEstimate.totalAmount,
     createdAt: costEstimate.createdAt?.toISOString() || '',
     company_id: costEstimate.company_id,
+    lineItems: costEstimate.lineItems || [],
+    lineItemsCount: costEstimate.lineItems?.length || 0,
   }
 
   await costEstimatesIndex.saveObject(algoliaObject)

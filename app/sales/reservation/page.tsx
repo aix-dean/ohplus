@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { searchProducts, SearchResult } from "@/lib/algolia-service"
+import { searchBookings, SearchResult } from "@/lib/algolia-service"
 import { Pagination } from "@/components/ui/pagination"
 
 interface Booking {
@@ -80,9 +80,10 @@ export default function ReservationsPage() {
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [algoliaSearchResults, setAlgoliaSearchResults] = useState<SearchResult[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState<{ [key: string]: Product }>({})
+  const [isSearching, setIsSearching] = useState(false)
   const [isSearchingAlgolia, setIsSearchingAlgolia] = useState(false)
   const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
@@ -188,6 +189,21 @@ export default function ReservationsPage() {
   useEffect(() => {
     fetchBookings(1, true)
     fetchTotalReservationsCount()
+
+    // Index bookings into Algolia on page load
+    const indexBookings = async () => {
+      try {
+        const response = await fetch('/api/bookings/index', {
+          method: 'POST',
+        })
+        const result = await response.json()
+        console.log('Booking indexing result:', result)
+      } catch (error) {
+        console.error('Error indexing bookings:', error)
+      }
+    }
+
+    indexBookings()
   }, [user, userData])
 
   const formatDate = (date: any) => {
@@ -221,28 +237,45 @@ export default function ReservationsPage() {
 
   const performAlgoliaSearch = useCallback(async () => {
     if (!searchQuery.trim()) {
-      setAlgoliaSearchResults([])
+      console.log("Search query is empty, clearing results")
+      setSearchResults([])
+      setIsSearching(false)
       return
     }
 
     setIsSearchingAlgolia(true)
     try {
-      const { hits } = await searchProducts(searchQuery, userData?.company_id || undefined)
-      setAlgoliaSearchResults(hits)
+      console.log(`Performing Algolia search for query: "${searchQuery}" with company_id: ${userData?.company_id}`)
+      const result = await searchBookings(searchQuery, userData?.company_id || undefined)
+      console.log(`Algolia search result:`, result)
+      console.log(`Algolia search returned ${result.hits?.length || 0} hits:`, result.hits)
+      if (result.error) {
+        console.error("Algolia search error:", result.error)
+        setSearchResults([])
+        setIsSearching(false)
+      } else {
+        setSearchResults(result.hits || [])
+        setIsSearching(true)
+      }
     } catch (error) {
       console.error("Algolia search failed:", error)
-      setAlgoliaSearchResults([])
+      setSearchResults([])
+      setIsSearching(false)
     } finally {
       setIsSearchingAlgolia(false)
     }
   }, [searchQuery, userData?.company_id])
 
   useEffect(() => {
+    console.log(`Search useEffect triggered with searchQuery: "${searchQuery}"`)
     const handler = setTimeout(() => {
+      console.log(`Executing debounced search for: "${searchQuery}"`)
       if (searchQuery.trim()) {
         performAlgoliaSearch()
       } else {
-        setAlgoliaSearchResults([])
+        console.log("Clearing search results")
+        setSearchResults([])
+        setIsSearching(false)
       }
     }, 300) // Debounce search input
 
@@ -252,16 +285,20 @@ export default function ReservationsPage() {
   }, [searchQuery, performAlgoliaSearch])
 
   const getFilteredBookings = () => {
-    if (searchQuery.trim() && algoliaSearchResults.length > 0) {
-      const algoliaProductIds = new Set(algoliaSearchResults.map((hit) => hit.objectID))
-      return bookings.filter((booking) => algoliaProductIds.has(booking.product_id || ""))
+    console.log(`getFilteredBookings called with searchQuery: "${searchQuery}", isSearching: ${isSearching}, searchResults length: ${searchResults.length}, bookings length: ${bookings.length}`)
+
+    if (isSearching) {
+      console.log("Using search results directly")
+      return searchResults
     }
-    // Fallback to client-side filtering if no Algolia results or no search query
-    return bookings.filter((booking) => {
+
+    // Fallback to client-side filtering if no search
+    console.log("Using client-side filtering")
+    const filtered = bookings.filter((booking) => {
       const product = booking.product_id ? products[booking.product_id] : null
       const siteCode = getSiteCode(product)
 
-      return (
+      const matches = (
         siteCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         booking.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         booking.client_company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -269,7 +306,15 @@ export default function ReservationsPage() {
         booking.client?.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         booking.status?.toLowerCase().includes(searchQuery.toLowerCase())
       )
+
+      if (matches) {
+        console.log(`Booking ${booking.id} matches client-side filter`)
+      }
+
+      return matches
     })
+    console.log(`Client-side filtered to ${filtered.length} bookings`)
+    return filtered
   }
 
 
@@ -444,7 +489,7 @@ export default function ReservationsPage() {
     input.click()
   }
 
-  const displayedReservations = getFilteredBookings()
+  const displayedReservations = getFilteredBookings() as (Booking | SearchResult)[]
 
   const handleNextPage = async () => {
     if (hasMore) {
@@ -484,7 +529,7 @@ export default function ReservationsPage() {
 
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">
-              Total Reservations: {loading ? "..." : totalReservationsCount}
+              {isSearching ? `Found ${searchResults.length} results` : `Total Reservations: ${loading ? "..." : totalReservationsCount}`}
             </span>
           </div>
         </div>
@@ -505,7 +550,7 @@ export default function ReservationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {(loading || isSearchingAlgolia) ? (
                 Array(5)
                   .fill(0)
                   .map((_, i) => (
@@ -546,222 +591,239 @@ export default function ReservationsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                displayedReservations.map((booking: Booking) => {
-                  const product = booking.product_id ? products[booking.product_id] : null
+                displayedReservations.map((item) => {
+                  const isSearchResult = 'objectID' in item
+                  const bookingId = isSearchResult ? (item as SearchResult).objectID : (item as Booking).id
+                  const reservationId = isSearchResult ? (item as any).reservation_id : (item as Booking).reservation_id
+                  const productName = isSearchResult ? (item as any).product_name : (item as Booking).product_name
+                  const clientName = isSearchResult ? (item as any).client_name : (item as Booking).client_name
+                  const clientCompanyName = isSearchResult ? (item as any).client_company_name : (item as Booking).client_company_name
+                  const client = isSearchResult ? (item as any).client : (item as Booking).client
+                  const startDate = isSearchResult ? (item as any).start_date : (item as Booking).start_date
+                  const endDate = isSearchResult ? (item as any).end_date : (item as Booking).end_date
+                  const status = isSearchResult ? (item as any).status : (item as Booking).status
+                  const quotationId = isSearchResult ? (item as any).quotation_id : (item as Booking).quotation_id
+                  const projectCompliance = isSearchResult ? null : (item as Booking).projectCompliance
+
+                  const product = !isSearchResult && (item as Booking).product_id ? products[(item as Booking).product_id!] : null
                   const siteCode = getSiteCode(product)
-                  const compliance = getProjectCompliance(booking)
-                  const isExpanded = expandedCompliance.has(booking.id)
+                  const compliance = projectCompliance ? getProjectCompliance(item as Booking) : null
+                  const isExpanded = expandedCompliance.has(bookingId)
 
                   return (
                     <TableRow
-                      key={booking.id}
+                      key={bookingId}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/sales/reservation/${booking.id}`)}
+                      onClick={() => router.push(`/sales/reservation/${bookingId}`)}
                     >
-                      <TableCell className="font-medium text-sm font-mono">{booking.reservation_id || "N/A"}</TableCell>
-                      <TableCell className="font-medium">{booking.product_name || "-"}</TableCell>
+                      <TableCell className="font-medium text-sm font-mono">{reservationId || "N/A"}</TableCell>
+                      <TableCell className="font-medium">{productName || siteCode || "-"}</TableCell>
                       <TableCell>
                         {(() => {
-                          const companyName = booking.client_company_name || booking.client?.company_name || "";
-                          const clientName = booking.client_name || booking.client?.name || "";
-                          if (companyName && clientName) {
-                            return `${companyName} - ${clientName}`;
+                          const companyName = clientCompanyName || client?.company_name || "";
+                          const clientNameValue = clientName || client?.name || "";
+                          if (companyName && clientNameValue) {
+                            return `${companyName} - ${clientNameValue}`;
                           } else if (companyName) {
                             return companyName;
-                          } else if (clientName) {
-                            return clientName;
+                          } else if (clientNameValue) {
+                            return clientNameValue;
                           } else {
                             return "N/A";
                           }
                         })()}
                       </TableCell>
-                      <TableCell>{formatDate(booking.start_date)}</TableCell>
-                      <TableCell>{formatDate(booking.end_date)}</TableCell>
-                      <TableCell>{calculateDuration(booking.start_date, booking.end_date)}</TableCell>
+                      <TableCell>{formatDate(startDate)}</TableCell>
+                      <TableCell>{formatDate(endDate)}</TableCell>
+                      <TableCell>{calculateDuration(startDate, endDate)}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={booking.status?.toLowerCase() === "confirmed" ? "default" : "secondary"}
+                          variant={status?.toLowerCase() === "confirmed" ? "default" : "secondary"}
                           className={
-                            booking.status?.toLowerCase() === "confirmed"
+                            status?.toLowerCase() === "confirmed"
                                 ? "bg-green-100 text-green-800 hover:bg-green-100"
                                 : "bg-blue-100 text-blue-800 hover:bg-blue-100"
                           }
                         >
-                          {booking.status?.toUpperCase() || "PENDING"}
+                          {status?.toUpperCase() || "PENDING"}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-3 text-sm text-gray-700">
-                        <div className="space-y-2">
-                          <div
-                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleComplianceExpansion(booking.id);
-                            }}
-                          >
-                            <span className="font-medium">
-                              {compliance.completed}/{compliance.total}
-                            </span>
-                            <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                            <div className="transition-transform duration-200 ease-in-out">
-                              {isExpanded ? (
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
-                              ) : (
-                                <ChevronRight className="w-3 h-3 text-gray-400" />
-                              )}
+                        {compliance ? (
+                          <div className="space-y-2">
+                            <div
+                              className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleComplianceExpansion(bookingId);
+                              }}
+                            >
+                              <span className="font-medium">
+                                {compliance.completed}/{compliance.total}
+                              </span>
+                              <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                              <div className="transition-transform duration-200 ease-in-out">
+                                {isExpanded ? (
+                                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3 text-gray-400" />
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          <div
-                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                            }`}
-                          >
-                            <div className="space-y-1 pt-1">
-                                <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
-                                {compliance.toReserve.map((item: any, index: number) => {
-                                  const uploadKey = `${booking.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
+                            <div
+                              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                              }`}
+                            >
+                              <div className="space-y-1 pt-1">
+                                  <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
+                                  {compliance.toReserve.map((complianceItem: any, index: number) => {
+                                    const uploadKey = `${bookingId}-${complianceItem.key}`
+                                    const isUploading = uploadingFiles.has(uploadKey)
 
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                        style={{
+                                          animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                          animationDuration: "200ms",
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {complianceItem.status === "completed" ? (
+                                            <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                              <CheckCircle className="w-3 h-3 text-white" />
+                                            </div>
+                                          ) : (
+                                            <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                          )}
+                                          <div className="flex flex-col">
+                                            <span className="text-gray-700">{complianceItem.name}</span>
+                                            {complianceItem.note && <span className="text-xs text-gray-500 italic">{complianceItem.note}</span>}
                                           </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <div className="flex flex-col">
-                                          <span className="text-gray-700">{item.name}</span>
-                                          {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          {complianceItem.file && complianceItem.fileUrl ? (
+                                            <a
+                                              href={complianceItem.fileUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <FileText className="w-3 h-3" />
+                                              {complianceItem.file}
+                                            </a>
+                                          ) : complianceItem.status === "upload" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-6 px-2 text-xs bg-transparent"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                triggerFileUpload(bookingId, complianceItem.key);
+                                              }}
+                                              disabled={isUploading}
+                                            >
+                                              {isUploading ? (
+                                                <>
+                                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                  Uploading...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Upload className="w-3 h-3 mr-1" />
+                                                  Upload
+                                                </>
+                                              )}
+                                            </Button>
+                                          ) : complianceItem.status === "confirmation" ? (
+                                            <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                              Pending
+                                            </span>
+                                          ) : null}
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              triggerFileUpload(booking.id, item.key);
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
+                                    )
+                                  })}
 
-                                <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
-                                {compliance.otherRequirements.map((item: any, index: number) => {
-                                  const uploadKey = `${booking.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
+                                  <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
+                                  {compliance.otherRequirements.map((complianceItem: any, index: number) => {
+                                    const uploadKey = `${bookingId}-${complianceItem.key}`
+                                    const isUploading = uploadingFiles.has(uploadKey)
 
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
-                                          </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <span className="text-gray-700">{item.name}</span>
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                        style={{
+                                          animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                          animationDuration: "200ms",
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {complianceItem.status === "completed" ? (
+                                            <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                              <CheckCircle className="w-3 h-3 text-white" />
+                                            </div>
+                                          ) : (
+                                            <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                          )}
+                                          <span className="text-gray-700">{complianceItem.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          {complianceItem.file && complianceItem.fileUrl ? (
+                                            <a
+                                              href={complianceItem.fileUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <FileText className="w-3 h-3" />
+                                              {complianceItem.file}
+                                            </a>
+                                          ) : complianceItem.status === "upload" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-6 px-2 text-xs bg-transparent"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                triggerFileUpload(bookingId, complianceItem.key)
+                                              }}
+                                              disabled={isUploading}
+                                            >
+                                              {isUploading ? (
+                                                <>
+                                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                  Uploading...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Upload className="w-3 h-3 mr-1" />
+                                                  Upload
+                                                </>
+                                              )}
+                                            </Button>
+                                          ) : complianceItem.status === "confirmation" ? (
+                                            <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                              Pending
+                                            </span>
+                                          ) : null}
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(booking.id, item.key)
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
+                                    )
+                                  })}
 
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          <span className="text-gray-400">N/A</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -774,7 +836,7 @@ export default function ReservationsPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/sales/job-orders/create?quotationId=${booking.quotation_id}`);
+                                router.push(`/sales/job-orders/create?quotationId=${quotationId}`);
                               }}
                             >
                               Create JO
@@ -791,52 +853,54 @@ export default function ReservationsPage() {
         </div>
 
         {/* Pagination Controls */}
-        <div className="flex justify-end mt-4">
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-            <div className="flex flex-1 justify-between sm:hidden">
-              <Button onClick={handlePreviousPage} disabled={currentPage === 1 || loading} variant="outline" size="sm">
-                Previous
-              </Button>
-              <Button onClick={handleNextPage} disabled={!hasMore || loading} variant="outline" size="sm">
-                Next
-              </Button>
-            </div>
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-                  <span className="font-medium">{(currentPage - 1) * itemsPerPage + bookings.length}</span> of{" "}
-                  <span className="font-medium">{totalReservationsCount}</span> results
-                </p>
+        {!isSearching && (
+          <div className="flex justify-end mt-4">
+            <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+              <div className="flex flex-1 justify-between sm:hidden">
+                <Button onClick={handlePreviousPage} disabled={currentPage === 1 || loading} variant="outline" size="sm">
+                  Previous
+                </Button>
+                <Button onClick={handleNextPage} disabled={!hasMore || loading} variant="outline" size="sm">
+                  Next
+                </Button>
               </div>
-              <div>
-                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                  <Button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1 || loading}
-                    variant="outline"
-                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                  >
-                    <span className="sr-only">Previous</span>
-                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                  </Button>
-                  <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
-                    {currentPage}
-                  </span>
-                  <Button
-                    onClick={handleNextPage}
-                    disabled={!hasMore || loading}
-                    variant="outline"
-                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                  >
-                    <span className="sr-only">Next</span>
-                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                  </Button>
-                </nav>
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                    <span className="font-medium">{(currentPage - 1) * itemsPerPage + bookings.length}</span> of{" "}
+                    <span className="font-medium">{totalReservationsCount}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                    <Button
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1 || loading}
+                      variant="outline"
+                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                    >
+                      <span className="sr-only">Previous</span>
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </Button>
+                    <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
+                      {currentPage}
+                    </span>
+                    <Button
+                      onClick={handleNextPage}
+                      disabled={!hasMore || loading}
+                      variant="outline"
+                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                    >
+                      <span className="sr-only">Next</span>
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                    </Button>
+                  </nav>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
     </div>

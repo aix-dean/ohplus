@@ -130,6 +130,7 @@ export class BookingService {
     return BookingService.instance
   }
 
+
   async getCompletedBookingsCount(companyId: string, filters?: FilterOptions): Promise<number> {
     try {
       const bookingsRef = collection(db, "booking")
@@ -411,3 +412,29 @@ export class BookingService {
 }
 
 export const bookingService = BookingService.getInstance()
+
+// Export getAllBookings as a standalone function for indexing
+ export async function getAllBookings(): Promise<Booking[]> {
+   try {
+     console.log("Fetching all bookings from Firestore...")
+     const bookingsRef = collection(db, "booking")
+     const q = query(bookingsRef, orderBy("created", "desc"))
+     console.log("Executing query for all bookings...")
+     const querySnapshot = await getDocs(q)
+     console.log(`Query executed, found ${querySnapshot.size} documents`)
+     const bookings: Booking[] = []
+
+     querySnapshot.forEach((doc) => {
+       bookings.push({
+         id: doc.id,
+         ...doc.data(),
+       } as Booking)
+     })
+
+     console.log(`Processed ${bookings.length} bookings`)
+     return bookings
+   } catch (error) {
+     console.error("Error fetching all bookings:", error)
+     throw error
+   }
+ }
