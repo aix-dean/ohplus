@@ -894,120 +894,131 @@ ${contactDetails}`,
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
-                    <Input
-                      value={emailData.to}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
-                      placeholder="Enter recipient email"
-                      className="w-full"
-                    />
-                  </div>
+           <div className="lg:col-span-3">
+             <Card>
+               <CardContent className="p-6">
+                 <div className="space-y-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
+                     <Input
+                       value={emailData.to}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
+                       placeholder="Enter recipient email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
-                    <Input
-                      value={emailData.cc}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
-                      placeholder="Enter CC email"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
+                     <Input
+                       value={emailData.cc}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
+                       placeholder="Enter CC email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
-                    <Input
-                      value={emailData.replyTo}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
-                      placeholder="Enter reply-to email"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
+                     <Input
+                       value={emailData.replyTo}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
+                       placeholder="Enter reply-to email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
-                    <Input
-                      value={emailData.subject}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
-                      placeholder="Enter email subject"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+                     <Input
+                       value={emailData.subject}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
+                       placeholder="Enter email subject"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <Textarea
-                      value={emailData.message}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
-                      placeholder="Enter your message"
-                      className="w-full min-h-[200px] resize-none"
-                    />
-                  </div>
+                   <div>
+                     <Textarea
+                       value={emailData.message}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
+                       placeholder="Enter your message"
+                       className="w-full min-h-[200px] resize-none"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
 
-                    {/* File size warning */}
-                    {totalAttachmentSize > 30 * 1024 * 1024 && (
-                      <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
-                            <h3 className="text-sm font-medium text-yellow-800">
-                              Large attachment size detected
-                            </h3>
-                            <div className="mt-1 text-sm text-yellow-700">
-                              <p>
-                                Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
-                                Email services have a 40MB limit. Consider removing or compressing files.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                     {/* File size warning */}
+                     {totalAttachmentSize > 30 * 1024 * 1024 && (
+                       <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                         <div className="flex items-center">
+                           <div className="flex-shrink-0">
+                             <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                             </svg>
+                           </div>
+                           <div className="ml-3">
+                             <h3 className="text-sm font-medium text-yellow-800">
+                               Large attachment size detected
+                             </h3>
+                             <div className="mt-1 text-sm text-yellow-700">
+                               <p>
+                                 Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
+                                 Email services have a 40MB limit. Consider removing or compressing files.
+                               </p>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     )}
 
-                    <div className="space-y-2">
-                      {attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <Paperclip className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-700">{attachment.name}</span>
-                            <span className="text-xs text-gray-500">({attachment.size})</span>
-                            {attachment.type === "user-upload" && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewAttachment(attachment)}
-                              title="View attachment"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                     <div className="space-y-2">
+                       {attachments.map((attachment, index) => (
+                         <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                           <div className="flex items-center space-x-2">
+                             <Paperclip className="h-4 w-4 text-gray-500" />
+                             <span className="text-sm text-gray-700">{attachment.name}</span>
+                             <span className="text-xs text-gray-500">({attachment.size})</span>
+                             {attachment.type === "user-upload" && (
+                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                             )}
+                           </div>
+                           <div className="flex items-center space-x-1">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => handleViewAttachment(attachment)}
+                               title="View attachment"
+                             >
+                               <Eye className="h-4 w-4" />
+                             </Button>
+                             <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
+                               <X className="h-4 w-4" />
+                             </Button>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
 
-          <div className="lg:col-span-1">
+                     <div className="mt-4">
+                       <Button
+                         onClick={handleAddAttachment}
+                         variant="outline"
+                         className="w-full bg-white hover:bg-gray-50 border-gray-200 hover:border-blue-300"
+                       >
+                         <Upload className="h-4 w-4 mr-2" />
+                         Add File
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+
+           <div className="lg:col-span-1">
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-gray-900 mb-4">Templates:</h3>
@@ -1061,29 +1072,14 @@ ${contactDetails}`,
         </div>
 
         <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleSendEmail}
-            disabled={sending}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-          >
-            {sending ? "Sending..." : "Send Email"}
-          </Button>
-        </div>
-
-        {/* Floating Attachment Button */}
-        <div className="fixed left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 z-50">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleAddAttachment}
-              variant="outline"
-              size="lg"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              <Upload className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Add File</span>
-          </div>
-        </div>
+           <Button
+             onClick={handleSendEmail}
+             disabled={sending}
+             className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+           >
+             {sending ? "Sending..." : "Send Email"}
+           </Button>
+         </div>
 
         <input
           ref={fileInputRef}
