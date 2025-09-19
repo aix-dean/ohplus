@@ -57,6 +57,46 @@ export function getImageDimensions(base64: string): Promise<{ width: number; hei
   })
 }
 
+// Helper function to compress image using canvas
+export async function compressImage(base64: string, quality: number = 0.8, maxWidth: number = 800, maxHeight: number = 600): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      if (!ctx) {
+        resolve(base64) // Fallback to original if canvas not available
+        return
+      }
+
+      // Calculate new dimensions maintaining aspect ratio
+      let { width, height } = img
+      const aspectRatio = width / height
+
+      if (width > maxWidth) {
+        width = maxWidth
+        height = width / aspectRatio
+      }
+      if (height > maxHeight) {
+        height = maxHeight
+        width = height * aspectRatio
+      }
+
+      canvas.width = width
+      canvas.height = height
+
+      // Draw and compress
+      ctx.drawImage(img, 0, 0, width, height)
+      const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+
+      resolve(compressedBase64)
+    }
+    img.onerror = () => resolve(base64) // Fallback to original on error
+    img.src = base64
+  })
+}
+
 // Helper function to generate QR code using online service
 export async function generateQRCode(text: string): Promise<string> {
   try {
@@ -89,12 +129,13 @@ async function logProposalPDFGenerated(proposalId: string, userId: string, userN
   return Promise.resolve()
 }
 
-// New helper function to calculate image dimensions for fitting
+// New helper function to calculate image dimensions for fitting with compression
 async function calculateImageFitDimensions(
   imageUrl: string,
   maxWidth: number,
   maxHeight: number,
-  quality: number = 0.8, // Add quality parameter for compression
+  quality: number = 0.7, // Default quality for PDF compression
+  isForEmail: boolean = false,
 ): Promise<{ base64: string | null; width: number; height: number }> {
   const base64 = await loadImageAsBase64(imageUrl)
   if (!base64) return { base64: null, width: 0, height: 0 }
@@ -113,19 +154,24 @@ async function calculateImageFitDimensions(
     width = height * aspectRatio
   }
 
-  // For email optimization, further reduce dimensions if they're still large
-  const MAX_EMAIL_DIMENSION = 300 // Max 300px for email attachments
-  if (width > MAX_EMAIL_DIMENSION || height > MAX_EMAIL_DIMENSION) {
-    if (width > height) {
-      width = MAX_EMAIL_DIMENSION
-      height = width / aspectRatio
-    } else {
-      height = MAX_EMAIL_DIMENSION
-      width = height * aspectRatio
+  // For email optimization, further reduce dimensions
+  if (isForEmail) {
+    const MAX_EMAIL_DIMENSION = 300 // Max 300px for email attachments
+    if (width > MAX_EMAIL_DIMENSION || height > MAX_EMAIL_DIMENSION) {
+      if (width > height) {
+        width = MAX_EMAIL_DIMENSION
+        height = width / aspectRatio
+      } else {
+        height = MAX_EMAIL_DIMENSION
+        width = height * aspectRatio
+      }
     }
   }
 
-  return { base64, width, height }
+  // Compress the image using canvas
+  const compressedBase64 = await compressImage(base64, quality, width, height)
+
+  return { base64: compressedBase64, width, height }
 }
 
 // Helper function to format currency without +/- signs
@@ -1393,10 +1439,17 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
       const pageNumber = pageIndex + 1
       const pageContent = getPageContent(pageNumber, selectedLayout)
 
-      // Background image if provided
+      // Background image if provided with compression
       if (selectedTemplateBackground) {
         try {
-          const bgBase64 = await loadImageAsBase64(selectedTemplateBackground)
+          const { base64: bgBase64 } = await calculateImageFitDimensions(
+            selectedTemplateBackground,
+            pageWidth,
+            pageHeight,
+            0.6, // Lower quality for backgrounds to save space
+            false
+          )
+
           if (bgBase64) {
             pdf.addImage(bgBase64, "JPEG", 0, 0, pageWidth, pageHeight)
           }
@@ -1409,30 +1462,25 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
       const logoSize = 20 // 20mm x 20mm logo
       const logoX = margin
       const logoY = yPosition
+// Load and add company logo with compression
+try {
+  const logoUrl = await resolveCompanyLogo()
+  if (logoUrl) {
+    const { base64: logoBase64, width: finalWidth, height: finalHeight } = await calculateImageFitDimensions(
+      logoUrl,
+      logoSize,
+      logoSize,
+      0.8, // High quality for logos
+      false
+    )
 
-      // Load and add company logo
-      try {
-        const logoUrl = await resolveCompanyLogo()
-        if (logoUrl) {
-          const logoBase64 = await loadImageAsBase64(logoUrl)
-          if (logoBase64) {
-            const { width: actualWidth, height: actualHeight } = await getImageDimensions(logoBase64)
-            const aspectRatio = actualWidth / actualHeight
-            let finalWidth = logoSize
-            let finalHeight = logoSize
-
-            if (aspectRatio > 1) {
-              finalHeight = finalWidth / aspectRatio
-            } else {
-              finalWidth = finalHeight * aspectRatio
-            }
-
-            pdf.addImage(logoBase64, "PNG", logoX, logoY, finalWidth, finalHeight)
-          }
-        }
-      } catch (error) {
-        console.error("Error loading company logo:", error)
-      }
+    if (logoBase64) {
+      pdf.addImage(logoBase64, "JPEG", logoX, logoY, finalWidth, finalHeight)
+    }
+  }
+} catch (error) {
+  console.error("Error loading company logo:", error)
+}
 
       // Title and Price on the right
       const titleX = pageWidth - margin
@@ -1489,9 +1537,20 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 
         if (product.media && product.media.length > 0) {
           try {
-            const imageBase64 = await loadImageAsBase64(product.media[0].url)
+            const { base64: imageBase64, width: finalImageWidth, height: finalImageHeight } = await calculateImageFitDimensions(
+              product.media[0].url,
+              imageSize,
+              imageSize,
+              0.7, // Balanced quality for product images
+              false
+            )
+
             if (imageBase64) {
-              pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
+              pdf.addImage(imageBase64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
+            } else {
+              // Draw placeholder
+              pdf.setFillColor(229, 231, 235) // gray-200
+              pdf.rect(imageX, imageY, imageSize, imageSize, "F")
             }
           } catch (error) {
             console.error("Error loading product image:", error)

@@ -776,7 +776,7 @@ export async function downloadProposalPDF(
         logging: false,
       })
 
-      const imgData = canvas.toDataURL('image/png')
+      const imgData = canvas.toDataURL('image/jpeg', 0.7)
 
       // Calculate dimensions to fit the page
       const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -848,7 +848,7 @@ export async function generateProposalPDFBlob(
       logging: false,
     })
 
-    const imgData = canvas.toDataURL('image/png')
+      const imgData = canvas.toDataURL('image/jpeg', 0.7)
 
     // Calculate dimensions to fit the page
     const pdfWidth = pdf.internal.pageSize.getWidth()
