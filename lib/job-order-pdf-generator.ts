@@ -487,7 +487,7 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, action: 'download'
     document.body.removeChild(container)
 
     // Create PDF from canvas
-    const imgData = canvas.toDataURL('image/png')
+    const imgData = canvas.toDataURL('image/jpeg', 0.7)
     const pdf = new jsPDF('p', 'mm', 'a4')
 
     const imgWidth = 210 // A4 width in mm
