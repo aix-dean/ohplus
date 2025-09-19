@@ -3,21 +3,18 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
-import { collection, query, where, getDocs, addDoc, GeoPoint } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { collection, getDocs, doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { createUserWithEmailAndPassword } from "firebase/auth"
+import { db, tenantAuth } from "@/lib/firebase"
+import { assignRoleToUser } from "@/lib/hardcoded-access-service"
 
 const createAnalyticsDocument = async () => {
   try {
@@ -57,143 +54,270 @@ const createAnalyticsDocument = async () => {
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
-  const [comingSoonFeature, setComingSoonFeature] = useState("")
-  const [orgCode, setOrgCode] = useState("")
-  const [isValidatingCode, setIsValidatingCode] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1: email+password, 2: new password, 3: file upload
 
-  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
+  const { user, userData, getRoleDashboardPath, refreshUserData } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
-  // useEffect(() => {
-  //   if (user) {
-  //     router.push("/admin/dashboard")
-  //   }
-  // }, [user, router])
+  useEffect(() => {
+    if (user && userData) {
+      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+      if (dashboardPath) {
+        router.push(dashboardPath)
+      }
+    }
+  }, [user, userData, router, getRoleDashboardPath])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Fetch point_person data from companies collection
+  const fetchPointPersonData = async (email: string) => {
+    try {
+      console.log("Fetching point_person data for email:", email)
+      const companiesRef = collection(db, "companies")
+      const companiesSnapshot = await getDocs(companiesRef)
+
+      // Find the company with matching point_person.email
+      for (const doc of companiesSnapshot.docs) {
+        const data = doc.data()
+        if (data.point_person && data.point_person.email === email) {
+          console.log("Found point_person data:", data.point_person)
+          return {
+            point_person: data.point_person,
+            company_id: doc.id,
+            company_data: data
+          }
+        }
+      }
+
+      console.log("No point_person data found for email:", email)
+      return null
+    } catch (error) {
+      console.error("Error fetching point_person data:", error)
+      return null
+    }
+  }
+
+  const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    try {
-      await loginOHPlusOnly(email, password)
-      // The redirect will be handled by the useEffect below after userData is loaded
-    } catch (error: any) {
-      console.error("Login error:", error)
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter both email and password.")
+      setIsLoading(false)
+      return
+    }
 
-      // Provide more user-friendly error messages
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many unsuccessful login attempts. Please try again later.")
-      } else if (error.code === "auth/tenant-id-mismatch") {
-        setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
-        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
-      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
-        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
+    try {
+      // Fetch point_person data to verify password
+      const pointPersonData = await fetchPointPersonData(email)
+
+      if (!pointPersonData) {
+        setError("This email address is not registered with any company. Please contact your administrator.")
+        setIsLoading(false)
+        return
+      }
+
+      const { point_person } = pointPersonData
+
+      // Check if entered password matches point_person.password
+      if (point_person.password !== password) {
+        setError("Invalid password. Please check your credentials.")
+        setIsLoading(false)
+        return
+      }
+
+      console.log("Password verified, proceeding to password change step")
+      setCurrentStep(2)
+
+    } catch (error) {
+      console.error("Login error:", error)
+      setError("An error occurred during login. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
+
+    if (!newPassword || !confirmPassword) {
+      setError("Please fill in all required fields.")
+      setIsLoading(false)
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.")
+      setIsLoading(false)
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long.")
+      setIsLoading(false)
+      return
+    }
+
+    console.log("Password change validated, proceeding to file upload step")
+    setCurrentStep(3)
+    setIsLoading(false)
+  }
+
+  const validateAndSetFile = (file: File) => {
+    // Check if it's a PDF or text file
+    const allowedTypes = ['application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (allowedTypes.includes(file.type) || file.name.toLowerCase().endsWith('.txt') || file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')) {
+      // File size validation (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File size must be less than 10MB.")
+        return
+      }
+      setUploadedFile(file)
+      setError("")
+    } else {
+      setError("Please upload a PDF or text document.")
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const file = files[0]
+      validateAndSetFile(file)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      validateAndSetFile(file)
+    }
+  }
+
+  const handleCompleteRegistration = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
+
+    if (!uploadedFile) {
+      setError("Please upload a file to complete registration.")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      // Fetch point_person data from companies collection
+      const pointPersonData = await fetchPointPersonData(email)
+
+      if (!pointPersonData) {
+        setError("Unable to find your information. Please contact your administrator.")
+        setIsLoading(false)
+        return
+      }
+
+      const { point_person, company_id } = pointPersonData
+
+      console.log("Creating user with point_person data:", point_person)
+
+      // Create user in Firebase Auth (tenant) with new password
+      const userCredential = await createUserWithEmailAndPassword(tenantAuth, email, newPassword)
+      const firebaseUser = userCredential.user
+
+      console.log("User created in tenant:", firebaseUser.uid)
+
+      // Create user document in iboard_users collection with type="OHPLUS"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+      const userData = {
+        email: firebaseUser.email,
+        uid: firebaseUser.uid,
+        first_name: point_person.first_name || "",
+        last_name: point_person.last_name || "",
+        middle_name: point_person.middle_name || "",
+        phone_number: point_person.phone_number || "",
+        gender: point_person.gender || "",
+        company_id: company_id,
+        type: "OHPLUS",
+        role: "sales",
+        permissions: [],
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        onboarding: true,
+      }
+
+      await setDoc(userDocRef, userData)
+      console.log("User document created in iboard_users collection with type OHPLUS")
+      console.log("User data from point_person:", userData)
+
+      // Assign role "sales" to user_roles collection
+      try {
+        await assignRoleToUser(firebaseUser.uid, "sales", firebaseUser.uid)
+        console.log("Role 'sales' assigned to user_roles collection")
+      } catch (roleError) {
+        console.error("Error assigning role 'sales' to user_roles collection:", roleError)
+      }
+
+      // Refresh user data to update the auth context
+      await refreshUserData()
+
+      console.log("Registration completed successfully with type OHPLUS")
+
+      // Registration successful - redirect will be handled by useEffect
+    } catch (error: any) {
+      console.error("Registration failed:", error)
+
+      // Handle specific Firebase Auth errors
+      if (error.code === "auth/email-already-in-use") {
+        setError("This email is already registered.")
+      } else if (error.code === "auth/weak-password") {
+        setError("Password is too weak. Please choose a stronger password.")
       } else {
-        setError(error.message || "Failed to login. Please check your credentials.")
+        setError(error.message || "Registration failed. Please try again.")
       }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleSocialLogin = (provider: string) => {
-    setComingSoonFeature(`${provider} login`)
-    setShowComingSoonDialog(true)
-  }
-
-  const validateInvitationCode = async (code: string) => {
-    try {
-      // Query invitation_codes collection by the 'code' field
-      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
-      const invitationSnapshot = await getDocs(invitationQuery)
-
-      if (invitationSnapshot.empty) {
-        throw new Error("Invalid invitation code.")
-      }
-
-      // Get the first matching document
-      const invitationDoc = invitationSnapshot.docs[0]
-      const invitationData = invitationDoc.data()
-
-      // Check if code has expired
-      if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
-        throw new Error("Invitation code has expired.")
-      }
-
-      // Check if code has reached maximum uses
-      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
-        throw new Error("Invitation code has reached its maximum number of uses.")
-      }
-
-      return true
-    } catch (error: any) {
-      throw error
-    }
-  }
-
-  const handleJoinOrganization = async () => {
-    if (!orgCode.trim()) {
-      setError("Please enter an organization code.")
-      return
-    }
-
-    setIsValidatingCode(true)
+  const handleBackToEmail = () => {
+    setCurrentStep(1)
     setError("")
-
-    try {
-      await validateInvitationCode(orgCode)
-      // If validation passes, navigate to registration page with organization code
-      router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
-    } catch (error: any) {
-      setError(error.message || "Failed to validate invitation code.")
-    } finally {
-      setIsValidatingCode(false)
-    }
+    setPassword("")
+    setNewPassword("")
+    setConfirmPassword("")
+    setUploadedFile(null)
+    setIsDragOver(false)
   }
 
-  // Role-based navigation after login
-  useEffect(() => {
-    console.log("Login navigation useEffect triggered")
-    console.log("user:", !!user)
-    console.log("userData:", userData)
-    console.log("isLoading:", isLoading)
-
-    if (user && userData && !isLoading) {
-      console.log("userData.roles:", userData.roles)
-
-      // Only use the roles array from user_roles collection
-      if (userData.roles && userData.roles.length > 0) {
-        console.log("Using roles from user_roles collection:", userData.roles)
-        const dashboardPath = getRoleDashboardPath(userData.roles)
-
-        if (dashboardPath) {
-          console.log("Navigating to:", dashboardPath)
-          router.push(dashboardPath)
-        } else {
-          console.log("No dashboard path found for roles, redirecting to unauthorized")
-          router.push("/unauthorized")
-        }
-      } else {
-        console.log("No roles found in user_roles collection, redirecting to unauthorized")
-        router.push("/unauthorized")
-      }
-    }
-  }, [user, userData, isLoading, router, getRoleDashboardPath])
-
-  // Analytics tracking on page load
-  useEffect(() => {
-    createAnalyticsDocument()
-  }, [])
+  const handleBackToPassword = () => {
+    setCurrentStep(2)
+    setError("")
+    setUploadedFile(null)
+    setIsDragOver(false)
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
@@ -232,183 +356,251 @@ export default function LoginPage() {
             <Card className="border-none shadow-none">
               <CardHeader className="text-center md:text-left">
                 <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
-                <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
+                <CardDescription className="text-gray-600 mt-2">
+                  {currentStep === 1 ? "Welcome back! Please enter your credentials to continue." :
+                   currentStep === 2 ? "Create a new password to complete registration." :
+                   "Upload your document to complete your account setup."}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4 mb-6">
-                  <Button
-                    variant="outline"
-                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    onClick={() => handleSocialLogin("Google")}
-                  >
-                    <Image
-                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
-                      alt="Google"
-                      width={20}
-                      height={20}
-                    />
-                    Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    onClick={() => handleSocialLogin("Facebook")}
-                  >
-                    <Image
-                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
-                      alt="Facebook"
-                      width={20}
-                      height={20}
-                    />
-                    Facebook
-                  </Button>
-                </div>
+                {currentStep === 1 ? (
+                  <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
 
-                <div className="relative flex items-center justify-center my-6">
-                  <Separator className="absolute w-full" />
-                  <span className="relative z-10 bg-white px-4 text-sm text-gray-500">or continue with email</span>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="sr-only">
-                      Email
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="sr-only">
+                        Email
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="sr-only">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="sr-only">
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Verifying..." : "Continue"}
+                    </Button>
+                  </form>
+                ) : currentStep === 2 ? (
+                  <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email-display" className="text-sm text-gray-600">
+                        Email: {email}
+                      </Label>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
+                        onClick={handleBackToEmail}
+                        className="text-blue-600 hover:underline p-0 h-auto"
                       >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        Change email
                       </Button>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="remember-me" />
-                      <Label htmlFor="remember-me" className="text-gray-700">
-                        Remember me
-                      </Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          id="newPassword"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Create new password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                          className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </Button>
+                      </div>
                     </div>
-                    <Link href="/forgot-password" className="text-blue-600 hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Logging in..." : "Log in"}
-                  </Button>
-                </form>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : "Continue to Upload"}
+                    </Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleCompleteRegistration} className="space-y-6">
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email-display" className="text-sm text-gray-600">
+                        Email: {email}
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBackToPassword}
+                        className="text-blue-600 hover:underline p-0 h-auto"
+                      >
+                        Change password
+                      </Button>
+                    </div>
+
+                    {/* File Upload */}
+                    <div
+                      className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
+                        isDragOver
+                          ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg shadow-blue-500/20'
+                          : 'border-gray-300 hover:border-blue-400 bg-gray-50/50'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <div className="space-y-6">
+                        <div className="relative">
+                          <div
+                            className={`w-16 h-16 mx-auto rounded-xl flex items-center justify-center transition-all duration-300 ${
+                              isDragOver
+                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30'
+                                : 'bg-gradient-to-br from-gray-100 to-gray-200'
+                            }`}
+                          >
+                            <svg
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              className={`w-8 h-8 ${isDragOver ? 'text-white' : 'text-gray-500'}`}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                          </div>
+                          {isDragOver && (
+                            <div className="absolute inset-0 w-16 h-16 mx-auto rounded-xl bg-blue-500/20 animate-pulse"></div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-2">
+                            {uploadedFile ? `✓ ${uploadedFile.name}` : "Upload your document"}
+                          </h3>
+                          <p className="text-gray-600 text-sm">
+                            {uploadedFile ? "Document uploaded successfully!" : "Drag and drop your file here or click to browse"}
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          id="file-upload"
+                          className="hidden"
+                          accept=".pdf,.txt,.doc,.docx,.csv"
+                          onChange={handleFileSelect}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                          onClick={() => document.getElementById('file-upload')?.click()}
+                        >
+                          Choose File
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-gray-600 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+                      <p className="font-semibold mb-3 text-blue-800">📋 Upload Instructions:</p>
+                      <ol className="list-decimal list-inside space-y-2 text-blue-700">
+                        <li>Drag your PDF or text document from your computer to the upload area above</li>
+                        <li>Or click "Choose File" to browse and select your document</li>
+                        <li>The system will validate your file and complete your account registration</li>
+                      </ol>
+                      <p className="text-xs text-blue-600 mt-3 italic">
+                        Supported formats: PDF, TXT, DOC, DOCX (max 10MB)
+                      </p>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
+                      disabled={isLoading || !uploadedFile}
+                    >
+                      {isLoading ? "Creating Account..." : "Complete Registration"}
+                    </Button>
+                  </form>
+                )}
               </CardContent>
-              <CardFooter className="flex flex-col gap-2 text-center">
-                <p className="text-sm text-gray-600">
-                  Don't have an account?{" "}
-                  <Link href="/register" className="text-blue-600 hover:underline">
-                    Create an account
-                  </Link>
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full mt-2 bg-transparent"
-                  onClick={() => setShowJoinOrgDialog(true)}
-                >
-                  Join an organization
-                </Button>
-                <div className="md:hidden flex flex-col items-center mt-4 pt-[30px]">
-                  <span className="text-sm text-gray-500 mb-2">by OH! Plus</span>
-                  <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={40} />
-                </div>
-              </CardFooter>
             </Card>
           </div>
         </div>
       </div>
-
-      {/* Join Organization Dialog */}
-      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code"
-                value={orgCode}
-                onChange={(e) => setOrgCode(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={isValidatingCode}>
-                {isValidatingCode ? "Validating..." : "Continue to Registration"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Coming Soon Dialog */}
-      <ComingSoonDialog
-        isOpen={showComingSoonDialog}
-        onClose={() => setShowComingSoonDialog(false)}
-        feature={comingSoonFeature}
-      />
     </div>
   )
 }
