@@ -245,7 +245,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create from address using company information
-    const from = `${actualCompanyName} <noreply@ohplus.ph>`
+    // Check for verified domain in environment variables first
+    const verifiedDomain = process.env.RESEND_VERIFIED_DOMAIN
+    let from: string
+
+    if (verifiedDomain) {
+      // Use verified domain if available
+      from = `${actualCompanyName} <noreply@${verifiedDomain}>`
+    } else {
+      // Fallback to default - this may not work if no domains are verified
+      from = `noreply@resend.dev`
+    }
 
     console.log("[v0] Email sending - Subject:", subject)
     console.log("[v0] Email sending - Body length:", body?.length)
@@ -268,21 +278,49 @@ export async function POST(request: NextRequest) {
     // Process file attachments
     const attachments = []
     let attachmentIndex = 0
+    let totalAttachmentSize = 0
 
     while (true) {
       const file = formData.get(`attachment_${attachmentIndex}`) as File
       if (!file) break
 
+      // Validate file
+      if (file.size === 0) {
+        console.error(`[v0] Empty attachment file: ${file.name}`)
+        return NextResponse.json({
+          error: `Attachment "${file.name}" appears to be empty. Please try regenerating the PDF.`
+        }, { status: 400 })
+      }
+
       // Convert file to buffer
       const bytes = await file.arrayBuffer()
       const buffer = Buffer.from(bytes)
+
+      // Additional validation
+      if (buffer.length === 0) {
+        console.error(`[v0] Failed to read attachment file: ${file.name}`)
+        return NextResponse.json({
+          error: `Failed to process attachment "${file.name}". Please try again.`
+        }, { status: 400 })
+      }
 
       attachments.push({
         filename: file.name,
         content: buffer,
       })
 
+      totalAttachmentSize += buffer.length
       attachmentIndex++
+    }
+
+    // Check total attachment size
+    // Note: Resend has a 40MB limit, but allowing higher limit for flexibility with other email services
+    const maxSize = 500 * 1024 * 1024 // 500MB limit (configurable)
+    if (totalAttachmentSize > maxSize) {
+      console.error(`[v0] Total attachment size exceeds limit: ${(totalAttachmentSize / (1024 * 1024)).toFixed(2)}MB`)
+      return NextResponse.json({
+        error: `Total attachment size (${(totalAttachmentSize / (1024 * 1024)).toFixed(2)}MB) exceeds the ${maxSize / (1024 * 1024)}MB limit. Please reduce file sizes or remove attachments.`
+      }, { status: 400 })
     }
 
     console.log("[v0] Email sending - Attachments count:", attachments.length)
@@ -308,15 +346,49 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[v0] Email sending - Sending to Resend API")
+    console.log("[v0] Email data:", {
+      from,
+      to: to.length,
+      cc: cc?.length || 0,
+      subject: subject.substring(0, 50) + "...",
+      hasAttachments: attachments.length > 0,
+      attachmentCount: attachments.length,
+      totalAttachmentSize: attachments.reduce((sum, att) => sum + att.content.length, 0)
+    })
+
     const { data, error } = await resend.emails.send(emailData)
 
     if (error) {
       console.error("[v0] Resend error:", error)
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error("[v0] Error details:", {
+        name: error.name,
+        message: error.message
+      })
+
+      // Provide more specific error messages
+      let errorMessage = error.message || "Failed to send email"
+      if (errorMessage.includes("domain")) {
+        errorMessage = "Email domain not verified. Please go to your Resend dashboard (resend.com), add and verify your domain (ohplus.ph), then set RESEND_VERIFIED_DOMAIN environment variable to your verified domain."
+      } else if (errorMessage.includes("attachment")) {
+        errorMessage = "Attachment issue. Please check file sizes and try again."
+      }
+
+      return NextResponse.json({
+        error: errorMessage,
+        details: error.message
+      }, { status: 400 })
     }
 
     console.log("[v0] Email sent successfully:", data?.id)
-    return NextResponse.json({ success: true, data })
+    console.log("[v0] Email delivery details:", {
+      id: data?.id
+    })
+
+    return NextResponse.json({
+      success: true,
+      data,
+      message: "Email sent successfully! If you don't receive it within a few minutes, please check your spam/junk folder. Note: Emails may take 1-5 minutes to deliver."
+    })
   } catch (error) {
     console.error("[v0] Send email error:", error)
     return NextResponse.json(

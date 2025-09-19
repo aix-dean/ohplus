@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus } from "lucide-react"
+import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
@@ -17,6 +17,49 @@ import { getProposalById } from "@/lib/proposal-service"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
 import { CompanyService } from "@/lib/company-service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
+
+// IndexedDB utility for retrieving PDF blobs
+const openPDFDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('ProposalPDFs', 1)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains('pdfs')) {
+        db.createObjectStore('pdfs')
+      }
+    }
+  })
+}
+
+const getPDFFromIndexedDB = async (key: string): Promise<{ blob: Blob; filename: string; timestamp: number } | null> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readonly')
+  const store = transaction.objectStore('pdfs')
+  return new Promise((resolve, reject) => {
+    const request = store.get(key)
+    request.onsuccess = () => {
+      resolve(request.result || null)
+    }
+    request.onerror = () => reject(request.error)
+  })
+}
+
+const deletePDFFromIndexedDB = async (key: string): Promise<void> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readwrite')
+  const store = transaction.objectStore('pdfs')
+  await new Promise<void>((resolve, reject) => {
+    const request = store.delete(key)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+}
 
 interface ComposeEmailPageProps {
   params: Promise<{
@@ -70,9 +113,17 @@ Sales Executive
   })
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [tempPdfLoaded, setTempPdfLoaded] = useState(false)
+  const [totalAttachmentSize, setTotalAttachmentSize] = useState(0)
 
   const [templates, setTemplates] = useState<ProposalEmailTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(true)
+
+  // Template settings for preview
+  const [selectedSize, setSelectedSize] = useState<string>("A4")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedLayout, setSelectedLayout] = useState<string>("1")
+  const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
 
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<ProposalEmailTemplate | null>(null)
@@ -228,6 +279,64 @@ ${contactDetails}`,
 
         setProposal(proposalData)
 
+        // Read URL parameters
+        const urlParams = new URLSearchParams(window.location.search)
+        const pdfKey = urlParams.get('pdfKey')
+
+        if (pdfKey && !tempPdfLoaded) {
+          // Use pre-generated PDF from IndexedDB
+          try {
+            const pdfData = await getPDFFromIndexedDB(pdfKey)
+            if (pdfData) {
+              const pdfFile = new File([pdfData.blob], pdfData.filename, {
+                type: "application/pdf",
+              })
+
+              const proposalPDFs: Attachment[] = [
+                {
+                  name: pdfData.filename,
+                  size: formatFileSize(pdfData.blob.size),
+                  type: "proposal",
+                  file: pdfFile,
+                },
+              ]
+
+              setAttachments(proposalPDFs)
+              setTempPdfLoaded(true)
+
+              // Clean up IndexedDB
+              await deletePDFFromIndexedDB(pdfKey)
+            } else {
+              console.warn('PDF not found in IndexedDB, no PDF attachment will be included')
+              setTempPdfLoaded(true)
+            }
+          } catch (error) {
+            console.error('Error retrieving PDF from IndexedDB:', error)
+            setTempPdfLoaded(true)
+          }
+        } else if (!pdfKey && !tempPdfLoaded) {
+          // No PDF available
+          console.warn('No PDF key provided, no PDF attachment will be included')
+          setTempPdfLoaded(true)
+        }
+
+        // Set proposal data
+        setProposal(proposalData)
+
+        // Initialize template settings from proposal
+        if (proposalData.templateSize) {
+          setSelectedSize(proposalData.templateSize)
+        }
+        if (proposalData.templateOrientation) {
+          setSelectedOrientation(proposalData.templateOrientation)
+        }
+        if (proposalData.templateLayout) {
+          setSelectedLayout(proposalData.templateLayout)
+        }
+        if (proposalData.templateBackground) {
+          setSelectedTemplateBackground(proposalData.templateBackground)
+        }
+
         // Determine company name - prioritize proposal's companyId, fallback to projectData
         let finalCompanyName = 'Your Company'
 
@@ -310,7 +419,6 @@ Best regards,
 ${contactDetails}`,
         }))
 
-        await generateProposalPDFs(proposalData, finalCompanyName)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
@@ -332,60 +440,14 @@ ${contactDetails}`,
     }
   }, [userData?.company_id])
 
-  const generateProposalPDFs = async (proposalData: Proposal, companyNameOverride?: string) => {
-    try {
-      const response = await fetch(`/api/proposals/generate-pdf`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ proposal: proposalData }),
-      })
+  // Calculate total attachment size
+  useEffect(() => {
+    const totalSize = attachments.reduce((sum, attachment) => {
+      return sum + (attachment.file?.size || 0)
+    }, 0)
+    setTotalAttachmentSize(totalSize)
+  }, [attachments])
 
-      if (response.ok) {
-        const pdfBlob = await response.blob()
-        const effectiveCompanyName = companyNameOverride || companyName || 'COMPANY'
-        const companyNameSlug = effectiveCompanyName.replace(/\s+/g, '_').toUpperCase()
-        const fileName = `${companyNameSlug}_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
-        const pdfFile = new File([pdfBlob], fileName, {
-          type: "application/pdf",
-        })
-
-        const proposalPDFs: Attachment[] = [
-          {
-            name: fileName,
-            size: formatFileSize(pdfBlob.size),
-            type: "proposal",
-            file: pdfFile,
-          },
-        ]
-
-        setAttachments(proposalPDFs)
-      } else {
-        throw new Error("Failed to generate PDF")
-      }
-    } catch (error) {
-      console.error("Error generating proposal PDFs:", error)
-      const effectiveCompanyName = companyNameOverride || companyName || 'COMPANY'
-      const companyNameSlug = effectiveCompanyName.replace(/\s+/g, '_').toUpperCase()
-      const fallbackFileName = `${companyNameSlug}_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
-      const fallbackPDFs: Attachment[] = [
-        {
-          name: fallbackFileName,
-          size: "2.3 MB",
-          type: "proposal",
-          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf`,
-        },
-      ]
-      setAttachments(fallbackPDFs)
-
-      toast({
-        title: "Warning",
-        description: "Could not generate proposal PDF. Using fallback attachment.",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleBack = () => {
     router.back()
@@ -471,22 +533,53 @@ ${contactDetails}`,
         }
       }
 
+      console.log("Sending email request to /api/send-email", {
+        to: toEmails,
+        cc: ccEmails,
+        subject: emailData.subject,
+        hasAttachments: attachments.length > 0,
+        attachmentCount: attachments.length,
+        companyId: userData?.company_id,
+        userId: user?.uid
+      })
+
       const response = await fetch("/api/send-email", {
         method: "POST",
         body: formData,
       })
 
+      console.log("Email API response received", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+
       // Check if response is ok before trying to parse JSON
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+        console.log("Email API returned error response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type')
+        })
+
         try {
           // Read the response body once
           const responseText = await response.text()
+          console.log("Email API error response content", {
+            responseText: responseText.substring(0, 500), // First 500 chars to avoid huge logs
+            isHtml: responseText.includes('<!DOCTYPE') || responseText.includes('<html'),
+            length: responseText.length
+          })
+
           // Try to parse as JSON first
           try {
             const errorData = JSON.parse(responseText)
+            console.log("Parsed error data from API", errorData)
             errorMessage = errorData.error || errorMessage
           } catch (jsonParseError) {
+            console.log("Failed to parse error response as JSON", jsonParseError)
             // If it's not JSON, check if it's HTML
             if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
               errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
@@ -495,6 +588,7 @@ ${contactDetails}`,
             }
           }
         } catch (readError) {
+          console.log("Failed to read error response body", readError)
           // If we can't read the response at all
           errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
         }
@@ -502,6 +596,7 @@ ${contactDetails}`,
       }
 
       const result = await response.json()
+      console.log("Email API success response", result)
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to send email")
@@ -693,6 +788,21 @@ ${contactDetails}`,
     })
   }
 
+  const handleViewAttachment = (attachment: Attachment) => {
+    if (attachment.file) {
+      const url = URL.createObjectURL(attachment.file)
+      window.open(url, '_blank')
+    } else if (attachment.url) {
+      window.open(attachment.url, '_blank')
+    } else {
+      toast({
+        title: "Cannot view attachment",
+        description: "No file data available for this attachment.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleAddAttachment = () => {
     fileInputRef.current?.click()
   }
@@ -701,11 +811,25 @@ ${contactDetails}`,
     const files = event.target.files
     if (!files) return
 
+    const maxTotalSize = 35 * 1024 * 1024 // 35MB to leave buffer before 40MB limit
+    let newFilesAdded = 0
+
     Array.from(files).forEach((file) => {
+      // Check individual file size
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check if adding this file would exceed total limit
+      if (totalAttachmentSize + file.size > maxTotalSize) {
+        toast({
+          title: "Total size limit approaching",
+          description: `Adding ${file.name} would exceed the recommended total size limit. Consider compressing files or removing attachments.`,
           variant: "destructive",
         })
         return
@@ -719,16 +843,19 @@ ${contactDetails}`,
       }
 
       setAttachments((prev) => [...prev, newAttachment])
+      newFilesAdded++
     })
 
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
 
-    toast({
-      title: "Files added",
-      description: `${files.length} file(s) have been added to your email.`,
-    })
+    if (newFilesAdded > 0) {
+      toast({
+        title: "Files added",
+        description: `${newFilesAdded} file(s) have been added to your email.`,
+      })
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -822,6 +949,31 @@ ${contactDetails}`,
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+
+                    {/* File size warning */}
+                    {totalAttachmentSize > 30 * 1024 * 1024 && (
+                      <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800">
+                              Large attachment size detected
+                            </h3>
+                            <div className="mt-1 text-sm text-yellow-700">
+                              <p>
+                                Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
+                                Email services have a 40MB limit. Consider removing or compressing files.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       {attachments.map((attachment, index) => (
                         <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
@@ -833,9 +985,19 @@ ${contactDetails}`,
                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
                             )}
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewAttachment(attachment)}
+                              title="View attachment"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

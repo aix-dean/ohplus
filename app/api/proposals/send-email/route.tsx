@@ -68,7 +68,13 @@ export async function POST(request: NextRequest) {
     let pdfBase64 = null
     try {
       console.log("Generating PDF for email attachment...")
-      pdfBase64 = await generateProposalPDF(proposal, true) // true for base64 return
+      // Use proposal template settings or defaults
+      const selectedSize = proposal.templateSize || "A4"
+      const selectedOrientation = proposal.templateOrientation || "Portrait"
+      const selectedLayout = proposal.templateLayout || "1"
+      const selectedTemplateBackground = proposal.templateBackground || ""
+
+      pdfBase64 = await generateProposalPDF(proposal, true, selectedSize, selectedOrientation, selectedLayout, selectedTemplateBackground) // true for base64 return
       console.log("PDF generated successfully for email attachment")
     } catch (pdfError) {
       console.error("Error generating PDF:", pdfError)

@@ -8,16 +8,78 @@ import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import type { Proposal } from "@/lib/types/proposal"
+import { generateProposalPDFBlob } from "@/lib/proposal-service"
+
+// IndexedDB utility for storing large PDF blobs
+const openPDFDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('ProposalPDFs', 1)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains('pdfs')) {
+        db.createObjectStore('pdfs')
+      }
+    }
+  })
+}
+
+const storePDFInIndexedDB = async (key: string, pdfData: { blob: Blob; filename: string; timestamp: number }): Promise<void> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readwrite')
+  const store = transaction.objectStore('pdfs')
+  await new Promise<void>((resolve, reject) => {
+    const request = store.put(pdfData, key)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+}
+
+const getPDFFromIndexedDB = async (key: string): Promise<{ blob: Blob; filename: string; timestamp: number } | null> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readonly')
+  const store = transaction.objectStore('pdfs')
+  return new Promise((resolve, reject) => {
+    const request = store.get(key)
+    request.onsuccess = () => {
+      resolve(request.result || null)
+    }
+    request.onerror = () => reject(request.error)
+  })
+}
+
+const deletePDFFromIndexedDB = async (key: string): Promise<void> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readwrite')
+  const store = transaction.objectStore('pdfs')
+  await new Promise<void>((resolve, reject) => {
+    const request = store.delete(key)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+}
 interface SendProposalShareDialogProps {
   isOpen: boolean
   onClose: () => void
   proposal: Proposal
+  templateSettings?: {
+    size: string
+    orientation: string
+    layout: string
+    background: string
+  }
 }
 
-export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendProposalShareDialogProps) {
+export function SendProposalShareDialog({ isOpen, onClose, proposal, templateSettings }: SendProposalShareDialogProps) {
   const { toast } = useToast()
   const router = useRouter()
   const [proposalUrl] = useState(`${window.location.origin}/proposals/view/${proposal.id}`)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(proposalUrl)
@@ -34,9 +96,42 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
     }
   }
 
-  const handleEmailShare = () => {
-    onClose()
-    router.push(`/sales/proposals/compose/${proposal.id}`)
+  const handleEmailShare = async () => {
+    setIsGeneratingPDF(true)
+
+    try {
+      // Generate PDF blob with current template settings (same as download)
+      const { blob, filename } = await generateProposalPDFBlob(
+        proposal,
+        templateSettings?.size || 'A4',
+        templateSettings?.orientation || 'Portrait'
+      )
+
+      // Store PDF blob in IndexedDB with unique key
+      const storageKey = `proposal_pdf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const pdfData = {
+        blob,
+        filename,
+        timestamp: Date.now()
+      }
+
+      await storePDFInIndexedDB(storageKey, pdfData)
+
+      // Close dialog and navigate with localStorage key
+      onClose()
+      const composeUrl = `/sales/proposals/compose/${proposal.id}?pdfKey=${storageKey}`
+      router.push(composeUrl)
+
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsGeneratingPDF(false)
+    }
   }
 
   const handleWhatsAppShare = () => {
@@ -116,12 +211,19 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal }: SendPropo
           <div className="grid grid-cols-4 gap-4">
             <button
               onClick={handleEmailShare}
-              className="flex flex-col items-center space-y-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isGeneratingPDF}
+              className="flex flex-col items-center space-y-2 p-3 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="w-12 h-12  rounded-full flex items-center justify-center">
-                <Image src="/icons/email.png" alt="Email" width={74} height={74} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                {isGeneratingPDF ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600"></div>
+                ) : (
+                  <Image src="/icons/email.png" alt="Email" width={74} height={74} />
+                )}
               </div>
-              <span className="text-xs font-medium text-gray-700">Email</span>
+              <span className="text-xs font-medium text-gray-700">
+                {isGeneratingPDF ? 'Generating...' : 'Email'}
+              </span>
             </button>
 
             <button

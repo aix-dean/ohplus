@@ -362,7 +362,10 @@ function ProposalsPageContent() {
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(proposal.createdAt, "MMM d, yyyy")}
+                          {(() => {
+                            console.log("Proposal createdAt:", proposal.createdAt, "Type:", typeof proposal.createdAt, "Is Date:", proposal.createdAt instanceof Date, "Is valid Date:", proposal.createdAt instanceof Date && !isNaN(proposal.createdAt.getTime()))
+                            return format(proposal.createdAt, "MMM d, yyyy")
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>

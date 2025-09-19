@@ -471,6 +471,18 @@ export default function ProposalDetailsPage() {
       setSelectedLayout(previewLayout)
       setSelectedTemplateBackground(previewTemplateBackground)
 
+      // Update URL with new template settings
+      const url = new URL(window.location.href)
+      url.searchParams.set('size', previewSize)
+      url.searchParams.set('orientation', previewOrientation)
+      url.searchParams.set('layout', previewLayout)
+      if (previewTemplateBackground) {
+        url.searchParams.set('background', previewTemplateBackground)
+      } else {
+        url.searchParams.delete('background')
+      }
+      window.history.replaceState({}, '', url.toString())
+
       setShowTemplatesPanel(false)
 
       toast({
@@ -1665,6 +1677,12 @@ export default function ProposalDetailsPage() {
         isOpen={isSendOptionsDialogOpen}
         onClose={() => setIsSendOptionsDialogOpen(false)}
         proposal={proposal}
+        templateSettings={{
+          size: selectedSize,
+          orientation: selectedOrientation,
+          layout: selectedLayout,
+          background: selectedTemplateBackground
+        }}
       />
     </div>
   )
