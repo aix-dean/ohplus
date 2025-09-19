@@ -64,11 +64,18 @@ export async function POST(request: NextRequest) {
 
     const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
 
-    // Generate PDF as base64 for attachment
+    // Generate PDF as base64 for attachment with optimized compression for email
     let pdfBase64 = null
     try {
       console.log("Generating PDF for email attachment...")
-      pdfBase64 = await generateProposalPDF(proposal, true) // true for base64 return
+      // Use proposal template settings or defaults
+      const selectedSize = proposal.templateSize || "A4"
+      const selectedOrientation = proposal.templateOrientation || "Portrait"
+      const selectedLayout = proposal.templateLayout || "1"
+      const selectedTemplateBackground = proposal.templateBackground || ""
+
+      // Generate PDF with email-optimized compression
+      pdfBase64 = await generateProposalPDF(proposal, true, selectedSize, selectedOrientation, selectedLayout, selectedTemplateBackground) // true for base64 return
       console.log("PDF generated successfully for email attachment")
     } catch (pdfError) {
       console.error("Error generating PDF:", pdfError)
