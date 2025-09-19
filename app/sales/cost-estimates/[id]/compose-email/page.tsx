@@ -193,7 +193,7 @@ export default function ComposeEmailPage() {
 
 I hope you're doing well!
 
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
+Please find attached the quotation for your upcoming billboard campaign. The cost estimate includes the site location, duration, and pricing details based on our recent discussion.
 
 If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
 

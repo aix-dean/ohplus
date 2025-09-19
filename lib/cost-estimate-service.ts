@@ -56,11 +56,15 @@ async function indexCostEstimate(costEstimate: CostEstimate) {
       id: costEstimate.id,
       title: costEstimate.title,
       client_company: costEstimate.client?.company || '',
-      client_contact: costEstimate.client?.name || '',
+      client_contact: costEstimate.client?.contactPerson || '',
+      client_email: costEstimate.client?.email || '',
+      client_phone: costEstimate.client?.phone || '',
       status: costEstimate.status,
       totalAmount: costEstimate.totalAmount,
       createdAt: costEstimate.createdAt?.toISOString() || '',
       company_id: costEstimate.company_id,
+      lineItems: costEstimate.lineItems || [],
+      lineItemsCount: costEstimate.lineItems?.length || 0,
     }
 
     await costEstimatesIndex.saveObject(algoliaObject)
