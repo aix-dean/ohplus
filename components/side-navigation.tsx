@@ -596,8 +596,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/it", icon: LayoutDashboard },
-                  { title: "System Status", href: "/it/system-status", icon: Monitor },
-                  { title: "Support Overview", href: "/it/support-overview", icon: AlertTriangle },
+                  { title: "Planner", href: "/it/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -627,9 +626,10 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
-                  { title: "Assets", href: "/it/inventory", icon: Package },
                   { title: "User Management", href: "/it/user-management", icon: Users },
+                  { title: "Migration", href: "/it/migration", icon: Truck },
+                  { title: "To-do-list", href: "/it/todo-list", icon: ClipboardList },
+                  { title: "Assets", href: "/it/inventory", icon: Package },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
