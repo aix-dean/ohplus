@@ -671,285 +671,231 @@ export default function LoginPage() {
       </div>
     </div>
   ) : (
-    <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      <div className="flex flex-col w-full max-w-4xl bg-white rounded-lg md:shadow-lg overflow-hidden">
-        {/* Mobile Header - Only visible on mobile */}
-        <div className="md:hidden w-full p-6">
-          <div className="flex flex-col items-center text-center">
-            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
-            <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
-              Powering Smarter Site Management
-              <br />
-              for Billboard Operator
-            </h2>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Mobile Header - Only visible on mobile */}
+      <div className="md:hidden w-full p-6 bg-white border-b border-gray-200">
+        <div className="flex flex-col items-center text-center">
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 mb-4">
+            <div className="text-gray-900 font-bold text-xl">OH+</div>
           </div>
+          <h2 className="text-xl font-light text-gray-700 leading-tight">
+            Powering smarter site management
+            <br />
+            for billboard operators.
+          </h2>
         </div>
+      </div>
 
-        <div className="flex">
-          {/* Left Section: Logo and Company Name */}
-          <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
-            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={120} height={120} priority />
-            <h2 className="text-3xl font-light text-blue-700 leading-tight text-center">
-              Powering Smarter
-              <br />
-              Site Management for
-              <br />
-              Billboard Operators
-            </h2>
-            <div className="flex flex-col items-center">
-              <span className="text-sm text-gray-500 mb-2">by OH! Plus</span>
-              <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={40} />
-            </div>
+
+
+      {/* Left side - Login Form */}
+      <div className="flex-1 flex items-center justify-center bg-white p-8 order-1 md:order-1">
+        <div className="w-full max-w-md space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold text-gray-900">Welcome!</h1>
           </div>
 
-          {/* Right Section: Login Form */}
-          <div className="w-full md:w-1/2 p-8">
-            <Card className="border-none shadow-none">
-              <CardHeader className="text-center md:text-left">
-                <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
-                <CardDescription className="text-gray-600 mt-2">
-                  {currentStep === 1 ? "Welcome back! Please enter your credentials to continue." :
-                   currentStep === 2 ? "Create a new password to complete registration." :
-                   "Upload your document to complete your account setup."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {currentStep === 1 ? (
-                  <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
+          <div className="space-y-4">
+            {currentStep === 1 ? (
+              <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="sr-only">
-                        Email
-                      </Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="Email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-sm text-gray-600">
+                    Username
+                  </Label>
+                  <Input id="username" type="text" placeholder="Username" className="h-12 border-gray-200 rounded-lg" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="sr-only">
-                        Password
-                      </Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </Button>
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm text-gray-600">
+                    Password
+                  </Label>
+                  <Input id="password" type="password" placeholder="Password" className="h-12 border-gray-200 rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Verifying..." : "Continue"}
-                    </Button>
-                  </form>
-                ) : currentStep === 2 ? (
-                  <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
+                <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg" type="submit" disabled={isLoading}>
+                  {isLoading ? "Verifying..." : "Login"}
+                </Button>
+              </form>
+            ) : currentStep === 2 ? (
+              <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email-display" className="text-sm text-gray-600">
-                        Email: {email}
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleBackToEmail}
-                        className="text-blue-600 hover:underline p-0 h-auto"
+                <div className="space-y-2">
+                  <Label htmlFor="email-display" className="text-sm text-gray-600">
+                    Username: {email}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToEmail}
+                    className="text-blue-600 hover:underline p-0 h-auto"
+                  >
+                    Change username
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Create new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    className="h-12 border-gray-200 rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="h-12 border-gray-200 rounded-lg"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : "Continue to Upload"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleCompleteRegistration} className="space-y-6">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email-display" className="text-sm text-gray-600">
+                    Username: {email}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToPassword}
+                    className="text-blue-600 hover:underline p-0 h-auto"
+                  >
+                    Change password
+                  </Button>
+                </div>
+
+                {/* File Upload */}
+                <div
+                  className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
+                    isDragOver
+                      ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg shadow-blue-500/20'
+                      : 'border-gray-300 hover:border-blue-400 bg-gray-50/50'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <div className="space-y-6">
+                    <div className="relative">
+                      <div
+                        className={`w-16 h-16 mx-auto rounded-xl flex items-center justify-center transition-all duration-300 ${
+                          isDragOver
+                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30'
+                            : 'bg-gradient-to-br from-gray-100 to-gray-200'
+                        }`}
                       >
-                        Change email
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="newPassword"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Create new password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          required
-                          className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
+                        <svg
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          className={`w-8 h-8 ${isDragOver ? 'text-white' : 'text-gray-500'}`}
                         >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </Button>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
                       </div>
+                      {isDragOver && (
+                        <div className="absolute inset-0 w-16 h-16 mx-auto rounded-xl bg-blue-500/20 animate-pulse"></div>
+                      )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="Confirm new password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        className="py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Processing..." : "Continue to Upload"}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleCompleteRegistration} className="space-y-6">
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email-display" className="text-sm text-gray-600">
-                        Email: {email}
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleBackToPassword}
-                        className="text-blue-600 hover:underline p-0 h-auto"
-                      >
-                        Change password
-                      </Button>
-                    </div>
-
-                    {/* File Upload */}
-                    <div
-                      className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
-                        isDragOver
-                          ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg shadow-blue-500/20'
-                          : 'border-gray-300 hover:border-blue-400 bg-gray-50/50'
-                      }`}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                    >
-                      <div className="space-y-6">
-                        <div className="relative">
-                          <div
-                            className={`w-16 h-16 mx-auto rounded-xl flex items-center justify-center transition-all duration-300 ${
-                              isDragOver
-                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30'
-                                : 'bg-gradient-to-br from-gray-100 to-gray-200'
-                            }`}
-                          >
-                            <svg
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              className={`w-8 h-8 ${isDragOver ? 'text-white' : 'text-gray-500'}`}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                          </div>
-                          {isDragOver && (
-                            <div className="absolute inset-0 w-16 h-16 mx-auto rounded-xl bg-blue-500/20 animate-pulse"></div>
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {uploadedFile ? `✓ ${uploadedFile.name}` : "Upload your document"}
-                          </h3>
-                          <p className="text-gray-600 text-sm">
-                            {uploadedFile ? "Document uploaded successfully!" : "Drag and drop your file here or click to browse"}
-                          </p>
-                        </div>
-                        <input
-                          type="file"
-                          id="file-upload"
-                          className="hidden"
-                          accept=".pdf,.txt,.doc,.docx,.csv"
-                          onChange={handleFileSelect}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                          onClick={() => document.getElementById('file-upload')?.click()}
-                        >
-                          Choose File
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-gray-600 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
-                      <p className="font-semibold mb-3 text-blue-800">📋 Upload Instructions:</p>
-                      <ol className="list-decimal list-inside space-y-2 text-blue-700">
-                        <li>Drag your PDF or text document from your computer to the upload area above</li>
-                        <li>Or click "Choose File" to browse and select your document</li>
-                        <li>The system will validate your file and complete your account registration</li>
-                      </ol>
-                      <p className="text-xs text-blue-600 mt-3 italic">
-                        Supported formats: PDF, TXT, DOC, DOCX (max 10MB)
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">
+                        {uploadedFile ? `✓ ${uploadedFile.name}` : "Upload your document"}
+                      </h3>
+                      <p className="text-gray-600 text-sm">
+                        {uploadedFile ? "Document uploaded successfully!" : "Drag and drop your file here or click to browse"}
                       </p>
                     </div>
-
+                    <input
+                      type="file"
+                      id="file-upload"
+                      className="hidden"
+                      accept=".pdf,.txt,.doc,.docx,.csv"
+                      onChange={handleFileSelect}
+                    />
                     <Button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                      disabled={isLoading || !uploadedFile}
+                      type="button"
+                      variant="outline"
+                      className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                      onClick={() => document.getElementById('file-upload')?.click()}
                     >
-                      {isLoading ? "Creating Account..." : "Complete Registration"}
+                      Choose File
                     </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+                  <p className="font-semibold mb-3 text-blue-800">📋 Upload Instructions:</p>
+                  <ol className="list-decimal list-inside space-y-2 text-blue-700">
+                    <li>Drag your PDF or text document from your computer to the upload area above</li>
+                    <li>Or click "Choose File" to browse and select your document</li>
+                    <li>The system will validate your file and complete your account registration</li>
+                  </ol>
+                  <p className="text-xs text-blue-600 mt-3 italic">
+                    Supported formats: PDF, TXT, DOC, DOCX (max 10MB)
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
+                  disabled={isLoading || !uploadedFile}
+                >
+                  {isLoading ? "Creating Account..." : "Complete Registration"}
+                </Button>
+              </form>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Right side - Illustration */}
+      <div className="hidden md:flex flex-1 relative order-2 md:order-2">
+        <div className="w-full h-full rounded-[50px] p-4">
+          <Image
+            src="/login-image-1.png"
+            alt="Login illustration"
+            fill
+            className="rounded-[46px] p-8"
+            priority
+          />
         </div>
       </div>
     </div>
