@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Settings, Mail, Shield } from 'lucide-react'
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { ResponsiveTable } from "@/components/responsive-table"
 import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
+import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,7 @@ interface User {
   status: string
   lastLogin: Date | null
   created: Date
+  department?: string
 }
 
 export default function ITUserManagementPage() {
@@ -56,10 +59,38 @@ export default function ITUserManagementPage() {
     sales: false,
     logistics: false,
     cms: false,
+    it: false,
+    business: false,
+    treasury: false,
+    accounting: false,
+    finance: false,
   })
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const [usersByDepartment, setUsersByDepartment] = useState<Record<string, User[]>>({})
+  const [isUserAddedSuccessDialogOpen, setIsUserAddedSuccessDialogOpen] = useState(false)
+  const [addedUserData, setAddedUserData] = useState<{ email: string; name: string; role: string } | null>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
+
+  // Debounce search term
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300) // 300ms delay
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm])
 
   useEffect(() => {
     if (!userData?.company_id) {
@@ -92,6 +123,80 @@ export default function ITUserManagementPage() {
     return () => unsubscribe()
   }, [userData?.company_id])
 
+  // Filter users based on debounced search term
+  const filteredUsers = users.filter(
+    (user) =>
+      user.displayName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
+  )
+
+  // Role to department mapping
+  const roleToDepartment: Record<string, string> = {
+    admin: "Administrator",
+    sales: "Sales Team",
+    logistics: "Logistics Team",
+    cms: "Content Management",
+    it: "IT Team",
+    business: "Business Development",
+    treasury: "Treasury",
+    accounting: "Accounting",
+    finance: "Finance",
+  }
+
+  // Department color mapping for divider lines
+  const departmentColors: Record<string, string> = {
+    "Administrator": "bg-violet-500",
+    "Sales Team": "bg-red-500",
+    "Logistics Team": "bg-blue-500",
+    "Content Management": "bg-yellow-500",
+    "IT Team": "bg-teal-500",
+    "Business Development": "bg-purple-500",
+    "Treasury": "bg-green-500",
+    "Accounting": "bg-blue-600",
+    "Finance": "bg-emerald-500",
+  }
+
+  // Group users by department (simple implementation)
+  const groupUsersByRoles = async (usersToGroup: User[]) => {
+    if (usersToGroup.length === 0) {
+      setUsersByDepartment({})
+      return
+    }
+
+    const grouped: Record<string, User[]> = {}
+
+    // Initialize departments
+    Object.values(roleToDepartment).forEach((department) => {
+      grouped[department] = []
+    })
+
+    // Group users by their roles
+    for (const user of usersToGroup) {
+      try {
+        const userRoles = await getUserRoles(user.id)
+        userRoles.forEach((roleId) => {
+          const departmentName = roleToDepartment[roleId]
+          if (departmentName && !grouped[departmentName].find((u) => u.id === user.id)) {
+            grouped[departmentName].push(user)
+          }
+        })
+      } catch (error) {
+        console.error(`Error getting roles for user ${user.id}:`, error)
+      }
+    }
+
+    setUsersByDepartment(grouped)
+  }
+
+  // Group users by roles when filtered users change
+  useEffect(() => {
+    if (filteredUsers.length > 0) {
+      groupUsersByRoles(filteredUsers)
+    } else {
+      setUsersByDepartment({})
+    }
+  }, [filteredUsers])
+
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
       setIsCompanyRegistrationDialogOpen(true)
@@ -122,6 +227,11 @@ export default function ITUserManagementPage() {
       sales: "bg-green-100 text-green-800 hover:bg-green-100",
       logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
       cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
+      it: "bg-teal-100 text-teal-800 hover:bg-teal-100",
+      business: "bg-indigo-100 text-indigo-800 hover:bg-indigo-100",
+      treasury: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+      accounting: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100",
+      finance: "bg-lime-100 text-lime-800 hover:bg-lime-100",
     }
 
     return <Badge className={colorClasses[roleId]}>{role.name}</Badge>
@@ -142,6 +252,11 @@ export default function ITUserManagementPage() {
           sales: userRoles.includes("sales"),
           logistics: userRoles.includes("logistics"),
           cms: userRoles.includes("cms"),
+          it: userRoles.includes("it"),
+          business: userRoles.includes("business"),
+          treasury: userRoles.includes("treasury"),
+          accounting: userRoles.includes("accounting"),
+          finance: userRoles.includes("finance"),
         }
 
         setSelectedRoles(initialSelectedRoles)
@@ -210,52 +325,6 @@ export default function ITUserManagementPage() {
       setIsAddUserDialogOpen(true)
     })
   }
-
-  const columns = [
-    {
-      key: "user",
-      label: "User",
-      render: (user: User) => (
-        <div>
-          <div className="font-medium">{user.displayName}</div>
-          <div className="text-sm text-muted-foreground">{user.email}</div>
-        </div>
-      ),
-    },
-    {
-      key: "roles",
-      label: "Roles",
-      render: (user: User) => <UserRolesBadges userId={user.id} />,
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (user: User) => getStatusBadge(user.status),
-    },
-    {
-      key: "lastLogin",
-      label: "Last Login",
-      render: (user: User) => (
-        <span className="text-sm">{user.lastLogin ? user.lastLogin.toLocaleDateString() : "Never"}</span>
-      ),
-    },
-    {
-      key: "created",
-      label: "Joined",
-      render: (user: User) => <span className="text-sm">{user.created.toLocaleDateString()}</span>,
-    },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (user: User) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ]
 
   // Component to display user roles
   function UserRolesBadges({ userId }: { userId: string }) {
@@ -339,11 +408,88 @@ export default function ITUserManagementPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent>
-          <ResponsiveTable data={users} columns={columns} keyField="id" />
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search users..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading && users.length === 0 ? (
+        <div className="flex justify-center p-8">
+          <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+          <span className="ml-2">Loading users...</span>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Object.keys(usersByDepartment).length === 0 ? (
+            <div className="col-span-full text-center py-6">
+              No users found
+            </div>
+          ) : (
+            Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
+              <Card key={department} className="h-fit">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {department}
+                    <Badge variant="secondary" className="ml-auto">
+                      {departmentUsers.length}
+                    </Badge>
+                  </CardTitle>
+                  <div className={`h-1 w-full ${departmentColors[department] || 'bg-gray-300'} mt-2`}></div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {departmentUsers.slice(0, 5).map((user) => (
+                    <div key={user.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h4 className="font-medium">{user.displayName}</h4>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {departmentUsers.length > 5 && (
+                    <div className="text-center text-sm text-muted-foreground py-2">
+                      +{departmentUsers.length - 5} more users
+                    </div>
+                  )}
+                  <div className="pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+                    >
+                      View More Details
+                    </Button>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(`/it/department/${department}`)}
+                    >
+                      View More Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
 
       <CompanyRegistrationDialog
         isOpen={isCompanyRegistrationDialogOpen}
@@ -357,8 +503,9 @@ export default function ITUserManagementPage() {
       <AddUserDialog
         open={isAddUserDialogOpen}
         onOpenChange={setIsAddUserDialogOpen}
-        onSuccess={() => {
-          console.log("User invitation sent successfully")
+        onSuccess={(userData) => {
+          setAddedUserData(userData)
+          setIsUserAddedSuccessDialogOpen(true)
         }}
       />
 
@@ -418,6 +565,20 @@ export default function ITUserManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {addedUserData && isUserAddedSuccessDialogOpen && (
+        <UserAddedSuccessDialog
+          isOpen={isUserAddedSuccessDialogOpen}
+          onClose={(_?: any) => setIsUserAddedSuccessDialogOpen(false)}
+          onAddAnother={() => {
+            setIsUserAddedSuccessDialogOpen(false)
+            setIsAddUserDialogOpen(true)
+          }}
+          userEmail={addedUserData.email}
+          userName={addedUserData.name}
+          userRole={addedUserData.role}
+        />
+      )}
     </div>
   )
 }
