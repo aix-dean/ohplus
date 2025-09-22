@@ -183,6 +183,10 @@ export function SideNavigation() {
     // Ensure sales section is active for cost estimates page
     currentSection = "sales"
   }
+  if (pathname?.startsWith("/sales/reports")) {
+    // Ensure sales section is active for reports page
+    currentSection = "sales"
+  }
   if (pathname?.startsWith("/business")) {
     currentSection = "business"
   }
@@ -1216,6 +1220,7 @@ export function SideNavigation() {
                   { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
+                  { title: "Reports", href: "/sales/reports", icon: BarChart3 },
                   { title: "Billings", href: "/sales/billings", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },

@@ -13,12 +13,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
-export default function AdminReportsPage() {
+export default function SalesReportsPage() {
   const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
-  const [activeTab, setActiveTab] = useState("From Admin")
+  const [activeTab, setActiveTab] = useState("From Sales")
   const [showDrafts, setShowDrafts] = useState(false)
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
@@ -144,11 +144,11 @@ export default function AdminReportsPage() {
   }
 
   const handleViewReport = (reportId: string) => {
-    router.push(`/admin/reports/${reportId}`)
+    router.push(`/sales/reports/${reportId}`)
   }
 
   const handleEditReport = (reportId: string) => {
-    router.push(`/admin/reports/${reportId}/edit`)
+    router.push(`/sales/reports/${reportId}/edit`)
   }
 
   const handleDeleteReport = (reportId: string) => {
@@ -167,7 +167,7 @@ export default function AdminReportsPage() {
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Admin Reports</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Sales Reports</h1>
         </div>
       </div>
 
@@ -311,7 +311,7 @@ export default function AdminReportsPage() {
       {/* Create New Report Button */}
       <div className="fixed bottom-6 right-6">
         <Button
-          onClick={() => router.push("/admin/assets")}
+          onClick={() => router.push("/sales/dashboard")}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
         >
           <Plus className="h-5 w-5" />
