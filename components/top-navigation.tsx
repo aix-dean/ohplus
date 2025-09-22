@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { DepartmentDropdown } from "@/components/department-dropdown"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -177,7 +178,7 @@ export function TopNavigation() {
   }}
 ></div>
 
-      <div className="top-nav-container text-white relative z-10 overflow-hidden">
+      <div className="top-nav-container text-white relative z-10">
         <div className="top-nav-content flex items-center justify-between w-full px-4 md:px-8">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
@@ -188,8 +189,12 @@ export function TopNavigation() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-semibold text-white">
-                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")}
+              <DepartmentDropdown />
+              <h1 className="text-xl font-semibold text-white ml-4">
+                {(() => {
+                  let title = pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")
+                  return title.includes(" - ") ? title.split(" - ").slice(1).join(" - ") : title
+                })()}
               </h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>

@@ -183,3 +183,11 @@ export function AdminNotifications() {
     notificationsPath: "/admin/notifications"
   }} />
 }
+
+export function ITNotifications() {
+  return <Notifications config={{
+    department: "IT",
+    colorScheme: "purple",
+    notificationsPath: "/it/notifications"
+  }} />
+}

@@ -393,14 +393,6 @@ export default function ITUserManagementPage() {
             <Shield className="h-4 w-4" />
             Roles & Access
           </Button>
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/invitation-codes"))}
-          >
-            <Mail className="h-4 w-4" />
-            Generate Codes
-          </Button>
           <Button className="gap-2" onClick={handleAddUser}>
             <UserPlus className="h-4 w-4" />
             Add User
@@ -470,16 +462,6 @@ export default function ITUserManagementPage() {
                       size="sm"
                       className="w-full"
                       onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
-                    >
-                      View More Details
-                    </Button>
-                  </div>
-                  <div className="pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => router.push(`/it/department/${department}`)}
                     >
                       View More Details
                     </Button>

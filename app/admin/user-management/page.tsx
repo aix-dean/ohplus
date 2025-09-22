@@ -478,16 +478,6 @@ export default function UserManagementPage() {
                       View More Details
                     </Button>
                   </div>
-                  <div className="pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => router.push(`/admin/department/${department}`)}
-                    >
-                      View More Details
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             ))
