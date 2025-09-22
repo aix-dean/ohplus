@@ -33,7 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth-context"
-import { savePettyCashConfig, getPettyCashConfig, createPettyCashCycle, getNextCycleNo, getActivePettyCashCycle, completePettyCashCycle, getPettyCashCycles, getPettyCashExpenses, savePettyCashExpense, getLatestPettyCashCycle, updatePettyCashCycleTotal, uploadFileToFirebase, type PettyCashCycle } from "@/lib/petty-cash-service"
+import { savePettyCashConfig, getPettyCashConfig, createPettyCashCycle, getNextCycleNo, getActivePettyCashCycle, completePettyCashCycle, getPettyCashCycles, getPettyCashExpenses, savePettyCashExpense, getLatestPettyCashCycle, updatePettyCashCycleTotal, updatePettyCashCycleConfigId, uploadFileToFirebase, type PettyCashCycle } from "@/lib/petty-cash-service"
 import { db } from "@/lib/firebase"
 import { onSnapshot, collection, query, where, orderBy, limit } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -304,6 +304,20 @@ export default function PettyCashPage() {
         data.warnAmount
       )
       console.log("Configuration saved with ID:", configId)
+
+      // Update the latest cycle's config_id if a cycle exists
+      try {
+        const latestCycle = await getLatestPettyCashCycle(userData.company_id)
+        if (latestCycle) {
+          await updatePettyCashCycleConfigId(latestCycle.id!, configId)
+          console.log("Updated latest cycle config_id to:", configId)
+        } else {
+          console.log("No latest cycle found, skipping config_id update")
+        }
+      } catch (cycleUpdateError) {
+        console.error("Error updating cycle config_id:", cycleUpdateError)
+        // Don't fail the whole operation if cycle update fails
+      }
 
       // Update local state
       setConfigData(data)

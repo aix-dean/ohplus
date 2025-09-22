@@ -351,6 +351,28 @@ export async function updatePettyCashCycleTotal(
 }
 
 /**
+ * Update petty cash cycle config_id
+ */
+export async function updatePettyCashCycleConfigId(
+  cycleId: string,
+  configId: string
+): Promise<void> {
+  try {
+    const cycleRef = doc(db, "petty_cash_cycles", cycleId)
+
+    await updateDoc(cycleRef, {
+      config_id: configId,
+      updated: serverTimestamp(),
+    })
+
+    console.log("Petty cash cycle config_id updated:", cycleId, "to", configId)
+  } catch (error) {
+    console.error("Error updating petty cash cycle config_id:", error)
+    throw error
+  }
+}
+
+/**
  * Complete a petty cash cycle
  */
 export async function completePettyCashCycle(cycleId: string): Promise<void> {
