@@ -413,65 +413,79 @@ export default function ITUserManagementPage() {
         </div>
       </div>
 
-      {loading && users.length === 0 ? (
-        <div className="flex justify-center p-8">
-          <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-2">Loading users...</span>
-        </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Object.keys(usersByDepartment).length === 0 ? (
-            <div className="col-span-full text-center py-6">
-              No users found
-            </div>
-          ) : (
-            Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
-              <Card key={department} className="h-fit">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    {department}
-                    <Badge variant="secondary" className="ml-auto">
-                      {departmentUsers.length}
-                    </Badge>
-                  </CardTitle>
-                  <div className={`h-1 w-full ${departmentColors[department] || 'bg-gray-300'} mt-2`}></div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {departmentUsers.slice(0, 5).map((user) => (
-                    <div key={user.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h4 className="font-medium">{user.displayName}</h4>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                        </div>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
-                          <Settings className="h-4 w-4" />
-                        </Button>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {loading || Object.keys(usersByDepartment).length === 0 ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={`skeleton-${i}`} className="h-fit">
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-1 w-full mt-2" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <div key={`user-skeleton-${j}`} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-32" />
                       </div>
+                      <Skeleton className="h-8 w-8 rounded" />
                     </div>
-                  ))}
-                  {departmentUsers.length > 5 && (
-                    <div className="text-center text-sm text-muted-foreground py-2">
-                      +{departmentUsers.length - 5} more users
-                    </div>
-                  )}
-                  <div className="pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
-                    >
-                      View More Details
-                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
+                ))}
+                <div className="pt-4 border-t">
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
+            <Card key={department} className="h-fit">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  {department}
+                  <Badge variant="secondary" className="ml-auto">
+                    {departmentUsers.length}
+                  </Badge>
+                </CardTitle>
+                <div className={`h-1 w-full ${departmentColors[department] || 'bg-gray-300'} mt-2`}></div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {departmentUsers.slice(0, 5).map((user) => (
+                  <div key={user.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">{user.displayName}</h4>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {departmentUsers.length > 5 && (
+                  <div className="text-center text-sm text-muted-foreground py-2">
+                    +{departmentUsers.length - 5} more users
+                  </div>
+                )}
+                <div className="pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+                  >
+                    View More Details
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       <CompanyRegistrationDialog
         isOpen={isCompanyRegistrationDialogOpen}

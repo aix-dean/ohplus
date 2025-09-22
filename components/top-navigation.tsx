@@ -47,6 +47,7 @@ export function TopNavigation() {
     const segments = path.split("/").filter(Boolean)
     if (segments.length === 0) return "Dashboard"
 
+    if (path === "/it") return "Dashboard"
     if (path === "/sales/dashboard") return "Sales - Dashboard"
     if (path === "/logistics/dashboard") return "Logistics - Dashboard"
     if (path === "/cms/dashboard") return "CMS - Dashboard"

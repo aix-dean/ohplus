@@ -1,23 +1,126 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, User } from "lucide-react"
 import { RouteProtection } from "@/components/route-protection"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
+
+interface User {
+  id: string
+  email: string
+  displayName: string
+  role: string
+  status: string
+  lastLogin: Date | null
+  created: Date
+}
 
 export default function ITPage() {
+  const { userData } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [departmentCounts, setDepartmentCounts] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [departmentLoading, setDepartmentLoading] = useState(true)
+
+  // Role to department mapping
+  const roleToDepartment: Record<string, string> = {
+    admin: "Admin",
+    sales: "Sales",
+    logistics: "Logistics",
+    cms: "Content Management",
+    it: "Soft Admin (I.T.)",
+    business: "Business Dev.",
+    treasury: "Treasury",
+    accounting: "Accounting",
+    finance: "Finance",
+  }
+
+  useEffect(() => {
+    if (!userData?.company_id) {
+      setLoading(false)
+      return
+    }
+
+    const q = query(collection(db, "iboard_users"), where("company_id", "==", userData.company_id))
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          email: data.email || "",
+          displayName:
+            data.first_name && data.last_name
+              ? `${data.first_name} ${data.last_name}`
+              : data.display_name || data.displayName || "Unknown User",
+          role: String(data.role || "user"),
+          status: data.active === false ? "inactive" : "active",
+          lastLogin: data.lastLogin?.toDate() || null,
+          created: data.created?.toDate() || new Date(),
+        }
+      })
+      setUsers(usersData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [userData?.company_id])
+
+  // Calculate department counts
+  useEffect(() => {
+    const calculateDepartmentCounts = async () => {
+      setDepartmentLoading(true)
+      if (users.length === 0) {
+        setDepartmentCounts({})
+        setDepartmentLoading(false)
+        return
+      }
+
+      const counts: Record<string, number> = {}
+      // Initialize departments
+      Object.values(roleToDepartment).forEach((dept) => {
+        counts[dept] = 0
+      })
+
+      // Count users per department
+      for (const user of users) {
+        try {
+          const userRoles = await getUserRoles(user.id)
+          userRoles.forEach((roleId) => {
+            const dept = roleToDepartment[roleId]
+            if (dept) counts[dept]++
+          })
+        } catch (error) {
+          console.error(`Error getting roles for user ${user.id}:`, error)
+        }
+      }
+
+      setDepartmentCounts(counts)
+      setDepartmentLoading(false)
+    }
+
+    calculateDepartmentCounts()
+  }, [users])
+
   return (
     <RouteProtection requiredRoles="it">
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">IT Dashboard</h1>
+        <h2 className="text-xl font-bold text-gray-900 mb-6">{userData?.first_name || 'User'}'s Dashboard</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Schedule Card */}
           <Card className="border-2 border-orange-200 bg-orange-50">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Today 12, Sep</CardTitle>
+              <CardTitle className="text-base font-semibold">Today 12, Sep</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
@@ -61,52 +164,47 @@ export default function ITPage() {
           {/* Total Users Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Total Users</CardTitle>
+              <CardTitle className="text-base font-semibold">Total Users</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Sales</span>
-                    <span className="text-sm font-medium">4</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Logistics</span>
-                    <span className="text-sm font-medium">2</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Treasury</span>
-                    <span className="text-sm font-medium">1</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Business Dev.</span>
-                    <span className="text-sm font-medium">1</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Admin</span>
-                    <span className="text-sm font-medium">1</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Soft Admin (I.T.)</span>
-                    <span className="text-sm font-medium">1</span>
-                  </div>
+                  {departmentLoading ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="flex justify-between items-center">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-6" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    Object.entries(departmentCounts).map(([dept, count]) => (
+                      <div key={dept} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 mr-2">{dept}</span>
+                        <span className="text-sm font-medium">{count}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
                 <div className="text-center">
-                  <div className="text-6xl font-bold text-gray-900 mb-2">9</div>
+                  <div className="text-6xl font-bold text-gray-900 mb-2">{loading ? "..." : users.length}</div>
                   <div className="text-sm text-gray-600">Total users</div>
                 </div>
               </div>
-              <Button variant="outline" className="w-full bg-transparent">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Teammates
-              </Button>
+              <Link href="/it/user-management">
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Teammates
+                </Button>
+              </Link>
             </CardContent>
           </Card>
 
           {/* User Activity Card */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-semibold">User Activity</CardTitle>
+              <CardTitle className="text-base font-semibold">User Activity</CardTitle>
               <Select defaultValue="last7days">
                 <SelectTrigger className="w-32">
                   <SelectValue />
@@ -187,10 +285,10 @@ export default function ITPage() {
           {/* Devices Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Devices</CardTitle>
+              <CardTitle className="text-base font-semibold">Devices</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <div className="space-y-2">
                   <div className="text-sm text-gray-600">Total LED Screens</div>
                   <div className="text-2xl font-bold">4</div>
@@ -248,7 +346,7 @@ export default function ITPage() {
           {/* Integration Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Integration</CardTitle>
+              <CardTitle className="text-base font-semibold">Integration</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center py-8">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
