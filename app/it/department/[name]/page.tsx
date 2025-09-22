@@ -45,7 +45,7 @@ interface User {
   department?: string
 }
 
-export default function DepartmentDetailsPage() {
+export default function ITDepartmentDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const { userData, refreshUserData } = useAuth()

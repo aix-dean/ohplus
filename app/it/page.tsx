@@ -1,183 +1,363 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Server,
-  Shield,
-  Database,
-  Wifi,
-  HardDrive,
-  Monitor,
-  Smartphone,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-} from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Plus, User } from "lucide-react"
+import { RouteProtection } from "@/components/route-protection"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
+
+interface User {
+  id: string
+  email: string
+  displayName: string
+  role: string
+  status: string
+  lastLogin: Date | null
+  created: Date
+}
 
 export default function ITPage() {
+  const { userData } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [departmentCounts, setDepartmentCounts] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [departmentLoading, setDepartmentLoading] = useState(true)
+
+  // Role to department mapping
+  const roleToDepartment: Record<string, string> = {
+    admin: "Admin",
+    sales: "Sales",
+    logistics: "Logistics",
+    cms: "Content Management",
+    it: "Soft Admin (I.T.)",
+    business: "Business Dev.",
+    treasury: "Treasury",
+    accounting: "Accounting",
+    finance: "Finance",
+  }
+
+  useEffect(() => {
+    if (!userData?.company_id) {
+      setLoading(false)
+      return
+    }
+
+    const q = query(collection(db, "iboard_users"), where("company_id", "==", userData.company_id))
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          email: data.email || "",
+          displayName:
+            data.first_name && data.last_name
+              ? `${data.first_name} ${data.last_name}`
+              : data.display_name || data.displayName || "Unknown User",
+          role: String(data.role || "user"),
+          status: data.active === false ? "inactive" : "active",
+          lastLogin: data.lastLogin?.toDate() || null,
+          created: data.created?.toDate() || new Date(),
+        }
+      })
+      setUsers(usersData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [userData?.company_id])
+
+  // Calculate department counts
+  useEffect(() => {
+    const calculateDepartmentCounts = async () => {
+      setDepartmentLoading(true)
+      if (users.length === 0) {
+        setDepartmentCounts({})
+        setDepartmentLoading(false)
+        return
+      }
+
+      const counts: Record<string, number> = {}
+      // Initialize departments
+      Object.values(roleToDepartment).forEach((dept) => {
+        counts[dept] = 0
+      })
+
+      // Count users per department
+      for (const user of users) {
+        try {
+          const userRoles = await getUserRoles(user.id)
+          userRoles.forEach((roleId) => {
+            const dept = roleToDepartment[roleId]
+            if (dept) counts[dept]++
+          })
+        } catch (error) {
+          console.error(`Error getting roles for user ${user.id}:`, error)
+        }
+      }
+
+      setDepartmentCounts(counts)
+      setDepartmentLoading(false)
+    }
+
+    calculateDepartmentCounts()
+  }, [users])
+
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">IT Department</h2>
+    <RouteProtection requiredRoles="it">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8 pt-6">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">{userData?.first_name || 'User'}'s Dashboard</h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Schedule Card */}
+          <Card className="border-2 border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Today 12, Sep</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-green-500 rounded"></div>
+                  <span className="text-sm font-medium">RR0932-</span>
+                  <span className="text-sm text-gray-600">Start Date</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                  <span className="text-sm font-medium">SA0512-</span>
+                  <span className="text-sm text-gray-600">Deadline</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-pink-400 rounded"></div>
+                  <span className="text-sm font-medium">NAN305-</span>
+                  <span className="text-sm text-gray-600">Yearly Maintenan..</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-yellow-400 rounded"></div>
+                  <span className="text-sm text-gray-600">Attend Supplier's Expo @.....</span>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <h3 className="font-semibold text-gray-900 mb-2">13, Sep</h3>
+                <p className="text-sm text-gray-500 text-center py-4">No events for this day.</p>
+              </div>
+
+              <div className="pt-4">
+                <h3 className="font-semibold text-gray-900 mb-2">14, Sep</h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-pink-400 rounded"></div>
+                  <span className="text-sm font-medium">NAN305-</span>
+                  <span className="text-sm text-gray-600">Yearly Maintenan..</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Users Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Total Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <div className="space-y-2">
+                  {departmentLoading ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="flex justify-between items-center">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-6" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    Object.entries(departmentCounts).map(([dept, count]) => (
+                      <div key={dept} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 mr-2">{dept}</span>
+                        <span className="text-sm font-medium">{count}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="text-center">
+                  <div className="text-6xl font-bold text-gray-900 mb-2">{loading ? "..." : users.length}</div>
+                  <div className="text-sm text-gray-600">Total users</div>
+                </div>
+              </div>
+              <Link href="/it/user-management">
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Teammates
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* User Activity Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold">User Activity</CardTitle>
+              <Select defaultValue="last7days">
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last7days">last 7 days</SelectItem>
+                  <SelectItem value="last30days">last 30 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Sales</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "100%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Logistics</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "100%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Treasury</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "70%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Business Dev.</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "40%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Admin</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "80%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Soft Admin (I.T.)</span>
+                    <div className="flex-1 mx-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "60%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 mt-4">
+                  <span>Hours</span>
+                  <div className="flex gap-8">
+                    <span>0</span>
+                    <span>10</span>
+                    <span>20</span>
+                    <span>30</span>
+                    <span>40</span>
+                    <span>50</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Devices Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Devices</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-600">Total LED Screens</div>
+                  <div className="text-2xl font-bold">4</div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Online</span>
+                      <span className="font-medium">3</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Offline</span>
+                      <span className="font-medium">1</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative w-24 h-24">
+                  <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="transparent"
+                      className="text-gray-200"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray={`${75 * 2.51} ${25 * 2.51}`}
+                      className="text-green-500"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-gray-900">75%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-600">Online</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                  <span className="text-gray-600">Offline</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Integration Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Integration</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                <User className="w-8 h-8 text-orange-600" />
+              </div>
+              <p className="text-gray-600 text-center">Coming soon.</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* System Status Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Server Status</CardTitle>
-            <Server className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-2xl font-bold">Online</span>
-            </div>
-            <p className="text-xs text-muted-foreground">All systems operational</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Network</CardTitle>
-            <Wifi className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-2xl font-bold">Stable</span>
-            </div>
-            <p className="text-xs text-muted-foreground">99.9% uptime</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span className="text-2xl font-bold">Alert</span>
-            </div>
-            <p className="text-xs text-muted-foreground">2 pending updates</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Storage</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-2xl font-bold">78%</span>
-            </div>
-            <p className="text-xs text-muted-foreground">Used capacity</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Tickets */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Support Tickets</CardTitle>
-            <CardDescription>Latest IT support requests</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Monitor className="h-8 w-8 text-blue-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">Display not working - Sales Dept</p>
-                <p className="text-xs text-muted-foreground">Reported 2 hours ago</p>
-              </div>
-              <Badge variant="destructive">High</Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Wifi className="h-8 w-8 text-green-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">WiFi connectivity issues</p>
-                <p className="text-xs text-muted-foreground">Reported 4 hours ago</p>
-              </div>
-              <Badge variant="secondary">Medium</Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Smartphone className="h-8 w-8 text-yellow-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">Mobile app login issues</p>
-                <p className="text-xs text-muted-foreground">Reported 6 hours ago</p>
-              </div>
-              <Badge variant="outline">Low</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Maintenance</CardTitle>
-            <CardDescription>Scheduled maintenance tasks</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Clock className="h-8 w-8 text-blue-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">Database backup</p>
-                <p className="text-xs text-muted-foreground">Scheduled for tonight 2:00 AM</p>
-              </div>
-              <Badge>Scheduled</Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Server className="h-8 w-8 text-green-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">Server updates</p>
-                <p className="text-xs text-muted-foreground">This weekend</p>
-              </div>
-              <Badge variant="secondary">Planned</Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Shield className="h-8 w-8 text-red-500" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium">Security patches</p>
-                <p className="text-xs text-muted-foreground">Next week</p>
-              </div>
-              <Badge variant="destructive">Critical</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common IT management tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="justify-start bg-transparent">
-              <Server className="mr-2 h-4 w-4" />
-              Server Management
-            </Button>
-            <Button variant="outline" className="justify-start bg-transparent">
-              <Database className="mr-2 h-4 w-4" />
-              Database Admin
-            </Button>
-            <Button variant="outline" className="justify-start bg-transparent">
-              <Shield className="mr-2 h-4 w-4" />
-              Security Center
-            </Button>
-            <Button variant="outline" className="justify-start bg-transparent">
-              <Monitor className="mr-2 h-4 w-4" />
-              Device Management
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
+    </RouteProtection>
   )
 }
