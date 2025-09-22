@@ -33,7 +33,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth-context"
-import { savePettyCashConfig, getPettyCashConfig, createPettyCashCycle, getNextCycleNo, getActivePettyCashCycle, completePettyCashCycle, getPettyCashCycles, getPettyCashExpenses, savePettyCashExpense, getLatestPettyCashCycle, updatePettyCashCycleTotal, uploadFileToFirebase } from "@/lib/petty-cash-service"
+import { savePettyCashConfig, getPettyCashConfig, createPettyCashCycle, getNextCycleNo, getActivePettyCashCycle, completePettyCashCycle, getPettyCashCycles, getPettyCashExpenses, savePettyCashExpense, getLatestPettyCashCycle, updatePettyCashCycleTotal, uploadFileToFirebase, type PettyCashCycle } from "@/lib/petty-cash-service"
+import { db } from "@/lib/firebase"
+import { onSnapshot, collection, query, where, orderBy, limit } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { useResponsive } from "@/hooks/use-responsive"
 import { News_Cycle } from "next/font/google"
@@ -47,10 +49,11 @@ export default function PettyCashPage() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [isConfigLoading, setIsConfigLoading] = useState(false)
-  const [configData, setConfigData] = useState({ pettyCashAmount: 10000, warnAmount: 2000 })
-  const [onHandAmount, setOnHandAmount] = useState(10000000) // Default fallback
+  const [configData, setConfigData] = useState({ pettyCashAmount: 0, warnAmount: 0 })
+  const [onHandAmount, setOnHandAmount] = useState(0) // Default fallback
   const [expenseCycles, setExpenseCycles] = useState<ExpenseCycle[]>([])
   const [isExpensesLoading, setIsExpensesLoading] = useState(false)
+  const [currentCycle, setCurrentCycle] = useState<PettyCashCycle | null>(null)
 
   // Debug: Log onHandAmount changes
   useEffect(() => {
@@ -94,6 +97,46 @@ export default function PettyCashPage() {
     loadConfiguration()
   }, [userData?.company_id])
 
+  // Load latest petty cash cycle on component mount with real-time updates
+  useEffect(() => {
+    console.log("Setting up real-time listener for latest cycle - userData:", userData)
+    console.log("Company ID:", userData?.company_id)
+
+    if (!userData?.company_id) {
+      console.log("No company_id found, skipping cycle listener")
+      return
+    }
+
+    const cyclesRef = collection(db, "petty_cash_cycles")
+    const q = query(
+      cyclesRef,
+      where("company_id", "==", userData.company_id),
+      orderBy("cycle_no", "desc"),
+      limit(1)
+    )
+
+    console.log("Setting up onSnapshot for latest petty cash cycle")
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log("onSnapshot triggered for latest cycle, docs:", querySnapshot.size)
+      querySnapshot.docChanges().forEach((change) => {
+        console.log("Change type:", change.type, "doc id:", change.doc.id, "data:", change.doc.data())
+      })
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const cycle = { id: doc.id, ...doc.data() } as PettyCashCycle
+        console.log("Latest cycle updated to:", cycle.cycle_no, "id:", cycle.id)
+        setCurrentCycle(cycle)
+      } else {
+        console.log("No cycles found, setting currentCycle to null")
+        setCurrentCycle(null)
+      }
+    }, (error) => {
+      console.error("Error in onSnapshot for latest cycle:", error)
+      setCurrentCycle(null)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id])
 
   const toggleCycle = (cycleId: string) => {
     setExpandedCycles((prev) => (prev.includes(cycleId) ? prev.filter((id) => id !== cycleId) : [...prev, cycleId]))
@@ -323,12 +366,13 @@ export default function PettyCashPage() {
       const nextCycleNo = await getNextCycleNo(userData.company_id)
 
       // Create new cycle
-      await createPettyCashCycle(
+      const newCycleId = await createPettyCashCycle(
         userData.company_id,
         userData.uid,
         config.id!,
         nextCycleNo,
       )
+      console.log("New cycle created with ID:", newCycleId, "cycle_no:", nextCycleNo)
 
       // Update on-hand amount
       setOnHandAmount(config.amount)
@@ -362,22 +406,30 @@ export default function PettyCashPage() {
     })
   }
 
-  // Load expense cycles on component mount
+  // Load expense cycles on component mount with real-time updates
   useEffect(() => {
-    const loadExpenseCycles = async () => {
-      console.log("Loading expense cycles - userData:", userData)
-      console.log("Company ID:", userData?.company_id)
+    console.log("Setting up real-time listener for expense cycles - userData:", userData)
+    console.log("Company ID:", userData?.company_id)
 
-      if (!userData?.company_id) {
-        console.log("No company_id found, skipping cycles load")
-        return
-      }
+    if (!userData?.company_id) {
+      console.log("No company_id found, skipping cycles listener")
+      return
+    }
 
-      setIsExpensesLoading(true)
+    setIsExpensesLoading(true)
 
+    const cyclesRef = collection(db, "petty_cash_cycles")
+    const q = query(
+      cyclesRef,
+      where("company_id", "==", userData.company_id),
+      orderBy("cycle_no", "desc")
+    )
+
+    console.log("Setting up onSnapshot for petty cash cycles")
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      console.log("onSnapshot triggered for cycles, docs:", querySnapshot.size)
       try {
-        console.log("Fetching petty cash cycles for company:", userData.company_id)
-        const cycles = await getPettyCashCycles(userData.company_id)
+        const cycles: PettyCashCycle[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PettyCashCycle))
         console.log("Fetched cycles:", cycles)
 
         // Transform cycles and fetch expenses for each
@@ -403,16 +455,19 @@ export default function PettyCashPage() {
 
         console.log("Transformed cycles:", transformedCycles)
         setExpenseCycles(transformedCycles)
-
+        setIsExpensesLoading(false)
       } catch (error) {
-        console.error("Error loading expense cycles:", error)
-        // Keep empty array on error
-      } finally {
+        console.error("Error in onSnapshot for cycles:", error)
+        setExpenseCycles([])
         setIsExpensesLoading(false)
       }
-    }
+    }, (error) => {
+      console.error("Error in onSnapshot for cycles:", error)
+      setExpenseCycles([])
+      setIsExpensesLoading(false)
+    })
 
-    loadExpenseCycles()
+    return unsubscribe
   }, [userData?.company_id])
 
   return (
@@ -448,8 +503,8 @@ export default function PettyCashPage() {
                     </div>
                   )}
                   <div className="text-sm text-[#a1a1a1] space-y-1">
-                    <div className="text-center">Cycle#: {12}</div>
-                    <div>Start: Nov 10, 2025</div>
+                    <div className="text-center">{currentCycle ? `Cycle#: ${currentCycle.cycle_no.toString().padStart(4, '0')}` : 'No Cycle'}</div>
+                    <div>Start: {currentCycle ? formatDate(currentCycle.startDate) : '-'}</div>
                   </div>
                 </div>
 
@@ -539,7 +594,7 @@ export default function PettyCashPage() {
 
                         {isExpanded && cycle.expenses.length > 0 && (
                           <div className="mt-2">
-                            <div className="bg-white rounded-lg border border-[#e0e0e0] overflow-hidden">
+                            <div className="bg-white rounded-lg border border-[#e0e0e0] overflow-hidden max-h-64 overflow-y-auto">
                               <ResponsiveTable
                                 data={cycle.expenses}
                                 columns={[
