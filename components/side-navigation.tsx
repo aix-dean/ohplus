@@ -186,6 +186,7 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/sales/price-listing")) {
     // Ensure sales section is active for price listing page
+  }
   if (pathname?.startsWith("/sales/reports")) {
     // Ensure sales section is active for reports page
     currentSection = "sales"
