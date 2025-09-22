@@ -26,7 +26,9 @@ export interface SalesEvent {
   end: Timestamp | Date
   location: string
   status: "scheduled" | "completed" | "cancelled" | "pending"
-  type: "meeting" | "call" | "presentation" | "follow-up"
+  type: 'meeting' | 'holiday' | 'party'
+  department: string
+  isAdminCreated: boolean
   clientId: string
   clientName: string
   description?: string
@@ -64,6 +66,8 @@ export function convertToSalesEvent(id: string, data: any): SalesEvent {
     location: data.location || "",
     status: data.status || "pending",
     type: data.type || "meeting",
+    department: data.department || "",
+    isAdminCreated: data.isAdminCreated || false,
     clientId: data.clientId || "",
     clientName: data.clientName || "",
     description: data.description || "",
@@ -83,10 +87,15 @@ export function convertToSalesEvent(id: string, data: any): SalesEvent {
 }
 
 // Get all sales events for a user
-export async function getSalesEvents(userId: string): Promise<SalesEvent[]> {
+export async function getSalesEvents(isAdmin: boolean, userDepartment: string): Promise<SalesEvent[]> {
   try {
-    const eventsRef = collection(db, "planner")
-    const q = query(eventsRef, where("createdBy", "==", userId), orderBy("start", "asc"))
+    const eventsRef = collection(db, "events")
+    let q
+    if (isAdmin) {
+      q = query(eventsRef, orderBy("start", "asc"))
+    } else {
+      q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+    }
     const querySnapshot = await getDocs(q)
 
     const events: SalesEvent[] = []
@@ -102,14 +111,19 @@ export async function getSalesEvents(userId: string): Promise<SalesEvent[]> {
 }
 
 // Get sales events for a specific date range, including recurring events
-export async function getSalesEventsByDateRange(userId: string, startDate: Date, endDate: Date): Promise<SalesEvent[]> {
+export async function getSalesEventsByDateRange(isAdmin: boolean, userDepartment: string, startDate: Date, endDate: Date): Promise<SalesEvent[]> {
   try {
-    const eventsRef = collection(db, "planner")
+    const eventsRef = collection(db, "events")
     const startTimestamp = Timestamp.fromDate(startDate)
     const endTimestamp = Timestamp.fromDate(endDate)
 
     // Query events that start within the date range
-    const q = query(eventsRef, where("createdBy", "==", userId), orderBy("start", "asc"))
+    let q
+    if (isAdmin) {
+      q = query(eventsRef, orderBy("start", "asc"))
+    } else {
+      q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+    }
 
     const querySnapshot = await getDocs(q)
 
@@ -209,15 +223,15 @@ function generateRecurringEventInstances(event: SalesEvent, startDate: Date, end
 }
 
 // Get a single sales event by ID
-export async function getSalesEventById(eventId: string, userId: string): Promise<SalesEvent | null> {
+export async function getSalesEventById(eventId: string, isAdmin: boolean, userDepartment: string): Promise<SalesEvent | null> {
   try {
-    const eventDoc = await getDoc(doc(db, "planner", eventId))
+    const eventDoc = await getDoc(doc(db, "events", eventId))
 
     if (eventDoc.exists()) {
       const event = convertToSalesEvent(eventDoc.id, eventDoc.data())
 
-      // Ensure the event belongs to the user
-      if (event.createdBy === userId) {
+      // Ensure the event belongs to the user's department or user is admin
+      if (isAdmin || event.department === userDepartment) {
         return event
       }
     }
@@ -229,12 +243,19 @@ export async function getSalesEventById(eventId: string, userId: string): Promis
   }
 }
 
-// Create a new sales event
-export async function createSalesEvent(
+// Create a new event
+export async function createEvent(
   userId: string,
-  eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt">,
+  department: string,
+  isAdmin: boolean,
+  userDepartment: string,
+  eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt" | "department" | "isAdminCreated">,
 ): Promise<string> {
   try {
+    if (!isAdmin && department !== userDepartment) {
+      throw new Error("Non-admins can only create events in their own department")
+    }
+
     // Convert Date objects to Firestore Timestamps
     const startTimestamp = eventData.start instanceof Date ? Timestamp.fromDate(eventData.start) : eventData.start
     const endTimestamp = eventData.end instanceof Date ? Timestamp.fromDate(eventData.end) : eventData.end
@@ -250,6 +271,8 @@ export async function createSalesEvent(
 
     const newEvent = {
       ...eventData,
+      department,
+      isAdminCreated: isAdmin,
       start: startTimestamp,
       end: endTimestamp,
       recurrence: recurrence || null,
@@ -258,24 +281,24 @@ export async function createSalesEvent(
       updatedAt: serverTimestamp(),
     }
 
-    const docRef = await addDoc(collection(db, "planner"), newEvent)
+    const docRef = await addDoc(collection(db, "events"), newEvent)
     return docRef.id
   } catch (error) {
-    console.error("Error creating sales event:", error)
+    console.error("Error creating event:", error)
     throw error
   }
 }
 
 // Update an existing sales event
-export async function updateSalesEvent(eventId: string, eventData: Partial<SalesEvent>, userId: string): Promise<void> {
+export async function updateSalesEvent(eventId: string, eventData: Partial<SalesEvent>, isAdmin: boolean, userDepartment: string): Promise<void> {
   try {
-    // First verify the event belongs to the user
-    const eventDoc = await getDoc(doc(db, "planner", eventId))
-    if (!eventDoc.exists() || eventDoc.data().createdBy !== userId) {
-      throw new Error("Unauthorized: You can only update your own events")
+    // First verify the event belongs to the user's department or user is admin
+    const eventDoc = await getDoc(doc(db, "events", eventId))
+    if (!eventDoc.exists() || (!isAdmin && eventDoc.data().department !== userDepartment)) {
+      throw new Error("Unauthorized: You can only update events in your department")
     }
 
-    const eventRef = doc(db, "planner", eventId)
+    const eventRef = doc(db, "events", eventId)
 
     // Convert Date objects to Firestore Timestamps if they exist
     const updateData: any = { ...eventData, updatedAt: serverTimestamp() }
@@ -306,15 +329,15 @@ export async function updateSalesEvent(eventId: string, eventData: Partial<Sales
 }
 
 // Delete a sales event
-export async function deleteSalesEvent(eventId: string, userId: string): Promise<void> {
+export async function deleteSalesEvent(eventId: string, isAdmin: boolean, userDepartment: string): Promise<void> {
   try {
-    // First verify the event belongs to the user
-    const eventDoc = await getDoc(doc(db, "planner", eventId))
-    if (!eventDoc.exists() || eventDoc.data().createdBy !== userId) {
-      throw new Error("Unauthorized: You can only delete your own events")
+    // First verify the event belongs to the user's department or user is admin
+    const eventDoc = await getDoc(doc(db, "events", eventId))
+    if (!eventDoc.exists() || (!isAdmin && eventDoc.data().department !== userDepartment)) {
+      throw new Error("Unauthorized: You can only delete events in your department")
     }
 
-    const eventRef = doc(db, "planner", eventId)
+    const eventRef = doc(db, "events", eventId)
     await deleteDoc(eventRef)
   } catch (error) {
     console.error("Error deleting sales event:", error)
@@ -323,11 +346,11 @@ export async function deleteSalesEvent(eventId: string, userId: string): Promise
 }
 
 // Search sales events by term
-export async function searchSalesEvents(userId: string, searchTerm: string): Promise<SalesEvent[]> {
+export async function searchSalesEvents(isAdmin: boolean, userDepartment: string, searchTerm: string): Promise<SalesEvent[]> {
   try {
     // Fetch all user events and filter client-side
     // For production with large datasets, consider using Algolia or Firestore's array-contains
-    const events = await getSalesEvents(userId)
+    const events = await getSalesEvents(isAdmin, userDepartment)
 
     if (!searchTerm) return events
 
@@ -346,15 +369,24 @@ export async function searchSalesEvents(userId: string, searchTerm: string): Pro
 }
 
 // Get events by client
-export async function getSalesEventsByClient(userId: string, clientId: string): Promise<SalesEvent[]> {
+export async function getSalesEventsByClient(isAdmin: boolean, userDepartment: string, clientId: string): Promise<SalesEvent[]> {
   try {
-    const eventsRef = collection(db, "planner")
-    const q = query(
-      eventsRef,
-      where("createdBy", "==", userId),
-      where("clientId", "==", clientId),
-      orderBy("start", "asc"),
-    )
+    const eventsRef = collection(db, "events")
+    let q
+    if (isAdmin) {
+      q = query(
+        eventsRef,
+        where("clientId", "==", clientId),
+        orderBy("start", "asc"),
+      )
+    } else {
+      q = query(
+        eventsRef,
+        where("department", "==", userDepartment),
+        where("clientId", "==", clientId),
+        orderBy("start", "asc"),
+      )
+    }
 
     const querySnapshot = await getDocs(q)
 
@@ -371,10 +403,15 @@ export async function getSalesEventsByClient(userId: string, clientId: string): 
 }
 
 // Get events by type
-export async function getSalesEventsByType(userId: string, type: SalesEvent["type"]): Promise<SalesEvent[]> {
+export async function getSalesEventsByType(isAdmin: boolean, userDepartment: string, type: SalesEvent["type"]): Promise<SalesEvent[]> {
   try {
-    const eventsRef = collection(db, "planner")
-    const q = query(eventsRef, where("createdBy", "==", userId), where("type", "==", type), orderBy("start", "asc"))
+    const eventsRef = collection(db, "events")
+    let q
+    if (isAdmin) {
+      q = query(eventsRef, where("type", "==", type), orderBy("start", "asc"))
+    } else {
+      q = query(eventsRef, where("department", "==", userDepartment), where("type", "==", type), orderBy("start", "asc"))
+    }
 
     const querySnapshot = await getDocs(q)
 
@@ -391,10 +428,15 @@ export async function getSalesEventsByType(userId: string, type: SalesEvent["typ
 }
 
 // Get events by status
-export async function getSalesEventsByStatus(userId: string, status: SalesEvent["status"]): Promise<SalesEvent[]> {
+export async function getSalesEventsByStatus(isAdmin: boolean, userDepartment: string, status: SalesEvent["status"]): Promise<SalesEvent[]> {
   try {
-    const eventsRef = collection(db, "planner")
-    const q = query(eventsRef, where("createdBy", "==", userId), where("status", "==", status), orderBy("start", "asc"))
+    const eventsRef = collection(db, "events")
+    let q
+    if (isAdmin) {
+      q = query(eventsRef, where("status", "==", status), orderBy("start", "asc"))
+    } else {
+      q = query(eventsRef, where("department", "==", userDepartment), where("status", "==", status), orderBy("start", "asc"))
+    }
 
     const querySnapshot = await getDocs(q)
 

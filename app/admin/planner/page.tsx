@@ -15,6 +15,10 @@ import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import type { Booking } from "@/lib/booking-service"
 import { getProductById } from "@/lib/firebase-service"
+import { SalesEvent, getSalesEvents, createEvent } from "@/lib/planner-service"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -72,6 +76,17 @@ export default function AdminPlannerPage() {
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
   const [siteProduct, setSiteProduct] = useState<any>(null)
   const [siteProductLoading, setSiteProductLoading] = useState(false)
+  const [events, setEvents] = useState<SalesEvent[]>([])
+  const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    type: "meeting" as SalesEvent["type"],
+    department: "admin",
+    start: new Date(),
+    end: new Date(),
+    location: "",
+    description: "",
+  })
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -212,9 +227,21 @@ export default function AdminPlannerPage() {
     }
   }, [userData])
 
+  // Fetch events
+  const fetchEvents = useCallback(async () => {
+    try {
+      const fetchedEvents = await getSalesEvents(true, "admin")
+      setEvents(fetchedEvents)
+    } catch (error) {
+      console.error("Error fetching events:", error)
+      setEvents([])
+    }
+  }, [])
+
   useEffect(() => {
     fetchAssignments()
-  }, [fetchAssignments])
+    fetchEvents()
+  }, [fetchAssignments, fetchEvents])
 
   // Fetch site product details when siteId is provided
   useEffect(() => {
@@ -665,6 +692,46 @@ export default function AdminPlannerPage() {
     }
   }
 
+  // Handle create event
+  const handleCreateEvent = async () => {
+    try {
+      await createEvent(
+        userData?.uid || "",
+        newEvent.department,
+        true, // isAdmin
+        "admin", // userDepartment
+        {
+          title: newEvent.title,
+          start: newEvent.start,
+          end: newEvent.end,
+          location: newEvent.location,
+          type: newEvent.type,
+          clientId: "",
+          clientName: "",
+          description: newEvent.description,
+          status: "scheduled",
+          color: "",
+          allDay: false,
+          reminder: false,
+          createdBy: userData?.uid || "",
+        }
+      )
+      setEventDialogOpen(false)
+      setNewEvent({
+        title: "",
+        type: "meeting",
+        department: "admin",
+        start: new Date(),
+        end: new Date(),
+        location: "",
+        description: "",
+      })
+      fetchEvents()
+    } catch (error) {
+      console.error("Error creating event:", error)
+    }
+  }
+
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -734,6 +801,18 @@ export default function AdminPlannerPage() {
       }
     })
 
+    // Group events by day
+    const eventsByDay: { [key: number]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        if (event.start.getMonth() === month && event.start.getFullYear() === year) {
+          const day = event.start.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          eventsByDay[day].push(event)
+        }
+      }
+    })
+
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">
         {/* Day headers */}
@@ -794,6 +873,39 @@ export default function AdminPlannerPage() {
                     {dayAssignments.length > 3 && (
                       <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
                         +{dayAssignments.length - 3} more
+                      </div>
+                    )}
+                    {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
+                      <div
+                        key={`event-${day}-${j}`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Could navigate to event details if available
+                        }}
+                        title={`${event.title} - ${event.type} at ${event.location}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>🎉</span>
+                          <span className="truncate font-medium">{event.title}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                          {event.location}
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <Badge
+                            variant="outline"
+                            className={`text-[6px] sm:text-[8px] px-1 py-0 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
+                          >
+                            {event.type}
+                          </Badge>
+                          <span className="text-[6px] sm:text-[8px] text-gray-500">{formatTime(event.start as Date)}</span>
+                        </div>
+                      </div>
+                    )) : null}
+                    {day && eventsByDay[day]?.length > 2 && (
+                      <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline">
+                        +{eventsByDay[day].length - 2} more events
                       </div>
                     )}
                   </div>
@@ -1388,9 +1500,19 @@ export default function AdminPlannerPage() {
                 Back to Site
               </Button>
             )}
+            {!siteId && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setEventDialogOpen(true)}
+                className="flex items-center gap-2"
+              >
+                Add Event
+              </Button>
+            )}
           </div>
           <div className="text-sm text-gray-500">
-            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments loaded`}
+            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments, ${events.length} events loaded`}
           </div>
         </div>
 
@@ -1543,6 +1665,88 @@ export default function AdminPlannerPage() {
           )}
         </div>
 
+        <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Event</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                  placeholder="Event title"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Type</label>
+                <Select value={newEvent.type} onValueChange={(value: SalesEvent["type"]) => setNewEvent({...newEvent, type: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="holiday">Holiday</SelectItem>
+                    <SelectItem value="party">Party</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Department</label>
+                <Select value={newEvent.department} onValueChange={(value) => setNewEvent({...newEvent, department: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="it">IT</SelectItem>
+                    <SelectItem value="treasury">Treasury</SelectItem>
+                    <SelectItem value="business-dev">Business Dev</SelectItem>
+                    <SelectItem value="logistics">Logistics</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Start Date & Time</label>
+                <Input
+                  type="datetime-local"
+                  value={newEvent.start.toISOString().slice(0,16)}
+                  onChange={(e) => setNewEvent({...newEvent, start: new Date(e.target.value)})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">End Date & Time</label>
+                <Input
+                  type="datetime-local"
+                  value={newEvent.end.toISOString().slice(0,16)}
+                  onChange={(e) => setNewEvent({...newEvent, end: new Date(e.target.value)})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Location</label>
+                <Input
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+                  placeholder="Event location"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                  placeholder="Event description"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEventDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateEvent}>Create Event</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}
@@ -1550,6 +1754,7 @@ export default function AdminPlannerPage() {
             // Refresh assignments after creating a new one
             fetchAssignments()
           }}
+          department="ADMIN"
         />
       </div>
     </div>

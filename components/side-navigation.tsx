@@ -484,6 +484,7 @@ export function SideNavigation() {
                   { title: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
                   { title: "Overview", href: "/business/overview", icon: BarChart3 },
                   { title: "Reports", href: "/business/reports", icon: FileText },
+                  { title: "Planner", href: "/business-dev/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1093,6 +1094,7 @@ export function SideNavigation() {
                   { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
                   { title: "Requests", href: "/admin/requests", icon: FileText },
                   { title: "Planner", href: "/admin/planner", icon: Calendar },
+                  { title: "Project Bulletin", href: "/admin/project-bulletin", icon: Monitor },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1128,7 +1130,7 @@ export function SideNavigation() {
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
                   { title: "To-do-list", href: "/admin/todo-list", icon: ClipboardList },
                   { title: "User Management", href: "/admin/user-management", icon: Users },
-                  { title: "Inventory", href: "/admin/inventory", icon: Package },
+
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1316,6 +1318,7 @@ export function SideNavigation() {
                   { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/quotations", icon: FileText },
+                  { title: "Planner", href: "/treasury/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
