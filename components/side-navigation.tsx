@@ -57,6 +57,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
       { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
+      { title: "Price Listing", href: "/sales/price-listing", icon: DollarSign },
       { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
       { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
@@ -181,6 +182,10 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/sales/cost-estimates")) {
     // Ensure sales section is active for cost estimates page
+    currentSection = "sales"
+  }
+  if (pathname?.startsWith("/sales/price-listing")) {
+    // Ensure sales section is active for price listing page
     currentSection = "sales"
   }
   if (pathname?.startsWith("/business")) {
@@ -1212,6 +1217,7 @@ export function SideNavigation() {
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
                   { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
+                  { title: "Price Listing", href: "/sales/price-listing", icon: DollarSign },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
