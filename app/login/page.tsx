@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Mail, Lock, Eye, EyeOff, Upload, Car, Power, CheckCircle, Zap, Loader2 } from "lucide-react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Mail, Lock, Eye, EyeOff, Upload, Car, Power, CheckCircle, Zap, Loader2, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { collection, getDocs, doc, setDoc, getDoc, addDoc, serverTimestamp, GeoPoint } from "firebase/firestore"
 import { createUserWithEmailAndPassword } from "firebase/auth"
@@ -368,8 +369,8 @@ export default function LoginPage() {
 
       console.log("Registration completed successfully, navigating...")
       // Navigate to admin dashboard
-      console.log("Setting window.location.href to https://ohplus.ph/admin/dashboard")
-      window.location.href = "https://ohplus.ph/admin/dashboard"
+      console.log("Navigating to /admin/dashboard")
+      router.push("/admin/dashboard")
       console.log("Navigation set")
     } catch (error: any) {
       console.error("Registration failed:", error)
@@ -524,149 +525,106 @@ export default function LoginPage() {
   }, [])
 
   return currentStep === 3 ? (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full space-y-8">
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="relative p-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl shadow-2xl">
-              <Car className="w-16 h-16 text-slate-900" />
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                <Power className="w-3 h-3 text-white" />
-              </div>
-            </div>
-          </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
-            Oh Plus Engine
-          </h1>
-          <p className="text-xl text-slate-300 font-medium">Insert your digital key to start the engine</p>
-        </div>
+    <div className="min-h-screen flex">
+      {/* Left side - Content */}
+      <div className="flex-1 bg-white flex items-center justify-center p-8">
+        <div className="max-w-xl w-full space-y-6">
+          {/* Avatar */}
+          <Image
+            src="/login-image-5.png"
+            alt="User avatar"
+            width={64}
+            height={64}
+            className="rounded-full"
+          />
 
-        <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-2xl p-8 border border-slate-600 shadow-2xl">
-          <h2 className="text-2xl font-bold text-amber-400 mb-8 flex items-center gap-3">
-            <Zap className="w-6 h-6" />
-            Ignition Sequence
-          </h2>
-          <div className="space-y-6">
-            <div className="flex items-center space-x-6 p-4 bg-slate-900/50 rounded-xl border border-slate-600">
-              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg">
-                1
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-5 bg-slate-700 rounded border-2 border-amber-400 relative">
-                  <div className="absolute inset-1 bg-amber-400 rounded-sm"></div>
-                </div>
-                <span className="text-slate-200 font-medium">Insert key</span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-6 p-4 bg-slate-900/50 rounded-xl border border-slate-600">
-              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg">
-                2
-              </div>
-              <div className="flex items-center space-x-3">
-                <Power className="w-6 h-6 text-amber-400" />
-                <span className="text-slate-200 font-medium">Open the key</span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-6 p-4 bg-slate-900/50 rounded-xl border border-slate-600">
-              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg">
-                3
-              </div>
-              <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-amber-400" />
-                <span className="text-slate-200 font-medium">Drop the Activation Key (.lic file) to start the engine</span>
-              </div>
-            </div>
+          {/* Heading */}
+          <div>
+            <h1 className="text-6xl font-bold text-gray-900 leading-tight mb-4">
+              Alright {pointPersonDataRef.current?.point_person?.first_name || "User"},
+              <br />
+              {"we're almost"}
+              <br />
+              set!
+            </h1>
+            <p className="text-gray-600 text-xl leading-relaxed">
+              Just upload the license key from your <span className="font-semibold text-gray-900">OHPlus Key</span> so
+              we can unlock your account.
+            </p>
           </div>
         </div>
+      </div>
 
-        <div
-          className={`
-            relative border-2 border-dashed rounded-2xl p-16 text-center transition-all duration-300 shadow-2xl
-            ${
-              isDragOver
-                ? "border-amber-400 bg-gradient-to-br from-amber-400/10 to-amber-600/10 scale-105 shadow-amber-400/20"
-                : "border-slate-600 hover:border-amber-400/50 bg-gradient-to-br from-slate-800/50 to-slate-700/50"
-            }
-            ${isActivated ? "border-green-400 bg-gradient-to-br from-green-400/10 to-green-600/10" : ""}
-          `}
-          onDragOver={handleDragOverStep3}
-          onDragLeave={handleDragLeaveStep3}
-          onDrop={handleDropStep3}
-        >
-          {isValidating ? (
-            <div className="space-y-6">
-              <div className="relative">
-                <Loader2 className="w-20 h-20 text-amber-400 mx-auto animate-spin" />
-              </div>
-              <h3 className="text-3xl font-bold text-slate-200">Validating Activation Key</h3>
-              <p className="text-slate-400 text-lg max-w-md mx-auto leading-relaxed">
-                Please wait while we verify your license file...
-              </p>
-            </div>
-          ) : isActivated ? (
-            <div className="space-y-6">
-              <div className="relative">
-                <CheckCircle className="w-20 h-20 text-green-400 mx-auto" />
-                <div className="absolute inset-0 w-20 h-20 mx-auto rounded-full bg-green-400/20 animate-pulse"></div>
-              </div>
-              <h3 className="text-3xl font-bold text-green-400">Engine Started!</h3>
-              <p className="text-green-300 text-lg">Key "{fileName}" authenticated. Oh Plus Engine is now running...</p>
-              <div className="flex justify-center space-x-2 mt-4">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse delay-100"></div>
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse delay-200"></div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="relative">
-                <div
-                  className={`
-                  w-20 h-20 mx-auto rounded-2xl flex items-center justify-center transition-all duration-300
-                  ${
-                    isDragOver
-                      ? "bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-400/30"
-                      : "bg-gradient-to-br from-slate-700 to-slate-600"
-                  }
-                `}
-                >
-                  <Upload className={`w-10 h-10 ${isDragOver ? "text-slate-900" : "text-amber-400"}`} />
-                </div>
-                {isDragOver && (
-                  <div className="absolute inset-0 w-20 h-20 mx-auto rounded-2xl bg-amber-400/20 animate-pulse"></div>
-                )}
-              </div>
-              <h3 className="text-3xl font-bold text-slate-200">
-                {isDragOver ? "Release to Start Engine" : "Drop Activation Key"}
-              </h3>
-              <p className="text-slate-400 text-lg max-w-md mx-auto leading-relaxed">
-                Drag your Activation Key (.lic) file into this ignition zone to power up the Oh Plus Engine
-              </p>
-              <input
-                type="file"
-                id="activation-file-upload"
-                className="hidden"
-                accept=".lic"
-                onChange={handleFileSelectStep3}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="border-amber-500 text-amber-600 hover:bg-amber-50"
-                onClick={() => document.getElementById('activation-file-upload')?.click()}
-              >
-                Choose File
-              </Button>
-            </div>
-          )}
+      {/* Right side - Upload area with illustration */}
+      <div className="flex-1 relative overflow-hidden flex flex-col">
+        <Image
+          src="/login-image-3.png"
+          alt="Background"
+          fill
+          className="object-cover -z-10"
+        />
+        {/* Floating geometric shapes */}
+        <div className="absolute inset-0">
+          {/* Various floating cubes and rectangles */}
+          <div className="absolute top-20 left-20 w-16 h-16 bg-cyan-400 rounded-lg transform rotate-12 opacity-80"></div>
+          <div className="absolute top-32 right-32 w-12 h-20 bg-pink-400 rounded-lg transform -rotate-6 opacity-70"></div>
+          <div className="absolute top-60 left-32 w-20 h-12 bg-purple-400 rounded-lg transform rotate-45 opacity-60"></div>
+          <div className="absolute bottom-40 right-20 w-14 h-14 bg-blue-300 rounded-lg transform -rotate-12 opacity-80"></div>
+          <div className="absolute bottom-60 left-16 w-18 h-10 bg-pink-300 rounded-lg transform rotate-30 opacity-70"></div>
+          <div className="absolute top-40 right-16 w-10 h-16 bg-cyan-300 rounded-lg transform -rotate-45 opacity-60"></div>
         </div>
 
-        <div className="text-center">
-          <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg px-4 py-2 inline-block border border-slate-700">
-            🔑 Ensure steps 1-2 are complete before dropping your activation key
-          </p>
+        {/* Main upload area */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="relative max-w-sm w-full -mt-16 ml-16">
+            <Image
+              src="/login-image-4.png"
+              alt="License upload area"
+              width={300}
+              height={225}
+              className={`rounded-2xl transition-all duration-300 cursor-pointer ${
+                isDragOver ? "scale-105 shadow-lg ring-4 ring-cyan-400" : ""
+              } ${isActivated ? "ring-4 ring-green-400" : ""}`}
+              onDragOver={handleDragOverStep3}
+              onDragLeave={handleDragLeaveStep3}
+              onDrop={handleDropStep3}
+              onClick={() => document.getElementById('activation-file-upload')?.click()}
+            />
+            <input
+              type="file"
+              id="activation-file-upload"
+              className="hidden"
+              accept=".lic"
+              onChange={handleFileSelectStep3}
+            />
+            {isValidating && (
+              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+                <div className="text-center text-white">
+                  <Loader2 className="w-16 h-16 mx-auto animate-spin mb-4" />
+                  <p className="text-lg font-medium">Validating License Key...</p>
+                </div>
+              </div>
+            )}
+            {isActivated && (
+              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+                <div className="text-center text-white">
+                  <CheckCircle className="w-16 h-16 mx-auto mb-4" />
+                  <p className="text-lg font-medium">License Key Validated!</p>
+                  <p className="text-sm">Key "{fileName}" authenticated.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Fun fact at bottom */}
+        <div className="p-8">
+          <div className="bg-blue-800/30 backdrop-blur-sm rounded-lg p-4">
+            <p className="text-white text-lg leading-relaxed text-center font-bold">
+              <span className="font-bold">FUN FACT:</span> The Philippines is one of the top OOH markets in Southeast
+              Asia, with EDSA alone hosting more than 2,000 billboards! {"It's"} like the Times Square of Manila.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -696,7 +654,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-4">
-            {currentStep === 1 ? (
+            {(currentStep === 1 || currentStep === 2) ? (
               <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
                 {error && (
                   <Alert variant="destructive">
@@ -722,166 +680,7 @@ export default function LoginPage() {
                   {isLoading ? "Verifying..." : "Login"}
                 </Button>
               </form>
-            ) : currentStep === 2 ? (
-              <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email-display" className="text-sm text-gray-600">
-                    Username: {email}
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBackToEmail}
-                    className="text-blue-600 hover:underline p-0 h-auto"
-                  >
-                    Change username
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    placeholder="Create new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    className="h-12 border-gray-200 rounded-lg"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="h-12 border-gray-200 rounded-lg"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Processing..." : "Continue to Upload"}
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleCompleteRegistration} className="space-y-6">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email-display" className="text-sm text-gray-600">
-                    Username: {email}
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBackToPassword}
-                    className="text-blue-600 hover:underline p-0 h-auto"
-                  >
-                    Change password
-                  </Button>
-                </div>
-
-                {/* File Upload */}
-                <div
-                  className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
-                    isDragOver
-                      ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg shadow-blue-500/20'
-                      : 'border-gray-300 hover:border-blue-400 bg-gray-50/50'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <div className="space-y-6">
-                    <div className="relative">
-                      <div
-                        className={`w-16 h-16 mx-auto rounded-xl flex items-center justify-center transition-all duration-300 ${
-                          isDragOver
-                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30'
-                            : 'bg-gradient-to-br from-gray-100 to-gray-200'
-                        }`}
-                      >
-                        <svg
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          className={`w-8 h-8 ${isDragOver ? 'text-white' : 'text-gray-500'}`}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      </div>
-                      {isDragOver && (
-                        <div className="absolute inset-0 w-16 h-16 mx-auto rounded-xl bg-blue-500/20 animate-pulse"></div>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">
-                        {uploadedFile ? `✓ ${uploadedFile.name}` : "Upload your document"}
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        {uploadedFile ? "Document uploaded successfully!" : "Drag and drop your file here or click to browse"}
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      id="file-upload"
-                      className="hidden"
-                      accept=".pdf,.txt,.doc,.docx,.csv"
-                      onChange={handleFileSelect}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                      onClick={() => document.getElementById('file-upload')?.click()}
-                    >
-                      Choose File
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
-                  <p className="font-semibold mb-3 text-blue-800">📋 Upload Instructions:</p>
-                  <ol className="list-decimal list-inside space-y-2 text-blue-700">
-                    <li>Drag your PDF or text document from your computer to the upload area above</li>
-                    <li>Or click "Choose File" to browse and select your document</li>
-                    <li>The system will validate your file and complete your account registration</li>
-                  </ol>
-                  <p className="text-xs text-blue-600 mt-3 italic">
-                    Supported formats: PDF, TXT, DOC, DOCX (max 10MB)
-                  </p>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
-                  disabled={isLoading || !uploadedFile}
-                >
-                  {isLoading ? "Creating Account..." : "Complete Registration"}
-                </Button>
-              </form>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -898,6 +697,67 @@ export default function LoginPage() {
           />
         </div>
       </div>
+
+      {/* Password Setup Dialog */}
+      <Dialog open={currentStep === 2} onOpenChange={(open) => { if (!open) setCurrentStep(1); }}>
+        <DialogContent className="bg-white rounded-[50px] shadow-lg p-8 max-w-4xl w-full flex">
+<div className="flex-1 p-4 flex items-center justify-center">
+              <Image
+                src="/login-image-2.png"
+                alt="Login illustration"
+                width={400}
+                height={400}
+                className="rounded-lg"
+              />
+            </div>
+            <div className="flex-1 p-4 space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentStep(1)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div>
+                <h1 className="text-5xl font-bold text-gray-900 mb-3">Hey {pointPersonDataRef.current?.point_person?.first_name || email}!</h1>
+                <p className="text-gray-600 text-xl leading-relaxed">
+                  {"It's great to finally meet you. I'm "}
+                  <span className="font-semibold text-gray-900">Oscar</span>
+                  {", your OHPlus buddy."}
+                </p>
+                <p className="text-gray-600 text-xl leading-relaxed mt-3">
+                  {
+                    "Before we jump into the exciting stuff, let's set up a new password to keep your account safe and secure."
+                  }
+                </p>
+              </div>
+
+              <form onSubmit={handlePasswordChangeSubmit} className="space-y-3">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Input type="password" placeholder="New password" className="h-11 border-gray-200 rounded-lg text-xl" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                <Input
+                  type="password"
+                  placeholder="Confirm new password"
+                  className="h-11 border-gray-200 rounded-lg text-xl"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <Button className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg mt-4" type="submit" disabled={isLoading}>
+                  {isLoading ? "Processing..." : "OK"}
+                </Button>
+              </form>
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
