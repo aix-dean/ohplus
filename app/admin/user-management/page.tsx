@@ -59,6 +59,11 @@ export default function UserManagementPage() {
     sales: false,
     logistics: false,
     cms: false,
+    it: false,
+    business: false,
+    treasury: false,
+    accounting: false,
+    finance: false,
   })
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -132,6 +137,11 @@ export default function UserManagementPage() {
     sales: "Sales Team",
     logistics: "Logistics Team",
     cms: "Content Management",
+    it: "IT Team",
+    business: "Business Development",
+    treasury: "Treasury",
+    accounting: "Accounting",
+    finance: "Finance",
   }
 
   // Department color mapping for divider lines
@@ -140,6 +150,11 @@ export default function UserManagementPage() {
     "Sales Team": "bg-red-500",
     "Logistics Team": "bg-blue-500",
     "Content Management": "bg-yellow-500",
+    "IT Team": "bg-teal-500",
+    "Business Development": "bg-purple-500",
+    "Treasury": "bg-green-500",
+    "Accounting": "bg-blue-600",
+    "Finance": "bg-emerald-500",
   }
 
   // Group users by department (simple implementation)
@@ -213,6 +228,11 @@ export default function UserManagementPage() {
       sales: "bg-green-100 text-green-800 hover:bg-green-100",
       logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
       cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
+      it: "bg-teal-100 text-teal-800 hover:bg-teal-100",
+      business: "bg-indigo-100 text-indigo-800 hover:bg-indigo-100",
+      treasury: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+      accounting: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100",
+      finance: "bg-lime-100 text-lime-800 hover:bg-lime-100",
     }
 
     return <Badge className={colorClasses[roleId]}>{role.name}</Badge>
@@ -233,6 +253,11 @@ export default function UserManagementPage() {
           sales: userRoles.includes("sales"),
           logistics: userRoles.includes("logistics"),
           cms: userRoles.includes("cms"),
+          it: userRoles.includes("it"),
+          business: userRoles.includes("business"),
+          treasury: userRoles.includes("treasury"),
+          accounting: userRoles.includes("accounting"),
+          finance: userRoles.includes("finance"),
         }
 
         setSelectedRoles(initialSelectedRoles)

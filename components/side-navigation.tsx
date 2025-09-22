@@ -1115,7 +1115,6 @@ export function SideNavigation() {
                 {[
                   { title: "Company", href: "/admin/company", icon: Users },
                   { title: "Assets", href: "/admin/assets", icon: Package },
-                  { title: "Reports", href: "/admin/reports", icon: BarChart3 },
                   { title: "Petty Cash", href: "/admin/petty-cash", icon: DollarSign },
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
                   { title: "To-do-list", href: "/admin/todo-list", icon: ClipboardList },

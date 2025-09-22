@@ -22,7 +22,7 @@ interface CreateReportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   siteId: string
-  module?: "logistics" | "sales" | "admin"
+  module?: "logistics" | "sales"
   hideJobOrderSelection?: boolean
   preSelectedJobOrder?: string
 }
@@ -376,20 +376,17 @@ export function CreateReportDialog({
     e.preventDefault()
     e.stopPropagation()
 
-    // Skip site image logic for admin mode
-    if (module !== "admin") {
-      // Get the effective job order (selected or product-associated) for non-admin modes
-      const effectiveJobOrder = selectedJobOrderDetails ||
-        (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+    // Get the effective job order (selected or product-associated)
+    const effectiveJobOrder = selectedJobOrderDetails ||
+      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
 
-      // If we have a job order with siteImageUrl, show it (only for non-admin modes)
-      if (effectiveJobOrder?.siteImageUrl) {
-        setPreviewModal({
-          open: true,
-          preview: effectiveJobOrder.siteImageUrl,
-        })
-        return
-      }
+    // If we have a job order with siteImageUrl, show it
+    if (effectiveJobOrder?.siteImageUrl) {
+      setPreviewModal({
+        open: true,
+        preview: effectiveJobOrder.siteImageUrl,
+      })
+      return
     }
 
     // Fallback to uploaded file
@@ -406,76 +403,71 @@ export function CreateReportDialog({
   }
 
   const renderFilePreview = (attachment: AttachmentData, index: number) => {
-    // Skip site image logic for admin mode
-    if (module === "admin") {
-      // For admin mode, don't use site images, just handle uploaded files
-    } else {
-      // Get the effective job order (selected or product-associated) for non-admin modes
-      const effectiveJobOrder = selectedJobOrderDetails ||
-        (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+    // Get the effective job order (selected or product-associated)
+    const effectiveJobOrder = selectedJobOrderDetails ||
+      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
 
-      // If we have a job order with siteImageUrl, use it for the preview (only for non-admin modes)
-      if (effectiveJobOrder?.siteImageUrl) {
-        return (
-          <div className="relative w-full h-full group">
-            <div className="w-full h-full">
-              <img
-                src={effectiveJobOrder.siteImageUrl}
-                alt="Site Image"
-                className="w-full h-full object-cover rounded"
-                onError={(e) => {
-                  console.error("Site image failed to load:", effectiveJobOrder.siteImageUrl)
-                  // Fallback to uploaded file if site image fails
-                  if (attachment.preview) {
-                    e.currentTarget.src = attachment.preview
-                  }
-                }}
-              />
-            </div>
-
-            {/* Upload overlay when no file is uploaded yet */}
-            {!attachment.file && (
-              <label
-                htmlFor={`file-${index}`}
-                className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity"
-              >
-                <Upload className="h-6 w-6 text-white" />
-                <span className="text-xs text-white mt-1">Replace</span>
-              </label>
-            )}
-
-            {/* Preview Button */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                // Show site image in modal
-                setPreviewModal({
-                  open: true,
-                  preview: effectiveJobOrder.siteImageUrl,
-                })
+    // If we have a job order with siteImageUrl, use it for the preview
+    if (effectiveJobOrder?.siteImageUrl) {
+      return (
+        <div className="relative w-full h-full group">
+          <div className="w-full h-full">
+            <img
+              src={effectiveJobOrder.siteImageUrl}
+              alt="Site Image"
+              className="w-full h-full object-cover rounded"
+              onError={(e) => {
+                console.error("Site image failed to load:", effectiveJobOrder.siteImageUrl)
+                // Fallback to uploaded file if site image fails
+                if (attachment.preview) {
+                  e.currentTarget.src = attachment.preview
+                }
               }}
-              className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Preview site image"
-            >
-              <Eye className="h-3 w-3" />
-            </button>
-
-            {/* Success indicator when uploaded */}
-            {attachment.fileUrl && !attachment.uploading && (
-              <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
-                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            )}
+            />
           </div>
-        )
-      }
+
+          {/* Upload overlay when no file is uploaded yet */}
+          {!attachment.file && (
+            <label
+              htmlFor={`file-${index}`}
+              className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity"
+            >
+              <Upload className="h-6 w-6 text-white" />
+              <span className="text-xs text-white mt-1">Replace</span>
+            </label>
+          )}
+
+          {/* Preview Button */}
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              // Show site image in modal
+              setPreviewModal({
+                open: true,
+                preview: effectiveJobOrder.siteImageUrl,
+              })
+            }}
+            className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Preview site image"
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+
+          {/* Success indicator when uploaded */}
+          {attachment.fileUrl && !attachment.uploading && (
+            <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+      )
     }
 
     // Fallback to original behavior if no siteImageUrl
@@ -639,7 +631,7 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
-        siteImageUrl: module === "admin" ? undefined : (effectiveJobOrder?.siteImageUrl || undefined),
+        siteImageUrl: effectiveJobOrder?.siteImageUrl || undefined,
       }
       console.log("Built report data with siteName:", reportData.siteName)
       console.log("Report siteImageUrl:", reportData.siteImageUrl)
@@ -737,7 +729,7 @@ export function CreateReportDialog({
       setDescriptionOfWork("")
 
 
-      const previewPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/reports/preview"
+      const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
     } catch (error) {
       console.error("Error generating report:", error)
