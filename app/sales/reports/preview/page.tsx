@@ -332,27 +332,41 @@ export default function SalesReportPreviewPage() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!report || !product) return
+    if (!report) return
 
     setIsGeneratingPDF(true)
     try {
-      console.log("[v0] Starting PDF generation with report:", {
-        id: report.id,
-        bookingDates: report.bookingDates,
-        hasBookingDates: !!report.bookingDates,
-        startDate: report.bookingDates?.start,
-        endDate: report.bookingDates?.end,
+      console.log("Starting Puppeteer PDF generation for report:", report.id)
+
+      // Call the new Puppeteer API
+      const response = await fetch(`/api/sales/reports/${report.id}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      const reportWithSafeDates = {
-        ...report,
-        bookingDates: report.bookingDates || {
-          start: new Date().toISOString().split("T")[0],
-          end: new Date().toISOString().split("T")[0],
-        },
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
       }
 
-      await generateReportPDF(reportWithSafeDates, product, false, undefined, false, "sales")
+      // Get the PDF blob
+      const pdfBlob = await response.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `report-${report.id}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully.",
+      })
     } catch (error) {
       console.error("Error generating report PDF:", error)
       toast({

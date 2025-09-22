@@ -30,6 +30,7 @@ export interface SearchResponse {
 
 // Function to search products
 export async function searchProducts(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse<SearchResult>> {
+export async function searchProducts(query: string, userId?: string): Promise<SearchResponse> {
   try {
     // Log the search attempt
     console.log(`Searching for: "${query}"${companyId ? ` with user filter: ${companyId}` : ""}`)
@@ -110,7 +111,7 @@ export async function searchProducts(query: string, companyId?: string, page: nu
 }
 
 // Function to search service assignments
-export async function searchServiceAssignments(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse<SearchResult>> {
+export async function searchServiceAssignments(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
     console.log(`Searching service assignments for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
@@ -191,7 +192,7 @@ export async function searchServiceAssignments(query: string, companyId?: string
 }
 
 // Function to search bookings
-export async function searchBookings(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse<SearchResult>> {
+export async function searchBookings(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
     console.log(`Searching bookings for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
@@ -272,7 +273,7 @@ export async function searchBookings(query: string, companyId?: string, page: nu
 }
 
 // Function to search cost estimates
-export async function searchCostEstimates(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse<SearchResult>> {
+export async function searchCostEstimates(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
     console.log(`Searching quotations for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
@@ -444,6 +445,20 @@ export async function searchPriceListingProducts(query: string, userId?: string)
     // Only add filters if userId is provided
     if (userId) {
       requestBody.filters = `company_id:${userId}`
+// Function to search reports
+export async function searchReports(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 50, filters?: string): Promise<SearchResponse> {
+  try {
+    // Log the search attempt
+    console.log(`Searching reports for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
+
+    // Create the request body
+    const requestBody: any = { query, indexName: 'reports', page, hitsPerPage }
+
+    // Add filters if provided
+    if (filters) {
+      requestBody.filters = filters
+    } else if (companyId) {
+      requestBody.filters = `companyId:${companyId}`
     }
 
     const response = await fetch("/api/search", {
@@ -499,6 +514,7 @@ export async function searchPriceListingProducts(query: string, userId?: string)
     return data
   } catch (error) {
     console.error("Error searching price listing products:", error)
+    console.error("Error searching reports:", error)
     // Return empty results instead of throwing
     return {
       hits: [],
