@@ -76,6 +76,10 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
       finalIndexName = 'booking'
+    } else if (indexName === 'price_listing') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
+      apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
     } else {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
@@ -124,6 +128,9 @@ export async function POST(request: Request) {
     } else if (indexName === 'booking') {
       attributesToRetrieve = "reservation_id,product_name,client,project_name,start_date,end_date,status,created,quotation_id,product_id,company_id,client_name,client_company_name"
       attributesToHighlight = "reservation_id,product_name,client_name,client_company_name"
+    } else if (indexName === 'price_listing') {
+      attributesToRetrieve = "name,type,location,price,site_code,image_url,category,seller_id,media,id,specs_rental,created,updated"
+      attributesToHighlight = "name,location"
     }
 
     const searchParams: any = {
