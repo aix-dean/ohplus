@@ -47,7 +47,7 @@ const departmentMapping: Record<RoleType, DepartmentOption> = {
   },
   business: {
     name: "Business",
-    path: "/business",
+    path: "/business/dashboard",
     role: "business",
     color: "bg-purple-500"
   },
