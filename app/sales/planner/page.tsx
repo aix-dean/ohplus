@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SalesEventDialog } from "@/components/sales-event-dialog"
+import { EventDialog } from "@/components/event-dialog"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
 import {
   type SalesEvent,
   getSalesEventsByDateRange,
@@ -77,6 +78,8 @@ export default function SalesPlannerPage() {
   const [filterStatus, setFilterStatus] = useState<SalesEvent["status"] | "all">("all")
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Partial<SalesEvent> | undefined>(undefined)
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
   const [showRecurringOnly, setShowRecurringOnly] = useState(false)
 
   // Load events from Firestore
@@ -330,12 +333,8 @@ export default function SalesPlannerPage() {
 
   // Handle event click
   const handleEventClick = (event: SalesEvent) => {
-    // If it's a recurring instance, we need to get the original event
-    const eventToEdit =
-      event.isRecurringInstance && event.originalEventId ? { ...event, id: event.originalEventId } : event
-
-    setSelectedEvent(eventToEdit)
-    setIsEventDialogOpen(true)
+    setSelectedEventForDetails(event)
+    setEventDetailsDialogOpen(true)
   }
 
   // Handle create new event
@@ -1068,14 +1067,21 @@ export default function SalesPlannerPage() {
 
       {/* Event Dialog */}
       {user && (
-        <SalesEventDialog
+        <EventDialog
           isOpen={isEventDialogOpen}
           onClose={() => setIsEventDialogOpen(false)}
           event={selectedEvent}
-          userId={user.uid}
           onEventSaved={handleEventSaved}
+          department="sales"
         />
       )}
+
+      {/* Event Details Dialog */}
+      <EventDetailsDialog
+        isOpen={eventDetailsDialogOpen}
+        onClose={() => setEventDetailsDialogOpen(false)}
+        event={selectedEventForDetails}
+      />
     </div>
   )
 }

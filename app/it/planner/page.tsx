@@ -18,6 +18,7 @@ import type { Booking } from "@/lib/booking-service"
 import type { SalesEvent } from "@/lib/planner-service"
 import { getProductById, getServiceAssignmentsByDepartment } from "@/lib/firebase-service"
 import { getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -75,6 +76,8 @@ export default function ITPlannerPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<SalesEvent | null>(null)
   const [siteProduct, setSiteProduct] = useState<any>(null)
   const [siteProductLoading, setSiteProductLoading] = useState(false)
 
@@ -298,6 +301,11 @@ export default function ITPlannerPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date())
+  }
+
+  const handleEventClick = (event: SalesEvent) => {
+    setSelectedEvent(event)
+    setEventDetailsDialogOpen(true)
   }
 
   // View title based on current view and date
@@ -809,6 +817,10 @@ export default function ITPlannerPage() {
                             key={`event-${day}-${j}`}
                             className="text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-blue-50 border-blue-200"
                             title={`${event.title} - ${event.location}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEventClick(event)
+                            }}
                           >
                             <div className="flex items-center gap-1">
                               <span>📅</span>
@@ -1606,6 +1618,13 @@ export default function ITPlannerPage() {
             // Refresh events after creating a new one
             fetchEvents()
           }}
+          department="it"
+        />
+
+        <EventDetailsDialog
+          isOpen={eventDetailsDialogOpen}
+          onClose={() => setEventDetailsDialogOpen(false)}
+          event={selectedEvent}
         />
       </div>
     </div>
