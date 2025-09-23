@@ -70,7 +70,7 @@ export default function LoginPage() {
   const [pointPersonData, setPointPersonData] = useState<any>(null)
   const pointPersonDataRef = useRef<any>(null)
 
-  const { user, userData, getRoleDashboardPath, refreshUserData, loginOHPlusOnly } = useAuth()
+  const { user, userData, getRoleDashboardPath, refreshUserData, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -79,7 +79,11 @@ export default function LoginPage() {
     if (user && userData) {
       const dashboardPath = getRoleDashboardPath(userData.roles || [])
       if (dashboardPath) {
-        router.push(dashboardPath)
+        // Add a small delay to prevent immediate back-and-forth redirects
+        const timer = setTimeout(() => {
+          router.push(dashboardPath)
+        }, 1000) // 1 second delay
+        return () => clearTimeout(timer)
       }
     }
   }, [user, userData, router, getRoleDashboardPath])
@@ -306,6 +310,9 @@ export default function LoginPage() {
       const { point_person, company_id } = pointPersonDataRef.current
       console.log("Point person data found:", point_person)
 
+      // Start registration to prevent auth listener from signing out
+      startRegistration()
+
       // Use email and password from point_person data instead of component state
       const userEmail = point_person.email
       const userPassword = pointPersonDataRef.current.newPassword || newPassword
@@ -367,15 +374,21 @@ export default function LoginPage() {
       await refreshUserData()
       console.log("User data refreshed")
 
+      // End registration
+      endRegistration()
+
       console.log("Registration completed successfully, navigating...")
-      // Navigate to admin dashboard
-      console.log("Navigating to /admin/dashboard")
-      router.push("/admin/dashboard")
+      // Navigate to IT page
+      console.log("Navigating to /it")
+      router.push("/it")
       console.log("Navigation set")
     } catch (error: any) {
       console.error("Registration failed:", error)
       console.log("Error code:", error.code, "Error message:", error.message)
       console.log("handleCompleteRegistration failed - no iboard_users created")
+
+      // End registration on error
+      endRegistration()
 
       // Handle specific Firebase Auth errors
       if (error.code === "auth/email-already-in-use") {

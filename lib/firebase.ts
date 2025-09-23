@@ -28,7 +28,7 @@ export const auth = getAuth(app)
 
 // Initialize tenant-specific auth for OHPLUS
 export const tenantAuth = getAuth(app)
-// tenantAuth.tenantId = TENANT_ID
+tenantAuth.tenantId = TENANT_ID
 
 export const db = getFirestore(app)
 export const storage = getStorage(app)
