@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { getOccupancyData } from "@/lib/firebase-service"
 import type { Booking, Product, Quotation } from "@/lib/firebase-service"
 
 export async function GET(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     // Fetch quotations
     const quotationsQuery = query(
       collection(db, "quotations"),
-      where("client_company_id", "==", companyId),
+      where("company_id", "==", companyId),
       orderBy("created", "desc")
     )
     const quotationsSnapshot = await getDocs(quotationsQuery)
@@ -71,10 +72,25 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Filter by year if provided
+    // Filter quotations by date range or year if provided
     let filteredQuotations = quotations
-    let filteredBookingsForRate = bookings
-    if (year) {
+    if (startDate || endDate) {
+      filteredQuotations = quotations.filter(quotation => {
+        let created: Date
+        if (typeof quotation.created === 'string') {
+          created = new Date(quotation.created)
+        } else if (quotation.created && typeof quotation.created.toDate === 'function') {
+          created = quotation.created.toDate()
+        } else {
+          return false
+        }
+        const start = startDate ? new Date(startDate) : null
+        const end = endDate ? new Date(endDate) : null
+        if (start && created < start) return false
+        if (end && created > end) return false
+        return true
+      })
+    } else if (year) {
       const yearNum = parseInt(year)
       const yearStart = new Date(yearNum, 0, 1) // Jan 1
       const yearEnd = new Date(yearNum + 1, 0, 1) // Jan 1 next year
@@ -85,18 +101,6 @@ export async function GET(request: NextRequest) {
           created = new Date(quotation.created)
         } else if (quotation.created && typeof quotation.created.toDate === 'function') {
           created = quotation.created.toDate()
-        } else {
-          return false
-        }
-        return created >= yearStart && created < yearEnd
-      })
-
-      filteredBookingsForRate = bookings.filter(booking => {
-        let created: Date
-        if (typeof booking.created === 'string') {
-          created = new Date(booking.created)
-        } else if (booking.created && typeof booking.created.toDate === 'function') {
-          created = booking.created.toDate()
         } else {
           return false
         }
@@ -142,8 +146,11 @@ export async function GET(request: NextRequest) {
 
     // Calculate conversion rate
     const quotationsCount = filteredQuotations.length
-    const bookingsCount = filteredBookingsForRate.length
+    const bookingsCount = filteredQuotations.filter(q => (q.status as string) === "reserved" || (q.status as string) === "To Reserve").length
     const conversionRate = quotationsCount > 0 ? Math.min(100, Math.round((bookingsCount / quotationsCount) * 100)) : 0
+
+    // Get occupancy data
+    const occupancy = await getOccupancyData(companyId)
 
     return NextResponse.json({
       bestPerforming: {
@@ -160,7 +167,8 @@ export async function GET(request: NextRequest) {
         quotations: quotationsCount,
         bookings: bookingsCount,
         rate: conversionRate
-      }
+      },
+      occupancy
     })
 
   } catch (error) {

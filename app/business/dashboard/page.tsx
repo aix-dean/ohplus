@@ -41,6 +41,13 @@ export default function Dashboard() {
   })
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [conversionYear, setConversionYear] = useState("2025")
+  const [conversionDateRange, setConversionDateRange] = useState<DateRange | undefined>()
+  const [occupancy, setOccupancy] = useState({
+    staticUnavailable: 0,
+    staticTotal: 0,
+    dynamicUnavailable: 0,
+    dynamicTotal: 0
+  })
 
   useEffect(() => {
     if (userData?.company_id) {
@@ -52,7 +59,7 @@ export default function Dashboard() {
     if (userData?.company_id) {
       fetchConversionRate()
     }
-  }, [userData?.company_id, conversionYear])
+  }, [userData?.company_id, conversionYear, conversionDateRange])
 
   const fetchSitePerformance = async () => {
     try {
@@ -66,6 +73,7 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         setSitePerformance(data)
+        setOccupancy(data.occupancy)
       } else {
         console.error("Failed to fetch site performance")
       }
@@ -77,14 +85,24 @@ export default function Dashboard() {
   const fetchConversionRate = async () => {
     try {
       const params = new URLSearchParams({
-        companyId: userData!.company_id!,
-        year: conversionYear
+        companyId: userData!.company_id!
       })
+
+      if (conversionDateRange?.from) {
+        params.append("startDate", format(conversionDateRange.from, "yyyy-MM-dd"))
+      }
+      if (conversionDateRange?.to) {
+        params.append("endDate", format(conversionDateRange.to, "yyyy-MM-dd"))
+      } else {
+        params.append("year", conversionYear)
+      }
 
       const response = await fetch(`/api/business/dashboard?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setConversionRate(data.conversionRate)
+        const conversionData = data.conversionRate
+        const calculatedRate = conversionData.quotations > 0 ? Math.round((conversionData.bookings / conversionData.quotations) * 100) : 0
+        setConversionRate({ ...conversionData, rate: calculatedRate })
       } else {
         console.error("Failed to fetch conversion rate")
       }
@@ -96,7 +114,7 @@ export default function Dashboard() {
     <div className="min-h-screen">
         {/* Main Content */}
         <main className="flex-1 p-6">
-          <h1 className="text-2xl font-bold text-[#333333] mb-6">Nikki's Dashboard</h1>
+          <h1 className="text-2xl font-bold text-[#333333] mb-6">{userData?.first_name ? `${userData.first_name}'s Dashboard` : 'Dashboard'}</h1>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {/* Today Calendar */}
@@ -145,15 +163,11 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Static BB</span>
-                    <span className="font-semibold">16/20</span>
+                    <span className="font-semibold">{occupancy.staticUnavailable}/{occupancy.staticTotal}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">LED BB</span>
-                    <span className="font-semibold">2/3</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Lamp Posts</span>
-                    <span className="font-semibold">8/10</span>
+                    <span className="font-semibold">{occupancy.dynamicUnavailable}/{occupancy.dynamicTotal}</span>
                   </div>
 
                   <div className="flex items-center justify-center mt-6">
@@ -170,11 +184,11 @@ export default function Dashboard() {
                           fill="none"
                           stroke="#18da69"
                           strokeWidth="3"
-                          strokeDasharray="80, 100"
+                          strokeDasharray={`${occupancy.staticTotal + occupancy.dynamicTotal > 0 ? Math.round(((occupancy.staticUnavailable + occupancy.dynamicUnavailable) / (occupancy.staticTotal + occupancy.dynamicTotal)) * 100) : 0}, ${100 - (occupancy.staticTotal + occupancy.dynamicTotal > 0 ? Math.round(((occupancy.staticUnavailable + occupancy.dynamicUnavailable) / (occupancy.staticTotal + occupancy.dynamicTotal)) * 100) : 0)}`}
                         />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl font-bold text-[#333333]">80%</span>
+                        <span className="text-3xl font-bold text-[#333333]">{occupancy.staticTotal + occupancy.dynamicTotal > 0 ? Math.round(((occupancy.staticUnavailable + occupancy.dynamicUnavailable) / (occupancy.staticTotal + occupancy.dynamicTotal)) * 100) : 0}%</span>
                       </div>
                     </div>
                   </div>
@@ -241,17 +255,25 @@ export default function Dashboard() {
 
             {/* Conversion Rate */}
             <Card className="bg-white">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-semibold text-[#333333]">Conversion Rate</CardTitle>
-                <Select value={conversionYear} onValueChange={setConversionYear}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025">2025</SelectItem>
-                    <SelectItem value="2024">2024</SelectItem>
-                  </SelectContent>
-                </Select>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-semibold text-[#333333]">Conversion Rate</CardTitle>
+                  <Select value={conversionYear} onValueChange={setConversionYear}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2025">2025</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DateRangePicker
+                  value={conversionDateRange}
+                  onChange={setConversionDateRange}
+                  placeholder="Select custom date range"
+                  className="w-full mt-2"
+                />
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center gap-4 mb-6">
@@ -280,7 +302,7 @@ export default function Dashboard() {
                         fill="none"
                         stroke="#18da69"
                         strokeWidth="3"
-                        strokeDasharray={`${conversionRate.rate}, 100`}
+                        strokeDasharray={`${conversionRate.rate}, ${100 - conversionRate.rate}`}
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -291,6 +313,17 @@ export default function Dashboard() {
 
                 <div className="text-center mt-2">
                   <span className="text-xs text-gray-600">conversion rate</span>
+                </div>
+
+                <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-[#18da69] rounded-full"></div>
+                    <span>Reserved</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    <span>Pending</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
