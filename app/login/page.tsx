@@ -661,12 +661,12 @@ export default function LoginPage() {
 
         {/* Main upload area */}
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="relative max-w-sm w-full -mt-16 ml-16">
+          <div className="relative max-w-sm w-full -mt-16 ml-32">
             <Image
               src="/login-image-4.png"
               alt="License upload area"
-              width={300}
-              height={225}
+              width={240}
+              height={180}
               className={`rounded-2xl transition-all duration-300 cursor-pointer ${
                 isDragOver ? "scale-105 shadow-lg ring-4 ring-cyan-400" : ""
               } ${isActivated ? "ring-4 ring-green-400" : ""}`}
@@ -683,9 +683,9 @@ export default function LoginPage() {
               onChange={handleFileSelectStep3}
             />
             {isValidating && (
-              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+              <div className="absolute inset-0 flex items-center justify-center  -ml-32 bg-black/50 rounded-2xl">
                 <div className="text-center text-white">
-                  <Loader2 className="w-16 h-16 mx-auto animate-spin mb-4" />
+                  <Loader2 className="w-8 h-12 mx-auto animate-spin" />
                   <p className="text-lg font-medium">Validating License Key...</p>
                 </div>
               </div>
@@ -787,14 +787,14 @@ export default function LoginPage() {
       <Dialog open={currentStep === 2} onOpenChange={(open) => { if (!open) setCurrentStep(1); }}>
         <DialogContent className="bg-white rounded-[50px] shadow-lg p-8 max-w-4xl w-full flex">
 <div className="flex-1 p-4 flex items-center justify-center">
-              <Image
-                src="/login-image-2.png"
-                alt="Login illustration"
-                width={400}
-                height={400}
-                className="rounded-lg"
-              />
-            </div>
+  <Image
+    src="/login-image-2.png"
+    alt="Login illustration"
+    width={320}
+    height={320}
+    className="rounded-lg"
+  />
+</div>
             <div className="flex-1 p-4 space-y-4">
               <div className="flex justify-end">
                 <Button
