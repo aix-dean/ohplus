@@ -2140,6 +2140,9 @@ export async function getOccupancyData(companyId: string, currentDate: Date = ne
       dynamicUnavailable: 0,
       dynamicTotal: 0
     }
+  }
+}
+
 // Get service assignments filtered by company_id and department
 export async function getServiceAssignmentsByDepartment(company_id: string, department: string): Promise<ServiceAssignment[]> {
   try {
