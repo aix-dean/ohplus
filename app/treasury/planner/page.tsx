@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,11 +13,12 @@ import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import type { Booking } from "@/lib/booking-service"
-import { getProductById } from "@/lib/firebase-service"
-import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
-import { EventDetailsDialog } from "@/components/event-details-dialog"
 import { EventDialog } from "@/components/event-dialog"
+import type { Booking } from "@/lib/booking-service"
+import type { SalesEvent } from "@/lib/planner-service"
+import { getProductById, getServiceAssignmentsByDepartment } from "@/lib/firebase-service"
+import { getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -59,7 +60,7 @@ const formatDate = (date: Date) => {
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
 }
 
-export default function AdminPlannerPage() {
+export default function TreasuryPlannerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { userData } = useAuth()
@@ -75,10 +76,12 @@ export default function AdminPlannerPage() {
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
   const [siteProduct, setSiteProduct] = useState<any>(null)
   const [siteProductLoading, setSiteProductLoading] = useState(false)
+
+  // Events state
   const [events, setEvents] = useState<SalesEvent[]>([])
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
   const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
-  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<SalesEvent | null>(null)
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -92,79 +95,25 @@ export default function AdminPlannerPage() {
       return
     }
 
+    const DEPARTMENT = "TREASURY"
+
     try {
       setLoading(true)
 
-      // Query service assignments from Firestore using company_id
-      const assignmentsRef = collection(db, "service_assignments")
-
-      // Try with orderBy first
-      let q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
-
-      let querySnapshot
-      try {
-        querySnapshot = await getDocs(q)
-      } catch (orderByError) {
-        // If orderBy fails (likely due to missing index), try without orderBy
-        q = query(assignmentsRef, where("company_id", "==", userData.company_id))
-        querySnapshot = await getDocs(q)
-      }
+      const assignments = await getServiceAssignmentsByDepartment(userData.company_id, DEPARTMENT)
 
       const fetchedAssignments: ServiceAssignment[] = []
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-
+      assignments.forEach((assignment) => {
         // Convert Firestore timestamps to Date objects with better error handling
-        let alarmDate: Date | null = null
-        let coveredDateStart: Date | null = null
-        let coveredDateEnd: Date | null = null
-
-        try {
-          // Parse alarmDate - this is the primary date for calendar display
-          if (data.alarmDate) {
-            if (data.alarmDate.toDate) {
-              alarmDate = data.alarmDate.toDate()
-            } else if (data.alarmDate.seconds) {
-              alarmDate = new Date(data.alarmDate.seconds * 1000)
-            } else {
-              alarmDate = new Date(data.alarmDate)
-            }
-          }
-
-          // Parse coveredDateStart
-          if (data.coveredDateStart) {
-            if (data.coveredDateStart.toDate) {
-              coveredDateStart = data.coveredDateStart.toDate()
-            } else if (data.coveredDateStart.seconds) {
-              coveredDateStart = new Date(data.coveredDateStart.seconds * 1000)
-            } else {
-              coveredDateStart = new Date(data.coveredDateStart)
-            }
-          }
-
-          // Parse coveredDateEnd
-          if (data.coveredDateEnd) {
-            if (data.coveredDateEnd.toDate) {
-              coveredDateEnd = data.coveredDateEnd.toDate()
-            } else if (data.coveredDateEnd.seconds) {
-              coveredDateEnd = new Date(data.coveredDateEnd.seconds * 1000)
-            } else {
-              coveredDateEnd = new Date(data.coveredDateEnd)
-            }
-          }
-        } catch (dateError) {
-          console.error("Error parsing dates for assignment:", doc.id, dateError)
-        }
-
         let createdAt: Date = new Date()
         try {
-          if (data.created) {
-            if (data.created.toDate) {
-              createdAt = data.created.toDate()
-            } else if (data.created.seconds) {
-              createdAt = new Date(data.created.seconds * 1000)
+          if (assignment.created) {
+            if (assignment.created.toDate) {
+              createdAt = assignment.created.toDate()
+            } else if (assignment.created.seconds) {
+              createdAt = new Date(assignment.created.seconds * 1000)
             } else {
-              createdAt = new Date(data.created)
+              createdAt = new Date(assignment.created)
             }
           }
         } catch (createdError) {
@@ -173,41 +122,40 @@ export default function AdminPlannerPage() {
 
         let updatedAt: Date = new Date()
         try {
-          if (data.updated) {
-            if (data.updated.toDate) {
-              updatedAt = data.updated.toDate()
-            } else if (data.updated.seconds) {
-              updatedAt = new Date(data.updated.seconds * 1000)
+          if (assignment.updated) {
+            if (assignment.updated.toDate) {
+              updatedAt = assignment.updated.toDate()
+            } else if (assignment.updated.seconds) {
+              updatedAt = new Date(assignment.updated.seconds * 1000)
             } else {
-              updatedAt = new Date(data.updated)
+              updatedAt = new Date(assignment.updated)
             }
           }
         } catch (updatedError) {
           console.error("Error parsing updated date:", updatedError)
         }
 
-        const assignment: ServiceAssignment = {
-          id: doc.id,
-          saNumber: data.saNumber || "",
-          projectSiteId: data.projectSiteId || data.siteId || "",
-          projectSiteName:
-            data.projectSiteName || data.project_site_name || data.siteName || data.location || "Unknown Site",
-          serviceType: data.serviceType || data.service_type || data.type || "General Service",
-          alarmDate,
-          alarmTime: data.alarmTime || data.alarm_time || "08:00",
-          coveredDateStart,
-          coveredDateEnd,
-          status: data.status || "Pending",
-          location: data.projectSiteLocation || data.location || data.address || "",
-          notes: data.message || data.notes || data.description || "",
-          assignedTo: data.assignedTo || data.assignedToId || "",
-          assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
-          jobDescription: data.jobDescription || data.description || "",
+        const localAssignment: ServiceAssignment = {
+          id: assignment.id,
+          saNumber: assignment.saNumber || "",
+          projectSiteId: assignment.projectSiteId || "",
+          projectSiteName: assignment.projectSiteName || "Unknown Site",
+          serviceType: assignment.serviceType || "General Service",
+          alarmDate: assignment.alarmDate,
+          alarmTime: assignment.alarmTime || "08:00",
+          coveredDateStart: assignment.coveredDateStart,
+          coveredDateEnd: assignment.coveredDateEnd,
+          status: assignment.status || "Pending",
+          location: assignment.projectSiteLocation || "",
+          notes: assignment.message || "",
+          assignedTo: assignment.assignedTo || "",
+          assignedToName: assignment.requestedBy?.name || "Unassigned",
+          jobDescription: assignment.jobDescription || "",
           createdAt,
           updatedAt,
         }
 
-        fetchedAssignments.push(assignment)
+        fetchedAssignments.push(localAssignment)
       })
 
       setAssignments(fetchedAssignments)
@@ -219,16 +167,23 @@ export default function AdminPlannerPage() {
     }
   }, [userData])
 
-  // Fetch events
+  // Fetch events for treasury department
   const fetchEvents = useCallback(async () => {
+    if (!userData?.company_id) {
+      setEvents([])
+      return
+    }
+
     try {
-      const fetchedEvents = await getSalesEvents(true, "admin")
+      const isAdmin = userData.role === "admin"
+      const userDepartment = "treasury"
+      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment)
       setEvents(fetchedEvents)
     } catch (error) {
       console.error("Error fetching events:", error)
       setEvents([])
     }
-  }, [])
+  }, [userData])
 
   useEffect(() => {
     fetchAssignments()
@@ -350,7 +305,7 @@ export default function AdminPlannerPage() {
   }
 
   const handleEventClick = (event: SalesEvent) => {
-    setSelectedEventForDetails(event)
+    setSelectedEvent(event)
     setEventDetailsDialogOpen(true)
   }
 
@@ -397,7 +352,7 @@ export default function AdminPlannerPage() {
     return currentDate.toLocaleDateString([], options)
   }
 
-  // Filter assignments/bookings based on current view and search term
+  // Filter assignments/events/bookings based on current view and search term
   const getFilteredItems = () => {
     if (plannerView === "bookings") {
       if (!bookings || bookings.length === 0) {
@@ -689,7 +644,6 @@ export default function AdminPlannerPage() {
     }
   }
 
-
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -718,8 +672,8 @@ export default function AdminPlannerPage() {
     }
   }
 
-  // Month view renderer with actual assignment data
-  const renderMonthView = (assignments: ServiceAssignment[]) => {
+  // Month view renderer with actual assignment and event data
+  const renderMonthView = (assignments: ServiceAssignment[], events: SalesEvent[] = []) => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const daysInMonth = getDaysInMonth(year, month)
@@ -786,6 +740,7 @@ export default function AdminPlannerPage() {
             day && new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year
 
           const dayAssignments = day ? assignmentsByDay[day] || [] : []
+          const dayEvents = day ? eventsByDay[day] || [] : []
 
           return (
             <div
@@ -800,7 +755,8 @@ export default function AdminPlannerPage() {
                     {day}
                   </div>
                   <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
-                    {dayAssignments.slice(0, 3).map((assignment, j) => (
+                    {/* Service Assignments */}
+                    {dayAssignments.slice(0, 2).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
@@ -828,15 +784,12 @@ export default function AdminPlannerPage() {
                         </div>
                       </div>
                     ))}
-                    {dayAssignments.length > 3 && (
-                      <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
-                        +{dayAssignments.length - 3} more
-                      </div>
-                    )}
-                    {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
+
+                    {/* Events */}
+                    {dayEvents.slice(0, 2).map((event, j) => (
                       <div
                         key={`event-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-purple-50 border-purple-200`}
                         onClick={(e) => {
                           e.stopPropagation()
                           handleEventClick(event)
@@ -844,7 +797,7 @@ export default function AdminPlannerPage() {
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
                         <div className="flex items-center gap-1">
-                          <span>🎉</span>
+                          <span>📅</span>
                           <span className="truncate font-medium">{event.title}</span>
                         </div>
                         <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
@@ -853,17 +806,20 @@ export default function AdminPlannerPage() {
                         <div className="flex items-center justify-between mt-0.5">
                           <Badge
                             variant="outline"
-                            className={`text-[6px] sm:text-[8px] px-1 py-0 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
+                            className={`${getStatusColor(event.status)} text-[6px] sm:text-[8px] px-1 py-0`}
                           >
                             {event.type}
                           </Badge>
-                          <span className="text-[6px] sm:text-[8px] text-gray-500">{formatTime(event.start as Date)}</span>
+                          <span className="text-[6px] sm:text-[8px] text-gray-500">
+                            {event.start instanceof Date ? formatTime(event.start) : ""}
+                          </span>
                         </div>
                       </div>
-                    )) : null}
-                    {day && eventsByDay[day]?.length > 2 && (
-                      <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline">
-                        +{eventsByDay[day].length - 2} more events
+                    ))}
+
+                    {(dayAssignments.length > 2 || dayEvents.length > 2) && (
+                      <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
+                        +{(dayAssignments.length - 2) + (dayEvents.length - 2)} more
                       </div>
                     )}
                   </div>
@@ -876,8 +832,8 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Week view renderer with actual assignment data
-  const renderWeekView = (assignments: ServiceAssignment[]) => {
+  // Week view renderer with actual assignment and event data
+  const renderWeekView = (assignments: ServiceAssignment[], events: SalesEvent[] = []) => {
     const weekStart = new Date(currentDate)
     weekStart.setDate(currentDate.getDate() - currentDate.getDay())
     weekStart.setHours(0, 0, 0, 0)
@@ -999,8 +955,8 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Day view renderer with actual assignment data
-  const renderDayView = (assignments: ServiceAssignment[]) => {
+  // Day view renderer with actual assignment and event data
+  const renderDayView = (assignments: ServiceAssignment[], events: SalesEvent[] = []) => {
     // Create array of hours
     const hours = Array(24)
       .fill(null)
@@ -1100,8 +1056,8 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Hour view renderer with actual assignment data
-  const renderHourView = (assignments: ServiceAssignment[]) => {
+  // Hour view renderer with actual assignment and event data
+  const renderHourView = (assignments: ServiceAssignment[], events: SalesEvent[] = []) => {
     // Create array of 5-minute intervals
     const intervals = Array(12)
       .fill(null)
@@ -1200,8 +1156,8 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Minute view renderer with actual assignment data
-  const renderMinuteView = (assignments: ServiceAssignment[]) => {
+  // Minute view renderer with actual assignment and event data
+  const renderMinuteView = (assignments: ServiceAssignment[], events: SalesEvent[] = []) => {
     // Create array of 1-minute intervals for a 15-minute window
     const baseMinute = Math.floor(currentDate.getMinutes() / 15) * 15
     const intervals = Array(15)
@@ -1423,15 +1379,15 @@ export default function AdminPlannerPage() {
 
     switch (view) {
       case "month":
-        return plannerView === "bookings" ? renderMonthView(filteredItems as any) : renderMonthView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderMonthView(filteredItems as any) : renderMonthView(filteredItems as ServiceAssignment[], events)
       case "week":
-        return plannerView === "bookings" ? renderWeekView(filteredItems as any) : renderWeekView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderWeekView(filteredItems as any) : renderWeekView(filteredItems as ServiceAssignment[], events)
       case "day":
-        return plannerView === "bookings" ? renderDayView(filteredItems as any) : renderDayView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderDayView(filteredItems as any) : renderDayView(filteredItems as ServiceAssignment[], events)
       case "hour":
-        return plannerView === "bookings" ? renderHourView(filteredItems as any) : renderHourView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderHourView(filteredItems as any) : renderHourView(filteredItems as ServiceAssignment[], events)
       case "minute":
-        return plannerView === "bookings" ? renderMinuteView(filteredItems as any) : renderMinuteView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderMinuteView(filteredItems as any) : renderMinuteView(filteredItems as ServiceAssignment[], events)
     }
   }
 
@@ -1444,7 +1400,7 @@ export default function AdminPlannerPage() {
             <h1 className="text-2xl font-bold">
               {plannerView === "bookings"
                 ? (siteProduct ? `${siteProduct.name} - Bookings Calendar` : "Site Bookings Calendar")
-                : "Admin Calendar"
+                : "Treasury Calendar"
               }
             </h1>
             {siteId && (
@@ -1458,19 +1414,16 @@ export default function AdminPlannerPage() {
                 Back to Site
               </Button>
             )}
-            {!siteId && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setEventDialogOpen(true)}
-                className="flex items-center gap-2"
-              >
-                Add Event
-              </Button>
-            )}
+            <Button
+              onClick={() => setEventDialogOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Event
+            </Button>
           </div>
           <div className="text-sm text-gray-500">
-            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments, ${events.length} events loaded`}
+            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments and ${events.length} events loaded`}
           </div>
         </div>
 
@@ -1623,16 +1576,6 @@ export default function AdminPlannerPage() {
           )}
         </div>
 
-        <EventDialog
-          isOpen={eventDialogOpen}
-          onClose={() => setEventDialogOpen(false)}
-          onEventSaved={(eventId) => {
-            // Refresh events after creating a new one
-            fetchEvents()
-          }}
-          department="admin"
-        />
-
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}
@@ -1640,13 +1583,23 @@ export default function AdminPlannerPage() {
             // Refresh assignments after creating a new one
             fetchAssignments()
           }}
-          department="ADMIN"
+          department="TREASURY"
+        />
+
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="treasury"
         />
 
         <EventDetailsDialog
           isOpen={eventDetailsDialogOpen}
           onClose={() => setEventDetailsDialogOpen(false)}
-          event={selectedEventForDetails}
+          event={selectedEvent}
         />
       </div>
     </div>

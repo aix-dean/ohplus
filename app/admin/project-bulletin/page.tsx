@@ -453,7 +453,7 @@ export default function ProjectMonitoringPage() {
                       console.log('Latest JO IDs:', latestJoIds)
                       console.log('Latest JO ID for this product:', latestJoIds[product.id!])
                       if (latestJoIds[product.id!]) {
-                        router.push(`/sales/project-monitoring/details/${latestJoIds[product.id!]}`)
+                        router.push(`/admin/project-bulletin/details/${latestJoIds[product.id!]}`)
                       } else {
                         console.log('No latest JO ID found for product:', product.id)
                       }
@@ -554,7 +554,7 @@ export default function ProjectMonitoringPage() {
                     <div
                       key={jobOrder.id}
                       className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/sales/project-monitoring/details/${jobOrder.id}`)}
+                      onClick={() => router.push(`/admin/project-bulletin/details/${jobOrder.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-gray-900">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,11 +13,12 @@ import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import type { Booking } from "@/lib/booking-service"
-import { getProductById } from "@/lib/firebase-service"
-import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
-import { EventDetailsDialog } from "@/components/event-details-dialog"
 import { EventDialog } from "@/components/event-dialog"
+import type { Booking } from "@/lib/booking-service"
+import type { SalesEvent } from "@/lib/planner-service"
+import { getProductById, getServiceAssignmentsByDepartment } from "@/lib/firebase-service"
+import { getSalesEvents } from "@/lib/planner-service"
+import { usePermission } from "@/hooks/use-permissions"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -59,26 +60,25 @@ const formatDate = (date: Date) => {
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
 }
 
-export default function AdminPlannerPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { userData } = useAuth()
-  const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<CalendarViewType>("month")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [plannerView, setPlannerView] = useState<"assignments" | "bookings">("assignments")
+export default function BusinessDevPlannerPage() {
+   const router = useRouter()
+   const searchParams = useSearchParams()
+   const { userData, user } = useAuth()
+   const { hasAccess: hasEventPermission } = usePermission("events", "create")
+   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
+   const [events, setEvents] = useState<SalesEvent[]>([])
+   const [bookings, setBookings] = useState<Booking[]>([])
+   const [loading, setLoading] = useState(true)
+   const [currentDate, setCurrentDate] = useState(new Date())
+   const [view, setView] = useState<CalendarViewType>("month")
+   const [searchTerm, setSearchTerm] = useState("")
+   const [plannerView, setPlannerView] = useState<"assignments" | "bookings">("assignments")
 
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
-  const [siteProduct, setSiteProduct] = useState<any>(null)
-  const [siteProductLoading, setSiteProductLoading] = useState(false)
-  const [events, setEvents] = useState<SalesEvent[]>([])
-  const [eventDialogOpen, setEventDialogOpen] = useState(false)
-  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
-  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
+   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
+   const [eventDialogOpen, setEventDialogOpen] = useState(false)
+   const [siteProduct, setSiteProduct] = useState<any>(null)
+   const [siteProductLoading, setSiteProductLoading] = useState(false)
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -92,79 +92,25 @@ export default function AdminPlannerPage() {
       return
     }
 
+    const DEPARTMENT = "BUSINESS DEV"
+
     try {
       setLoading(true)
 
-      // Query service assignments from Firestore using company_id
-      const assignmentsRef = collection(db, "service_assignments")
-
-      // Try with orderBy first
-      let q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
-
-      let querySnapshot
-      try {
-        querySnapshot = await getDocs(q)
-      } catch (orderByError) {
-        // If orderBy fails (likely due to missing index), try without orderBy
-        q = query(assignmentsRef, where("company_id", "==", userData.company_id))
-        querySnapshot = await getDocs(q)
-      }
+      const assignments = await getServiceAssignmentsByDepartment(userData.company_id, DEPARTMENT)
 
       const fetchedAssignments: ServiceAssignment[] = []
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-
+      assignments.forEach((assignment) => {
         // Convert Firestore timestamps to Date objects with better error handling
-        let alarmDate: Date | null = null
-        let coveredDateStart: Date | null = null
-        let coveredDateEnd: Date | null = null
-
-        try {
-          // Parse alarmDate - this is the primary date for calendar display
-          if (data.alarmDate) {
-            if (data.alarmDate.toDate) {
-              alarmDate = data.alarmDate.toDate()
-            } else if (data.alarmDate.seconds) {
-              alarmDate = new Date(data.alarmDate.seconds * 1000)
-            } else {
-              alarmDate = new Date(data.alarmDate)
-            }
-          }
-
-          // Parse coveredDateStart
-          if (data.coveredDateStart) {
-            if (data.coveredDateStart.toDate) {
-              coveredDateStart = data.coveredDateStart.toDate()
-            } else if (data.coveredDateStart.seconds) {
-              coveredDateStart = new Date(data.coveredDateStart.seconds * 1000)
-            } else {
-              coveredDateStart = new Date(data.coveredDateStart)
-            }
-          }
-
-          // Parse coveredDateEnd
-          if (data.coveredDateEnd) {
-            if (data.coveredDateEnd.toDate) {
-              coveredDateEnd = data.coveredDateEnd.toDate()
-            } else if (data.coveredDateEnd.seconds) {
-              coveredDateEnd = new Date(data.coveredDateEnd.seconds * 1000)
-            } else {
-              coveredDateEnd = new Date(data.coveredDateEnd)
-            }
-          }
-        } catch (dateError) {
-          console.error("Error parsing dates for assignment:", doc.id, dateError)
-        }
-
         let createdAt: Date = new Date()
         try {
-          if (data.created) {
-            if (data.created.toDate) {
-              createdAt = data.created.toDate()
-            } else if (data.created.seconds) {
-              createdAt = new Date(data.created.seconds * 1000)
+          if (assignment.created) {
+            if (assignment.created.toDate) {
+              createdAt = assignment.created.toDate()
+            } else if (assignment.created.seconds) {
+              createdAt = new Date(assignment.created.seconds * 1000)
             } else {
-              createdAt = new Date(data.created)
+              createdAt = new Date(assignment.created)
             }
           }
         } catch (createdError) {
@@ -173,41 +119,40 @@ export default function AdminPlannerPage() {
 
         let updatedAt: Date = new Date()
         try {
-          if (data.updated) {
-            if (data.updated.toDate) {
-              updatedAt = data.updated.toDate()
-            } else if (data.updated.seconds) {
-              updatedAt = new Date(data.updated.seconds * 1000)
+          if (assignment.updated) {
+            if (assignment.updated.toDate) {
+              updatedAt = assignment.updated.toDate()
+            } else if (assignment.updated.seconds) {
+              updatedAt = new Date(assignment.updated.seconds * 1000)
             } else {
-              updatedAt = new Date(data.updated)
+              updatedAt = new Date(assignment.updated)
             }
           }
         } catch (updatedError) {
           console.error("Error parsing updated date:", updatedError)
         }
 
-        const assignment: ServiceAssignment = {
-          id: doc.id,
-          saNumber: data.saNumber || "",
-          projectSiteId: data.projectSiteId || data.siteId || "",
-          projectSiteName:
-            data.projectSiteName || data.project_site_name || data.siteName || data.location || "Unknown Site",
-          serviceType: data.serviceType || data.service_type || data.type || "General Service",
-          alarmDate,
-          alarmTime: data.alarmTime || data.alarm_time || "08:00",
-          coveredDateStart,
-          coveredDateEnd,
-          status: data.status || "Pending",
-          location: data.projectSiteLocation || data.location || data.address || "",
-          notes: data.message || data.notes || data.description || "",
-          assignedTo: data.assignedTo || data.assignedToId || "",
-          assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
-          jobDescription: data.jobDescription || data.description || "",
+        const localAssignment: ServiceAssignment = {
+          id: assignment.id,
+          saNumber: assignment.saNumber || "",
+          projectSiteId: assignment.projectSiteId || "",
+          projectSiteName: assignment.projectSiteName || "Unknown Site",
+          serviceType: assignment.serviceType || "General Service",
+          alarmDate: assignment.alarmDate,
+          alarmTime: assignment.alarmTime || "08:00",
+          coveredDateStart: assignment.coveredDateStart,
+          coveredDateEnd: assignment.coveredDateEnd,
+          status: assignment.status || "Pending",
+          location: assignment.projectSiteLocation || "",
+          notes: assignment.message || "",
+          assignedTo: assignment.assignedTo || "",
+          assignedToName: assignment.requestedBy?.name || "Unassigned",
+          jobDescription: assignment.jobDescription || "",
           createdAt,
           updatedAt,
         }
 
-        fetchedAssignments.push(assignment)
+        fetchedAssignments.push(localAssignment)
       })
 
       setAssignments(fetchedAssignments)
@@ -219,16 +164,23 @@ export default function AdminPlannerPage() {
     }
   }, [userData])
 
-  // Fetch events
+  // Fetch events for business-dev department
   const fetchEvents = useCallback(async () => {
+    if (!userData?.company_id || !user) {
+      setEvents([])
+      return
+    }
+
     try {
-      const fetchedEvents = await getSalesEvents(true, "admin")
-      setEvents(fetchedEvents)
+      const isAdmin = userData.role === "admin"
+      const userDepartment = "business-dev"
+      const events = await getSalesEvents(isAdmin, userDepartment)
+      setEvents(events)
     } catch (error) {
       console.error("Error fetching events:", error)
       setEvents([])
     }
-  }, [])
+  }, [userData, user])
 
   useEffect(() => {
     fetchAssignments()
@@ -349,11 +301,6 @@ export default function AdminPlannerPage() {
     setCurrentDate(new Date())
   }
 
-  const handleEventClick = (event: SalesEvent) => {
-    setSelectedEventForDetails(event)
-    setEventDetailsDialogOpen(true)
-  }
-
   // View title based on current view and date
   const getViewTitle = () => {
     const options: Intl.DateTimeFormatOptions = {}
@@ -397,7 +344,7 @@ export default function AdminPlannerPage() {
     return currentDate.toLocaleDateString([], options)
   }
 
-  // Filter assignments/bookings based on current view and search term
+  // Filter assignments/bookings/events based on current view and search term
   const getFilteredItems = () => {
     if (plannerView === "bookings") {
       if (!bookings || bookings.length === 0) {
@@ -466,179 +413,260 @@ export default function AdminPlannerPage() {
           return filtered
       }
     } else {
-      if (!assignments || assignments.length === 0) {
-        return []
-      }
+      // For assignments view, return both assignments and events
+      const filteredAssignments = (() => {
+        if (!assignments || assignments.length === 0) {
+          return []
+        }
 
-      let filtered = [...assignments]
+        let filtered = [...assignments]
 
-      // Apply search filter if any
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase()
-        filtered = filtered.filter(
-          (assignment) =>
-            assignment.saNumber?.toLowerCase().includes(term) ||
-            assignment.projectSiteName?.toLowerCase().includes(term) ||
-            assignment.serviceType?.toLowerCase().includes(term) ||
-            assignment.location?.toLowerCase().includes(term) ||
-            assignment.assignedToName?.toLowerCase().includes(term) ||
-            assignment.notes?.toLowerCase().includes(term) ||
-            assignment.jobDescription?.toLowerCase().includes(term),
-        )
-      }
+        // Apply search filter if any
+        if (searchTerm) {
+          const term = searchTerm.toLowerCase()
+          filtered = filtered.filter(
+            (assignment) =>
+              assignment.saNumber?.toLowerCase().includes(term) ||
+              assignment.projectSiteName?.toLowerCase().includes(term) ||
+              assignment.serviceType?.toLowerCase().includes(term) ||
+              assignment.location?.toLowerCase().includes(term) ||
+              assignment.assignedToName?.toLowerCase().includes(term) ||
+              assignment.notes?.toLowerCase().includes(term) ||
+              assignment.jobDescription?.toLowerCase().includes(term),
+          )
+        }
 
-      // Filter based on current view and date range - use alarmDate as primary filter
-      switch (view) {
-        case "month":
-          const monthFiltered = filtered.filter((assignment) => {
-            // Primary filter: alarmDate
-            if (assignment.alarmDate) {
-              const matches =
-                assignment.alarmDate.getMonth() === currentDate.getMonth() &&
-                assignment.alarmDate.getFullYear() === currentDate.getFullYear()
+        // Filter based on current view and date range - use alarmDate as primary filter
+        switch (view) {
+          case "month":
+            const monthFiltered = filtered.filter((assignment) => {
+              // Primary filter: alarmDate
+              if (assignment.alarmDate) {
+                const matches =
+                  assignment.alarmDate.getMonth() === currentDate.getMonth() &&
+                  assignment.alarmDate.getFullYear() === currentDate.getFullYear()
+                return matches
+              }
 
-              console.log(
-                "Assignment",
-                assignment.saNumber,
-                "alarmDate:",
-                assignment.alarmDate,
-                "current month/year:",
-                currentDate.getMonth(),
-                currentDate.getFullYear(),
-                "matches:",
-                matches,
-              )
-              return matches
-            }
+              // Fallback: check if assignment spans this month using covered dates
+              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
+                const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+                const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59)
 
-            // Fallback: check if assignment spans this month using covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-              const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59)
+                const overlaps = assignment.coveredDateStart <= monthEnd && assignment.coveredDateEnd >= monthStart
+                return overlaps
+              }
 
-              const overlaps = assignment.coveredDateStart <= monthEnd && assignment.coveredDateEnd >= monthStart
-              console.log(
-                "Assignment",
-                assignment.saNumber,
-                "spans month:",
-                overlaps,
-                "covered:",
-                assignment.coveredDateStart,
-                "to",
-                assignment.coveredDateEnd,
-              )
-              return overlaps
-            }
+              return false
+            })
+            return monthFiltered
 
-            return false
-          })
-          return monthFiltered
+          case "week":
+            const weekStart = new Date(currentDate)
+            weekStart.setDate(currentDate.getDate() - currentDate.getDay())
+            weekStart.setHours(0, 0, 0, 0)
 
-        case "week":
-          const weekStart = new Date(currentDate)
-          weekStart.setDate(currentDate.getDate() - currentDate.getDay())
-          weekStart.setHours(0, 0, 0, 0)
+            const weekEnd = new Date(weekStart)
+            weekEnd.setDate(weekStart.getDate() + 6)
+            weekEnd.setHours(23, 59, 59, 999)
 
-          const weekEnd = new Date(weekStart)
-          weekEnd.setDate(weekStart.getDate() + 6)
-          weekEnd.setHours(23, 59, 59, 999)
+            return filtered.filter((assignment) => {
+              // Primary filter: alarmDate
+              if (assignment.alarmDate) {
+                const inWeek = assignment.alarmDate >= weekStart && assignment.alarmDate <= weekEnd
+                return inWeek
+              }
 
-          return filtered.filter((assignment) => {
-            // Primary filter: alarmDate
-            if (assignment.alarmDate) {
-              const inWeek = assignment.alarmDate >= weekStart && assignment.alarmDate <= weekEnd
-              return inWeek
-            }
+              // Fallback: check covered dates
+              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
+                const overlaps = assignment.coveredDateStart <= weekEnd && assignment.coveredDateEnd >= weekStart
+                return overlaps
+              }
 
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart <= weekEnd && assignment.coveredDateEnd >= weekStart
-              return overlaps
-            }
+              return false
+            })
 
-            return false
-          })
+          case "day":
+            const dayStart = new Date(currentDate)
+            dayStart.setHours(0, 0, 0, 0)
 
-        case "day":
-          const dayStart = new Date(currentDate)
-          dayStart.setHours(0, 0, 0, 0)
+            const dayEnd = new Date(currentDate)
+            dayEnd.setHours(23, 59, 59, 999)
 
-          const dayEnd = new Date(currentDate)
-          dayEnd.setHours(23, 59, 59, 999)
+            return filtered.filter((assignment) => {
+              // Primary filter: alarmDate
+              if (assignment.alarmDate) {
+                const sameDay = assignment.alarmDate >= dayStart && assignment.alarmDate <= dayEnd
+                return sameDay
+              }
 
-          return filtered.filter((assignment) => {
-            // Primary filter: alarmDate
-            if (assignment.alarmDate) {
-              const sameDay = assignment.alarmDate >= dayStart && assignment.alarmDate <= dayEnd
-              return sameDay
-            }
+              // Fallback: check covered dates
+              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
+                const overlaps = assignment.coveredDateStart <= dayEnd && assignment.coveredDateEnd >= dayStart
+                return overlaps
+              }
 
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart <= dayEnd && assignment.coveredDateEnd >= dayStart
-              return overlaps
-            }
+              return false
+            })
 
-            return false
-          })
+          case "hour":
+            const hourStart = new Date(currentDate)
+            hourStart.setMinutes(0, 0, 0)
 
-        case "hour":
-          const hourStart = new Date(currentDate)
-          hourStart.setMinutes(0, 0, 0)
+            const hourEnd = new Date(hourStart)
+            hourEnd.setHours(hourStart.getHours() + 1)
 
-          const hourEnd = new Date(hourStart)
-          hourEnd.setHours(hourStart.getHours() + 1)
+            return filtered.filter((assignment) => {
+              // For hour view, check if alarmDate + alarmTime falls within this hour
+              if (assignment.alarmDate && assignment.alarmTime) {
+                const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
+                const assignmentDateTime = new Date(assignment.alarmDate)
+                assignmentDateTime.setHours(hours, minutes, 0, 0)
 
-          return filtered.filter((assignment) => {
-            // For hour view, check if alarmDate + alarmTime falls within this hour
-            if (assignment.alarmDate && assignment.alarmTime) {
-              const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-              const assignmentDateTime = new Date(assignment.alarmDate)
-              assignmentDateTime.setHours(hours, minutes, 0, 0)
+                const inHour = assignmentDateTime >= hourStart && assignmentDateTime < hourEnd
+                return inHour
+              }
 
-              const inHour = assignmentDateTime >= hourStart && assignmentDateTime < hourEnd
-              return inHour
-            }
+              // Fallback: check covered dates
+              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
+                const overlaps = assignment.coveredDateStart < hourEnd && assignment.coveredDateEnd >= hourStart
+                return overlaps
+              }
 
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart < hourEnd && assignment.coveredDateEnd >= hourStart
-              return overlaps
-            }
+              return false
+            })
 
-            return false
-          })
+          case "minute":
+            const minuteStart = new Date(currentDate)
+            minuteStart.setSeconds(0, 0)
 
-        case "minute":
-          const minuteStart = new Date(currentDate)
-          minuteStart.setSeconds(0, 0)
+            const minuteEnd = new Date(minuteStart)
+            minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
 
-          const minuteEnd = new Date(minuteStart)
-          minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
+            return filtered.filter((assignment) => {
+              // For minute view, check if alarmDate + alarmTime falls within this 15-minute window
+              if (assignment.alarmDate && assignment.alarmTime) {
+                const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
+                const assignmentDateTime = new Date(assignment.alarmDate)
+                assignmentDateTime.setHours(hours, minutes, 0, 0)
 
-          return filtered.filter((assignment) => {
-            // For minute view, check if alarmDate + alarmTime falls within this 15-minute window
-            if (assignment.alarmDate && assignment.alarmTime) {
-              const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-              const assignmentDateTime = new Date(assignment.alarmDate)
-              assignmentDateTime.setHours(hours, minutes, 0, 0)
+                const inWindow = assignmentDateTime >= minuteStart && assignmentDateTime < minuteEnd
+                return inWindow
+              }
 
-              const inWindow = assignmentDateTime >= minuteStart && assignmentDateTime < minuteEnd
-              return inWindow
-            }
+              // Fallback: check covered dates
+              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
+                const overlaps = assignment.coveredDateStart < minuteEnd && assignment.coveredDateEnd >= minuteStart
+                return overlaps
+              }
 
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart < minuteEnd && assignment.coveredDateEnd >= minuteStart
-              return overlaps
-            }
+              return false
+            })
 
-            return false
-          })
+          default:
+            return filtered
+        }
+      })()
 
-        default:
-          return filtered
-      }
+      const filteredEvents = (() => {
+        if (!events || events.length === 0) {
+          return []
+        }
+
+        let filtered = [...events]
+
+        // Apply search filter if any
+        if (searchTerm) {
+          const term = searchTerm.toLowerCase()
+          filtered = filtered.filter(
+            (event) =>
+              event.title?.toLowerCase().includes(term) ||
+              event.location?.toLowerCase().includes(term) ||
+              event.description?.toLowerCase().includes(term) ||
+              event.clientName?.toLowerCase().includes(term),
+          )
+        }
+
+        // Filter based on current view and date range - use start date
+        switch (view) {
+          case "month":
+            return filtered.filter((event) => {
+              if (event.start) {
+                const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+                return eventDate.getMonth() === currentDate.getMonth() &&
+                       eventDate.getFullYear() === currentDate.getFullYear()
+              }
+              return false
+            })
+
+          case "week":
+            const weekStart = new Date(currentDate)
+            weekStart.setDate(currentDate.getDate() - currentDate.getDay())
+            weekStart.setHours(0, 0, 0, 0)
+
+            const weekEnd = new Date(weekStart)
+            weekEnd.setDate(weekStart.getDate() + 6)
+            weekEnd.setHours(23, 59, 59, 999)
+
+            return filtered.filter((event) => {
+              if (event.start) {
+                const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+                return eventDate >= weekStart && eventDate <= weekEnd
+              }
+              return false
+            })
+
+          case "day":
+            const dayStart = new Date(currentDate)
+            dayStart.setHours(0, 0, 0, 0)
+
+            const dayEnd = new Date(currentDate)
+            dayEnd.setHours(23, 59, 59, 999)
+
+            return filtered.filter((event) => {
+              if (event.start) {
+                const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+                return eventDate >= dayStart && eventDate <= dayEnd
+              }
+              return false
+            })
+
+          case "hour":
+            const hourStart = new Date(currentDate)
+            hourStart.setMinutes(0, 0, 0)
+
+            const hourEnd = new Date(hourStart)
+            hourEnd.setHours(hourStart.getHours() + 1)
+
+            return filtered.filter((event) => {
+              if (event.start) {
+                const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+                return eventDate >= hourStart && eventDate < hourEnd
+              }
+              return false
+            })
+
+          case "minute":
+            const minuteStart = new Date(currentDate)
+            minuteStart.setSeconds(0, 0)
+
+            const minuteEnd = new Date(minuteStart)
+            minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
+
+            return filtered.filter((event) => {
+              if (event.start) {
+                const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+                return eventDate >= minuteStart && eventDate < minuteEnd
+              }
+              return false
+            })
+
+          default:
+            return filtered
+        }
+      })()
+
+      return { assignments: filteredAssignments, events: filteredEvents }
     }
   }
 
@@ -689,7 +717,6 @@ export default function AdminPlannerPage() {
     }
   }
 
-
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -718,8 +745,9 @@ export default function AdminPlannerPage() {
     }
   }
 
-  // Month view renderer with actual assignment data
-  const renderMonthView = (assignments: ServiceAssignment[]) => {
+  // Month view renderer with assignments and events data
+  const renderMonthView = (data: { assignments: ServiceAssignment[], events: SalesEvent[] }) => {
+    const { assignments, events } = data
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const daysInMonth = getDaysInMonth(year, month)
@@ -730,15 +758,17 @@ export default function AdminPlannerPage() {
       .fill(null)
       .concat([...Array(daysInMonth)].map((_, i) => i + 1))
 
-    // Group assignments by day - use alarmDate as primary grouping
-    const assignmentsByDay: { [key: number]: ServiceAssignment[] } = {}
+    // Group assignments and events by day
+    const itemsByDay: { [key: number]: (ServiceAssignment | SalesEvent)[] } = {}
+
+    // Add assignments
     assignments.forEach((assignment) => {
       // Primary: use alarmDate
       if (assignment.alarmDate) {
         if (assignment.alarmDate.getMonth() === month && assignment.alarmDate.getFullYear() === year) {
           const day = assignment.alarmDate.getDate()
-          if (!assignmentsByDay[day]) assignmentsByDay[day] = []
-          assignmentsByDay[day].push(assignment)
+          if (!itemsByDay[day]) itemsByDay[day] = []
+          itemsByDay[day].push(assignment)
         }
       } else if (assignment.coveredDateStart && assignment.coveredDateEnd) {
         // Fallback: show assignment on all days it spans within the current month
@@ -751,22 +781,22 @@ export default function AdminPlannerPage() {
         while (checkDate <= endCheck) {
           if (checkDate.getMonth() === month && checkDate.getFullYear() === year) {
             const day = checkDate.getDate()
-            if (!assignmentsByDay[day]) assignmentsByDay[day] = []
-            assignmentsByDay[day].push(assignment)
+            if (!itemsByDay[day]) itemsByDay[day] = []
+            itemsByDay[day].push(assignment)
           }
           checkDate.setDate(checkDate.getDate() + 1)
         }
       }
     })
 
-    // Group events by day
-    const eventsByDay: { [key: number]: SalesEvent[] } = {}
+    // Add events
     events.forEach((event) => {
-      if (event.start instanceof Date) {
-        if (event.start.getMonth() === month && event.start.getFullYear() === year) {
-          const day = event.start.getDate()
-          if (!eventsByDay[day]) eventsByDay[day] = []
-          eventsByDay[day].push(event)
+      if (event.start) {
+        const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+        if (eventDate.getMonth() === month && eventDate.getFullYear() === year) {
+          const day = eventDate.getDate()
+          if (!itemsByDay[day]) itemsByDay[day] = []
+          itemsByDay[day].push(event)
         }
       }
     })
@@ -785,7 +815,7 @@ export default function AdminPlannerPage() {
           const isToday =
             day && new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year
 
-          const dayAssignments = day ? assignmentsByDay[day] || [] : []
+          const dayItems = day ? itemsByDay[day] || [] : []
 
           return (
             <div
@@ -800,70 +830,76 @@ export default function AdminPlannerPage() {
                     {day}
                   </div>
                   <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
-                    {dayAssignments.slice(0, 3).map((assignment, j) => (
-                      <div
-                        key={`assignment-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/admin/service-assignments/${assignment.id}`)
-                        }}
-                        title={`${assignment.saNumber} - ${assignment.projectSiteName} (${assignment.serviceType}) at ${assignment.alarmTime}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>{getTypeIcon(assignment.serviceType)}</span>
-                          <span className="truncate font-medium">{assignment.saNumber}</span>
-                        </div>
-                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
-                          {assignment.projectSiteName}
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <Badge
-                            variant="outline"
-                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1 py-0`}
+                    {dayItems.slice(0, 3).map((item, j) => {
+                      const isAssignment = 'saNumber' in item
+                      const isEvent = 'title' in item
+
+                      if (isAssignment) {
+                        const assignment = item as ServiceAssignment
+                        return (
+                          <div
+                            key={`assignment-${day}-${j}`}
+                            className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/admin/service-assignments/${assignment.id}`)
+                            }}
+                            title={`${assignment.saNumber} - ${assignment.projectSiteName} (${assignment.serviceType}) at ${assignment.alarmTime}`}
                           >
-                            {assignment.status}
-                          </Badge>
-                          <span className="text-[6px] sm:text-[8px] text-gray-500">{assignment.alarmTime}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {dayAssignments.length > 3 && (
+                            <div className="flex items-center gap-1">
+                              <span>{getTypeIcon(assignment.serviceType)}</span>
+                              <span className="truncate font-medium">{assignment.saNumber}</span>
+                            </div>
+                            <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                              {assignment.projectSiteName}
+                            </div>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <Badge
+                                variant="outline"
+                                className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1 py-0`}
+                              >
+                                {assignment.status}
+                              </Badge>
+                              <span className="text-[6px] sm:text-[8px] text-gray-500">{assignment.alarmTime}</span>
+                            </div>
+                          </div>
+                        )
+                      } else if (isEvent) {
+                        const event = item as SalesEvent
+                        return (
+                          <div
+                            key={`event-${day}-${j}`}
+                            className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-blue-50 border-blue-200`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Could navigate to event details if available
+                            }}
+                            title={`${event.title} - ${event.location} (${event.type})`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>📅</span>
+                              <span className="truncate font-medium">{event.title}</span>
+                            </div>
+                            <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                              {event.location || 'No location'}
+                            </div>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <Badge
+                                variant="outline"
+                                className={`${getStatusColor(event.status)} text-[6px] sm:text-[8px] px-1 py-0`}
+                              >
+                                {event.status}
+                              </Badge>
+                              <span className="text-[6px] sm:text-[8px] text-gray-500">{event.type}</span>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    })}
+                    {dayItems.length > 3 && (
                       <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
-                        +{dayAssignments.length - 3} more
-                      </div>
-                    )}
-                    {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
-                      <div
-                        key={`event-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEventClick(event)
-                        }}
-                        title={`${event.title} - ${event.type} at ${event.location}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>🎉</span>
-                          <span className="truncate font-medium">{event.title}</span>
-                        </div>
-                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
-                          {event.location}
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <Badge
-                            variant="outline"
-                            className={`text-[6px] sm:text-[8px] px-1 py-0 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
-                          >
-                            {event.type}
-                          </Badge>
-                          <span className="text-[6px] sm:text-[8px] text-gray-500">{formatTime(event.start as Date)}</span>
-                        </div>
-                      </div>
-                    )) : null}
-                    {day && eventsByDay[day]?.length > 2 && (
-                      <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline">
-                        +{eventsByDay[day].length - 2} more events
+                        +{dayItems.length - 3} more
                       </div>
                     )}
                   </div>
@@ -876,8 +912,9 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Week view renderer with actual assignment data
-  const renderWeekView = (assignments: ServiceAssignment[]) => {
+  // Week view renderer with assignments and events data
+  const renderWeekView = (data: { assignments: ServiceAssignment[], events: SalesEvent[] }) => {
+    const { assignments, events } = data
     const weekStart = new Date(currentDate)
     weekStart.setDate(currentDate.getDate() - currentDate.getDay())
     weekStart.setHours(0, 0, 0, 0)
@@ -890,15 +927,16 @@ export default function AdminPlannerPage() {
         return day
       })
 
-    // Group assignments by day - use alarmDate as primary grouping
-    const assignmentsByDay: { [key: string]: ServiceAssignment[] } = {}
+    // Group assignments and events by day
+    const itemsByDay: { [key: string]: (ServiceAssignment | SalesEvent)[] } = {}
+
+    // Add assignments
     assignments.forEach((assignment) => {
-      console.log("Processing assignment: " + assignment.id)
       // Primary: use alarmDate
       if (assignment.alarmDate) {
         const dayKey = assignment.alarmDate.toDateString()
-        if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
-        assignmentsByDay[dayKey].push(assignment)
+        if (!itemsByDay[dayKey]) itemsByDay[dayKey] = []
+        itemsByDay[dayKey].push(assignment)
       } else if (assignment.coveredDateStart && assignment.coveredDateEnd) {
         // Fallback: show assignment on all days it spans within the week
         days.forEach((day) => {
@@ -910,10 +948,20 @@ export default function AdminPlannerPage() {
           const overlaps = assignment.coveredDateStart! <= dayEnd && assignment.coveredDateEnd! >= dayStart
           if (overlaps) {
             const dayKey = day.toDateString()
-            if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
-            assignmentsByDay[dayKey].push(assignment)
+            if (!itemsByDay[dayKey]) itemsByDay[dayKey] = []
+            itemsByDay[dayKey].push(assignment)
           }
         })
+      }
+    })
+
+    // Add events
+    events.forEach((event) => {
+      if (event.start) {
+        const eventDate = event.start instanceof Date ? event.start : (event.start as any).toDate()
+        const dayKey = eventDate.toDateString()
+        if (!itemsByDay[dayKey]) itemsByDay[dayKey] = []
+        itemsByDay[dayKey].push(event)
       }
     })
 
@@ -941,7 +989,7 @@ export default function AdminPlannerPage() {
         {/* Week content */}
         {days.map((day, i) => {
           const isToday = day.toDateString() === new Date().toDateString()
-          const dayAssignments = assignmentsByDay[day.toDateString()] || []
+          const dayItems = itemsByDay[day.toDateString()] || []
 
           return (
             <div
@@ -949,46 +997,87 @@ export default function AdminPlannerPage() {
               className={`border rounded-md overflow-hidden ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
             >
               <div className="overflow-y-auto h-[250px] sm:h-[400px] p-1">
-                {dayAssignments.map((assignment, j) => (
-                  <div
-                    key={`assignment-${i}-${j}`}
-                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm ${getServiceTypeColor(assignment.serviceType)}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/admin/service-assignments/${assignment.id}`)
-                    }}
-                    title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
-                  >
-                    <div className="font-medium truncate flex items-center gap-1">
-                      <span>{getTypeIcon(assignment.serviceType)}</span>
-                      <span>{assignment.saNumber}</span>
-                    </div>
-                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
-                      {assignment.projectSiteName}
-                    </div>
-                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1 truncate">
-                      {assignment.assignedToName || assignment.assignedTo || "Unassigned"}
-                    </div>
-                    <div className="flex items-center justify-between mt-1 sm:mt-2">
-                      <Badge
-                        variant="outline"
-                        className={`${getStatusColor(assignment.status)} text-[8px] sm:text-xs px-1`}
+                {dayItems.map((item, j) => {
+                  const isAssignment = 'saNumber' in item
+                  const isEvent = 'title' in item
+
+                  if (isAssignment) {
+                    const assignment = item as ServiceAssignment
+                    return (
+                      <div
+                        key={`assignment-${i}-${j}`}
+                        className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm ${getServiceTypeColor(assignment.serviceType)}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/admin/service-assignments/${assignment.id}`)
+                        }}
+                        title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
                       >
-                        {assignment.status}
-                      </Badge>
-                      <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
-                        {assignment.serviceType}
-                      </span>
-                    </div>
-                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1">
-                      {assignment.alarmTime && `⏰ ${assignment.alarmTime}`}
-                      {assignment.jobDescription && ` • ${assignment.jobDescription}`}
-                    </div>
-                  </div>
-                ))}
-                {dayAssignments.length === 0 && (
+                        <div className="font-medium truncate flex items-center gap-1">
+                          <span>{getTypeIcon(assignment.serviceType)}</span>
+                          <span>{assignment.saNumber}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
+                          {assignment.projectSiteName}
+                        </div>
+                        <div className="text-[8px] sm:text-xs text-gray-500 mt-1 truncate">
+                          {assignment.assignedToName || assignment.assignedTo || "Unassigned"}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 sm:mt-2">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(assignment.status)} text-[8px] sm:text-xs px-1`}
+                          >
+                            {assignment.status}
+                          </Badge>
+                          <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
+                            {assignment.serviceType}
+                          </span>
+                        </div>
+                        <div className="text-[8px] sm:text-xs text-gray-500 mt-1">
+                          {assignment.alarmTime && `⏰ ${assignment.alarmTime}`}
+                          {assignment.jobDescription && ` • ${assignment.jobDescription}`}
+                        </div>
+                      </div>
+                    )
+                  } else if (isEvent) {
+                    const event = item as SalesEvent
+                    return (
+                      <div
+                        key={`event-${i}-${j}`}
+                        className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-blue-50 border-blue-200`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Could navigate to event details if available
+                        }}
+                        title={`${event.title} - ${event.location}`}
+                      >
+                        <div className="font-medium truncate flex items-center gap-1">
+                          <span>📅</span>
+                          <span>{event.title}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
+                          {event.location || 'No location'}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 sm:mt-2">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(event.status)} text-[8px] sm:text-xs px-1`}
+                          >
+                            {event.status}
+                          </Badge>
+                          <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
+                            {event.type}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                })}
+                {dayItems.length === 0 && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
-                    No assignments
+                    No items
                   </div>
                 )}
               </div>
@@ -999,8 +1088,9 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Day view renderer with actual assignment data
-  const renderDayView = (assignments: ServiceAssignment[]) => {
+  // Day view renderer with assignments and events data
+  const renderDayView = (data: { assignments: ServiceAssignment[], events: SalesEvent[] }) => {
+    const { assignments, events } = data
     // Create array of hours
     const hours = Array(24)
       .fill(null)
@@ -1100,8 +1190,9 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Hour view renderer with actual assignment data
-  const renderHourView = (assignments: ServiceAssignment[]) => {
+  // Hour view renderer with assignments and events data
+  const renderHourView = (data: { assignments: ServiceAssignment[], events: SalesEvent[] }) => {
+    const { assignments, events } = data
     // Create array of 5-minute intervals
     const intervals = Array(12)
       .fill(null)
@@ -1200,8 +1291,9 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Minute view renderer with actual assignment data
-  const renderMinuteView = (assignments: ServiceAssignment[]) => {
+  // Minute view renderer with assignments and events data
+  const renderMinuteView = (data: { assignments: ServiceAssignment[], events: SalesEvent[] }) => {
+    const { assignments, events } = data
     // Create array of 1-minute intervals for a 15-minute window
     const baseMinute = Math.floor(currentDate.getMinutes() / 15) * 15
     const intervals = Array(15)
@@ -1423,15 +1515,15 @@ export default function AdminPlannerPage() {
 
     switch (view) {
       case "month":
-        return plannerView === "bookings" ? renderMonthView(filteredItems as any) : renderMonthView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderMonthViewBookings(filteredItems as Booking[]) : renderMonthView(filteredItems as any)
       case "week":
-        return plannerView === "bookings" ? renderWeekView(filteredItems as any) : renderWeekView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderWeekViewBookings(filteredItems as Booking[]) : renderWeekView(filteredItems as any)
       case "day":
-        return plannerView === "bookings" ? renderDayView(filteredItems as any) : renderDayView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderDayViewBookings(filteredItems as Booking[]) : renderDayView(filteredItems as any)
       case "hour":
-        return plannerView === "bookings" ? renderHourView(filteredItems as any) : renderHourView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderHourViewBookings(filteredItems as Booking[]) : renderHourView(filteredItems as any)
       case "minute":
-        return plannerView === "bookings" ? renderMinuteView(filteredItems as any) : renderMinuteView(filteredItems as ServiceAssignment[])
+        return plannerView === "bookings" ? renderMinuteViewBookings(filteredItems as Booking[]) : renderMinuteView(filteredItems as any)
     }
   }
 
@@ -1444,7 +1536,7 @@ export default function AdminPlannerPage() {
             <h1 className="text-2xl font-bold">
               {plannerView === "bookings"
                 ? (siteProduct ? `${siteProduct.name} - Bookings Calendar` : "Site Bookings Calendar")
-                : "Admin Calendar"
+                : "Business Dev Calendar"
               }
             </h1>
             {siteId && (
@@ -1458,19 +1550,17 @@ export default function AdminPlannerPage() {
                 Back to Site
               </Button>
             )}
-            {!siteId && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setEventDialogOpen(true)}
-                className="flex items-center gap-2"
-              >
-                Add Event
-              </Button>
-            )}
+            <Button
+              onClick={() => setEventDialogOpen(true)}
+              disabled={!hasEventPermission}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Event
+            </Button>
           </div>
           <div className="text-sm text-gray-500">
-            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments, ${events.length} events loaded`}
+            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} assignments and ${events.length} events loaded`}
           </div>
         </div>
 
@@ -1623,16 +1713,6 @@ export default function AdminPlannerPage() {
           )}
         </div>
 
-        <EventDialog
-          isOpen={eventDialogOpen}
-          onClose={() => setEventDialogOpen(false)}
-          onEventSaved={(eventId) => {
-            // Refresh events after creating a new one
-            fetchEvents()
-          }}
-          department="admin"
-        />
-
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}
@@ -1640,13 +1720,17 @@ export default function AdminPlannerPage() {
             // Refresh assignments after creating a new one
             fetchAssignments()
           }}
-          department="ADMIN"
+          department="BUSINESS DEV"
         />
 
-        <EventDetailsDialog
-          isOpen={eventDetailsDialogOpen}
-          onClose={() => setEventDetailsDialogOpen(false)}
-          event={selectedEventForDetails}
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="business-dev"
         />
       </div>
     </div>

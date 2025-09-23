@@ -2140,5 +2140,27 @@ export async function getOccupancyData(companyId: string, currentDate: Date = ne
       dynamicUnavailable: 0,
       dynamicTotal: 0
     }
+// Get service assignments filtered by company_id and department
+export async function getServiceAssignmentsByDepartment(company_id: string, department: string): Promise<ServiceAssignment[]> {
+  try {
+    const assignmentsRef = collection(db, "service_assignments")
+    const q = query(
+      assignmentsRef,
+      where("company_id", "==", company_id),
+      where("requestedBy.department", "==", department),
+      orderBy("created", "desc")
+    )
+
+    const querySnapshot = await getDocs(q)
+
+    const assignments: ServiceAssignment[] = []
+    querySnapshot.forEach((doc) => {
+      assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+    })
+
+    return assignments
+  } catch (error) {
+    console.error("Error fetching service assignments by department:", error)
+    return []
   }
 }
