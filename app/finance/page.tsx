@@ -4,12 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, Receipt, PieChart, BarChart3, FileText, Calendar, AlertCircle } from 'lucide-react'
-import { RouteProtection } from "@/components/route-protection"
 
 export default function FinancePage() {
   return (
-    <RouteProtection requiredRoles="finance">
-      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Finance Dashboard</h2>
         <div className="flex items-center space-x-2">
@@ -225,6 +223,5 @@ export default function FinancePage() {
         </Card>
       </div>
     </div>
-    </RouteProtection>
   )
 }

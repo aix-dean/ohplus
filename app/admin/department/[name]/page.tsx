@@ -13,7 +13,6 @@ import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
-import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
 import {
   Dialog,
   DialogContent,
@@ -63,18 +62,11 @@ export default function DepartmentDetailsPage() {
     sales: false,
     logistics: false,
     cms: false,
-    it: false,
-    business: false,
-    treasury: false,
-    accounting: false,
-    finance: false,
   })
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [departmentUsers, setDepartmentUsers] = useState<User[]>([])
-  const [isUserAddedSuccessDialogOpen, setIsUserAddedSuccessDialogOpen] = useState(false)
-  const [addedUserData, setAddedUserData] = useState<{ email: string; name: string; role: string } | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Role to department mapping
@@ -83,11 +75,6 @@ export default function DepartmentDetailsPage() {
     sales: "Sales Team",
     logistics: "Logistics Team",
     cms: "Content Management",
-    it: "IT Team",
-    business: "Business Development",
-    treasury: "Treasury",
-    accounting: "Accounting",
-    finance: "Finance",
   }
 
   // Department color mapping for divider lines
@@ -96,11 +83,6 @@ export default function DepartmentDetailsPage() {
     "Sales Team": "bg-red-500",
     "Logistics Team": "bg-blue-500",
     "Content Management": "bg-yellow-500",
-    "IT Team": "bg-teal-500",
-    "Business Development": "bg-purple-500",
-    "Treasury": "bg-green-500",
-    "Accounting": "bg-blue-600",
-    "Finance": "bg-emerald-500",
   }
 
   // Debounce search term
@@ -220,11 +202,6 @@ export default function DepartmentDetailsPage() {
       sales: "bg-green-100 text-green-800 hover:bg-green-100",
       logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
       cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-      it: "bg-teal-100 text-teal-800 hover:bg-teal-100",
-      business: "bg-indigo-100 text-indigo-800 hover:bg-indigo-100",
-      treasury: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
-      accounting: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100",
-      finance: "bg-lime-100 text-lime-800 hover:bg-lime-100",
     }
 
     return <Badge className={colorClasses[roleId]}>{role.name}</Badge>
@@ -245,11 +222,6 @@ export default function DepartmentDetailsPage() {
           sales: userRoles.includes("sales"),
           logistics: userRoles.includes("logistics"),
           cms: userRoles.includes("cms"),
-          it: userRoles.includes("it"),
-          business: userRoles.includes("business"),
-          treasury: userRoles.includes("treasury"),
-          accounting: userRoles.includes("accounting"),
-          finance: userRoles.includes("finance"),
         }
 
         setSelectedRoles(initialSelectedRoles)
@@ -485,9 +457,8 @@ export default function DepartmentDetailsPage() {
       <AddUserDialog
         open={isAddUserDialogOpen}
         onOpenChange={setIsAddUserDialogOpen}
-        onSuccess={(userData) => {
-          setAddedUserData(userData)
-          setIsUserAddedSuccessDialogOpen(true)
+        onSuccess={() => {
+          console.log("User invitation sent successfully")
         }}
       />
 
@@ -547,20 +518,6 @@ export default function DepartmentDetailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {addedUserData && isUserAddedSuccessDialogOpen && (
-        <UserAddedSuccessDialog
-          isOpen={isUserAddedSuccessDialogOpen}
-          onClose={(_?: any) => setIsUserAddedSuccessDialogOpen(false)}
-          onAddAnother={() => {
-            setIsUserAddedSuccessDialogOpen(false)
-            setIsAddUserDialogOpen(true)
-          }}
-          userEmail={addedUserData.email}
-          userName={addedUserData.name}
-          userRole={addedUserData.role}
-        />
-      )}
     </div>
   )
 }

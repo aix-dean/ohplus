@@ -22,7 +22,7 @@ interface CreateReportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   siteId: string
-  module?: "logistics" | "sales"
+  module?: "logistics" | "sales" | "admin"
   hideJobOrderSelection?: boolean
   preSelectedJobOrder?: string
 }
@@ -377,17 +377,20 @@ export function CreateReportDialog({
     e.preventDefault()
     e.stopPropagation()
 
-    // Get the effective job order (selected or product-associated)
-    const effectiveJobOrder = selectedJobOrderDetails ||
-      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
+    // Skip site image logic for admin mode
+    if (module !== "admin") {
+      // Get the effective job order (selected or product-associated) for non-admin modes
+      const effectiveJobOrder = selectedJobOrderDetails ||
+        (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
 
-    // If we have a job order with siteImageUrl, show it
-    if (effectiveJobOrder?.siteImageUrl) {
-      setPreviewModal({
-        open: true,
-        preview: effectiveJobOrder.siteImageUrl,
-      })
-      return
+      // If we have a job order with siteImageUrl, show it (only for non-admin modes)
+      if (effectiveJobOrder?.siteImageUrl) {
+        setPreviewModal({
+          open: true,
+          preview: effectiveJobOrder.siteImageUrl,
+        })
+        return
+      }
     }
 
     // Fallback to uploaded file
@@ -681,7 +684,7 @@ export function CreateReportDialog({
       setDescriptionOfWork("")
 
 
-      const previewPath = module === "sales" ? "/sales/reports/preview" : "/logistics/reports/preview"
+      const previewPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/reports/preview"
       router.push(previewPath)
     } catch (error) {
       console.error("Error generating report:", error)

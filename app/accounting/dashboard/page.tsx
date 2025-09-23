@@ -5,12 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { FileSpreadsheet, Wallet, HandCoins } from 'lucide-react'
-import { RouteProtection } from "@/components/route-protection"
 
 export default function AccountingDashboardPage() {
   return (
-    <RouteProtection requiredRoles="accounting">
-      <div className="flex-1 p-4 md:p-6">
+    <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -77,6 +75,5 @@ export default function AccountingDashboardPage() {
         </p>
       </div>
     </div>
-    </RouteProtection>
   )
 }

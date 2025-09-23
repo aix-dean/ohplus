@@ -172,11 +172,3 @@ export function AdminNotificationsPage() {
     notificationsPath: "/admin/notifications"
   }} />
 }
-
-export function ITNotificationsPage() {
-  return <NotificationsPage config={{
-    department: "IT",
-    colorScheme: "purple",
-    notificationsPath: "/it/notifications"
-  }} />
-}

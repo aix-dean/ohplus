@@ -27,7 +27,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { subscriptionService } from "@/lib/subscription-service"
-import { RouteProtection } from "@/components/route-protection"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -487,8 +486,7 @@ export default function BusinessInventoryPage() {
   }
 
   return (
-    <RouteProtection requiredRoles="business">
-      <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
       </div>
@@ -682,6 +680,5 @@ export default function BusinessInventoryPage() {
         onSuccess={handleCompanyUpdateSuccess}
       />
     </div>
-    </RouteProtection>
   )
 }
