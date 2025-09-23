@@ -11,6 +11,15 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json()
 
+    // Log the full Success Response (200 OK) of file validation API
+    console.log('OHPlus Activation Key Validator API Full Success Response (200 OK):', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries()),
+      data: result
+    })
+
     console.log('Validation result:', result)
 
     return NextResponse.json(result)

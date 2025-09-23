@@ -17,6 +17,7 @@ import { collection, getDocs, doc, setDoc, getDoc, addDoc, serverTimestamp, GeoP
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { db, tenantAuth } from "@/lib/firebase"
 import { assignRoleToUser } from "@/lib/hardcoded-access-service"
+import WelcomePage from "./welcome-page"
 
 const createAnalyticsDocument = async () => {
   try {
@@ -68,15 +69,16 @@ export default function LoginPage() {
   const [fileName, setFileName] = useState("")
   const [isValidating, setIsValidating] = useState(false)
   const [pointPersonData, setPointPersonData] = useState<any>(null)
+  const [showWelcome, setShowWelcome] = useState(false)
   const pointPersonDataRef = useRef<any>(null)
 
-  const { user, userData, getRoleDashboardPath, refreshUserData, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
+  const { user, userData, getRoleDashboardPath, refreshUserData, login, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && userData) {
+    if (user && userData && !showWelcome) {
       const dashboardPath = getRoleDashboardPath(userData.roles || [])
       if (dashboardPath) {
         // Add a small delay to prevent immediate back-and-forth redirects
@@ -86,7 +88,7 @@ export default function LoginPage() {
         return () => clearTimeout(timer)
       }
     }
-  }, [user, userData, router, getRoleDashboardPath])
+  }, [user, userData, router, getRoleDashboardPath, showWelcome])
 
   // Fetch point_person data from companies collection
   const fetchPointPersonData = async (email: string) => {
@@ -142,8 +144,9 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("Attempting login for email:", trimmedEmail)
       // First, try to login as existing user
-      await loginOHPlusOnly(trimmedEmail, password)
+      await login(trimmedEmail, password)
       // If successful, auth context will handle redirect
       console.log("Existing user logged in successfully")
     } catch (error: any) {
@@ -151,7 +154,7 @@ export default function LoginPage() {
 
       if (error.code === 'auth/user-not-found') {
         // User not found in tenant, check if eligible for signup
-        console.log("User not found in tenant, checking for signup eligibility")
+        console.log("User not found in tenant, checking for signup eligibility for email:", trimmedEmail)
 
         const pointPersonData = await fetchPointPersonData(trimmedEmail)
 
@@ -177,8 +180,6 @@ export default function LoginPage() {
         setCurrentStep(2)
       } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setError("Invalid email or password.")
-      } else if (error.message === 'OHPLUS_ACCOUNT_NOT_FOUND') {
-        setError("Account not found or not authorized.")
       } else {
         setError("An error occurred during login. Please try again.")
       }
@@ -339,7 +340,7 @@ export default function LoginPage() {
         company_id: company_id,
         type: "OHPLUS",
         role: "admin",
-        permissions: [],
+        permissions: ["admin", "it"],
         activation: activationData,
         created: serverTimestamp(),
         updated: serverTimestamp(),
@@ -360,13 +361,16 @@ export default function LoginPage() {
       console.log("iboard_users document verified successfully")
       console.log('warren')
 
-      console.log("Assigning role...")
-      // Assign role "admin" to user_roles collection
+      console.log("Assigning roles...")
+      // Assign roles "admin" and "it" to user_roles collection
       try {
         await assignRoleToUser(firebaseUser.uid, "admin", firebaseUser.uid)
         console.log("Role 'admin' assigned to user_roles collection")
+
+        await assignRoleToUser(firebaseUser.uid, "it", firebaseUser.uid)
+        console.log("Role 'it' assigned to user_roles collection")
       } catch (roleError) {
-        console.error("Error assigning role 'admin' to user_roles collection:", roleError)
+        console.error("Error assigning roles to user_roles collection:", roleError)
       }
 
       console.log("Refreshing user data...")
@@ -377,11 +381,8 @@ export default function LoginPage() {
       // End registration
       endRegistration()
 
-      console.log("Registration completed successfully, navigating...")
-      // Navigate to IT page
-      console.log("Navigating to /it")
-      router.push("/it")
-      console.log("Navigation set")
+      console.log("Registration completed successfully, showing welcome page...")
+      setShowWelcome(true)
     } catch (error: any) {
       console.error("Registration failed:", error)
       console.log("Error code:", error.code, "Error message:", error.message)
@@ -417,6 +418,7 @@ export default function LoginPage() {
     setFileName("")
     setIsValidating(false)
     setPointPersonData(null)
+    setShowWelcome(false)
     pointPersonDataRef.current = null
     // Don't reset email here
   }
@@ -429,6 +431,7 @@ export default function LoginPage() {
     setIsActivated(false)
     setFileName("")
     setIsValidating(false)
+    setShowWelcome(false)
   }
 
   const handleDragOverStep3 = useCallback((e: React.DragEvent) => {
@@ -442,32 +445,61 @@ export default function LoginPage() {
   }, [])
 
   const handleDropStep3 = useCallback(async (e: React.DragEvent) => {
+    console.log('handleDropStep3 called')
     e.preventDefault()
     setIsDragOver(false)
 
     const files = Array.from(e.dataTransfer.files)
+    console.log('Dropped files:', files.map(f => f.name))
     const activationFile = files.find((file) => file.name.endsWith('.lic'))
+    console.log('Activation file found:', activationFile?.name)
 
     if (activationFile) {
+      console.log('Starting validation process for file:', activationFile.name)
       setIsValidating(true)
       const formData = new FormData()
       formData.append('activationKey', activationFile)
 
       try {
+        console.log('Calling OHPlus Activation Key Validator API...')
         const response = await fetch('/api/validate-activation', {
           method: 'POST',
           body: formData
         })
+        console.log('API response received, status:', response.status)
         const result = await response.json()
+        console.log('API result parsed:', result)
 
-        console.log('API response:', result)
+        console.log('OHPlus Activation Key Validator API Full Success Response (200 OK):', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries()),
+          data: result
+        })
 
         if (result.success) {
+          console.log('API returned success, proceeding with companyId validation')
+          // Additional validation: check if callback companyId matches step 1 company_id
+          const callbackCompanyId = result.data.companyId
+          const step1CompanyId = pointPersonDataRef.current.company_id
+          console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
+
+          if (callbackCompanyId !== step1CompanyId) {
+            console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+            setError('Invalid activation key: Company ID does not match.')
+            toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
+            setIsValidating(false)
+            return
+          }
+
+          console.log('Company ID validation passed, proceeding with registration')
           console.log('File authenticated')
           setFileName(activationFile.name)
           setUploadedFile(activationFile)
           try {
             // Complete registration first
+            console.log('Calling handleCompleteRegistration')
             await handleCompleteRegistration(result.data, activationFile)
             // Only show success after successful registration
             setIsActivated(true)
@@ -477,42 +509,74 @@ export default function LoginPage() {
             setError('Registration failed. Please try again.')
           }
         } else {
-          console.log('File not valid')
+          console.log('File not valid, result:', result)
           setError(result.error || 'Invalid activation key')
           toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
         }
       } catch (error) {
+        console.error('Failed to validate activation key, error:', error)
         setError('Failed to validate activation key')
       } finally {
         setIsValidating(false)
       }
+    } else {
+      console.log('No .lic file found in dropped files')
     }
   }, [])
 
   const handleFileSelectStep3 = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileSelectStep3 called')
     const files = e.target.files
+    console.log('Selected files:', files ? Array.from(files).map(f => f.name) : 'none')
     if (files && files.length > 0) {
       const file = files[0]
+      console.log('Processing file:', file.name)
       if (file.name.endsWith('.lic')) {
+        console.log('Starting validation process for file:', file.name)
         setIsValidating(true)
         const formData = new FormData()
         formData.append('activationKey', file)
 
         try {
+          console.log('Calling OHPlus Activation Key Validator API...')
           const response = await fetch('/api/validate-activation', {
             method: 'POST',
             body: formData
           })
+          console.log('API response received, status:', response.status)
           const result = await response.json()
+          console.log('API result parsed:', result)
 
-          console.log('API response:', result)
+          console.log('OHPlus Activation Key Validator API Full Success Response (200 OK):', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries()),
+            data: result
+          })
 
           if (result.success) {
+            console.log('API returned success, proceeding with companyId validation')
+            // Additional validation: check if callback companyId matches step 1 company_id
+            const callbackCompanyId = result.data.companyId
+            const step1CompanyId = pointPersonDataRef.current.company_id
+            console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
+
+            if (callbackCompanyId !== step1CompanyId) {
+              console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+              setError('Invalid activation key: Company ID does not match.')
+              toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
+              setIsValidating(false)
+              return
+            }
+
+            console.log('Company ID validation passed, proceeding with registration')
             console.log('File authenticated')
             setFileName(file.name)
             setUploadedFile(file)
             try {
               // Complete registration first
+              console.log('Calling handleCompleteRegistration')
               await handleCompleteRegistration(result.data, file)
               // Only show success after successful registration
               setIsActivated(true)
@@ -522,20 +586,28 @@ export default function LoginPage() {
               setError('Registration failed. Please try again.')
             }
           } else {
-            console.log('File not valid')
+            console.log('File not valid, result:', result)
             setError(result.error || 'Invalid activation key')
             toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
           }
         } catch (error) {
+          console.error('Failed to validate activation key, error:', error)
           setError('Failed to validate activation key')
         } finally {
           setIsValidating(false)
         }
       } else {
+        console.log('File does not end with .lic')
         setError('Please select a .lic file')
       }
+    } else {
+      console.log('No files selected')
     }
   }, [])
+
+  if (showWelcome) {
+    return <WelcomePage onStartTour={() => router.push("/it/user-management")} />
+  }
 
   return currentStep === 3 ? (
     <div className="min-h-screen flex">
@@ -589,12 +661,12 @@ export default function LoginPage() {
 
         {/* Main upload area */}
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="relative max-w-sm w-full -mt-16 ml-16">
+          <div className="relative max-w-sm w-full -mt-16 ml-32">
             <Image
               src="/login-image-4.png"
               alt="License upload area"
-              width={300}
-              height={225}
+              width={240}
+              height={180}
               className={`rounded-2xl transition-all duration-300 cursor-pointer ${
                 isDragOver ? "scale-105 shadow-lg ring-4 ring-cyan-400" : ""
               } ${isActivated ? "ring-4 ring-green-400" : ""}`}
@@ -611,9 +683,9 @@ export default function LoginPage() {
               onChange={handleFileSelectStep3}
             />
             {isValidating && (
-              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+              <div className="absolute inset-0 flex items-center justify-center  -ml-32 bg-black/50 rounded-2xl">
                 <div className="text-center text-white">
-                  <Loader2 className="w-16 h-16 mx-auto animate-spin mb-4" />
+                  <Loader2 className="w-8 h-12 mx-auto animate-spin" />
                   <p className="text-lg font-medium">Validating License Key...</p>
                 </div>
               </div>
@@ -715,14 +787,14 @@ export default function LoginPage() {
       <Dialog open={currentStep === 2} onOpenChange={(open) => { if (!open) setCurrentStep(1); }}>
         <DialogContent className="bg-white rounded-[50px] shadow-lg p-8 max-w-4xl w-full flex">
 <div className="flex-1 p-4 flex items-center justify-center">
-              <Image
-                src="/login-image-2.png"
-                alt="Login illustration"
-                width={400}
-                height={400}
-                className="rounded-lg"
-              />
-            </div>
+  <Image
+    src="/login-image-2.png"
+    alt="Login illustration"
+    width={320}
+    height={320}
+    className="rounded-lg"
+  />
+</div>
             <div className="flex-1 p-4 space-y-4">
               <div className="flex justify-end">
                 <Button

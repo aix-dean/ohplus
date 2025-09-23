@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
 import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
+import { OnboardingTooltip } from "@/components/onboarding-tooltip"
 import {
   Dialog,
   DialogContent,
@@ -196,6 +197,22 @@ export default function ITUserManagementPage() {
       setUsersByDepartment({})
     }
   }, [filteredUsers])
+
+  const handleCloseOnboarding = async () => {
+    if (!userData?.uid) return
+
+    try {
+      const userDocRef = doc(db, "iboard_users", userData.uid)
+      await updateDoc(userDocRef, {
+        onboarding: false,
+        updated: new Date(),
+      })
+      // Refresh user data to update the context
+      refreshUserData()
+    } catch (error) {
+      console.error("Error updating onboarding status:", error)
+    }
+  }
 
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
@@ -595,6 +612,10 @@ export default function ITUserManagementPage() {
           userName={addedUserData.name}
           userRole={addedUserData.role}
         />
+      )}
+
+      {userData?.onboarding && (
+        <OnboardingTooltip onClose={handleCloseOnboarding} />
       )}
     </div>
   )
