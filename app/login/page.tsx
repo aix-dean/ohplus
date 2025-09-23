@@ -1,23 +1,22 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
-import { Mail, Lock, Eye, EyeOff } from "lucide-react"
-import { collection, query, where, getDocs, addDoc, GeoPoint } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Mail, Lock, Eye, EyeOff, Upload, Car, Power, CheckCircle, Zap, Loader2, X } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { collection, getDocs, doc, setDoc, getDoc, addDoc, serverTimestamp, GeoPoint } from "firebase/firestore"
+import { createUserWithEmailAndPassword } from "firebase/auth"
+import { db, tenantAuth } from "@/lib/firebase"
+import { assignRoleToUser } from "@/lib/hardcoded-access-service"
 
 const createAnalyticsDocument = async () => {
   try {
@@ -57,358 +56,721 @@ const createAnalyticsDocument = async () => {
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
-  const [comingSoonFeature, setComingSoonFeature] = useState("")
-  const [orgCode, setOrgCode] = useState("")
-  const [isValidatingCode, setIsValidatingCode] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1: email+password, 2: new password, 3: file upload
+  const [isActivated, setIsActivated] = useState(false)
+  const [fileName, setFileName] = useState("")
+  const [isValidating, setIsValidating] = useState(false)
+  const [pointPersonData, setPointPersonData] = useState<any>(null)
+  const pointPersonDataRef = useRef<any>(null)
 
-  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
+  const { user, userData, getRoleDashboardPath, refreshUserData, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
 
   // Redirect if already logged in
-  // useEffect(() => {
-  //   if (user) {
-  //     router.push("/admin/dashboard")
-  //   }
-  // }, [user, router])
+  useEffect(() => {
+    if (user && userData) {
+      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+      if (dashboardPath) {
+        // Add a small delay to prevent immediate back-and-forth redirects
+        const timer = setTimeout(() => {
+          router.push(dashboardPath)
+        }, 1000) // 1 second delay
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [user, userData, router, getRoleDashboardPath])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Fetch point_person data from companies collection
+  const fetchPointPersonData = async (email: string) => {
+    try {
+      console.log("Fetching point_person data for email:", email)
+      const companiesRef = collection(db, "companies")
+      const companiesSnapshot = await getDocs(companiesRef)
+
+      // Find the company with matching point_person.email
+      for (const doc of companiesSnapshot.docs) {
+        const data = doc.data()
+        if (data.point_person && data.point_person.email === email) {
+          console.log("Found point_person data:", data.point_person)
+          return {
+            point_person: data.point_person,
+            company_id: doc.id,
+            company_data: data
+          }
+        }
+      }
+
+      console.log("No point_person data found for email:", email)
+      return null
+    } catch (error) {
+      console.error("Error fetching point_person data:", error)
+      return null
+    }
+  }
+
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    try {
-      await loginOHPlusOnly(email, password)
-      // The redirect will be handled by the useEffect below after userData is loaded
-    } catch (error: any) {
-      console.error("Login error:", error)
+    const trimmedEmail = email.trim()
+    setEmail(trimmedEmail)
 
-      // Provide more user-friendly error messages
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many unsuccessful login attempts. Please try again later.")
-      } else if (error.code === "auth/tenant-id-mismatch") {
-        setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
-        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
-      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
-        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
+    if (!trimmedEmail || !password.trim()) {
+      setError("Please enter both email and password.")
+      setIsLoading(false)
+      return
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError("Please enter a valid email address.")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      // First, try to login as existing user
+      await loginOHPlusOnly(trimmedEmail, password)
+      // If successful, auth context will handle redirect
+      console.log("Existing user logged in successfully")
+    } catch (error: any) {
+      console.error("Login attempt failed:", error)
+
+      if (error.code === 'auth/user-not-found') {
+        // User not found in tenant, check if eligible for signup
+        console.log("User not found in tenant, checking for signup eligibility")
+
+        const pointPersonData = await fetchPointPersonData(trimmedEmail)
+
+        if (!pointPersonData) {
+          setError("This email address is not registered with any company. Please contact your administrator.")
+          setIsLoading(false)
+          return
+        }
+
+        const { point_person } = pointPersonData
+
+        // Check if entered password matches point_person.password
+        if (point_person.password !== password) {
+          setError("Invalid password. Please check your credentials.")
+          setIsLoading(false)
+          return
+        }
+
+        console.log("Signup eligibility verified, proceeding to password change step")
+        setPointPersonData(pointPersonData)
+        pointPersonDataRef.current = pointPersonData
+        console.log('pointPersonData set to state and ref:', pointPersonData)
+        setCurrentStep(2)
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setError("Invalid email or password.")
+      } else if (error.message === 'OHPLUS_ACCOUNT_NOT_FOUND') {
+        setError("Account not found or not authorized.")
       } else {
-        setError(error.message || "Failed to login. Please check your credentials.")
+        setError("An error occurred during login. Please try again.")
       }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleSocialLogin = (provider: string) => {
-    setComingSoonFeature(`${provider} login`)
-    setShowComingSoonDialog(true)
-  }
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
 
-  const validateInvitationCode = async (code: string) => {
-    try {
-      // Query invitation_codes collection by the 'code' field
-      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
-      const invitationSnapshot = await getDocs(invitationQuery)
-
-      if (invitationSnapshot.empty) {
-        throw new Error("Invalid invitation code.")
-      }
-
-      // Get the first matching document
-      const invitationDoc = invitationSnapshot.docs[0]
-      const invitationData = invitationDoc.data()
-
-      // Check if code has expired
-      if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
-        throw new Error("Invitation code has expired.")
-      }
-
-      // Check if code has reached maximum uses
-      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
-        throw new Error("Invitation code has reached its maximum number of uses.")
-      }
-
-      return true
-    } catch (error: any) {
-      throw error
-    }
-  }
-
-  const handleJoinOrganization = async () => {
-    if (!orgCode.trim()) {
-      setError("Please enter an organization code.")
+    if (!newPassword || !confirmPassword) {
+      setError("Please fill in all required fields.")
+      setIsLoading(false)
       return
     }
 
-    setIsValidatingCode(true)
-    setError("")
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.")
+      setIsLoading(false)
+      return
+    }
 
-    try {
-      await validateInvitationCode(orgCode)
-      // If validation passes, navigate to registration page with organization code
-      router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
-    } catch (error: any) {
-      setError(error.message || "Failed to validate invitation code.")
-    } finally {
-      setIsValidatingCode(false)
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long.")
+      setIsLoading(false)
+      return
+    }
+
+    console.log("Password change validated, proceeding to file upload step")
+    // Store the new password in the ref for use in step 3
+    if (pointPersonDataRef.current) {
+      pointPersonDataRef.current.newPassword = newPassword
+    }
+    setCurrentStep(3)
+    setIsLoading(false)
+  }
+
+  const validateAndSetFile = (file: File) => {
+    // Check if it's a PDF or text file
+    const allowedTypes = ['application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (allowedTypes.includes(file.type) || file.name.toLowerCase().endsWith('.txt') || file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')) {
+      // File size validation (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File size must be less than 10MB.")
+        return
+      }
+      setUploadedFile(file)
+      setError("")
+    } else {
+      setError("Please upload a PDF or text document.")
     }
   }
 
-  // Role-based navigation after login
-  useEffect(() => {
-    console.log("Login navigation useEffect triggered")
-    console.log("user:", !!user)
-    console.log("userData:", userData)
-    console.log("isLoading:", isLoading)
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
 
-    if (user && userData && !isLoading) {
-      console.log("userData.roles:", userData.roles)
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
 
-      // Only use the roles array from user_roles collection
-      if (userData.roles && userData.roles.length > 0) {
-        console.log("Using roles from user_roles collection:", userData.roles)
-        const dashboardPath = getRoleDashboardPath(userData.roles)
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
 
-        if (dashboardPath) {
-          console.log("Navigating to:", dashboardPath)
-          router.push(dashboardPath)
-        } else {
-          console.log("No dashboard path found for roles, redirecting to unauthorized")
-          router.push("/unauthorized")
-        }
-      } else {
-        console.log("No roles found in user_roles collection, redirecting to unauthorized")
-        router.push("/unauthorized")
-      }
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const file = files[0]
+      validateAndSetFile(file)
     }
-  }, [user, userData, isLoading, router, getRoleDashboardPath])
+  }
 
-  // Analytics tracking on page load
-  useEffect(() => {
-    createAnalyticsDocument()
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      validateAndSetFile(file)
+    }
+  }
+
+  const handleCompleteRegistration = async (activationData?: any, file?: File, e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    console.log('Starting registration completion with activationData:', activationData)
+    console.log('handleCompleteRegistration called - step 3 user creation')
+    console.log('File parameter:', file)
+    console.log('uploadedFile state:', uploadedFile)
+    setError("")
+    setIsLoading(true)
+
+    const actualFile = file || uploadedFile
+    console.log('actualFile:', actualFile)
+    if (!actualFile) {
+      console.log('No file found, returning early')
+      setError("Please upload a file to complete registration.")
+      setIsLoading(false)
+      return
+    }
+    console.log('File validation passed, continuing...')
+
+    // Email validation - use point_person email since component state might be lost
+    const userEmail = pointPersonDataRef.current?.point_person?.email
+    console.log('Email to validate from point_person:', userEmail)
+
+    if (!userEmail || !isValidEmail(userEmail)) {
+      console.log('Email validation failed for:', userEmail)
+      setError("Invalid email address.")
+      setIsLoading(false)
+      return
+    }
+
+    console.log("Email validation passed, email:", userEmail)
+
+    try {
+      console.log('Using stored point_person data...')
+      console.log('pointPersonData in ref:', pointPersonDataRef.current)
+      if (!pointPersonDataRef.current) {
+        console.log('Point person data not found in ref - returning early')
+        setError("Unable to find your information. Please contact your administrator.")
+        setIsLoading(false)
+        return
+      }
+      console.log('Point person data found in ref, continuing...')
+
+      const { point_person, company_id } = pointPersonDataRef.current
+      console.log("Point person data found:", point_person)
+
+      // Start registration to prevent auth listener from signing out
+      startRegistration()
+
+      // Use email and password from point_person data instead of component state
+      const userEmail = point_person.email
+      const userPassword = pointPersonDataRef.current.newPassword || newPassword
+      console.log("About to create user in Firebase Auth")
+      console.log("Creating user in Firebase Auth with email:", userEmail, "password length:", userPassword.length)
+      // Create user in Firebase Auth (tenant) with new password
+      const userCredential = await createUserWithEmailAndPassword(tenantAuth, userEmail, userPassword)
+      const firebaseUser = userCredential.user
+      console.log("User created in tenant:", firebaseUser.uid)
+      console.log("Created user ID:", firebaseUser.uid)
+      console.log("User creation successful, proceeding to document creation")
+
+      console.log("Creating user document in iboard_users...")
+      // Create user document in iboard_users collection with type="OHPLUS"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+      const userData = {
+        email: firebaseUser.email,
+        uid: firebaseUser.uid,
+        first_name: point_person.first_name || "",
+        last_name: point_person.last_name || "",
+        middle_name: point_person.middle_name || "",
+        phone_number: point_person.phone_number || "",
+        gender: point_person.gender || "",
+        company_id: company_id,
+        type: "OHPLUS",
+        role: "admin",
+        permissions: [],
+        activation: activationData,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        onboarding: true,
+      }
+      console.log("User data to be created in iboard_users:", userData)
+      console.log("About to call setDoc for iboard_users")
+
+      await setDoc(userDocRef, userData)
+      console.log("User document created in iboard_users collection with type OHPLUS")
+      console.log("setDoc completed successfully")
+
+      console.log("Verifying iboard_users document creation...")
+      const docSnap = await getDoc(userDocRef)
+      if (!docSnap.exists()) {
+        throw new Error("Failed to create iboard_users document")
+      }
+      console.log("iboard_users document verified successfully")
+      console.log('warren')
+
+      console.log("Assigning role...")
+      // Assign role "admin" to user_roles collection
+      try {
+        await assignRoleToUser(firebaseUser.uid, "admin", firebaseUser.uid)
+        console.log("Role 'admin' assigned to user_roles collection")
+      } catch (roleError) {
+        console.error("Error assigning role 'admin' to user_roles collection:", roleError)
+      }
+
+      console.log("Refreshing user data...")
+      // Refresh user data to update the auth context
+      await refreshUserData()
+      console.log("User data refreshed")
+
+      // End registration
+      endRegistration()
+
+      console.log("Registration completed successfully, navigating...")
+      // Navigate to IT page
+      console.log("Navigating to /it")
+      router.push("/it")
+      console.log("Navigation set")
+    } catch (error: any) {
+      console.error("Registration failed:", error)
+      console.log("Error code:", error.code, "Error message:", error.message)
+      console.log("handleCompleteRegistration failed - no iboard_users created")
+
+      // End registration on error
+      endRegistration()
+
+      // Handle specific Firebase Auth errors
+      if (error.code === "auth/email-already-in-use") {
+        setError("This email is already registered.")
+      } else if (error.code === "auth/weak-password") {
+        setError("Password is too weak. Please choose a stronger password.")
+      } else if (error.code === "auth/invalid-email") {
+        setError("Invalid email address.")
+      } else {
+        setError(error.message || "Registration failed. Please try again.")
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleBackToEmail = () => {
+    setCurrentStep(1)
+    setError("")
+    setPassword("")
+    setNewPassword("")
+    setConfirmPassword("")
+    setUploadedFile(null)
+    setIsDragOver(false)
+    setIsActivated(false)
+    setFileName("")
+    setIsValidating(false)
+    setPointPersonData(null)
+    pointPersonDataRef.current = null
+    // Don't reset email here
+  }
+
+  const handleBackToPassword = () => {
+    setCurrentStep(2)
+    setError("")
+    setUploadedFile(null)
+    setIsDragOver(false)
+    setIsActivated(false)
+    setFileName("")
+    setIsValidating(false)
+  }
+
+  const handleDragOverStep3 = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
   }, [])
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      <div className="flex flex-col w-full max-w-4xl bg-white rounded-lg md:shadow-lg overflow-hidden">
-        {/* Mobile Header - Only visible on mobile */}
-        <div className="md:hidden w-full p-6">
-          <div className="flex flex-col items-center text-center">
-            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
-            <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
-              Powering Smarter Site Management
+  const handleDragLeaveStep3 = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDropStep3 = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    const activationFile = files.find((file) => file.name.endsWith('.lic'))
+
+    if (activationFile) {
+      setIsValidating(true)
+      const formData = new FormData()
+      formData.append('activationKey', activationFile)
+
+      try {
+        const response = await fetch('/api/validate-activation', {
+          method: 'POST',
+          body: formData
+        })
+        const result = await response.json()
+
+        console.log('API response:', result)
+
+        if (result.success) {
+          console.log('File authenticated')
+          setFileName(activationFile.name)
+          setUploadedFile(activationFile)
+          try {
+            // Complete registration first
+            await handleCompleteRegistration(result.data, activationFile)
+            // Only show success after successful registration
+            setIsActivated(true)
+            toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
+          } catch (error) {
+            console.error('Registration failed:', error)
+            setError('Registration failed. Please try again.')
+          }
+        } else {
+          console.log('File not valid')
+          setError(result.error || 'Invalid activation key')
+          toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
+        }
+      } catch (error) {
+        setError('Failed to validate activation key')
+      } finally {
+        setIsValidating(false)
+      }
+    }
+  }, [])
+
+  const handleFileSelectStep3 = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      if (file.name.endsWith('.lic')) {
+        setIsValidating(true)
+        const formData = new FormData()
+        formData.append('activationKey', file)
+
+        try {
+          const response = await fetch('/api/validate-activation', {
+            method: 'POST',
+            body: formData
+          })
+          const result = await response.json()
+
+          console.log('API response:', result)
+
+          if (result.success) {
+            console.log('File authenticated')
+            setFileName(file.name)
+            setUploadedFile(file)
+            try {
+              // Complete registration first
+              await handleCompleteRegistration(result.data, file)
+              // Only show success after successful registration
+              setIsActivated(true)
+              toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
+            } catch (error) {
+              console.error('Registration failed:', error)
+              setError('Registration failed. Please try again.')
+            }
+          } else {
+            console.log('File not valid')
+            setError(result.error || 'Invalid activation key')
+            toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
+          }
+        } catch (error) {
+          setError('Failed to validate activation key')
+        } finally {
+          setIsValidating(false)
+        }
+      } else {
+        setError('Please select a .lic file')
+      }
+    }
+  }, [])
+
+  return currentStep === 3 ? (
+    <div className="min-h-screen flex">
+      {/* Left side - Content */}
+      <div className="flex-1 bg-white flex items-center justify-center p-8">
+        <div className="max-w-xl w-full space-y-6">
+          {/* Avatar */}
+          <Image
+            src="/login-image-5.png"
+            alt="User avatar"
+            width={64}
+            height={64}
+            className="rounded-full"
+          />
+
+          {/* Heading */}
+          <div>
+            <h1 className="text-6xl font-bold text-gray-900 leading-tight mb-4">
+              Alright {pointPersonDataRef.current?.point_person?.first_name || "User"},
               <br />
-              for Billboard Operator
-            </h2>
-          </div>
-        </div>
-
-        <div className="flex">
-          {/* Left Section: Logo and Company Name */}
-          <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
-            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={120} height={120} priority />
-            <h2 className="text-3xl font-light text-blue-700 leading-tight text-center">
-              Powering Smarter
+              {"we're almost"}
               <br />
-              Site Management for
-              <br />
-              Billboard Operators
-            </h2>
-            <div className="flex flex-col items-center">
-              <span className="text-sm text-gray-500 mb-2">by OH! Plus</span>
-              <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={40} />
-            </div>
-          </div>
-
-          {/* Right Section: Login Form */}
-          <div className="w-full md:w-1/2 p-8">
-            <Card className="border-none shadow-none">
-              <CardHeader className="text-center md:text-left">
-                <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
-                <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4 mb-6">
-                  <Button
-                    variant="outline"
-                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    onClick={() => handleSocialLogin("Google")}
-                  >
-                    <Image
-                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
-                      alt="Google"
-                      width={20}
-                      height={20}
-                    />
-                    Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    onClick={() => handleSocialLogin("Facebook")}
-                  >
-                    <Image
-                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
-                      alt="Facebook"
-                      width={20}
-                      height={20}
-                    />
-                    Facebook
-                  </Button>
-                </div>
-
-                <div className="relative flex items-center justify-center my-6">
-                  <Separator className="absolute w-full" />
-                  <span className="relative z-10 bg-white px-4 text-sm text-gray-500">or continue with email</span>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="sr-only">
-                      Email
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="sr-only">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="remember-me" />
-                      <Label htmlFor="remember-me" className="text-gray-700">
-                        Remember me
-                      </Label>
-                    </div>
-                    <Link href="/forgot-password" className="text-blue-600 hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Logging in..." : "Log in"}
-                  </Button>
-                </form>
-              </CardContent>
-              <CardFooter className="flex flex-col gap-2 text-center">
-                <p className="text-sm text-gray-600">
-                  Don't have an account?{" "}
-                  <Link href="/register" className="text-blue-600 hover:underline">
-                    Create an account
-                  </Link>
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full mt-2 bg-transparent"
-                  onClick={() => setShowJoinOrgDialog(true)}
-                >
-                  Join an organization
-                </Button>
-                <div className="md:hidden flex flex-col items-center mt-4 pt-[30px]">
-                  <span className="text-sm text-gray-500 mb-2">by OH! Plus</span>
-                  <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={40} />
-                </div>
-              </CardFooter>
-            </Card>
+              set!
+            </h1>
+            <p className="text-gray-600 text-xl leading-relaxed">
+              Just upload the license key from your <span className="font-semibold text-gray-900">OHPlus Key</span> so
+              we can unlock your account.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Join Organization Dialog */}
-      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+      {/* Right side - Upload area with illustration */}
+      <div className="flex-1 relative overflow-hidden flex flex-col">
+        <Image
+          src="/login-image-3.png"
+          alt="Background"
+          fill
+          className="object-cover -z-10"
+        />
+        {/* Floating geometric shapes */}
+        <div className="absolute inset-0">
+          {/* Various floating cubes and rectangles */}
+          <div className="absolute top-20 left-20 w-16 h-16 bg-cyan-400 rounded-lg transform rotate-12 opacity-80"></div>
+          <div className="absolute top-32 right-32 w-12 h-20 bg-pink-400 rounded-lg transform -rotate-6 opacity-70"></div>
+          <div className="absolute top-60 left-32 w-20 h-12 bg-purple-400 rounded-lg transform rotate-45 opacity-60"></div>
+          <div className="absolute bottom-40 right-20 w-14 h-14 bg-blue-300 rounded-lg transform -rotate-12 opacity-80"></div>
+          <div className="absolute bottom-60 left-16 w-18 h-10 bg-pink-300 rounded-lg transform rotate-30 opacity-70"></div>
+          <div className="absolute top-40 right-16 w-10 h-16 bg-cyan-300 rounded-lg transform -rotate-45 opacity-60"></div>
+        </div>
+
+        {/* Main upload area */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="relative max-w-sm w-full -mt-16 ml-16">
+            <Image
+              src="/login-image-4.png"
+              alt="License upload area"
+              width={300}
+              height={225}
+              className={`rounded-2xl transition-all duration-300 cursor-pointer ${
+                isDragOver ? "scale-105 shadow-lg ring-4 ring-cyan-400" : ""
+              } ${isActivated ? "ring-4 ring-green-400" : ""}`}
+              onDragOver={handleDragOverStep3}
+              onDragLeave={handleDragLeaveStep3}
+              onDrop={handleDropStep3}
+              onClick={() => document.getElementById('activation-file-upload')?.click()}
+            />
+            <input
+              type="file"
+              id="activation-file-upload"
+              className="hidden"
+              accept=".lic"
+              onChange={handleFileSelectStep3}
+            />
+            {isValidating && (
+              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+                <div className="text-center text-white">
+                  <Loader2 className="w-16 h-16 mx-auto animate-spin mb-4" />
+                  <p className="text-lg font-medium">Validating License Key...</p>
+                </div>
+              </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code"
-                value={orgCode}
-                onChange={(e) => setOrgCode(e.target.value)}
-                required
+            {isActivated && (
+              <div className="absolute inset-0 flex items-center justify-center -mt-16 -ml-16 bg-black/50 rounded-2xl">
+                <div className="text-center text-white">
+                  <CheckCircle className="w-16 h-16 mx-auto mb-4" />
+                  <p className="text-lg font-medium">License Key Validated!</p>
+                  <p className="text-sm">Key "{fileName}" authenticated.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Fun fact at bottom */}
+        <div className="p-8">
+          <div className="bg-blue-800/30 backdrop-blur-sm rounded-lg p-4">
+            <p className="text-white text-lg leading-relaxed text-center font-bold">
+              <span className="font-bold">FUN FACT:</span> The Philippines is one of the top OOH markets in Southeast
+              Asia, with EDSA alone hosting more than 2,000 billboards! {"It's"} like the Times Square of Manila.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Mobile Header - Only visible on mobile */}
+      <div className="md:hidden w-full p-6 bg-white border-b border-gray-200">
+        <div className="flex flex-col items-center text-center">
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 mb-4">
+            <div className="text-gray-900 font-bold text-xl">OH+</div>
+          </div>
+          <h2 className="text-xl font-light text-gray-700 leading-tight">
+            Powering smarter site management
+            <br />
+            for billboard operators.
+          </h2>
+        </div>
+      </div>
+
+
+
+      {/* Left side - Login Form */}
+      <div className="flex-1 flex items-center justify-center bg-white p-8 order-1 md:order-1">
+        <div className="w-full max-w-md space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold text-gray-900">Welcome!</h1>
+          </div>
+
+          <div className="space-y-4">
+            {(currentStep === 1 || currentStep === 2) ? (
+              <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-sm text-gray-600">
+                    Username
+                  </Label>
+                  <Input id="username" type="text" placeholder="Username" className="h-12 border-gray-200 rounded-lg" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm text-gray-600">
+                    Password
+                  </Label>
+                  <Input id="password" type="password" placeholder="Password" className="h-12 border-gray-200 rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                </div>
+
+                <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg" type="submit" disabled={isLoading}>
+                  {isLoading ? "Verifying..." : "Login"}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Illustration */}
+      <div className="hidden md:flex flex-1 relative order-2 md:order-2">
+        <div className="w-full h-full rounded-[50px] p-4">
+          <Image
+            src="/login-image-1.png"
+            alt="Login illustration"
+            fill
+            className="rounded-[46px] p-8"
+            priority
+          />
+        </div>
+      </div>
+
+      {/* Password Setup Dialog */}
+      <Dialog open={currentStep === 2} onOpenChange={(open) => { if (!open) setCurrentStep(1); }}>
+        <DialogContent className="bg-white rounded-[50px] shadow-lg p-8 max-w-4xl w-full flex">
+<div className="flex-1 p-4 flex items-center justify-center">
+              <Image
+                src="/login-image-2.png"
+                alt="Login illustration"
+                width={400}
+                height={400}
+                className="rounded-lg"
               />
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={isValidatingCode}>
-                {isValidatingCode ? "Validating..." : "Continue to Registration"}
-              </Button>
+            <div className="flex-1 p-4 space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentStep(1)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div>
+                <h1 className="text-5xl font-bold text-gray-900 mb-3">Hey {pointPersonDataRef.current?.point_person?.first_name || email}!</h1>
+                <p className="text-gray-600 text-xl leading-relaxed">
+                  {"It's great to finally meet you. I'm "}
+                  <span className="font-semibold text-gray-900">Oscar</span>
+                  {", your OHPlus buddy."}
+                </p>
+                <p className="text-gray-600 text-xl leading-relaxed mt-3">
+                  {
+                    "Before we jump into the exciting stuff, let's set up a new password to keep your account safe and secure."
+                  }
+                </p>
+              </div>
+
+              <form onSubmit={handlePasswordChangeSubmit} className="space-y-3">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Input type="password" placeholder="New password" className="h-11 border-gray-200 rounded-lg text-xl" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                <Input
+                  type="password"
+                  placeholder="Confirm new password"
+                  className="h-11 border-gray-200 rounded-lg text-xl"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <Button className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg mt-4" type="submit" disabled={isLoading}>
+                  {isLoading ? "Processing..." : "OK"}
+                </Button>
+              </form>
             </div>
-          </div>
         </DialogContent>
       </Dialog>
-
-      {/* Coming Soon Dialog */}
-      <ComingSoonDialog
-        isOpen={showComingSoonDialog}
-        onClose={() => setShowComingSoonDialog(false)}
-        feature={comingSoonFeature}
-      />
     </div>
   )
 }

@@ -86,6 +86,8 @@ interface AuthContextType {
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
+  startRegistration: () => void
+  endRegistration: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -286,17 +288,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const startRegistration = useCallback(() => {
+    setIsRegistering(true)
+  }, [])
+
+  const endRegistration = useCallback(() => {
+    setIsRegistering(false)
+  }, [])
+
   const findOHPlusAccount = async (uid: string) => {
     try {
-      // Query for OHPLUS accounts with this uid
-      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid), where("type", "==", "OHPLUS"))
+      console.log("Checking OHPLUS account for uid:", uid)
+      // Query for user document with this uid
+      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid))
       const usersSnapshot = await getDocs(usersQuery)
 
+      console.log("Query snapshot empty:", usersSnapshot.empty)
       if (!usersSnapshot.empty) {
-        // Return true if OHPLUS account found
-        return true
+        const userDoc = usersSnapshot.docs[0]
+        const data = userDoc.data()
+        console.log("User data type:", data.type)
+        // Check if type is OHPLUS
+        if (data.type === "OHPLUS") {
+          console.log("OHPLUS account found")
+          return true
+        }
       }
 
+      console.log("No OHPLUS account found")
       return false
     } catch (error) {
       console.error("Error finding OHPLUS account:", error)
@@ -360,7 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgCode?: string,
   ) => {
     setLoading(true)
-    setIsRegistering(true)
+    startRegistration()
     try {
       console.log("Registering new user with tenant ID:", tenantAuth.tenantId)
 
@@ -498,10 +517,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
-      setIsRegistering(false)
+      endRegistration()
       throw error
     } finally {
-      setIsRegistering(false)
+      endRegistration()
     }
   }
 
@@ -677,6 +696,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
+    startRegistration,
+    endRegistration,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
