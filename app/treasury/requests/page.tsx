@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { bookingService, type Booking } from "@/lib/booking-service"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import Link from "next/link"
 
 export default function RequestsPage() {
   const { userData } = useAuth()
@@ -149,8 +150,8 @@ export default function RequestsPage() {
   }, [userData?.company_id, currentPage])
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50  md:p-6">
+      <div className="w-full mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8">
           <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Requests</h1>
@@ -187,7 +188,7 @@ export default function RequestsPage() {
                   </div>
                   <div className="text-gray-700">Nov 25, 2025</div>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <Button className="bg-green-600 hover:bg-green-700 text-white text-sm">Generate Invoice</Button>
+                    <Button variant="outline" className="text-sm">Generate Invoice</Button>
                     <Button
                       variant="outline"
                       className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent text-sm"
@@ -233,7 +234,9 @@ export default function RequestsPage() {
                     <div className="text-gray-700">{booking.client?.name || booking.client?.company_name || "N/A"}</div>
                     <div className="text-gray-700">{sellerNames[booking.seller_id] || booking.seller_id}</div>
                     <div>
-                      <Button className="bg-green-600 hover:bg-green-700 text-white text-sm">Create collectibles</Button>
+                      <Link href={`/treasury/requests/create-collectibles/${booking.id}`}>
+                        <Button variant="outline" className="text-sm">Create collectibles</Button>
+                      </Link>
                     </div>
                     <div>
                       <Button

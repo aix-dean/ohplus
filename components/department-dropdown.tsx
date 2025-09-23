@@ -88,8 +88,6 @@ export function DepartmentDropdown() {
     .map(role => departmentMapping[role])
     .filter(Boolean)
 
-  console.log("Accessible departments:", accessibleDepartments.map(d => d.name))
-
   // Find current department based on pathname
   const currentDepartment = accessibleDepartments.find(dept =>
     pathname.startsWith(`/${dept.role}`)

@@ -4,6 +4,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   orderBy,
   limit,
   startAfter,
@@ -525,6 +526,22 @@ export class BookingService {
       }
     } catch (error) {
       console.error("Error getting paginated collectibles:", error)
+      throw error
+    }
+  }
+
+  async getBookingById(bookingId: string): Promise<Booking | null> {
+    try {
+      const bookingDoc = await getDoc(doc(db, "booking", bookingId))
+      if (bookingDoc.exists()) {
+        return {
+          id: bookingDoc.id,
+          ...bookingDoc.data(),
+        } as Booking
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching booking by ID:", error)
       throw error
     }
   }
