@@ -68,19 +68,21 @@ export function FileBrowser({ companyId, userId }: FileBrowserProps) {
   const createDefaultFolders = useCallback(async () => {
     const defaultFolders = ['Reservations', 'Quotations', 'Inventory', 'Sales Invoice', 'Contracts', 'Government Documents']
 
-    for (const folderName of defaultFolders) {
-      try {
-        // Check if folder already exists
-        const existingFolders = await CompanyService.getCompanyFolders(companyId, '')
-        const folderExists = existingFolders.some(folder => folder.name === folderName)
+    try {
+      // Get all existing folders once
+      const existingFolders = await CompanyService.getCompanyFolders(companyId, '')
+      const existingFolderNames = existingFolders.map(folder => folder.name)
 
-        if (!folderExists) {
-          console.log(`Creating default folder: ${folderName}`)
-          await CompanyService.createFolder(companyId, userId, folderName, '')
-        }
-      } catch (error) {
-        console.error(`Error creating default folder ${folderName}:`, error)
+      // Filter out folders that already exist
+      const foldersToCreate = defaultFolders.filter(folderName => !existingFolderNames.includes(folderName))
+
+      // Create missing folders
+      for (const folderName of foldersToCreate) {
+        console.log(`Creating default folder: ${folderName}`)
+        await CompanyService.createFolder(companyId, userId, folderName, '')
       }
+    } catch (error) {
+      console.error('Error creating default folders:', error)
     }
   }, [companyId, userId])
 
@@ -286,7 +288,14 @@ export function FileBrowser({ companyId, userId }: FileBrowserProps) {
       const result = await CompanyService.getCompanyFiles(companyId, currentFolder)
       if (result.success) {
         const allFiles = result.files
-        const allFolders = result.folders
+        // Deduplicate folders by name, keeping the first occurrence (most recent)
+        const folderMap = new Map<string, CompanyFolder>()
+        result.folders.forEach(folder => {
+          if (!folderMap.has(folder.name)) {
+            folderMap.set(folder.name, folder)
+          }
+        })
+        const allFolders = Array.from(folderMap.values())
         const allItems = [...allFolders, ...allFiles]
 
         setTotalItems(allItems.length)

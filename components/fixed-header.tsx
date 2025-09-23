@@ -63,6 +63,63 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   console.log("Is Admin Page:", isAdminPage)
   // --- End Debugging Logs ---
 
+  // Determine current section for colors
+  let currentSection = pathname?.split("/")[1] || "dashboard"
+  if (pathname?.startsWith("/sales")) {
+    currentSection = "sales"
+  }
+  if (pathname?.startsWith("/logistics")) {
+    currentSection = "logistics"
+  }
+  if (pathname?.startsWith("/admin")) {
+    currentSection = "admin"
+  }
+  if (pathname?.startsWith("/treasury")) {
+    currentSection = "treasury"
+  }
+
+  const getHeaderColors = (section: string) => {
+    switch (section) {
+      case 'sales':
+        return {
+          bg: 'linear-gradient(to right, #FF3131, #FF313180)',
+          hover: '#FF313180'
+        }
+      case 'logistics':
+        return {
+          bg: 'linear-gradient(to right, #32A7FA, #32A7FA80)',
+          hover: '#32A7FA80'
+        }
+      case 'admin':
+        return {
+          bg: 'linear-gradient(to right, #2A31B4, #2A31B480)',
+          hover: '#2A31B480'
+        }
+      case 'treasury':
+        return {
+          bg: 'linear-gradient(to right, #049334, #04933480)',
+          hover: '#04933480'
+        }
+      case 'it':
+        return {
+          bg: 'linear-gradient(to right, #2A31B4, #2A31B480)',
+          hover: '#2A31B480'
+        }
+      case 'business':
+        return {
+          bg: 'linear-gradient(to right, #4169E1, #4169E180)',
+          hover: '#4169E180'
+        }
+      default:
+        return {
+          bg: 'linear-gradient(to right, #FF3131, #FF313180)',
+          hover: '#FF313180'
+        }
+    }
+  }
+
+  const headerColors = getHeaderColors(currentSection)
+
   const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
     const breadcrumbs: BreadcrumbItemData[] = []
@@ -165,9 +222,9 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     <header
       className={cn(
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background
         className,
       )}
+      style={{ backgroundImage: headerColors.bg }}
       {...props}
     >
       {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
@@ -240,7 +297,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
             size="icon"
             className={cn(
               "relative rounded-full text-white",
-              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
+              headerColors.hover,
             )}
           >
             <Bell className="h-5 w-5" />
@@ -284,7 +341,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           size="icon"
           className={cn(
             "overflow-hidden rounded-full text-white",
-            isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
+            headerColors.hover,
           )}
           asChild
         >
