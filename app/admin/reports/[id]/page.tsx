@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -18,17 +18,17 @@ import {
   ExternalLink,
   Edit,
 } from "lucide-react"
-import { postReport, type ReportData } from "@/lib/report-service"
-import type { Product } from "@/lib/firebase-service"
-import { generateReportPDF } from "@/lib/pdf-service"
+import { getReportById, type ReportData } from "@/lib/report-service"
+import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-export default function AdminReportPreviewPage() {
+export default function AdminReportViewPage() {
   const router = useRouter()
+  const params = useParams()
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,8 +44,10 @@ export default function AdminReportPreviewPage() {
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
 
   useEffect(() => {
-    loadPreviewData()
-  }, [])
+    if (params.id) {
+      loadReportData(params.id as string)
+    }
+  }, [params.id])
 
   useEffect(() => {
     if (user?.uid) {
@@ -124,100 +126,48 @@ export default function AdminReportPreviewPage() {
     }
   }
 
-  const loadPreviewData = () => {
+  const loadReportData = async (reportId: string) => {
     try {
-      const reportDataString = sessionStorage.getItem("previewReportData")
-      const productDataString = sessionStorage.getItem("previewProductData")
+      setLoading(true)
 
-      if (reportDataString && productDataString) {
-        const reportData = JSON.parse(reportDataString)
-        const productData = JSON.parse(productDataString)
+      // Fetch the report data
+      const reportData = await getReportById(reportId)
 
-        console.log("Loaded preview report data:", reportData)
-        console.log("Preview report attachments:", reportData.attachments)
-
-        setReport(reportData)
-        setProduct(productData)
-      } else {
-        console.error("No preview data found in session storage")
+      if (!reportData) {
         toast({
           title: "Error",
-          description: "No preview data found",
+          description: "Report not found",
           variant: "destructive",
         })
-        router.push("/admin/assets")
+        router.push("/admin/reports")
+        return
       }
+
+      console.log("Loaded report data:", reportData)
+
+      // Fetch the associated product data
+      if (reportData.siteId) {
+        try {
+          const productData = await getProductById(reportData.siteId)
+          console.log("Loaded product data:", productData)
+          setProduct(productData)
+        } catch (productError) {
+          console.error("Error fetching product data:", productError)
+          // Continue without product data - it's not critical
+        }
+      }
+
+      setReport(reportData)
     } catch (error) {
-      console.error("Error loading preview data:", error)
+      console.error("Error loading report data:", error)
       toast({
         title: "Error",
-        description: "Failed to load preview data",
+        description: "Failed to load report data",
         variant: "destructive",
       })
-      router.push("/admin/assets")
+      router.push("/admin/reports")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handlePostReport = async () => {
-    if (!report) {
-      toast({
-        title: "Error",
-        description: "No report data available",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setPosting(true)
-    try {
-      console.log("Posting report with attachments:", report.attachments)
-
-      const finalReportData: ReportData = {
-        ...report,
-        status: "posted",
-        id: undefined,
-        created: undefined,
-        updated: undefined,
-      }
-
-      if (finalReportData.attachments) {
-        finalReportData.attachments = finalReportData.attachments
-          .filter((attachment: any) => attachment && attachment.fileUrl && attachment.fileName)
-          .map((attachment: any) => ({
-            note: attachment.note || "",
-            fileName: attachment.fileName,
-            fileType: attachment.fileType || "unknown",
-            fileUrl: attachment.fileUrl,
-          }))
-      }
-
-      console.log("Final report data being posted:", finalReportData)
-      console.log("Final attachments data:", finalReportData.attachments)
-
-      const reportId = await postReport(finalReportData)
-
-      sessionStorage.setItem("lastPostedReportId", reportId)
-
-      sessionStorage.removeItem("previewReportData")
-      sessionStorage.removeItem("previewProductData")
-
-      toast({
-        title: "Success",
-        description: "Report posted successfully!",
-      })
-
-      router.push("/admin/reports")
-    } catch (error) {
-      console.error("Error posting report:", error)
-      toast({
-        title: "Error",
-        description: "Failed to post report. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setPosting(false)
     }
   }
 
@@ -312,27 +262,41 @@ export default function AdminReportPreviewPage() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!report || !product) return
+    if (!report) return
 
     setIsGeneratingPDF(true)
     try {
-      console.log("[v0] Starting PDF generation with report:", {
-        id: report.id,
-        bookingDates: report.bookingDates,
-        hasBookingDates: !!report.bookingDates,
-        startDate: report.bookingDates?.start,
-        endDate: report.bookingDates?.end,
+      console.log("Starting Puppeteer PDF generation for report:", report.id)
+
+      // Call the new Puppeteer API
+      const response = await fetch(`/api/admin/reports/${report.id}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      const reportWithSafeDates = {
-        ...report,
-        bookingDates: report.bookingDates || {
-          start: new Date().toISOString().split("T")[0],
-          end: new Date().toISOString().split("T")[0],
-        },
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
       }
 
-      await generateReportPDF(reportWithSafeDates, product, false)
+      // Get the PDF blob
+      const pdfBlob = await response.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `report-${report.id}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully.",
+      })
     } catch (error) {
       console.error("Error generating report PDF:", error)
       toast({
@@ -360,11 +324,11 @@ export default function AdminReportPreviewPage() {
   }
 
   const handleBack = () => {
-    router.back()
+    router.push("/admin/reports")
   }
 
   const handleEdit = () => {
-    router.back()
+    router.push(`/admin/reports/${params.id}/edit`)
   }
 
   const calculateInstallationDuration = (startDate: string, endDate: string) => {
@@ -441,7 +405,7 @@ export default function AdminReportPreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading report preview...</div>
+        <div className="text-lg">Loading report...</div>
       </div>
     )
   }
@@ -449,13 +413,13 @@ export default function AdminReportPreviewPage() {
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">No report data available</div>
+        <div className="text-lg">Report not found</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen overflow-hidden bg-gray-50">
       <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -511,7 +475,7 @@ export default function AdminReportPreviewPage() {
           </div>
         </div>
 
-        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
+        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto max-h-[calc(100vh-150px)]">
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
@@ -687,28 +651,10 @@ export default function AdminReportPreviewPage() {
                           </div>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>
-                          <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Time:</span>{" "}
-                          {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Location:</span> {getSiteLocation(product)}
-                        </div>
-                        {attachment.note && (
-                          <div>
-                            <span className="font-semibold">Note:</span> {attachment.note}
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ))}
                 </div>
               )}
-
             </div>
 
             <div className="flex justify-between items-end pt-8 border-t">
@@ -756,16 +702,6 @@ export default function AdminReportPreviewPage() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          onClick={handlePostReport}
-          disabled={posting}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
-        >
-          {posting ? "Posting..." : "Post Report"}
-        </Button>
       </div>
 
       {report && (
