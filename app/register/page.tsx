@@ -1,19 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FirebaseError } from "firebase/app"
-import { Eye, EyeOff } from "lucide-react"
 import { query, collection, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -438,31 +437,25 @@ If you have any questions about this Privacy Policy, You can contact us:
 
 By email: support@ohplus.com`
 
-export default function RegisterPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("+63 ")
+export default function AccountCreationPage() {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    middleName: "",
+    countryCode: "+63",
+    cellphone: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    agreeToTerms: false,
+  })
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
-  const [agreements, setAgreements] = useState({
-    terms: false,
-    privacy: false,
-    rules: false,
-  })
-  const [dialogOpen, setDialogOpen] = useState({
-    terms: false,
-    privacy: false,
-    rules: false,
-  })
-  const [manualAgreement, setManualAgreement] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false)
 
   const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
@@ -471,12 +464,23 @@ export default function RegisterPage() {
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
 
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+
   // Redirect if user is already logged in
   useEffect(() => {
-    if (user) {
-      router.push("/admin/dashboard")
+    if (user && userData && !showWelcome && !isRegistering) {
+      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+      if (dashboardPath) {
+        router.push(dashboardPath)
+      } else {
+        router.push("/unauthorized")
+      }
     }
-  }, [user, router])
+  }, [user, userData, router, getRoleDashboardPath, showWelcome, isRegistering])
+
 
   // Fetch invitation details when code is present
   useEffect(() => {
@@ -509,18 +513,6 @@ export default function RegisterPage() {
     fetchInvitationDetails()
   }, [orgCode])
 
-  // Check for stored agreements on component mount (for reference only)
-  useEffect(() => {
-    const termsAgreed = sessionStorage.getItem('termsAgreed') === 'true'
-    const privacyAgreed = sessionStorage.getItem('privacyAgreed') === 'true'
-    const rulesAgreed = sessionStorage.getItem('rulesAgreed') === 'true'
-
-    setAgreements({
-      terms: termsAgreed,
-      privacy: privacyAgreed,
-      rules: rulesAgreed,
-    })
-  }, [])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     if (error instanceof FirebaseError) {
@@ -542,450 +534,318 @@ export default function RegisterPage() {
     return "An unknown error occurred. Please try again."
   }
 
-  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-
-    if (!value.startsWith("+63 ")) {
-      setPhoneNumber("+63 ")
-      return
-    }
-
-    const numbersOnly = value.slice(4).replace(/\D/g, "")
-    if (numbersOnly.length <= 10) {
-      setPhoneNumber("+63 " + numbersOnly)
-    }
-  }
-
-  const isPhoneNumberValid = () => {
-    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
-    return numbersOnly.length === 10
-  }
-
-  const passwordCriteria = {
-    minLength: password.length >= 8,
-    hasLowerCase: /[a-z]/.test(password),
-    hasUpperCase: /[A-Z]/.test(password),
-    hasNumber: /[0-9]/.test(password),
-    hasSpecialChar: /[^a-zA-Z0-9]/.test(password),
-  }
-
-  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length
-
-  const getBarColorClass = (score: number) => {
-    if (score === 0) return "bg-gray-300"
-    if (score <= 2) return "bg-red-500"
-    if (score <= 4) return "bg-yellow-500"
-    return "bg-green-500"
-  }
-
-  const getStrengthText = (score: number) => {
-    if (score === 0) return "Enter a password"
-    if (score <= 2) return "Weak"
-    if (score <= 4) return "Moderate"
-    return "Strong"
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleRegister()
   }
 
   const handleRegister = async () => {
     setErrorMessage(null)
 
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.cellphone || !formData.password || !formData.confirmPassword) {
       setErrorMessage("Please fill in all required fields.")
       return
     }
 
-    if (!manualAgreement) {
-      setErrorMessage("Please check the agreement checkbox to proceed with registration.")
+    if (!formData.agreeToTerms) {
+      setErrorMessage("Please agree to the terms and conditions.")
       return
     }
 
-    if (!isPhoneNumberValid()) {
-      setErrorMessage("Phone number must be exactly 10 digits after +63.")
-      return
-    }
-
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setErrorMessage("Passwords do not match.")
       return
     }
 
     setLoading(true)
+    setIsRegistering(true)
 
     try {
       await register(
         {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          middle_name: formData.middleName,
+          phone_number: formData.countryCode + formData.cellphone,
           gender: "",
         },
         {
           company_name: "",
           company_location: "",
         },
-        password,
+        formData.password,
         orgCode || undefined,
       )
 
-      // Registration successful - redirect will be handled by useEffect
-      // The redirect logic will be handled after userData is loaded
+      // Registration successful - show welcome UI
+      setShowWelcome(true)
+      setIsRegistering(false)
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
+      setIsRegistering(false)
     } finally {
       setLoading(false)
     }
   }
 
-  // Role-based navigation after registration
-  useEffect(() => {
-    console.log("Register navigation useEffect triggered")
-    console.log("user:", !!user)
-    console.log("userData:", userData)
-    console.log("loading:", loading)
 
-    if (user && userData && !loading) {
-      console.log("userData.roles:", userData.roles)
-
-      // Check if user is in onboarding
-      if (userData.onboarding) {
-        console.log("User is in onboarding, redirecting to onboarding flow")
-        return
-      }
-
-      // Only use the roles array from user_roles collection
-      if (userData.roles && userData.roles.length > 0) {
-        console.log("Using roles from user_roles collection:", userData.roles)
-        const dashboardPath = getRoleDashboardPath(userData.roles)
-
-        if (dashboardPath) {
-          console.log("Navigating to:", dashboardPath)
-          router.push(dashboardPath)
-        } else {
-          console.log("No dashboard path found for roles, redirecting to unauthorized")
-          router.push("/unauthorized")
-        }
-      } else {
-        console.log("No roles found in user_roles collection, redirecting to unauthorized")
-        router.push("/unauthorized")
-      }
-    }
-  }, [user, userData, loading, router, getRoleDashboardPath])
-
-  return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
-      {/* Left Panel - Image */}
-      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
-        <Image
-          src="/registration-background.png"
-          alt="Background"
-          layout="fill"
-          objectFit="cover"
-          className="absolute inset-0 z-0 opacity-50"
-        />
-      </div>
-
-      {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
-        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
-          <CardHeader className="space-y-1 text-left">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">
-                {orgCode ? "Join Organization" : "Create an Account"}
-              </CardTitle>
+  if (showWelcome) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+        <div className="max-w-7xl w-full flex items-center gap-20">
+          {/* Left side - Illustration */}
+          <div className="flex-1 flex justify-center">
+            <div className="relative w-[500px] h-[500px] rounded-full overflow-hidden">
+              <img
+                src="/login-image-6.png"
+                alt="Welcome illustration"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">
-              {orgCode ? "Complete your registration to join the organization!" : "It's free to create one!"}
-            </CardDescription>
-            {orgCode && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
-                <p className="text-sm text-blue-800">
-                  <strong>Organization Code:</strong> {orgCode}
-                </p>
-                {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
-                {invitationRole && (
-                  <p className="text-sm text-green-800 mt-1">
-                    <strong>Assigned Role:</strong> {invitationRole}
-                  </p>
-                )}
-                {!loadingInvitation && !invitationRole && orgCode && (
-                  <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
-                )}
-              </div>
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Registration Form */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                <Input
-                  id="middleName"
-                  placeholder=""
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Cellphone number</Label>
-                <Input
-                  id="phoneNumber"
-                  placeholder="+63 9XXXXXXXXX"
-                  value={phoneNumber}
-                  onChange={handlePhoneNumberChange}
-                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
-                  required
-                />
-                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
-                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                  </button>
-                </div>
-                <div className="mt-2">
-                  <div className="flex gap-1 h-1">
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`flex-1 ${
-                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {getStrengthText(passwordStrengthScore)}
-                  </p>
-                  {passwordStrengthScore < 5 && password.length > 0 && (
-                    <ul className="list-inside text-sm mt-1">
-                      {!passwordCriteria.minLength && (
-                        <li className="text-red-500">Password should be at least 8 characters long</li>
-                      )}
-                      {!passwordCriteria.hasLowerCase && (
-                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
-                      )}
-                      {!passwordCriteria.hasUpperCase && (
-                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
-                      )}
-                      {!passwordCriteria.hasNumber && (
-                        <li className="text-red-500">Password should contain at least one number</li>
-                      )}
-                      {!passwordCriteria.hasSpecialChar && (
-                        <li className="text-red-500">Password should contain at least one special character</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
-                  </button>
-                </div>
-              </div>
+          </div>
 
-              {/* Policy Agreements Section */}
-              <div className="space-y-3 border-t pt-6">
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="agreements-checkbox"
-                    checked={manualAgreement}
-                    onCheckedChange={(checked) => setManualAgreement(checked as boolean)}
-                  />
-                  <Label htmlFor="agreements-checkbox" className="text-sm cursor-pointer flex-1 leading-relaxed">
-                    By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                    <Dialog open={dialogOpen.terms} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, terms: open }))}>
-                      <DialogTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-blue-600 hover:text-blue-800 underline font-medium"
-                        >
-                          Terms and Conditions
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                        <DialogHeader>
-                          <DialogTitle>Terms and Conditions</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-96 w-full">
-                          <div className="pr-4">
-                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                              {TERMS_AND_CONDITIONS}
-                            </div>
-                          </div>
-                        </ScrollArea>
-                        <div className="flex justify-end space-x-4 mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setDialogOpen(prev => ({ ...prev, terms: false }))}
-                          >
-                            Close
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    ,{" "}
-                    <Dialog open={dialogOpen.privacy} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, privacy: open }))}>
-                      <DialogTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-green-600 hover:text-green-800 underline font-medium"
-                        >
-                          Privacy Policy
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                        <DialogHeader>
-                          <DialogTitle>Privacy Policy</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-96 w-full">
-                          <div className="pr-4">
-                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                              {PRIVACY_POLICY}
-                            </div>
-                          </div>
-                        </ScrollArea>
-                        <div className="flex justify-end space-x-4 mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setDialogOpen(prev => ({ ...prev, privacy: false }))}
-                          >
-                            Close
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    , and all platform{" "}
-                    <Dialog open={dialogOpen.rules} onOpenChange={(open) => setDialogOpen(prev => ({ ...prev, rules: open }))}>
-                      <DialogTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-purple-600 hover:text-purple-800 underline font-medium"
-                        >
-                          Rules and Regulations
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                        <DialogHeader>
-                          <DialogTitle>Rules and Regulations</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-96 w-full">
-                          <div className="pr-4">
-                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                              {RULES_AND_REGULATIONS}
-                            </div>
-                          </div>
-                        </ScrollArea>
-                        <div className="flex justify-end space-x-4 mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setDialogOpen(prev => ({ ...prev, rules: false }))}
-                          >
-                            Close
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>{" "}
-                    set by OH!Plus.
-                  </Label>
-                </div>
-              </div>
+          {/* Right side - Content */}
+          <div className="flex-1 max-w-lg space-y-8">
+            {/* User icon image */}
+            <div className="flex justify-start">
+              <img
+                src="/login-image-7.png"
+                alt="User icon"
+                className="w-16 h-16 rounded-full"
+              />
+            </div>
 
-              {/* Sign Up Button */}
-              <Button
-                className={`w-full text-white ${
-                  manualAgreement
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-gray-400 cursor-not-allowed"
-                }`}
-                type="submit"
-                onClick={handleRegister}
-                disabled={loading || loadingInvitation || !manualAgreement}
-              >
-                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
+            {/* Main heading */}
+            <h1 className="text-5xl font-bold text-foreground leading-tight">
+              Welcome aboard,
+              <br />
+              {formData.firstName}!
+            </h1>
+
+            {/* Description text */}
+            <div className="space-y-5 text-muted-foreground leading-relaxed text-lg">
+              <p>
+                Since you're the first one here, your mission is to{" "}
+                <span className="font-semibold text-foreground">bring your teammates on board</span> this adventure.
+              </p>
+              <p>But before that, let me give you a quick little tour so you can get comfy. It'll only take a minute!</p>
+            </div>
+
+            {/* Start Tour button */}
+            <div className="pt-6 flex justify-end">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-medium text-lg flex items-center gap-3" onClick={() => router.push("/admin/dashboard")}>
+                Start Tour
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Button>
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-            {errorMessage && (
-              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
-                {errorMessage}
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Side - Illustration */}
+      <div className="hidden md:flex flex-1 relative">
+        <div className="w-full h-full rounded-[50px] p-4">
+          <Image
+            src="/register-image-1.png"
+            alt="Registration illustration"
+            fill
+            className="rounded-[46px] p-8"
+            priority
+          />
+        </div>
+      </div>
+
+      {/* Right Side - Form */}
+      <div className="flex-1 bg-white flex items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-gray-900">Let's create your account</h1>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* First Name and Last Name Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+                  First Name
+                </Label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange("firstName", e.target.value)}
+                  className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+                  Last Name
+                </Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange("lastName", e.target.value)}
+                  className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Middle Name */}
+            <div className="space-y-2">
+              <Label htmlFor="middleName" className="text-sm font-medium text-gray-700">
+                Middle Name (Optional)
+              </Label>
+              <Input
+                id="middleName"
+                type="text"
+                placeholder="Middle Name"
+                value={formData.middleName}
+                onChange={(e) => handleInputChange("middleName", e.target.value)}
+                className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Cellphone Number */}
+            <div className="space-y-2">
+              <Label htmlFor="cellphone" className="text-sm font-medium text-gray-700">
+                Cellphone Number
+              </Label>
+              <div className="flex gap-2">
+                <Select value={formData.countryCode} onValueChange={(value) => handleInputChange("countryCode", value)}>
+                  <SelectTrigger className="w-20 h-12 border-gray-300">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="+63">+63</SelectItem>
+                    <SelectItem value="+1">+1</SelectItem>
+                    <SelectItem value="+44">+44</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="cellphone"
+                  type="tel"
+                  placeholder="Cellphone No."
+                  value={formData.cellphone}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
+                    handleInputChange("cellphone", value)
+                  }}
+                  className="flex-1 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Email Address */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email Address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Email Address"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Password"
+                value={formData.password}
+                onChange={(e) => handleInputChange("password", e.target.value)}
+                className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                Confirm Password
+              </Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm password"
+                value={formData.confirmPassword}
+                onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Terms and Conditions */}
+            <div className="flex items-start space-x-2 pt-2">
+              <Checkbox
+                id="terms"
+                checked={formData.agreeToTerms}
+                onCheckedChange={(checked) => handleInputChange("agreeToTerms", checked as boolean)}
+                className="mt-1"
+              />
+              <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
+                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                <Dialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <span className="text-blue-600 underline cursor-pointer">Terms and Conditions</span>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                    <DialogHeader>
+                      <DialogTitle>Terms and Conditions</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="h-96 w-full">
+                      <div className="pr-4">
+                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                          {TERMS_AND_CONDITIONS}
+                        </div>
+                      </div>
+                    </ScrollArea>
+                    <div className="flex justify-end space-x-4 mt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setTermsDialogOpen(false)}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>{" "}
+                set by CoVPay.
+              </Label>
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg mt-6"
+              disabled={loading}
+            >
+              Confirm
+            </Button>
+          </form>
+
+          {errorMessage && (
+            <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+              {errorMessage}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
