@@ -515,6 +515,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Inventory", href: "/business/inventory", icon: Package },
+                  { title: "To-Do List", href: "/business/todo-list", icon: ClipboardList },
                   { title: "Assets", href: "/business/assets", icon: FileText },
                   { title: "Suppliers", href: "/business/suppliers", icon: Users },
                   { title: "Purchase Orders", href: "/business/purchase-orders", icon: ClipboardList },
@@ -1164,6 +1165,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
                   { title: "Project Bulletin", href: "/sales/project-monitoring", icon: Monitor },
+                  { title: "To-Do List", href: "/sales/todo-list", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1321,6 +1323,7 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
+                  { title: "To-Do List", href: "/treasury/todo-list", icon: ClipboardList },
                   { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
                   { title: "Settings", href: "/treasury/settings", icon: Settings },
                 ].map((item) => {

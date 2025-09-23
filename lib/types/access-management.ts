@@ -45,6 +45,8 @@ export const DEPARTMENTS = [
   { id: "logistics", name: "Logistics", description: "Logistics department" },
   { id: "cms", name: "CMS", description: "Content Management System" },
   { id: "admin", name: "Admin", description: "Administration" },
+  { id: "it", name: "IT", description: "Information Technology" },
+  { id: "treasury", name: "Treasury", description: "Treasury department" },
 ]
 
 export const PERMISSION_ACTIONS = [
