@@ -1,9 +1,97 @@
+"use client"
+
 import { Bell, MessageSquare, User, ChevronDown, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { format } from "date-fns"
+import type { DateRange } from "react-day-picker"
+
+interface SitePerformanceData {
+  bestPerforming: {
+    name: string
+    percentage: number
+  }
+  worstPerforming: {
+    name: string
+    percentage: number
+  }
+}
+
+interface ConversionRateData {
+  quotations: number
+  bookings: number
+  rate: number
+}
 
 export default function Dashboard() {
+  const { userData } = useAuth()
+  const [sitePerformance, setSitePerformance] = useState<SitePerformanceData>({
+    bestPerforming: { name: "Loading...", percentage: 0 },
+    worstPerforming: { name: "Loading...", percentage: 0 }
+  })
+  const [conversionRate, setConversionRate] = useState<ConversionRateData>({
+    quotations: 0,
+    bookings: 0,
+    rate: 0
+  })
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const [conversionYear, setConversionYear] = useState("2025")
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      fetchSitePerformance()
+    }
+  }, [userData?.company_id, dateRange])
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      fetchConversionRate()
+    }
+  }, [userData?.company_id, conversionYear])
+
+  const fetchSitePerformance = async () => {
+    try {
+      const params = new URLSearchParams({
+        companyId: userData!.company_id!
+      })
+      if (dateRange?.from) params.append("startDate", format(dateRange.from, "yyyy-MM-dd"))
+      if (dateRange?.to) params.append("endDate", format(dateRange.to, "yyyy-MM-dd"))
+
+      const response = await fetch(`/api/business/dashboard?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSitePerformance(data)
+      } else {
+        console.error("Failed to fetch site performance")
+      }
+    } catch (error) {
+      console.error("Error fetching site performance:", error)
+    }
+  }
+
+  const fetchConversionRate = async () => {
+    try {
+      const params = new URLSearchParams({
+        companyId: userData!.company_id!,
+        year: conversionYear
+      })
+
+      const response = await fetch(`/api/business/dashboard?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setConversionRate(data.conversionRate)
+      } else {
+        console.error("Failed to fetch conversion rate")
+      }
+    } catch (error) {
+      console.error("Error fetching conversion rate:", error)
+    }
+  }
   return (
     <div className="min-h-screen">
         {/* Main Content */}
@@ -155,7 +243,7 @@ export default function Dashboard() {
             <Card className="bg-white">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-[#333333]">Conversion Rate</CardTitle>
-                <Select defaultValue="2025">
+                <Select value={conversionYear} onValueChange={setConversionYear}>
                   <SelectTrigger className="w-20">
                     <SelectValue />
                   </SelectTrigger>
@@ -168,12 +256,12 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center justify-center gap-4 mb-6">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-[#4169e1]">30</div>
+                    <div className="text-3xl font-bold text-[#4169e1]">{conversionRate.quotations}</div>
                     <div className="text-sm text-gray-600">Quotations</div>
                   </div>
                   <ArrowRight className="w-6 h-6 text-gray-400" />
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-[#4169e1]">18</div>
+                    <div className="text-3xl font-bold text-[#4169e1]">{conversionRate.bookings}</div>
                     <div className="text-sm text-gray-600">Reservations</div>
                   </div>
                 </div>
@@ -192,11 +280,11 @@ export default function Dashboard() {
                         fill="none"
                         stroke="#18da69"
                         strokeWidth="3"
-                        strokeDasharray="60, 100"
+                        strokeDasharray={`${conversionRate.rate}, 100`}
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xl font-bold text-[#333333]">60%</span>
+                      <span className="text-xl font-bold text-[#333333]">{conversionRate.rate}%</span>
                     </div>
                   </div>
                 </div>
@@ -211,27 +299,24 @@ export default function Dashboard() {
             <Card className="bg-white lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-[#333333]">Site Performance</CardTitle>
-                <Select defaultValue="2025">
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025">2025</SelectItem>
-                    <SelectItem value="2024">2024</SelectItem>
-                  </SelectContent>
-                </Select>
+                <DateRangePicker
+                  value={dateRange}
+                  onChange={setDateRange}
+                  placeholder="Select date range"
+                  className="w-64"
+                />
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
                     <div className="text-sm text-[#18da69] mb-2">Best performing</div>
-                    <div className="text-lg font-semibold text-[#333333] mb-2">Petplans Tower</div>
-                    <div className="text-4xl font-bold text-[#18da69]">100%</div>
+                    <div className="text-lg font-semibold text-[#333333] mb-2">{sitePerformance.bestPerforming.name}</div>
+                    <div className="text-4xl font-bold text-[#18da69]">{sitePerformance.bestPerforming.percentage}%</div>
                   </div>
                   <div>
                     <div className="text-sm text-[#ff5252] mb-2">Worst performing</div>
-                    <div className="text-lg font-semibold text-[#333333] mb-2">C-5 BB 2.0</div>
-                    <div className="text-4xl font-bold text-[#ff5252]">40%</div>
+                    <div className="text-lg font-semibold text-[#333333] mb-2">{sitePerformance.worstPerforming.name}</div>
+                    <div className="text-4xl font-bold text-[#ff5252]">{sitePerformance.worstPerforming.percentage}%</div>
                   </div>
                 </div>
               </CardContent>
