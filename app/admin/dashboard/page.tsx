@@ -12,11 +12,11 @@ import {
   CalendarEvent,
 } from "@/lib/firebase-service";
 import { getPettyCashConfig, getActivePettyCashCycle, PettyCashConfig, PettyCashCycle, getLatestPettyCashCycle, savePettyCashExpense, updatePettyCashCycleTotal, getPettyCashCycles, getPettyCashExpenses, uploadFileToFirebase } from "@/lib/petty-cash-service"
-import { getUserProductsCount } from "@/lib/firebase-service"
+import { getOccupancyData } from "@/lib/firebase-service"
 import { AlertTriangle } from "lucide-react"
 import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { searchServiceAssignments, type SearchResult } from "@/lib/algolia-service"
+import { searchServiceAssignments, type SearchResult, type SearchResponse } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
 
 // Existing imports and content of app/admin/dashboard/page.tsx
@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams();
@@ -59,6 +60,7 @@ export default function AdminDashboardPage() {
   const [pettyCashBalance, setPettyCashBalance] = useState(0);
   const [loadingPettyCash, setLoadingPettyCash] = useState(true);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [loadingOccupancy, setLoadingOccupancy] = useState(true);
 
   // Product counts for Occupancy Index
   const [staticCount, setStaticCount] = useState(0);
@@ -66,12 +68,22 @@ export default function AdminDashboardPage() {
   const [dynamicCount, setDynamicCount] = useState(0);
   const [totalDynamic, setTotalDynamic] = useState(0);
 
+  // Calculate occupancy percentage
+  const totalUnavailable = staticCount + dynamicCount;
+  const totalProducts = totalStatic + totalDynamic;
+  const occupancyPercentage = totalProducts > 0 ? Math.round((totalUnavailable / totalProducts) * 100) : 0;
+
   // Service Assignments Search state
   const [serviceAssignmentsSearchTerm, setServiceAssignmentsSearchTerm] = useState("")
   const [serviceAssignmentsSearchResults, setServiceAssignmentsSearchResults] = useState<SearchResult[]>([])
+  const [serviceAssignmentsSearchResponse, setServiceAssignmentsSearchResponse] = useState<SearchResponse | null>(null)
   const [isSearchingServiceAssignments, setIsSearchingServiceAssignments] = useState(false)
   const [serviceAssignmentsSearchError, setServiceAssignmentsSearchError] = useState<string | null>(null)
   const debouncedServiceAssignmentsSearchTerm = useDebounce(serviceAssignmentsSearchTerm, 500)
+
+  // Service Assignments Pagination state
+  const [serviceAssignmentsCurrentPage, setServiceAssignmentsCurrentPage] = useState(1)
+  const serviceAssignmentsItemsPerPage = 10
 
   // Check if petty cash balance is low
   const isPettyCashBalanceLow = pettyCashConfig ? pettyCashBalance <= pettyCashConfig.warning_amount : false;
@@ -115,6 +127,10 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  useEffect(() => {
+    setServiceAssignmentsCurrentPage(1);
+  }, [debouncedServiceAssignmentsSearchTerm]);
 
   useEffect(() => {
     const fetchServiceAssignments = async () => {
@@ -164,71 +180,108 @@ export default function AdminDashboardPage() {
     const fetchProductCounts = async () => {
       if (!userData?.company_id) return;
 
+      setLoadingOccupancy(true);
       try {
-        const staticAvailable = await getUserProductsCount(userData.company_id, { active: true, content_type: "static" });
-        const staticTotal = await getUserProductsCount(userData.company_id, { content_type: "static" });
-        const dynamicAvailable = await getUserProductsCount(userData.company_id, { active: true, content_type: "dynamic" });
-        const dynamicTotal = await getUserProductsCount(userData.company_id, { content_type: "dynamic" });
+        const occupancyData = await getOccupancyData(userData.company_id);
 
-        setStaticCount(staticAvailable);
-        setTotalStatic(staticTotal);
-        setDynamicCount(dynamicAvailable);
-        setTotalDynamic(dynamicTotal);
+        setStaticCount(occupancyData.staticUnavailable);
+        setTotalStatic(occupancyData.staticTotal);
+        setDynamicCount(occupancyData.dynamicUnavailable);
+        setTotalDynamic(occupancyData.dynamicTotal);
       } catch (error) {
         console.error("Error fetching product counts:", error);
+      } finally {
+        setLoadingOccupancy(false);
       }
     };
 
     fetchProductCounts();
   }, [userData?.company_id]);
 
-  // Search service assignments when search term changes
-  useEffect(() => {
-    const performServiceAssignmentsSearch = async () => {
-      if (!debouncedServiceAssignmentsSearchTerm.trim()) {
-        setServiceAssignmentsSearchResults([])
-        setIsSearchingServiceAssignments(false)
-        setServiceAssignmentsSearchError(null)
-        return
-      }
+  // Search service assignments when search term or page changes
+   useEffect(() => {
+     const performServiceAssignmentsSearch = async () => {
+       if (!debouncedServiceAssignmentsSearchTerm.trim()) {
+         setServiceAssignmentsSearchResults([])
+         setServiceAssignmentsSearchResponse(null)
+         setIsSearchingServiceAssignments(false)
+         setServiceAssignmentsSearchError(null)
+         return
+       }
 
-      setIsSearchingServiceAssignments(true)
-      setServiceAssignmentsSearchError(null)
+       setIsSearchingServiceAssignments(true)
+       setServiceAssignmentsSearchError(null)
 
-      try {
-        console.log(`Searching service assignments for: "${debouncedServiceAssignmentsSearchTerm}"`)
-        const response = await searchServiceAssignments(debouncedServiceAssignmentsSearchTerm, userData?.company_id || undefined)
+       try {
+         console.log(`Searching service assignments for: "${debouncedServiceAssignmentsSearchTerm}" page: ${serviceAssignmentsCurrentPage - 1}`)
+         const response = await searchServiceAssignments(
+           debouncedServiceAssignmentsSearchTerm,
+           userData?.company_id || undefined,
+           serviceAssignmentsCurrentPage - 1, // Algolia page starts at 0
+           serviceAssignmentsItemsPerPage
+         )
 
-        if (response && Array.isArray(response.hits)) {
-          setServiceAssignmentsSearchResults(response.hits)
-          console.log(`Service assignments search returned ${response.hits.length} results`)
+         if (response && Array.isArray(response.hits)) {
+           setServiceAssignmentsSearchResults(response.hits)
+           setServiceAssignmentsSearchResponse(response)
+           console.log(`Service assignments search returned ${response.hits.length} results`)
 
-          if (response.error) {
-            setServiceAssignmentsSearchError(response.error)
-          } else {
-            setServiceAssignmentsSearchError(null)
-          }
-        } else {
-          console.error("Invalid service assignments search response:", response)
-          setServiceAssignmentsSearchResults([])
-          setServiceAssignmentsSearchError(response.error || "Received invalid search results")
-        }
-      } catch (error) {
-        console.error("Service assignments search error:", error)
-        setServiceAssignmentsSearchResults([])
-        setServiceAssignmentsSearchError("Failed to perform search")
-      } finally {
-        setIsSearchingServiceAssignments(false)
-      }
-    }
+           if (response.error) {
+             setServiceAssignmentsSearchError(response.error)
+           } else {
+             setServiceAssignmentsSearchError(null)
+           }
+         } else {
+           console.error("Invalid service assignments search response:", response)
+           setServiceAssignmentsSearchResults([])
+           setServiceAssignmentsSearchResponse(null)
+           setServiceAssignmentsSearchError(response.error || "Received invalid search results")
+         }
+       } catch (error) {
+         console.error("Service assignments search error:", error)
+         setServiceAssignmentsSearchResults([])
+         setServiceAssignmentsSearchResponse(null)
+         setServiceAssignmentsSearchError("Failed to perform search")
+       } finally {
+         setIsSearchingServiceAssignments(false)
+       }
+     }
 
-    performServiceAssignmentsSearch()
-  }, [debouncedServiceAssignmentsSearchTerm, userData?.company_id])
+     performServiceAssignmentsSearch()
+   }, [debouncedServiceAssignmentsSearchTerm, serviceAssignmentsCurrentPage, userData?.company_id])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false);
     // No need to remove query param here, it's already done in useEffect
   };
+
+  const handleServiceAssignmentsNextPage = () => {
+    setServiceAssignmentsCurrentPage(prev => prev + 1);
+  };
+
+  const handleServiceAssignmentsPreviousPage = () => {
+    setServiceAssignmentsCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  // Calculate paginated service assignments for non-search mode
+  const serviceAssignmentsStartIndex = (serviceAssignmentsCurrentPage - 1) * serviceAssignmentsItemsPerPage;
+  const paginatedServiceAssignments = serviceAssignments.slice(
+    serviceAssignmentsStartIndex,
+    serviceAssignmentsStartIndex + serviceAssignmentsItemsPerPage
+  );
+
+  // Pagination props
+  const isSearchingServiceAssignmentsMode = debouncedServiceAssignmentsSearchTerm.trim() !== "";
+  const totalServiceAssignmentsPages = Math.ceil(serviceAssignments.length / serviceAssignmentsItemsPerPage);
+  const serviceAssignmentsHasMore = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResponse ? serviceAssignmentsSearchResponse.page < serviceAssignmentsSearchResponse.nbPages - 1 : false
+    : serviceAssignmentsCurrentPage < totalServiceAssignmentsPages;
+  const serviceAssignmentsTotalItems = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResults.length
+    : paginatedServiceAssignments.length;
+  const serviceAssignmentsTotalOverall = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResponse?.nbHits
+    : serviceAssignments.length;
 
   const handleAddExpense = async (data: { item: string; amount: number; requestedBy: string; attachments: File[] }) => {
     console.log("handleAddExpense called with data:", data)
@@ -645,14 +698,15 @@ export default function AdminDashboardPage() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-2 gap-4 mb-8 h-[600px]">
             {/* Calendar Section - spans 2 rows in column 1 */}
             <div className="lg:col-span-1 lg:row-span-2">
-              <Card className="bg-[#ffffee] border-[#ffdea2] border-2 rounded-2xl h-[600px]">
+              <Card className="bg-[#ffffee] border-[#ffdea2] border-2 rounded-2xl h-full relative px-2">
                 <CardContent className="h-full overflow-y-auto pt-2">
                   {loadingCalendar ? (
-                    <div className="text-center py-4 text-[#a1a1a1]">
-                      Loading events...
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
                     </div>
                   ) : (
                     <div className="flex flex-col h-full">
@@ -788,14 +842,17 @@ export default function AdminDashboardPage() {
 
             {/* Petty Cash - Row 1, Column 2 */}
             <div className="lg:col-span-1">
-              <Card className="bg-[#ffffff] shadow-sm h-[300px] relative">
+              <Card className="bg-[#ffffff] shadow-sm h-full relative px-2">
                 <CardHeader>
                   <CardTitle className="text-lg">Petty Cash</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center h-[200px] relative">
                   <div className="flex flex-col items-center justify-center text-center">
                     {loadingPettyCash ? (
-                      <div className="text-sm text-[#a1a1a1]">Loading...</div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
+                    </div>
                     ) : (
                       <>
                         <div className={`text-3xl font-bold mb-2 flex items-center justify-center gap-2 ${isPettyCashBalanceLow ? 'text-red-600' : 'text-[#18da69]'}`}>
@@ -827,7 +884,7 @@ export default function AdminDashboardPage() {
 
             {/* Active Users - Row 1, Column 3 */}
             <div className="lg:col-span-1">
-              <Card className="bg-[#ffffff] shadow-sm h-[300px]">
+              <Card className="bg-[#ffffff] shadow-sm h-full px-2">
                 <CardHeader>
                   <CardTitle className="text-lg">Active Users</CardTitle>
                 </CardHeader>
@@ -885,11 +942,11 @@ export default function AdminDashboardPage() {
                                 fill="none"
                                 stroke="#18da69"
                                 strokeWidth="2"
-                                strokeDasharray="80, 100"
+                                strokeDasharray={`${occupancyPercentage}, 100`}
                               />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold">80%</span>
+                              <span className="text-xl font-bold">{occupancyPercentage}%</span>
                             </div>
                           </div>
                         </div>
@@ -912,7 +969,7 @@ export default function AdminDashboardPage() {
 
             {/* Sales Quota Index - Row 2, Column 2 */}
             <div className="lg:col-span-1">
-              <Card className="bg-[#ffffff] shadow-sm h-[300px]">
+              <Card className="bg-[#ffffff] shadow-sm h-full px-2">
                 <CardHeader>
                   <CardTitle className="text-lg">Sales Quota Index</CardTitle>
                 </CardHeader>
@@ -940,67 +997,74 @@ export default function AdminDashboardPage() {
 
             {/* Occupancy Index - Row 2, Column 3 */}
             <div className="lg:col-span-1">
-              <Card className="bg-[#ffffff] shadow-sm h-[300px]">
+              <Card className="bg-[#ffffff] shadow-sm h-[300px] relative h-full px-2">
                 <CardHeader>
                   <CardTitle className="text-lg">Occupancy Index</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    {/* Occupancy Details - Left Side */}
-                    <div className="flex-1">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Static</span>
-                          <span className="font-medium">{staticCount}/{totalStatic}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Dynamic</span>
-                          <span className="font-medium">{dynamicCount}/{totalDynamic}</span>
+                <CardContent >
+                  {loadingOccupancy ? (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      {/* Occupancy Details - Left Side */}
+                      <div className="flex-1">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Static BB</span>
+                            <span className="font-medium">{staticCount}/{totalStatic}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>LED BB</span>
+                            <span className="font-medium">{dynamicCount}/{totalDynamic}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Circular Progress - Right Side */}
-                    <div className="flex-1 flex justify-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center justify-center mb-2">
-                          <div className="relative w-20 h-20">
-                            <svg
-                              className="w-20 h-20 transform -rotate-90"
-                              viewBox="0 0 36 36"
-                            >
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#e0e0e0"
-                                strokeWidth="2"
-                              />
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#18da69"
-                                strokeWidth="2"
-                                strokeDasharray="80, 100"
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold">80%</span>
+                      {/* Circular Progress - Right Side */}
+                      <div className="flex-1 flex justify-center">
+                        <div className="flex flex-col items-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <div className="relative w-20 h-20">
+                              <svg
+                                className="w-20 h-20 transform -rotate-90"
+                                viewBox="0 0 36 36"
+                              >
+                                <path
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="#e0e0e0"
+                                  strokeWidth="2"
+                                />
+                                <path
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="#18da69"
+                                  strokeWidth="2"
+                                  strokeDasharray={`${occupancyPercentage}, 100`}
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-bold">{occupancyPercentage}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-4 text-xs">
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                              <span>Occupied</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                              <span>Vacant</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-center gap-4 text-xs">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                            <span>Occupied</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                            <span>Vacant</span>
-                          </div>
-                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1131,7 +1195,7 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     ) : (
-                      serviceAssignments.map((assignment) => (
+                      paginatedServiceAssignments.map((assignment) => (
                         <tr
                           key={assignment.id}
                           className="border-b border-[#e0e0e0]"
@@ -1170,6 +1234,15 @@ export default function AdminDashboardPage() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                currentPage={serviceAssignmentsCurrentPage}
+                itemsPerPage={serviceAssignmentsItemsPerPage}
+                totalItems={serviceAssignmentsTotalItems}
+                totalOverall={serviceAssignmentsTotalOverall}
+                onNextPage={handleServiceAssignmentsNextPage}
+                onPreviousPage={handleServiceAssignmentsPreviousPage}
+                hasMore={serviceAssignmentsHasMore}
+              />
             </CardContent>
           </Card>
         </div>

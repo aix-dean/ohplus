@@ -2043,3 +2043,102 @@ export async function getProposalTemplatesCount(companyId: string, searchTerm = 
     return 0
   }
 }
+
+// Get occupancy data for all products in one efficient query
+export async function getOccupancyData(companyId: string, currentDate: Date = new Date()): Promise<{
+  staticUnavailable: number;
+  staticTotal: number;
+  dynamicUnavailable: number;
+  dynamicTotal: number;
+}> {
+  try {
+    console.log(`Getting occupancy data for company:`, companyId)
+
+    // Get all products for the company
+    const productsRef = collection(db, "products")
+    const productsQuery = query(
+      productsRef,
+      where("company_id", "==", companyId),
+      where("deleted", "==", false)
+    )
+
+    const productsSnapshot = await getDocs(productsQuery)
+    const allProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product))
+
+    console.log(`Found ${allProducts.length} total products`)
+
+    // Get all bookings for the company
+    const bookingsRef = collection(db, "booking")
+    const bookingsQuery = query(bookingsRef, where("company_id", "==", companyId))
+    const bookingsSnapshot = await getDocs(bookingsQuery)
+    const allBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking))
+
+    console.log(`Found ${allBookings.length} total bookings`)
+
+    // Group bookings by product_id for faster lookup
+    const bookingsByProduct = new Map<string, Booking[]>()
+    allBookings.forEach(booking => {
+      if (!bookingsByProduct.has(booking.product_id)) {
+        bookingsByProduct.set(booking.product_id, [])
+      }
+      bookingsByProduct.get(booking.product_id)!.push(booking)
+    })
+
+    // Initialize counters
+    let staticUnavailable = 0
+    let staticTotal = 0
+    let dynamicUnavailable = 0
+    let dynamicTotal = 0
+
+    // Process each product
+    for (const product of allProducts) {
+      if (!product.id) continue // Skip products without ID
+
+      const productBookings = bookingsByProduct.get(product.id) || []
+      const isUnavailable = productBookings.some((booking) => {
+        // Skip completed or cancelled bookings
+        if (booking.status === "COMPLETED" || booking.status === "CANCELLED") {
+          return false
+        }
+
+        // Convert dates to Date objects (handle both string and Timestamp)
+        const startDate = booking.start_date ? (typeof booking.start_date === 'string' ? new Date(booking.start_date) : booking.start_date.toDate()) : null
+        const endDate = booking.end_date ? (typeof booking.end_date === 'string' ? new Date(booking.end_date) : booking.end_date.toDate()) : null
+
+        // Check if current date falls within booking period
+        if (startDate && endDate) {
+          return currentDate >= startDate && currentDate <= endDate
+        }
+
+        return false
+      })
+
+      // Check content type and increment counters
+      const contentType = (product.content_type || "").toLowerCase()
+      if (contentType === "static") {
+        staticTotal++
+        if (isUnavailable) staticUnavailable++
+      } else if (contentType === "dynamic") {
+        dynamicTotal++
+        if (isUnavailable) dynamicUnavailable++
+      }
+    }
+
+    console.log(`Occupancy results: Static ${staticUnavailable}/${staticTotal}, Dynamic ${dynamicUnavailable}/${dynamicTotal}`)
+
+    return {
+      staticUnavailable,
+      staticTotal,
+      dynamicUnavailable,
+      dynamicTotal
+    }
+  } catch (error) {
+    console.error(`Error getting occupancy data:`, error)
+    return {
+      staticUnavailable: 0,
+      staticTotal: 0,
+      dynamicUnavailable: 0,
+      dynamicTotal: 0
+    }
+  }
+}
