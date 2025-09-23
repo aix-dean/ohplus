@@ -1,82 +1,433 @@
-"use client" // Convert to client component
+"use client"; // Convert to client component
 
-import { useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
-import { RouteProtection } from "@/components/route-protection"
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context"; // Assuming useAuth provides user data
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"; // Import the dialog
+import { RouteProtection } from "@/components/route-protection";
+import {
+  getServiceAssignmentsByCompanyId,
+  ServiceAssignment,
+  getCalendarEventsForWindow,
+  CalendarEvent,
+} from "@/lib/firebase-service";
+import { getPettyCashConfig, getActivePettyCashCycle, PettyCashConfig, PettyCashCycle, getLatestPettyCashCycle, savePettyCashExpense, updatePettyCashCycleTotal, getPettyCashCycles, getPettyCashExpenses, uploadFileToFirebase } from "@/lib/petty-cash-service"
+import { getOccupancyData } from "@/lib/firebase-service"
+import { AlertTriangle } from "lucide-react"
+import { AddExpenseDialog } from "@/components/add-expense-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { searchServiceAssignments, type SearchResult, type SearchResponse } from "@/lib/algolia-service"
+import { useDebounce } from "@/hooks/use-debounce"
 
 // Existing imports and content of app/admin/dashboard/page.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge" // Added missing Badge
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { Search, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
 
 export default function AdminDashboardPage() {
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const { user, userData } = useAuth() // Get user data from auth context
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user, userData } = useAuth(); // Get user data from auth context
+  const { toast } = useToast();
 
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 15
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDate, setSelectedDate] = useState("Jun 2025");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+
+  const [serviceAssignments, setServiceAssignments] = useState<
+    ServiceAssignment[]
+  >([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [calendarEvents, setCalendarEvents] = useState<{
+    [date: string]: CalendarEvent[];
+  }>({});
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
+  const [pettyCashConfig, setPettyCashConfig] = useState<PettyCashConfig | null>(null);
+  const [pettyCashCycle, setPettyCashCycle] = useState<PettyCashCycle | null>(null);
+  const [pettyCashBalance, setPettyCashBalance] = useState(0);
+  const [loadingPettyCash, setLoadingPettyCash] = useState(true);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [loadingOccupancy, setLoadingOccupancy] = useState(true);
+
+  // Product counts for Occupancy Index
+  const [staticCount, setStaticCount] = useState(0);
+  const [totalStatic, setTotalStatic] = useState(0);
+  const [dynamicCount, setDynamicCount] = useState(0);
+  const [totalDynamic, setTotalDynamic] = useState(0);
+
+  // Calculate occupancy percentage
+  const totalUnavailable = staticCount + dynamicCount;
+  const totalProducts = totalStatic + totalDynamic;
+  const occupancyPercentage = totalProducts > 0 ? Math.round((totalUnavailable / totalProducts) * 100) : 0;
+
+  // Service Assignments Search state
+  const [serviceAssignmentsSearchTerm, setServiceAssignmentsSearchTerm] = useState("")
+  const [serviceAssignmentsSearchResults, setServiceAssignmentsSearchResults] = useState<SearchResult[]>([])
+  const [serviceAssignmentsSearchResponse, setServiceAssignmentsSearchResponse] = useState<SearchResponse | null>(null)
+  const [isSearchingServiceAssignments, setIsSearchingServiceAssignments] = useState(false)
+  const [serviceAssignmentsSearchError, setServiceAssignmentsSearchError] = useState<string | null>(null)
+  const debouncedServiceAssignmentsSearchTerm = useDebounce(serviceAssignmentsSearchTerm, 500)
+
+  // Service Assignments Pagination state
+  const [serviceAssignmentsCurrentPage, setServiceAssignmentsCurrentPage] = useState(1)
+  const serviceAssignmentsItemsPerPage = 10
+
+  // Check if petty cash balance is low
+  const isPettyCashBalanceLow = pettyCashConfig ? pettyCashBalance <= pettyCashConfig.warning_amount : false;
+
+  const fetchPettyCashData = async () => {
+    if (userData?.company_id) {
+      setLoadingPettyCash(true);
+      try {
+        // Fetch petty cash config and active cycle
+        const [config, cycle] = await Promise.all([
+          getPettyCashConfig(userData.company_id),
+          getActivePettyCashCycle(userData.company_id)
+        ]);
+
+        setPettyCashConfig(config);
+        setPettyCashCycle(cycle);
+
+        // Calculate remaining balance: config amount - cycle expenses
+        const balance = config ? config.amount - (cycle?.total || 0) : 0;
+        setPettyCashBalance(balance);
+      } catch (error) {
+        console.error("Error fetching petty cash data:", error);
+      } finally {
+        setLoadingPettyCash(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    const registeredParam = searchParams.get("registered")
-    const dialogShownKey = "registrationSuccessDialogShown"
+    const registeredParam = searchParams.get("registered");
+    const dialogShownKey = "registrationSuccessDialogShown";
 
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
-      setShowSuccessDialog(true)
-      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
+      setShowSuccessDialog(true);
+      sessionStorage.setItem(dialogShownKey, "true"); // Mark as shown for this session
       // Remove the query parameter immediately
-      router.replace("/admin/dashboard", undefined)
+      router.replace("/admin/dashboard", undefined);
     }
-  }, [searchParams, router])
+  }, [searchParams, router]);
 
   useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm])
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setServiceAssignmentsCurrentPage(1);
+  }, [debouncedServiceAssignmentsSearchTerm]);
+
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      if (userData?.company_id) {
+        setLoadingAssignments(true);
+        try {
+          const assignments = await getServiceAssignmentsByCompanyId(
+            userData.company_id
+          );
+          setServiceAssignments(assignments);
+        } catch (error) {
+          console.error("Error fetching service assignments:", error);
+        } finally {
+          setLoadingAssignments(false);
+        }
+      }
+    };
+
+    fetchServiceAssignments();
+  }, [userData?.company_id]);
+
+  useEffect(() => {
+    const fetchCalendarEvents = async () => {
+      if (userData?.company_id) {
+        setLoadingCalendar(true);
+        try {
+          // Fetch all events for the 3-day window at once
+          const events = await getCalendarEventsForWindow(userData.company_id);
+          setCalendarEvents(events);
+        } catch (error) {
+          console.error("Error fetching calendar events:", error);
+        } finally {
+          setLoadingCalendar(false);
+        }
+      }
+    };
+
+    fetchCalendarEvents();
+  }, [userData?.company_id]);
+
+  useEffect(() => {
+    fetchPettyCashData();
+  }, [userData?.company_id]);
+
+  // Fetch product counts for Occupancy Index
+  useEffect(() => {
+    const fetchProductCounts = async () => {
+      if (!userData?.company_id) return;
+
+      setLoadingOccupancy(true);
+      try {
+        const occupancyData = await getOccupancyData(userData.company_id);
+
+        setStaticCount(occupancyData.staticUnavailable);
+        setTotalStatic(occupancyData.staticTotal);
+        setDynamicCount(occupancyData.dynamicUnavailable);
+        setTotalDynamic(occupancyData.dynamicTotal);
+      } catch (error) {
+        console.error("Error fetching product counts:", error);
+      } finally {
+        setLoadingOccupancy(false);
+      }
+    };
+
+    fetchProductCounts();
+  }, [userData?.company_id]);
+
+  // Search service assignments when search term or page changes
+   useEffect(() => {
+     const performServiceAssignmentsSearch = async () => {
+       if (!debouncedServiceAssignmentsSearchTerm.trim()) {
+         setServiceAssignmentsSearchResults([])
+         setServiceAssignmentsSearchResponse(null)
+         setIsSearchingServiceAssignments(false)
+         setServiceAssignmentsSearchError(null)
+         return
+       }
+
+       setIsSearchingServiceAssignments(true)
+       setServiceAssignmentsSearchError(null)
+
+       try {
+         console.log(`Searching service assignments for: "${debouncedServiceAssignmentsSearchTerm}" page: ${serviceAssignmentsCurrentPage - 1}`)
+         const response = await searchServiceAssignments(
+           debouncedServiceAssignmentsSearchTerm,
+           userData?.company_id || undefined,
+           serviceAssignmentsCurrentPage - 1, // Algolia page starts at 0
+           serviceAssignmentsItemsPerPage
+         )
+
+         if (response && Array.isArray(response.hits)) {
+           setServiceAssignmentsSearchResults(response.hits)
+           setServiceAssignmentsSearchResponse(response)
+           console.log(`Service assignments search returned ${response.hits.length} results`)
+
+           if (response.error) {
+             setServiceAssignmentsSearchError(response.error)
+           } else {
+             setServiceAssignmentsSearchError(null)
+           }
+         } else {
+           console.error("Invalid service assignments search response:", response)
+           setServiceAssignmentsSearchResults([])
+           setServiceAssignmentsSearchResponse(null)
+           setServiceAssignmentsSearchError(response.error || "Received invalid search results")
+         }
+       } catch (error) {
+         console.error("Service assignments search error:", error)
+         setServiceAssignmentsSearchResults([])
+         setServiceAssignmentsSearchResponse(null)
+         setServiceAssignmentsSearchError("Failed to perform search")
+       } finally {
+         setIsSearchingServiceAssignments(false)
+       }
+     }
+
+     performServiceAssignmentsSearch()
+   }, [debouncedServiceAssignmentsSearchTerm, serviceAssignmentsCurrentPage, userData?.company_id])
 
   const handleCloseSuccessDialog = () => {
-    setShowSuccessDialog(false)
+    setShowSuccessDialog(false);
     // No need to remove query param here, it's already done in useEffect
+  };
+
+  const handleServiceAssignmentsNextPage = () => {
+    setServiceAssignmentsCurrentPage(prev => prev + 1);
+  };
+
+  const handleServiceAssignmentsPreviousPage = () => {
+    setServiceAssignmentsCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  // Calculate paginated service assignments for non-search mode
+  const serviceAssignmentsStartIndex = (serviceAssignmentsCurrentPage - 1) * serviceAssignmentsItemsPerPage;
+  const paginatedServiceAssignments = serviceAssignments.slice(
+    serviceAssignmentsStartIndex,
+    serviceAssignmentsStartIndex + serviceAssignmentsItemsPerPage
+  );
+
+  // Pagination props
+  const isSearchingServiceAssignmentsMode = debouncedServiceAssignmentsSearchTerm.trim() !== "";
+  const totalServiceAssignmentsPages = Math.ceil(serviceAssignments.length / serviceAssignmentsItemsPerPage);
+  const serviceAssignmentsHasMore = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResponse ? serviceAssignmentsSearchResponse.page < serviceAssignmentsSearchResponse.nbPages - 1 : false
+    : serviceAssignmentsCurrentPage < totalServiceAssignmentsPages;
+  const serviceAssignmentsTotalItems = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResults.length
+    : paginatedServiceAssignments.length;
+  const serviceAssignmentsTotalOverall = isSearchingServiceAssignmentsMode
+    ? serviceAssignmentsSearchResponse?.nbHits
+    : serviceAssignments.length;
+
+  const handleAddExpense = async (data: { item: string; amount: number; requestedBy: string; attachments: File[] }) => {
+    console.log("handleAddExpense called with data:", data)
+    if (!userData?.company_id || !userData?.uid) {
+      console.log("Missing user data:", { company_id: userData?.company_id, uid: userData?.uid })
+      toast({
+        title: "Error",
+        description: "User authentication required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      console.log("Getting latest cycle for company:", userData.company_id)
+      // Get latest cycle
+      const latestCycle = await getLatestPettyCashCycle(userData.company_id)
+      console.log("Latest cycle:", latestCycle)
+      if (!latestCycle) {
+        toast({
+          title: "Error",
+          description: "No petty cash cycle found. Please create a cycle first.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Upload attachments
+      console.log("Uploading attachments:", data.attachments.length, "files")
+      const attachmentUrls: string[] = []
+      for (const file of data.attachments) {
+        try {
+          console.log("Uploading file:", file.name)
+          const url = await uploadFileToFirebase(file, `petty-cash/${userData.company_id}/${latestCycle.id}`)
+          console.log("Uploaded URL:", url)
+          attachmentUrls.push(url)
+        } catch (uploadError) {
+          console.error("Error uploading file:", uploadError)
+          toast({
+            title: "Upload Error",
+            description: `Failed to upload ${file.name}`,
+            variant: "destructive",
+          })
+          return
+        }
+      }
+      console.log("All attachments uploaded:", attachmentUrls)
+
+      // Save expense
+      console.log("Saving expense with data:", {
+        companyId: userData.company_id,
+        userId: userData.uid,
+        cycleId: latestCycle.id,
+        expenseData: {
+          item: data.item,
+          amount: data.amount,
+          requestedBy: data.requestedBy,
+          attachment: attachmentUrls,
+        }
+      })
+      if (!latestCycle.id) {
+        toast({
+          title: "Error",
+          description: "Invalid cycle ID",
+          variant: "destructive",
+        })
+        return
+      }
+      await savePettyCashExpense(
+        userData.company_id,
+        userData.uid,
+        latestCycle.id,
+        {
+          item: data.item,
+          amount: data.amount,
+          requestedBy: data.requestedBy,
+          attachment: attachmentUrls,
+        }
+      )
+      console.log("Expense saved successfully")
+
+      // Update cycle total
+      const newTotal = latestCycle.total + data.amount
+      console.log("Updating cycle total from", latestCycle.total, "to", newTotal)
+      if (!latestCycle.id) {
+        toast({
+          title: "Error",
+          description: "Invalid cycle ID for update",
+          variant: "destructive",
+        })
+        return
+      }
+      await updatePettyCashCycleTotal(latestCycle.id, newTotal)
+      console.log("Cycle total updated")
+
+      // Refresh petty cash data
+      await fetchPettyCashData();
+
+      toast({
+        title: "Success",
+        description: "Expense added successfully",
+      })
+
+    } catch (error) {
+      console.error("Error adding expense:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add expense",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAddExpenseOpen(false)
+    }
   }
 
   // Define a type for department data
   interface Department {
-    id: string
-    name: string
-    headerColor: string // Tailwind class name for header background
-    contentBgColor: string // New: Tailwind class name for content background
-    members: string[]
-    metricLabel?: string
-    metricValue?: string
-    badgeCount?: number
-    href?: string
-    isAvailable?: boolean
+    id: string;
+    name: string;
+    headerColor: string; // Tailwind class name for header background
+    contentBgColor: string; // New: Tailwind class name for content background
+    members: string[];
+    metricLabel?: string;
+    metricValue?: string;
+    badgeCount?: number;
+    href?: string;
+    isAvailable?: boolean;
   }
 
   // Department Card Component
-  function DepartmentCard({
-    department,
-  }: {
-    department: Department
-  }) {
+  function DepartmentCard({ department }: { department: Department }) {
     const cardContent = (
       <>
         <CardHeader
           className={cn(
             "relative p-4 rounded-t-lg",
-            department.isAvailable !== false ? department.headerColor : "bg-gray-400",
-            department.isAvailable === false && "grayscale",
+            department.isAvailable !== false
+              ? department.headerColor
+              : "bg-gray-400",
+            department.isAvailable === false && "grayscale"
           )}
         >
           <CardTitle
             className={cn(
               "text-white text-lg font-semibold flex justify-between items-center",
-              department.isAvailable === false && "opacity-60",
+              department.isAvailable === false && "opacity-60"
             )}
           >
             {department.name}
@@ -84,7 +435,7 @@ export default function AdminDashboardPage() {
               <Badge
                 className={cn(
                   "bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold",
-                  department.isAvailable === false && "opacity-60",
+                  department.isAvailable === false && "opacity-60"
                 )}
               >
                 {department.badgeCount}
@@ -95,8 +446,10 @@ export default function AdminDashboardPage() {
         <CardContent
           className={cn(
             "p-4 rounded-b-lg flex flex-col justify-between flex-grow",
-            department.isAvailable !== false ? department.contentBgColor : "bg-gray-100",
-            department.isAvailable === false && "grayscale",
+            department.isAvailable !== false
+              ? department.contentBgColor
+              : "bg-gray-100",
+            department.isAvailable === false && "grayscale"
           )}
         >
           <div>
@@ -105,22 +458,31 @@ export default function AdminDashboardPage() {
                 key={index}
                 className={cn(
                   "text-sm text-gray-700 flex items-center gap-1",
-                  department.isAvailable === false && "opacity-60",
+                  department.isAvailable === false && "opacity-60"
                 )}
               >
                 <span
                   className={cn(
                     "h-2 w-2 rounded-full",
-                    department.isAvailable !== false ? "bg-green-500" : "bg-gray-400",
+                    department.isAvailable !== false
+                      ? "bg-green-500"
+                      : "bg-gray-400"
                   )}
                 />
                 {member}
               </p>
             ))}
             {department.metricLabel && department.metricValue && (
-              <div className={cn("mt-4 text-sm", department.isAvailable === false && "opacity-60")}>
+              <div
+                className={cn(
+                  "mt-4 text-sm",
+                  department.isAvailable === false && "opacity-60"
+                )}
+              >
                 <p className="text-gray-500">{department.metricLabel}</p>
-                <p className="font-bold text-gray-800">{department.metricValue}</p>
+                <p className="font-bold text-gray-800">
+                  {department.metricValue}
+                </p>
               </div>
             )}
           </div>
@@ -128,7 +490,8 @@ export default function AdminDashboardPage() {
             variant="outline"
             className={cn(
               "mt-4 w-full bg-transparent",
-              department.isAvailable === false && "opacity-60 cursor-not-allowed",
+              department.isAvailable === false &&
+                "opacity-60 cursor-not-allowed"
             )}
             disabled={department.isAvailable === false}
           >
@@ -136,7 +499,7 @@ export default function AdminDashboardPage() {
           </Button>
         </CardContent>
       </>
-    )
+    );
 
     if (department.href && department.isAvailable !== false) {
       return (
@@ -145,16 +508,19 @@ export default function AdminDashboardPage() {
             {cardContent}
           </Card>
         </Link>
-      )
+      );
     }
 
     return (
       <Card
-        className={cn("h-full flex flex-col overflow-hidden", department.isAvailable === false && "cursor-not-allowed")}
+        className={cn(
+          "h-full flex flex-col overflow-hidden",
+          department.isAvailable === false && "cursor-not-allowed"
+        )}
       >
         {cardContent}
       </Card>
-    )
+    );
   }
 
   const departmentData: Department[] = [
@@ -293,104 +659,607 @@ export default function AdminDashboardPage() {
       members: [],
       isAvailable: false,
     },
-  ]
+  ];
 
   // Filter departments based on search term
   const filteredDepartments = departmentData.filter((department) => {
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
     return (
       department.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-      department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
-    )
-  })
+      department.members.some((member) =>
+        member.toLowerCase().includes(lowerCaseSearchTerm)
+      )
+    );
+  });
 
-  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedDepartments = filteredDepartments.slice(startIndex, startIndex + itemsPerPage)
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedDepartments = filteredDepartments.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
 
   return (
     <RouteProtection requiredRoles="admin">
-      <div className="flex-1 p-4 md:p-6">
-        <div className="flex flex-col gap-6">
-          {/* Header Section */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold">
+      <div className="min-h-screen bg-[#fafafa]">
+        {/* Main Content */}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold text-[#000000]">
               {userData?.first_name
                 ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
                 : "Dashboard"}
-            </h1>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-grow">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search..."
-                  className="w-full rounded-lg bg-background pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                    {selectedDate} <ChevronDown className="h-4 w-4" />
+            </h2>
+            <Button
+              variant="outline"
+              className="bg-[#ffffff] border-[#c4c4c4] hover:bg-[#fafafa]"
+            >
+              Announcements
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-2 gap-4 mb-8 h-[600px]">
+            {/* Calendar Section - spans 2 rows in column 1 */}
+            <div className="lg:col-span-1 lg:row-span-2">
+              <Card className="bg-[#ffffee] border-[#ffdea2] border-2 rounded-2xl h-full relative px-2">
+                <CardContent className="h-full overflow-y-auto pt-2">
+                  {loadingCalendar ? (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full">
+                      {/* Today's events */}
+                      <div className="flex-1 space-y-2 pb-4">
+                        <h4 className="font-medium mb-2">
+                          Today{" "}
+                          {new Date().toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </h4>
+                        {(() => {
+                          const today = new Date();
+                          const todayKey = today.toDateString();
+                          const todayEvents = calendarEvents[todayKey] || [];
+
+                          return todayEvents.length > 0 ? (
+                            todayEvents.map((event) => (
+                              <div
+                                key={event.id}
+                                className="p-2 rounded text-sm"
+                                style={{ backgroundColor: event.color }}
+                              >
+                                <span className="font-medium">
+                                  {event.title}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-2 text-[#a1a1a1] text-xs">
+                              No events for today.
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Tomorrow's events */}
+                      <div className="flex-1 space-y-2 py-4 border-t border-[#e0e0e0]">
+                        <h4 className="font-medium mb-2">
+                          {(() => {
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            return tomorrow.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            });
+                          })()}
+                          ,{" "}
+                          {(() => {
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            return tomorrow.getFullYear();
+                          })()}
+                        </h4>
+                        {(() => {
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          const tomorrowKey = tomorrow.toDateString();
+                          const tomorrowEvents =
+                            calendarEvents[tomorrowKey] || [];
+
+                          return tomorrowEvents.length > 0 ? (
+                            tomorrowEvents.map((event) => (
+                              <div
+                                key={event.id}
+                                className="p-2 rounded text-sm"
+                                style={{ backgroundColor: event.color }}
+                              >
+                                <span className="font-medium">
+                                  {event.title}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-[#a1a1a1] text-center py-2">
+                              No events for this day.
+                            </p>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Day after tomorrow's events */}
+                      <div className="flex-1 space-y-2 pt-4">
+                        <h4 className="font-medium mb-2">
+                          {(() => {
+                            const dayAfter = new Date();
+                            dayAfter.setDate(dayAfter.getDate() + 2);
+                            return dayAfter.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            });
+                          })()}
+                          ,{" "}
+                          {(() => {
+                            const dayAfter = new Date();
+                            dayAfter.setDate(dayAfter.getDate() + 2);
+                            return dayAfter.getFullYear();
+                          })()}
+                        </h4>
+                        {(() => {
+                          const dayAfter = new Date();
+                          dayAfter.setDate(dayAfter.getDate() + 2);
+                          const dayAfterKey = dayAfter.toDateString();
+                          const dayAfterEvents =
+                            calendarEvents[dayAfterKey] || [];
+
+                          return dayAfterEvents.length > 0 ? (
+                            dayAfterEvents.map((event) => (
+                              <div
+                                key={event.id}
+                                className="p-2 rounded text-sm"
+                                style={{ backgroundColor: event.color }}
+                              >
+                                <span className="font-medium">
+                                  {event.title}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-[#a1a1a1] text-center py-2">
+                              No events for this day.
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+            </div>
+
+            {/* Petty Cash - Row 1, Column 2 */}
+            <div className="lg:col-span-1">
+              <Card className="bg-[#ffffff] shadow-sm h-full relative px-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Petty Cash</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center h-[200px] relative">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    {loadingPettyCash ? (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
+                    </div>
+                    ) : (
+                      <>
+                        <div className={`text-3xl font-bold mb-2 flex items-center justify-center gap-2 ${isPettyCashBalanceLow ? 'text-red-600' : 'text-[#18da69]'}`}>
+                          {isPettyCashBalanceLow && <AlertTriangle className="w-6 h-6 text-red-600" />}
+                          <span>₱{pettyCashBalance.toLocaleString()}</span>
+                        </div>
+                        {isPettyCashBalanceLow && (
+                          <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md mb-2 text-center">
+                            ⚠️ Petty cash balance is low!
+                          </div>
+                        )}
+                        <div className="text-sm text-[#a1a1a1] text-center">
+                          Cycle#: {pettyCashCycle ? pettyCashCycle.cycle_no.toString().padStart(4, '0') : "0000"}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    className="bg-[#737fff] hover:bg-[#5a5fff] text-white absolute bottom-4 right-4"
+                    onClick={() => setIsAddExpenseOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Expense
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Active Users - Row 1, Column 3 */}
+            <div className="lg:col-span-1">
+              <Card className="bg-[#ffffff] shadow-sm h-full px-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Active Users</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center">
+                    {/* Users List - Left Side */}
+                    <div className="flex-1">
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                          <span className="text-sm font-medium">SALES</span>
+                          <span className="text-sm">Noemi Abellanada</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                          <span className="text-sm font-medium">SALES</span>
+                          <span className="text-sm">Matthew Espanto</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                          <span className="text-sm font-medium">LOGISTICS</span>
+                          <span className="text-sm">May Tuyan</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                          <span className="text-sm font-medium">LOGISTICS</span>
+                          <span className="text-sm">James Polido</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                          <span className="text-sm font-medium">SOFT ADMIN</span>
+                          <span className="text-sm">Mel Mendoza</span>
+                        </div>
+                        <div className="text-center text-[#a1a1a1]">...</div>
+                      </div>
+                    </div>
+
+                    {/* Circular Progress - Right Side */}
+                    <div className="flex-1 flex justify-center">
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center justify-center mb-2">
+                          <div className="relative w-20 h-20">
+                            <svg
+                              className="w-20 h-20 transform -rotate-90"
+                              viewBox="0 0 36 36"
+                            >
+                              <path
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke="#e0e0e0"
+                                strokeWidth="2"
+                              />
+                              <path
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke="#18da69"
+                                strokeWidth="2"
+                                strokeDasharray={`${occupancyPercentage}, 100`}
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-xl font-bold">{occupancyPercentage}%</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-center gap-4 text-xs">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                            <span>Online</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                            <span>Offline</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sales Quota Index - Row 2, Column 2 */}
+            <div className="lg:col-span-1">
+              <Card className="bg-[#ffffff] shadow-sm h-full px-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Sales Quota Index</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="w-full bg-[#e0e0e0] rounded-full h-3">
+                      <div
+                        className="bg-[#18da69] h-3 rounded-full"
+                        style={{ width: "75%" }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-end mt-1">
+                      <span className="text-sm font-medium">75%</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-[#a1a1a1]">
+                    Sales Team Leader to set targets per sales associate.
+                    Sales Quota Index here is the average of the entire Sales
+                    Team. When this is clicked, breakdown per sales associate
+                    is showed.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Occupancy Index - Row 2, Column 3 */}
+            <div className="lg:col-span-1">
+              <Card className="bg-[#ffffff] shadow-sm h-[300px] relative h-full px-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Occupancy Index</CardTitle>
+                </CardHeader>
+                <CardContent >
+                  {loadingOccupancy ? (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                      <p>Loading...</p>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      {/* Occupancy Details - Left Side */}
+                      <div className="flex-1">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Static BB</span>
+                            <span className="font-medium">{staticCount}/{totalStatic}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>LED BB</span>
+                            <span className="font-medium">{dynamicCount}/{totalDynamic}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Circular Progress - Right Side */}
+                      <div className="flex-1 flex justify-center">
+                        <div className="flex flex-col items-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <div className="relative w-20 h-20">
+                              <svg
+                                className="w-20 h-20 transform -rotate-90"
+                                viewBox="0 0 36 36"
+                              >
+                                <path
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="#e0e0e0"
+                                  strokeWidth="2"
+                                />
+                                <path
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="#18da69"
+                                  strokeWidth="2"
+                                  strokeDasharray={`${occupancyPercentage}, 100`}
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-bold">{occupancyPercentage}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-4 text-xs">
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                              <span>Occupied</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                              <span>Vacant</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Department Cards Grid - Fixed 3-column layout for 15 items (3×5 grid) */}
-          <div className="grid grid-cols-3 gap-4 min-h-[600px]">
-            {paginatedDepartments.map((department) => (
-              <DepartmentCard key={department.id} department={department} />
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          )}
+          {/* Service Assignments Table */}
+          <Card className="bg-[#ffffff] shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Service Assignments</CardTitle>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4" />
+                  <Input
+                    placeholder="Search service assignments..."
+                    value={serviceAssignmentsSearchTerm}
+                    onChange={(e) => setServiceAssignmentsSearchTerm(e.target.value)}
+                    className="pl-10 w-64 bg-[#fafafa] border-[#e0e0e0]"
+                  />
+                  {isSearchingServiceAssignments && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#a1a1a1]"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[#e0e0e0]">
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        SA#
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        RV#
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        Type
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        Site
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        End Date
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        Campaign Name
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        Crew
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-[#000000]">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingAssignments ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="text-center py-4 text-[#a1a1a1]"
+                        >
+                          Loading service assignments...
+                        </td>
+                      </tr>
+                    ) : serviceAssignmentsSearchTerm.trim() ? (
+                      // Show search results
+                      isSearchingServiceAssignments ? (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="text-center py-4 text-[#a1a1a1]"
+                          >
+                            Searching service assignments...
+                          </td>
+                        </tr>
+                      ) : serviceAssignmentsSearchResults.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="text-center py-4 text-[#a1a1a1]"
+                          >
+                            No service assignments found for "{serviceAssignmentsSearchTerm}".
+                          </td>
+                        </tr>
+                      ) : (
+                        serviceAssignmentsSearchResults.map((result) => (
+                          <tr
+                            key={result.objectID}
+                            className="border-b border-[#e0e0e0]"
+                          >
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).saNumber || result.objectID}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).joNumber || (result as any).projectSiteId || "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).serviceType || "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).projectSiteName || result.location || "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).coveredDateEnd ? new Date((result as any).coveredDateEnd).toLocaleDateString() : "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).jobDescription || result.name || "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).assignedTo || "N/A"}
+                            </td>
+                            <td className="py-3 px-4 text-[#000000]">
+                              {(result as any).status || "N/A"}
+                            </td>
+                          </tr>
+                        ))
+                      )
+                    ) : serviceAssignments.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="text-center py-4 text-[#a1a1a1]"
+                        >
+                          No service assignments found.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedServiceAssignments.map((assignment) => (
+                        <tr
+                          key={assignment.id}
+                          className="border-b border-[#e0e0e0]"
+                        >
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.saNumber}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.joNumber || assignment.projectSiteId}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.serviceType}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.projectSiteName}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.coveredDateEnd
+                              ? new Date(
+                                  assignment.coveredDateEnd
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.jobDescription}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.assignedTo}
+                          </td>
+                          <td className="py-3 px-4 text-[#000000]">
+                            {assignment.status}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                currentPage={serviceAssignmentsCurrentPage}
+                itemsPerPage={serviceAssignmentsItemsPerPage}
+                totalItems={serviceAssignmentsTotalItems}
+                totalOverall={serviceAssignmentsTotalOverall}
+                onNextPage={handleServiceAssignmentsNextPage}
+                onPreviousPage={handleServiceAssignmentsPreviousPage}
+                hasMore={serviceAssignmentsHasMore}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         {/* Registration Success Dialog */}
         <RegistrationSuccessDialog
           isOpen={showSuccessDialog}
-          firstName={user?.first_name || ""} // Pass the user's first name
+          firstName={userData?.first_name || ""} // Pass the user's first name
           onClose={handleCloseSuccessDialog}
+        />
+
+        <AddExpenseDialog
+          isOpen={isAddExpenseOpen}
+          onClose={() => setIsAddExpenseOpen(false)}
+          onSubmit={handleAddExpense}
         />
       </div>
     </RouteProtection>
-  )
+  );
 }
-
-// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
