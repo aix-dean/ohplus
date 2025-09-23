@@ -70,7 +70,7 @@ export default function LoginPage() {
   const [pointPersonData, setPointPersonData] = useState<any>(null)
   const pointPersonDataRef = useRef<any>(null)
 
-  const { user, userData, getRoleDashboardPath, refreshUserData, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
+  const { user, userData, getRoleDashboardPath, refreshUserData, login, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -142,8 +142,9 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("Attempting login for email:", trimmedEmail)
       // First, try to login as existing user
-      await loginOHPlusOnly(trimmedEmail, password)
+      await login(trimmedEmail, password)
       // If successful, auth context will handle redirect
       console.log("Existing user logged in successfully")
     } catch (error: any) {
@@ -151,7 +152,7 @@ export default function LoginPage() {
 
       if (error.code === 'auth/user-not-found') {
         // User not found in tenant, check if eligible for signup
-        console.log("User not found in tenant, checking for signup eligibility")
+        console.log("User not found in tenant, checking for signup eligibility for email:", trimmedEmail)
 
         const pointPersonData = await fetchPointPersonData(trimmedEmail)
 
@@ -177,8 +178,6 @@ export default function LoginPage() {
         setCurrentStep(2)
       } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setError("Invalid email or password.")
-      } else if (error.message === 'OHPLUS_ACCOUNT_NOT_FOUND') {
-        setError("Account not found or not authorized.")
       } else {
         setError("An error occurred during login. Please try again.")
       }
@@ -339,7 +338,7 @@ export default function LoginPage() {
         company_id: company_id,
         type: "OHPLUS",
         role: "admin",
-        permissions: [],
+        permissions: ["admin", "it"],
         activation: activationData,
         created: serverTimestamp(),
         updated: serverTimestamp(),
@@ -378,9 +377,9 @@ export default function LoginPage() {
       endRegistration()
 
       console.log("Registration completed successfully, navigating...")
-      // Navigate to IT page
-      console.log("Navigating to /it")
-      router.push("/it")
+      // Navigate to IT user management page
+      console.log("Navigating to /it/user-management")
+      router.push("/it/user-management")
       console.log("Navigation set")
     } catch (error: any) {
       console.error("Registration failed:", error)

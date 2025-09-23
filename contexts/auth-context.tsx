@@ -10,7 +10,7 @@ import {
   type User as FirebaseUser,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
-import { tenantAuth, db, TENANT_ID } from "@/lib/firebase"
+import { tenantAuth, auth, db, TENANT_ID } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 import { subscriptionService } from "@/lib/subscription-service"
@@ -327,9 +327,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     try {
       console.log("Logging in user with tenant ID:", tenantAuth.tenantId)
-      const userCredential = await signInWithEmailAndPassword(tenantAuth, email, password)
-      setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      try {
+        // Try tenant auth first
+        const userCredential = await signInWithEmailAndPassword(tenantAuth, email, password)
+        setUser(userCredential.user)
+        await fetchUserData(userCredential.user)
+      } catch (tenantError: any) {
+        if (tenantError.code === 'auth/user-not-found') {
+          console.log("User not found in tenant, trying parent auth")
+          // Try parent auth
+          const userCredential = await signInWithEmailAndPassword(auth, email, password)
+          setUser(userCredential.user)
+          await fetchUserData(userCredential.user)
+        } else {
+          throw tenantError
+        }
+      }
     } catch (error) {
       console.error("Login error:", error)
       setLoading(false)
