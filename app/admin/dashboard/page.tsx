@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Pagination } from "@/components/ui/pagination";
+import { Timestamp } from "firebase/firestore";
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams();
@@ -199,56 +200,56 @@ export default function AdminDashboardPage() {
   }, [userData?.company_id]);
 
   // Search service assignments when search term or page changes
-   useEffect(() => {
-     const performServiceAssignmentsSearch = async () => {
-       if (!debouncedServiceAssignmentsSearchTerm.trim()) {
-         setServiceAssignmentsSearchResults([])
-         setServiceAssignmentsSearchResponse(null)
-         setIsSearchingServiceAssignments(false)
-         setServiceAssignmentsSearchError(null)
-         return
-       }
+  useEffect(() => {
+    const performServiceAssignmentsSearch = async () => {
+      if (!debouncedServiceAssignmentsSearchTerm.trim()) {
+        setServiceAssignmentsSearchResults([])
+        setServiceAssignmentsSearchResponse(null)
+        setIsSearchingServiceAssignments(false)
+        setServiceAssignmentsSearchError(null)
+        return
+      }
 
-       setIsSearchingServiceAssignments(true)
-       setServiceAssignmentsSearchError(null)
+      setIsSearchingServiceAssignments(true)
+      setServiceAssignmentsSearchError(null)
 
-       try {
-         console.log(`Searching service assignments for: "${debouncedServiceAssignmentsSearchTerm}" page: ${serviceAssignmentsCurrentPage - 1}`)
-         const response = await searchServiceAssignments(
-           debouncedServiceAssignmentsSearchTerm,
-           userData?.company_id || undefined,
-           serviceAssignmentsCurrentPage - 1, // Algolia page starts at 0
-           serviceAssignmentsItemsPerPage
-         )
+      try {
+        console.log(`Searching service assignments for: "${debouncedServiceAssignmentsSearchTerm}" page: ${serviceAssignmentsCurrentPage - 1}`)
+        const response = await searchServiceAssignments(
+          debouncedServiceAssignmentsSearchTerm,
+          userData?.company_id || undefined,
+          serviceAssignmentsCurrentPage - 1, // Algolia page starts at 0
+          serviceAssignmentsItemsPerPage
+        )
 
-         if (response && Array.isArray(response.hits)) {
-           setServiceAssignmentsSearchResults(response.hits)
-           setServiceAssignmentsSearchResponse(response)
-           console.log(`Service assignments search returned ${response.hits.length} results`)
+        if (response && Array.isArray(response.hits)) {
+          setServiceAssignmentsSearchResults(response.hits)
+          setServiceAssignmentsSearchResponse(response)
+          console.log(`Service assignments search returned ${response.hits.length} results`)
 
-           if (response.error) {
-             setServiceAssignmentsSearchError(response.error)
-           } else {
-             setServiceAssignmentsSearchError(null)
-           }
-         } else {
-           console.error("Invalid service assignments search response:", response)
-           setServiceAssignmentsSearchResults([])
-           setServiceAssignmentsSearchResponse(null)
-           setServiceAssignmentsSearchError(response.error || "Received invalid search results")
-         }
-       } catch (error) {
-         console.error("Service assignments search error:", error)
-         setServiceAssignmentsSearchResults([])
-         setServiceAssignmentsSearchResponse(null)
-         setServiceAssignmentsSearchError("Failed to perform search")
-       } finally {
-         setIsSearchingServiceAssignments(false)
-       }
-     }
+          if (response.error) {
+            setServiceAssignmentsSearchError(response.error)
+          } else {
+            setServiceAssignmentsSearchError(null)
+          }
+        } else {
+          console.error("Invalid service assignments search response:", response)
+          setServiceAssignmentsSearchResults([])
+          setServiceAssignmentsSearchResponse(null)
+          setServiceAssignmentsSearchError(response.error || "Received invalid search results")
+        }
+      } catch (error) {
+        console.error("Service assignments search error:", error)
+        setServiceAssignmentsSearchResults([])
+        setServiceAssignmentsSearchResponse(null)
+        setServiceAssignmentsSearchError("Failed to perform search")
+      } finally {
+        setIsSearchingServiceAssignments(false)
+      }
+    }
 
-     performServiceAssignmentsSearch()
-   }, [debouncedServiceAssignmentsSearchTerm, serviceAssignmentsCurrentPage, userData?.company_id])
+    performServiceAssignmentsSearch()
+  }, [debouncedServiceAssignmentsSearchTerm, serviceAssignmentsCurrentPage, userData?.company_id])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false);
@@ -491,7 +492,7 @@ export default function AdminDashboardPage() {
             className={cn(
               "mt-4 w-full bg-transparent",
               department.isAvailable === false &&
-                "opacity-60 cursor-not-allowed"
+              "opacity-60 cursor-not-allowed"
             )}
             disabled={department.isAvailable === false}
           >
@@ -701,7 +702,7 @@ export default function AdminDashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-2 gap-4 mb-8 h-[600px]">
             {/* Calendar Section - spans 2 rows in column 1 */}
             <div className="lg:col-span-1 lg:row-span-2">
-              <Card className="bg-[#ffffee] border-[#ffdea2] border-2 rounded-2xl h-full relative px-2">
+              <Card className="bg-[#ffffee] border-[#ffdea2] border-2 rounded-2xl h-full relative p-2">
                 <CardContent className="h-full overflow-y-auto pt-2">
                   {loadingCalendar ? (
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
@@ -850,9 +851,9 @@ export default function AdminDashboardPage() {
                   <div className="flex flex-col items-center justify-center text-center">
                     {loadingPettyCash ? (
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-4">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
-                      <p>Loading...</p>
-                    </div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18da69]"></div>
+                        <p>Loading...</p>
+                      </div>
                     ) : (
                       <>
                         <div className={`text-3xl font-bold mb-2 flex items-center justify-center gap-2 ${isPettyCashBalanceLow ? 'text-red-600' : 'text-[#18da69]'}`}>
@@ -1213,10 +1214,8 @@ export default function AdminDashboardPage() {
                             {assignment.projectSiteName}
                           </td>
                           <td className="py-3 px-4 text-[#000000]">
-                            {assignment.coveredDateEnd
-                              ? new Date(
-                                  assignment.coveredDateEnd
-                                ).toLocaleDateString()
+                            {assignment?.coveredDateEnd
+                              ? assignment.coveredDateEnd.toDate().toLocaleDateString()
                               : "N/A"}
                           </td>
                           <td className="py-3 px-4 text-[#000000]">

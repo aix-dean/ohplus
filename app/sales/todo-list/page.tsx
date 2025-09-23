@@ -304,7 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("admin")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("sales")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -329,7 +329,7 @@ export default function TodoApp() {
     end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
     repeat: "Once",
-    department: "admin",
+    department: "sales",
   })
 
   const sensors = useSensors(
@@ -451,7 +451,7 @@ export default function TodoApp() {
         end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
         repeat: "Once",
-        department: "admin",
+        department: "sales",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)
@@ -603,24 +603,6 @@ export default function TodoApp() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">To-Do-List</h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Department:</label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {DEPARTMENTS.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
         </div>
 
         {/* Stats */}
@@ -1089,7 +1071,7 @@ export default function TodoApp() {
                       </div>
                       <div>
                         <h4 className="font-semibold mb-1">Department</h4>
-                        <p>Admin</p>
+                        <p>Sales</p>
                       </div>
                     </div>
 

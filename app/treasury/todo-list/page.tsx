@@ -304,7 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("admin")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("treasury")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -329,7 +329,7 @@ export default function TodoApp() {
     end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
     repeat: "Once",
-    department: "admin",
+    department: "treasury",
   })
 
   const sensors = useSensors(
@@ -410,7 +410,7 @@ export default function TodoApp() {
     }
 
     if (!newTodo.title.trim()) {
-      toast.error("Title is required")
+      toast.error("Please enter a title for the todo")
       return
     }
 
@@ -451,7 +451,7 @@ export default function TodoApp() {
         end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
         repeat: "Once",
-        department: "admin",
+        department: "treasury",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)
@@ -603,24 +603,6 @@ export default function TodoApp() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">To-Do-List</h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Department:</label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {DEPARTMENTS.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
         </div>
 
         {/* Stats */}
@@ -921,7 +903,7 @@ export default function TodoApp() {
                             alt={`Attachment ${index + 1}`}
                             className="w-full h-20 object-cover rounded mb-2"
                             onError={(e) => {
-                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
                             }}
                           />
                           <div className="flex space-x-1">
@@ -960,11 +942,6 @@ export default function TodoApp() {
                 <Button
                   onClick={async () => {
                     if (!selectedTodo) return
-
-                    if (!selectedTodo.title.trim()) {
-                      toast.error("Title is required")
-                      return
-                    }
 
                     try {
                       let newAttachmentUrls: string[] = []
@@ -1089,7 +1066,7 @@ export default function TodoApp() {
                       </div>
                       <div>
                         <h4 className="font-semibold mb-1">Department</h4>
-                        <p>Admin</p>
+                        <p>Treasury</p>
                       </div>
                     </div>
 

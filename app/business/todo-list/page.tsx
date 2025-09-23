@@ -304,7 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("admin")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("business")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -329,7 +329,7 @@ export default function TodoApp() {
     end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
     repeat: "Once",
-    department: "admin",
+    department: "business",
   })
 
   const sensors = useSensors(
@@ -451,7 +451,7 @@ export default function TodoApp() {
         end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
         repeat: "Once",
-        department: "admin",
+        department: "business",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)
@@ -921,7 +921,7 @@ export default function TodoApp() {
                             alt={`Attachment ${index + 1}`}
                             className="w-full h-20 object-cover rounded mb-2"
                             onError={(e) => {
-                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MiAxMiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
+                              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDE0SDhWMThIMTZWMTJIMTRWMTRaTTEyIDIuQzYuNDggMiAyIDYuNDggMiAxMlMxMCAxNy41MiAxMiAxNy41MlMxNy41MiAxNy41MkwxMiAyWk0xMiAyMEMxNi45NzMgMjAgMjAgMTYuOTczIDIwIDEyUzE2Ljk3MyA0IDEyIDRDNy4wMjcgNCA0IDcuMDI3IDQgMTJTNy4wMjcgMjAgMTIgMjBaIiBmaWxsPSIjOWNhM2FmIi8+Cjwvc3ZnPgo="
                             }}
                           />
                           <div className="flex space-x-1">
@@ -1089,7 +1089,7 @@ export default function TodoApp() {
                       </div>
                       <div>
                         <h4 className="font-semibold mb-1">Department</h4>
-                        <p>Admin</p>
+                        <p>Business</p>
                       </div>
                     </div>
 
