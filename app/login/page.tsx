@@ -361,13 +361,16 @@ export default function LoginPage() {
       console.log("iboard_users document verified successfully")
       console.log('warren')
 
-      console.log("Assigning role...")
-      // Assign role "admin" to user_roles collection
+      console.log("Assigning roles...")
+      // Assign roles "admin" and "it" to user_roles collection
       try {
         await assignRoleToUser(firebaseUser.uid, "admin", firebaseUser.uid)
         console.log("Role 'admin' assigned to user_roles collection")
+
+        await assignRoleToUser(firebaseUser.uid, "it", firebaseUser.uid)
+        console.log("Role 'it' assigned to user_roles collection")
       } catch (roleError) {
-        console.error("Error assigning role 'admin' to user_roles collection:", roleError)
+        console.error("Error assigning roles to user_roles collection:", roleError)
       }
 
       console.log("Refreshing user data...")
