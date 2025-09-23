@@ -60,7 +60,7 @@ export function JobOrderCreatedSuccessDialog({
     try {
       // Generate PDF for each job order
       for (const jobOrder of jobOrders) {
-        await generateJobOrderPDF(jobOrder, false)
+        await generateJobOrderPDF(jobOrder, "print",false)
       }
       onClose()
     } catch (error) {

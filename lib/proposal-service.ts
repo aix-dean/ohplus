@@ -584,7 +584,7 @@ export async function getPaginatedProposalsByUserId(
       throw new Error("Firestore not initialized")
     }
 
-    let q = query(collection(db, "proposals"), where("createdBy", "==", userId), orderBy("createdAt", "desc"))
+    let q = query(collection(db, "proposals"), where("companyId", "==", userId), orderBy("createdAt", "desc"))
 
     if (statusFilter && statusFilter !== "all") {
       q = query(q, where("status", "==", statusFilter))
@@ -776,7 +776,7 @@ export async function downloadProposalPDF(
         logging: false,
       })
 
-      const imgData = canvas.toDataURL('image/png')
+      const imgData = canvas.toDataURL('image/jpeg', 0.7)
 
       // Calculate dimensions to fit the page
       const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -809,4 +809,66 @@ export async function downloadProposalPDF(
       variant: "destructive",
     })
   }
+}
+
+export async function generateProposalPDFBlob(
+  proposal: Proposal,
+  selectedSize: string,
+  selectedOrientation: string
+): Promise<{ blob: Blob; filename: string }> {
+  // Dynamic imports for client-side libraries
+  const html2canvas = (await import('html2canvas')).default
+  const jsPDF = (await import('jspdf')).default
+
+  // Find all page containers
+  const pageContainers = document.querySelectorAll('[class*="mx-auto bg-white shadow-lg"]')
+
+  if (pageContainers.length === 0) {
+    throw new Error("No proposal pages found")
+  }
+
+  const pdf = new jsPDF({
+    orientation: selectedOrientation === "Landscape" ? "landscape" : "portrait",
+    unit: "mm",
+    format: selectedSize === "A4" ? "a4" : selectedSize === "Letter size" ? "letter" : "legal"
+  })
+
+  for (let i = 0; i < pageContainers.length; i++) {
+    const container = pageContainers[i] as HTMLElement
+
+    // Capture the page with html2canvas
+    const canvas = await html2canvas(container, {
+      scale: 3, // Higher quality
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      imageTimeout: 0,
+      logging: false,
+    })
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.7)
+
+    // Calculate dimensions to fit the page
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pdfHeight = pdf.internal.pageSize.getHeight()
+    const imgWidth = canvas.width
+    const imgHeight = canvas.height
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+    const imgX = (pdfWidth - imgWidth * ratio) / 2
+    const imgY = (pdfHeight - imgHeight * ratio) / 2
+
+    if (i > 0) {
+      pdf.addPage()
+    }
+
+    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+  }
+
+  // Generate blob instead of saving
+  const pdfBlob = pdf.output('blob')
+  const filename = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
+
+  return { blob: pdfBlob, filename }
 }

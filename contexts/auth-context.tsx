@@ -86,6 +86,8 @@ interface AuthContextType {
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
+  startRegistration: () => void
+  endRegistration: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -286,17 +288,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const startRegistration = useCallback(() => {
+    setIsRegistering(true)
+  }, [])
+
+  const endRegistration = useCallback(() => {
+    setIsRegistering(false)
+  }, [])
+
   const findOHPlusAccount = async (uid: string) => {
     try {
-      // Query for OHPLUS accounts with this uid
-      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid), where("type", "==", "OHPLUS"))
+      console.log("Checking OHPLUS account for uid:", uid)
+      // Query for user document with this uid
+      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid))
       const usersSnapshot = await getDocs(usersQuery)
 
+      console.log("Query snapshot empty:", usersSnapshot.empty)
       if (!usersSnapshot.empty) {
-        // Return true if OHPLUS account found
-        return true
+        const userDoc = usersSnapshot.docs[0]
+        const data = userDoc.data()
+        console.log("User data type:", data.type)
+        // Check if type is OHPLUS
+        if (data.type === "OHPLUS") {
+          console.log("OHPLUS account found")
+          return true
+        }
       }
 
+      console.log("No OHPLUS account found")
       return false
     } catch (error) {
       console.error("Error finding OHPLUS account:", error)
@@ -360,7 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgCode?: string,
   ) => {
     setLoading(true)
-    setIsRegistering(true)
+    startRegistration()
     try {
       console.log("Registering new user with tenant ID:", tenantAuth.tenantId)
 
@@ -498,10 +517,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
-      setIsRegistering(false)
+      endRegistration()
       throw error
     } finally {
-      setIsRegistering(false)
+      endRegistration()
     }
   }
 
@@ -617,10 +636,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null
     }
 
-    // Priority order: admin > sales > logistics > cms
+    // Priority order: admin > it > sales > logistics > cms > business > treasury > accounting > finance
     if (roles.includes("admin")) {
       console.log("Admin role found, redirecting to admin dashboard")
       return "/admin/dashboard"
+    }
+    if (roles.includes("it")) {
+      console.log("IT role found, redirecting to IT dashboard")
+      return "/it"
     }
     if (roles.includes("sales")) {
       console.log("Sales role found, redirecting to sales dashboard")
@@ -633,6 +656,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (roles.includes("cms")) {
       console.log("CMS role found, redirecting to cms dashboard")
       return "/cms/dashboard"
+    }
+    if (roles.includes("business")) {
+      console.log("Business role found, redirecting to business dashboard")
+      return "/business"
+    }
+    if (roles.includes("treasury")) {
+      console.log("Treasury role found, redirecting to treasury dashboard")
+      return "/treasury"
+    }
+    if (roles.includes("accounting")) {
+      console.log("Accounting role found, redirecting to accounting dashboard")
+      return "/accounting"
+    }
+    if (roles.includes("finance")) {
+      console.log("Finance role found, redirecting to finance dashboard")
+      return "/finance"
     }
 
     console.log("No matching roles found, returning null")
@@ -657,6 +696,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
+    startRegistration,
+    endRegistration,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

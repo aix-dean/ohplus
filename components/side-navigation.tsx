@@ -33,7 +33,7 @@ import {
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
-import { LogisticsNotifications, SalesNotifications, AdminNotifications } from "@/components/notifications"
+import { LogisticsNotifications, SalesNotifications, AdminNotifications, ITNotifications } from "@/components/notifications"
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -57,6 +57,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
       { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
+      { title: "Price Listing", href: "/sales/price-listing", icon: DollarSign },
       { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
       { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
@@ -181,6 +182,13 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/sales/cost-estimates")) {
     // Ensure sales section is active for cost estimates page
+    currentSection = "sales"
+  }
+  if (pathname?.startsWith("/sales/price-listing")) {
+    // Ensure sales section is active for price listing page
+  }
+  if (pathname?.startsWith("/sales/reports")) {
+    // Ensure sales section is active for reports page
     currentSection = "sales"
   }
   if (pathname?.startsWith("/business")) {
@@ -559,34 +567,8 @@ export function SideNavigation() {
             </div>
           </>
         ) : currentSection === "it" ? (
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-purple-400 to-purple-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
+           <>
+             <ITNotifications />
 
             {/* To Go Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -596,8 +578,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/it", icon: LayoutDashboard },
-                  { title: "System Status", href: "/it/system-status", icon: Monitor },
-                  { title: "Support Overview", href: "/it/support-overview", icon: AlertTriangle },
+                  { title: "Planner", href: "/it/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -627,9 +608,10 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
-                  { title: "Assets", href: "/it/inventory", icon: Package },
                   { title: "User Management", href: "/it/user-management", icon: Users },
+                  { title: "Migration", href: "/it/migration", icon: Truck },
+                  { title: "To-do-list", href: "/it/todo-list", icon: ClipboardList },
+                  { title: "Assets", href: "/it/inventory", icon: Package },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -1211,10 +1193,12 @@ export function SideNavigation() {
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
                   { title: "Cost Estimates", href: "/sales/cost-estimates", icon: Calculator },
+                  { title: "Price Listing", href: "/sales/price-listing", icon: DollarSign },
                   { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
                   { title: "Reservations", href: "/sales/reservation", icon: CalendarCheck },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
+                  { title: "Reports", href: "/sales/reports", icon: BarChart3 },
                   { title: "Billings", href: "/sales/billings", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },

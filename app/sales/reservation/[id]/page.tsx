@@ -244,7 +244,7 @@ export default function BookingDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <span className="text-black font-medium">Booking Details</span>
+        <span className="text-black font-medium">Reservation Details</span>
         <span className="text-black italic ml-2">{booking.reservation_id || "N/A"}</span>
 
         <div className="ml-auto flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function BookingDetailPage() {
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold">Booking Details</h1>
+                    <h1 className="text-2xl font-bold">Reservation Details</h1>
                     <p className="text-blue-100 mt-1">Reservation ID: {booking.reservation_id || "N/A"}</p>
                   </div>
                   <Badge
@@ -395,9 +395,21 @@ export default function BookingDetailPage() {
                   </h2>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="flex justify-between items-center">
+                      <span className="text-base font-medium text-gray-700">Subtotal</span>
+                      <span className="text-xl text-gray-900">
+                        ₱{booking.costDetails?.total?.toLocaleString() || booking.total_cost?.toLocaleString() || booking.cost?.toLocaleString() || "0"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-base font-medium text-gray-700">12% Vat</span>
+                      <span className="text-xl text-gray-900">
+                        ₱{(booking.costDetails?.total * 0.12).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
                       <span className="text-base font-medium text-gray-700">Total Cost</span>
                       <span className="text-xl font-bold text-gray-900">
-                        ₱{booking.costDetails?.total?.toLocaleString() || booking.total_cost?.toLocaleString() || booking.cost?.toLocaleString() || "0"}
+                        ₱{(booking.costDetails?.total + (booking.costDetails?.total * 0.12)).toLocaleString() || "0"}
                       </span>
                     </div>
                   </div>
@@ -412,7 +424,7 @@ export default function BookingDetailPage() {
                     <div className="flex items-start gap-4">
                       <div className="w-3 h-3 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                       <div>
-                        <p className="text-base font-semibold text-gray-900">Booking Created</p>
+                        <p className="text-base font-semibold text-gray-900">Reservation Created</p>
                         <p className="text-sm text-gray-600">{formatDate(booking.created)}</p>
                       </div>
                     </div>

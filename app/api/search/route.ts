@@ -38,11 +38,11 @@ export async function POST(request: Request) {
 
     console.log(`Received search query: "${query}"${filters ? ` with filters: ${filters}` : ""}`)
 
-    if (!query || typeof query !== "string") {
+    if (typeof query !== "string") {
       console.error("Invalid query parameter:", query)
       return NextResponse.json(
         {
-          error: "Query parameter is required and must be a string",
+          error: "Query parameter must be a string",
           hits: [],
           nbHits: 0,
           page: page,
@@ -64,10 +64,22 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID
       apiKey = process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
       finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME
-    } else if (indexName === 'quotations') {
-      appId = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_APP_ID || process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
-      apiKey = process.env.ALGOLIA_QUOTATIONS_ADMIN_API_KEY || process.env.ALGOLIA_ADMIN_API_KEY
-      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_INDEX_NAME || process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+    } else if (indexName === 'cost_estimates') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
+      apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_INDEX_NAME
+    } else if (indexName === 'quotaions') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
+      apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_INDEX_NAME
+    } else if (indexName === 'booking') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      finalIndexName = 'booking'
+    } else if (indexName === 'reports') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_ADMIN_API_KEY
+      finalIndexName = 'reports'
     } else {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
@@ -107,9 +119,18 @@ export async function POST(request: Request) {
     if (indexName === 'service_assignments') {
       attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
       attributesToHighlight = "saNumber,projectSiteName,serviceType"
-    } else if (indexName === 'quotations') {
+    } else if (indexName === 'cost_estimates') {
+      attributesToRetrieve = "id,title,client,client_company,client_contact,client_email,client_phone,status,totalAmount,createdAt,company_id,lineItems,lineItemsCount"
+      attributesToHighlight = "title,client_company,client_contact"
+    } else if (indexName === 'quotaions') {
       attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created"
       attributesToHighlight = "quotation_number,client_name"
+    } else if (indexName === 'booking') {
+      attributesToRetrieve = "reservation_id,product_name,client,project_name,start_date,end_date,status,created,quotation_id,product_id,company_id,client_name,client_company_name"
+      attributesToHighlight = "reservation_id,product_name,client_name,client_company_name"
+    } else if (indexName === 'reports') {
+      attributesToRetrieve = "siteName,date,reportType,createdByName,category,companyId,status,created"
+      attributesToHighlight = "siteName,reportType,createdByName"
     }
 
     const searchParams: any = {
@@ -131,6 +152,7 @@ export async function POST(request: Request) {
 
     console.log(`Calling Algolia REST API: ${url}`)
     console.log(`Search parameters: ${JSON.stringify(searchParams)}`)
+    console.log(`Request body: ${body}`)
 
     const algoliaResponse = await fetch(url, {
       method: "POST",
@@ -159,6 +181,7 @@ export async function POST(request: Request) {
 
     const searchResults = await algoliaResponse.json()
     console.log(`Search completed with ${searchResults.nbHits} results`)
+    console.log(`Search results:`, JSON.stringify(searchResults, null, 2))
 
     return NextResponse.json(searchResults)
   } catch (error) {

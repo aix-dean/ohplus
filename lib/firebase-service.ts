@@ -15,6 +15,7 @@ import {
   updateDoc,
   serverTimestamp,
   getDoc,
+  onSnapshot,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -421,6 +422,114 @@ export async function getPaginatedUserProducts(
       hasMore: false,
     }
   }
+}
+
+// Get paginated products for a user with real-time updates
+export function getPaginatedUserProductsRealtime(
+  userId: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  options: { searchTerm?: string; active?: boolean; content_type?: string } = {},
+  callback: (result: PaginatedResult<Product>) => void,
+): () => void {
+  const productsRef = collection(db, "products")
+  const { searchTerm = "", active, content_type } = options
+
+  // Start with basic constraints
+  const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+
+  // Add active filter if specified
+  if (active !== undefined) {
+    constraints.unshift(where("active", "==", active))
+  }
+
+  // Add content_type filter if specified (case-insensitive handled client-side due to Firestore limitations)
+  if (content_type) {
+    // Note: Firestore doesn't support case-insensitive queries, so we'll need to handle this client-side
+    // For now, we'll fetch more items and filter client-side
+    constraints[constraints.length - 1] = limit(itemsPerPage * 2) // Fetch more to account for filtering
+  }
+
+  // Create the query with all constraints
+  let q = query(productsRef, ...constraints)
+
+  // If we have a last document, start after it for pagination
+  if (lastDoc) {
+    q = query(q, startAfter(lastDoc))
+  }
+
+  // Set up the real-time listener
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      // Get the last visible document for next pagination
+      let lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+
+      // Convert the documents to Product objects and apply filters
+      const products: Product[] = []
+      querySnapshot.forEach((doc) => {
+        const product = { id: doc.id, ...doc.data() } as Product
+
+        // Apply content_type filter (case-insensitive)
+        if (content_type) {
+          const productContentType = (product.content_type || "").toLowerCase()
+          const filterContentType = content_type.toLowerCase()
+          if (productContentType !== filterContentType) {
+            return // Skip this product
+          }
+        }
+
+        // If there's a search term, filter client-side
+        if (searchTerm && typeof searchTerm === "string") {
+          const searchLower = searchTerm.toLowerCase()
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            products.push(product)
+          }
+        } else {
+          products.push(product)
+        }
+      })
+
+      // If we filtered by content_type, we might have fewer items than requested
+      // Adjust pagination accordingly
+      const actualItems = products.slice(0, itemsPerPage)
+      const hasMore = content_type ? products.length > itemsPerPage : querySnapshot.docs.length === itemsPerPage
+
+      // Update lastVisible if we sliced the results
+      if (content_type && actualItems.length > 0) {
+        // Find the last document that corresponds to our last item
+        const lastItemId = actualItems[actualItems.length - 1].id
+        lastVisible = querySnapshot.docs.find((doc) => doc.id === lastItemId) || lastVisible
+      }
+
+      const result: PaginatedResult<Product> = {
+        items: actualItems,
+        lastDoc: lastVisible,
+        hasMore,
+      }
+
+      callback(result)
+    } catch (error) {
+      console.error("Error processing real-time product updates:", error)
+      callback({
+        items: [],
+        lastDoc: null,
+        hasMore: false,
+      })
+    }
+  }, (error) => {
+    console.error("Error in real-time product listener:", error)
+    callback({
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    })
+  })
+
+  return unsubscribe
 }
 
 // Get the total count of products for a user

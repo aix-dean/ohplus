@@ -187,7 +187,7 @@ export function CreateReportDialog({
         if (siteImageUrl) {
           console.log("Found siteImageUrl from associated job order for product:", siteImageUrl)
           // Store this in a way that can be used when creating the report
-          setSelectedJobOrderDetails({
+          const jobOrderDetails = {
             id: doc.id,
             joNumber: data.joNumber || "N/A",
             clientName: data.clientName || "Unknown Client",
@@ -197,7 +197,8 @@ export function CreateReportDialog({
             siteName: data.siteName || "Unknown Site",
             product_id: data.product_id || "",
             siteImageUrl: siteImageUrl,
-          })
+          }
+          setSelectedJobOrderDetails(jobOrderDetails)
         } else {
           console.log("No siteImageUrl found in associated job order for product")
         }
@@ -403,72 +404,6 @@ export function CreateReportDialog({
   }
 
   const renderFilePreview = (attachment: AttachmentData, index: number) => {
-    // Get the effective job order (selected or product-associated)
-    const effectiveJobOrder = selectedJobOrderDetails ||
-      (selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null)
-
-    // If we have a job order with siteImageUrl, use it for the preview
-    if (effectiveJobOrder?.siteImageUrl) {
-      return (
-        <div className="relative w-full h-full group">
-          <div className="w-full h-full">
-            <img
-              src={effectiveJobOrder.siteImageUrl}
-              alt="Site Image"
-              className="w-full h-full object-cover rounded"
-              onError={(e) => {
-                console.error("Site image failed to load:", effectiveJobOrder.siteImageUrl)
-                // Fallback to uploaded file if site image fails
-                if (attachment.preview) {
-                  e.currentTarget.src = attachment.preview
-                }
-              }}
-            />
-          </div>
-
-          {/* Upload overlay when no file is uploaded yet */}
-          {!attachment.file && (
-            <label
-              htmlFor={`file-${index}`}
-              className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity"
-            >
-              <Upload className="h-6 w-6 text-white" />
-              <span className="text-xs text-white mt-1">Replace</span>
-            </label>
-          )}
-
-          {/* Preview Button */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              // Show site image in modal
-              setPreviewModal({
-                open: true,
-                preview: effectiveJobOrder.siteImageUrl,
-              })
-            }}
-            className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Preview site image"
-          >
-            <Eye className="h-3 w-3" />
-          </button>
-
-          {/* Success indicator when uploaded */}
-          {attachment.fileUrl && !attachment.uploading && (
-            <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
-              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-      )
-    }
 
     // Fallback to original behavior if no siteImageUrl
     if (attachment.uploading) {
@@ -623,7 +558,7 @@ export function CreateReportDialog({
             fileType: att.fileType || att.file?.type || "",
             fileUrl: att.fileUrl!, // This is guaranteed to exist due to filter
           })),
-        status: module === "sales" ? "posted" : "draft", // Save as posted for sales, draft for logistics
+        status: module === "sales" ? "posted" : "draft", // Save as posted for sales, draft for others (logistics and admin)
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
         category: module,
@@ -631,7 +566,7 @@ export function CreateReportDialog({
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
-        siteImageUrl: effectiveJobOrder?.siteImageUrl || undefined,
+        siteImageUrl: undefined,
       }
       console.log("Built report data with siteName:", reportData.siteName)
       console.log("Report siteImageUrl:", reportData.siteImageUrl)
@@ -688,7 +623,7 @@ export function CreateReportDialog({
 
       let finalReportData = reportData
 
-      // For sales module, save the report to database immediately
+      // For sales module, save the report to database immediately with posted status
       if (module === "sales") {
         console.log("Saving report to database for sales module")
         const reportId = await postReport(reportData)
@@ -703,6 +638,20 @@ export function CreateReportDialog({
         } else {
           throw new Error("Failed to retrieve saved report")
         }
+      }
+
+      // For admin module, save the report to database immediately with draft status
+      if (module === "admin") {
+        console.log("Saving report to database for admin module with draft status")
+        const { createReport } = await import("@/lib/report-service")
+        const reportId = await createReport(reportData)
+
+        // Set the ID on the report data for the preview page
+        finalReportData = {
+          ...reportData,
+          id: reportId
+        }
+        console.log("Saved admin report with draft status, ID:", reportId)
       }
 
       // Store the report data in sessionStorage for the preview page

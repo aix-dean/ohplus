@@ -9,6 +9,7 @@ import {
   where,
   getDocs,
   serverTimestamp,
+  Timestamp,
   orderBy,
   limit,
   startAfter,
@@ -16,6 +17,81 @@ import {
 } from "firebase/firestore"
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import type { Proposal } from "@/lib/types/proposal"
+
+// Algolia client for indexing
+let algoliasearch: any = null
+let costEstimatesIndex: any = null
+
+// Initialize Algolia client
+function initializeAlgolia() {
+  if (typeof window === 'undefined') {
+    // Server-side
+    try {
+      algoliasearch = require('algoliasearch')
+      const client = algoliasearch(
+        process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID,
+        process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
+      )
+      costEstimatesIndex = client.initIndex(process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_INDEX_NAME)
+    } catch (error) {
+      console.warn('Algolia client not available:', error)
+    }
+  }
+}
+
+// Index cost estimate in Algolia
+async function indexCostEstimate(costEstimate: CostEstimate) {
+  if (!costEstimatesIndex) {
+    initializeAlgolia()
+  }
+
+  if (!costEstimatesIndex) {
+    console.warn('Algolia index not available, skipping indexing')
+    return
+  }
+
+  try {
+    const algoliaObject = {
+      objectID: costEstimate.id,
+      id: costEstimate.id,
+      title: costEstimate.title,
+      client_company: costEstimate.client?.company || '',
+      client_contact: costEstimate.client?.contactPerson || '',
+      client_email: costEstimate.client?.email || '',
+      client_phone: costEstimate.client?.phone || '',
+      status: costEstimate.status,
+      totalAmount: costEstimate.totalAmount,
+      createdAt: costEstimate.createdAt?.toISOString() || '',
+      company_id: costEstimate.company_id,
+      lineItems: costEstimate.lineItems || [],
+      lineItemsCount: costEstimate.lineItems?.length || 0,
+    }
+
+    await costEstimatesIndex.saveObject(algoliaObject)
+    console.log('Cost estimate indexed in Algolia:', costEstimate.id)
+  } catch (error) {
+    console.error('Error indexing cost estimate in Algolia:', error)
+  }
+}
+
+// Remove cost estimate from Algolia index
+async function removeCostEstimateFromIndex(costEstimateId: string) {
+  if (!costEstimatesIndex) {
+    initializeAlgolia()
+  }
+
+  if (!costEstimatesIndex) {
+    console.warn('Algolia index not available, skipping removal')
+    return
+  }
+
+  try {
+    await costEstimatesIndex.deleteObject(costEstimateId)
+    console.log('Cost estimate removed from Algolia index:', costEstimateId)
+  } catch (error) {
+    console.error('Error removing cost estimate from Algolia index:', error)
+  }
+}
 
 const COST_ESTIMATES_COLLECTION = "cost_estimates"
 
@@ -154,6 +230,32 @@ export async function createCostEstimateFromProposal(
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
 
+    // Index the cost estimate in Algolia
+    const costEstimateData = {
+      id: newCostEstimateRef.id,
+      proposalId: proposal.id,
+      costEstimateNumber: costEstimateNumber,
+      title: `Cost Estimate for ${proposal.title}`,
+      client: proposal.client,
+      lineItems,
+      totalAmount,
+      status: "draft",
+      notes: options?.notes || "",
+      customMessage: options?.customMessage || "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: userId,
+      company_id: options?.company_id || "",
+      page_id: options?.page_id || "",
+      startDate: options?.startDate || null,
+      endDate: options?.endDate || null,
+      durationDays: durationDays,
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    } as CostEstimate
+
+    // Index asynchronously (don't await to avoid blocking)
+    indexCostEstimate(costEstimateData)
+
     return newCostEstimateRef.id
   } catch (error) {
     console.error("Error creating cost estimate from proposal:", error)
@@ -187,6 +289,7 @@ export async function createDirectCostEstimate(
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
           image: site.image || undefined, // Added image field to line items
+          content_type: site.type || "", // Added content_type field to match quotation structure
           specs: site.specs_rental, // Added specs field to match quotation structure
         })
       })
@@ -383,11 +486,57 @@ export async function updateCostEstimateStatus(id: string, status: CostEstimateS
 // Update cost estimate
 export async function updateCostEstimate(costEstimateId: string, updates: Partial<CostEstimate>): Promise<void> {
   try {
+    // Exclude createdAt and validUntil from updates to prevent them from being modified during edits
+    const { createdAt, validUntil, ...allowedUpdates } = updates
+
+    // Ensure date fields are properly stored as Timestamps
+    const processedUpdates: any = { ...allowedUpdates }
+    if (processedUpdates.startDate instanceof Date) {
+      processedUpdates.startDate = Timestamp.fromDate(processedUpdates.startDate)
+    }
+    if (processedUpdates.endDate instanceof Date) {
+      processedUpdates.endDate = Timestamp.fromDate(processedUpdates.endDate)
+    }
+
     const costEstimateRef = doc(db, COST_ESTIMATES_COLLECTION, costEstimateId)
     await updateDoc(costEstimateRef, {
-      ...updates,
+      ...processedUpdates,
       updatedAt: serverTimestamp(),
     })
+
+    // Re-index the updated cost estimate in Algolia
+    try {
+      const updatedDoc = await getDoc(costEstimateRef)
+      if (updatedDoc.exists()) {
+        const updatedData = updatedDoc.data()
+        const updatedCostEstimate = {
+          id: costEstimateId,
+          proposalId: updatedData.proposalId || null,
+          costEstimateNumber: updatedData.costEstimateNumber || null,
+          title: updatedData.title,
+          client: updatedData.client,
+          lineItems: updatedData.lineItems,
+          totalAmount: updatedData.totalAmount,
+          status: updatedData.status,
+          notes: updatedData.notes || "",
+          customMessage: updatedData.customMessage || "",
+          createdAt: updatedData.createdAt?.toDate(),
+          updatedAt: new Date(),
+          createdBy: updatedData.createdBy,
+          company_id: updatedData.company_id || "",
+          page_id: updatedData.page_id || "",
+          startDate: updatedData.startDate?.toDate() || null,
+          endDate: updatedData.endDate?.toDate() || null,
+          durationDays: updatedData.durationDays || null,
+          validUntil: updatedData.validUntil?.toDate() || null,
+        } as CostEstimate
+
+        // Re-index asynchronously
+        indexCostEstimate(updatedCostEstimate)
+      }
+    } catch (indexError) {
+      console.error('Error re-indexing updated cost estimate:', indexError)
+    }
   } catch (error) {
     console.error("Error updating cost estimate:", error)
     throw error
@@ -501,6 +650,9 @@ export async function getPaginatedCostEstimates(
 export async function deleteCostEstimate(id: string): Promise<void> {
   try {
     await deleteDoc(doc(db, COST_ESTIMATES_COLLECTION, id))
+
+    // Remove from Algolia index
+    removeCostEstimateFromIndex(id)
   } catch (error) {
     console.error("Error deleting cost estimate:", error)
     throw new Error("Failed to delete cost estimate.")
@@ -549,14 +701,14 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
 
 // Get paginated cost estimates by createdBy ID
 export async function getPaginatedCostEstimatesByCreatedBy(
-  userId: string,
+  companyId: string,
   limitCount: number,
   lastDocId: string | null = null,
 ): Promise<{ items: CostEstimate[]; lastVisible: string | null; hasMore: boolean }> {
   try {
     let q = query(
       collection(db, COST_ESTIMATES_COLLECTION),
-      where("createdBy", "==", userId),
+      where("company_id", "==", companyId),
       orderBy("createdAt", "desc"),
       limit(limitCount + 1) // Fetch one extra to check if there are more pages
     )
@@ -639,6 +791,7 @@ export async function createMultipleCostEstimates(
         notes: `Location: ${site.location}`,
         image: site.image || undefined, // Added image field to line items for multiple cost estimates
         specs: site.specs_rental, // Added specs field to match quotation structure
+        content_type: site.type || "", // Added content_type field to match quotation structure
       })
 
       // Calculate total amount for this site

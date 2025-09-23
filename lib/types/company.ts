@@ -38,6 +38,7 @@ export interface CompanyData {
   phone?: string
   website?: string
   company_profile?: string
+  logo?: string
   business_type?: string
   position?: string
   createdAt: Date
@@ -71,6 +72,7 @@ export interface CompanyUpdateRequest {
   phone?: string
   website?: string
   company_profile?: string
+  logo?: string
   business_type?: string
   position?: string
 }

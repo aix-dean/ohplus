@@ -33,7 +33,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Pagination } from "@/components/ui/pagination"
 
 function ProposalsPageContent() {
@@ -48,7 +48,7 @@ function ProposalsPageContent() {
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const itemsPerPage = 10
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
@@ -84,7 +84,7 @@ function ProposalsPageContent() {
     try {
       const lastDocToUse = resetLastDoc ? null : lastDoc
       const result = await getPaginatedProposalsByUserId(
-        user.uid,
+        userData?.company_id || "",
         itemsPerPage,
         lastDocToUse,
         searchTerm,
@@ -362,7 +362,10 @@ function ProposalsPageContent() {
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(proposal.createdAt, "MMM d, yyyy")}
+                          {(() => {
+                            console.log("Proposal createdAt:", proposal.createdAt, "Type:", typeof proposal.createdAt, "Is Date:", proposal.createdAt instanceof Date, "Is valid Date:", proposal.createdAt instanceof Date && !isNaN(proposal.createdAt.getTime()))
+                            return format(proposal.createdAt, "MMM d, yyyy")
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
@@ -411,6 +414,7 @@ function ProposalsPageContent() {
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
+          <DialogTitle className="sr-only">Success</DialogTitle>
           <div className="py-6">
             <div className="mb-4">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Congratulations!</h2>

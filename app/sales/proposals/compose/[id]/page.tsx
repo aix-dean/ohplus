@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
@@ -9,18 +9,62 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus } from "lucide-react"
+import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
 import { getProposalById } from "@/lib/proposal-service"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
+import { CompanyService } from "@/lib/company-service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { loadGoogleMaps } from "@/lib/google-maps-loader"
+
+// IndexedDB utility for retrieving PDF blobs
+const openPDFDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('ProposalPDFs', 1)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains('pdfs')) {
+        db.createObjectStore('pdfs')
+      }
+    }
+  })
+}
+
+const getPDFFromIndexedDB = async (key: string): Promise<{ blob: Blob; filename: string; timestamp: number } | null> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readonly')
+  const store = transaction.objectStore('pdfs')
+  return new Promise((resolve, reject) => {
+    const request = store.get(key)
+    request.onsuccess = () => {
+      resolve(request.result || null)
+    }
+    request.onerror = () => reject(request.error)
+  })
+}
+
+const deletePDFFromIndexedDB = async (key: string): Promise<void> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readwrite')
+  const store = transaction.objectStore('pdfs')
+  await new Promise<void>((resolve, reject) => {
+    const request = store.delete(key)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+}
 
 interface ComposeEmailPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 interface Attachment {
@@ -41,9 +85,11 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
+  const resolvedParams = React.use(params)
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [companyName, setCompanyName] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [emailData, setEmailData] = useState({
@@ -61,15 +107,23 @@ If you have any questions or would like to explore other options, feel free to r
 
 Best regards,
 Sales Executive
-Sales Executive
-OH PLUS
-+639XXXXXXXXX`,
+[Company Name]
+📞 +639XXXXXXXXX
+📧 [Reply-To Email]`,
   })
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [tempPdfLoaded, setTempPdfLoaded] = useState(false)
+  const [totalAttachmentSize, setTotalAttachmentSize] = useState(0)
 
   const [templates, setTemplates] = useState<ProposalEmailTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(true)
+
+  // Template settings for preview
+  const [selectedSize, setSelectedSize] = useState<string>("A4")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedLayout, setSelectedLayout] = useState<string>("1")
+  const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
 
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<ProposalEmailTemplate | null>(null)
@@ -144,33 +198,39 @@ OH PLUS
   const createDefaultProposalTemplates = async () => {
     if (!userData?.company_id) return
 
+    const templateCompanyName = companyName || projectData?.company_name || 'Your Company'
+    const contactDetails = [
+      '[Your Name]',
+      templateCompanyName,
+      `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
+      `📧 ${userData?.email || user?.email || 'noreply@ohplus.ph'}`,
+      ...(projectData?.company_website ? [`🌐 ${projectData.company_website}`] : [])
+    ].join('\n')
+
     const defaultProposalTemplates = [
       {
         name: "Standard Proposal",
         subject: "Proposal: [Project Name] - [Company Name]",
         body: `Dear [Client Name],
 
-I hope this email finds you well.
+   I hope this email finds you well.
 
-Please find attached our detailed proposal for your upcoming project. We've carefully reviewed your requirements and prepared a comprehensive solution that aligns with your objectives.
+   Please find attached our detailed proposal for your upcoming project. We've carefully reviewed your requirements and prepared a comprehensive solution that aligns with your objectives.
 
-The proposal includes:
-- Detailed project scope and deliverables
-- Timeline and milestones
-- Pricing and payment terms
-- Our team's qualifications and experience
+   The proposal includes:
+   - Detailed project scope and deliverables
+   - Timeline and milestones
+   - Pricing and payment terms
+   - Our team's qualifications and experience
 
-We're excited about the opportunity to work with you and are confident that our approach will deliver exceptional results for your project.
+   We're excited about the opportunity to work with you and are confident that our approach will deliver exceptional results for your project.
 
-Please review the attached proposal and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
+   Please review the attached proposal and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
 
-Looking forward to your feedback!
+   Looking forward to your feedback!
 
-Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
+   Best regards,
+${contactDetails}`,
         company_id: userData.company_id,
         template_type: "proposal" as const,
       },
@@ -179,21 +239,18 @@ OH PLUS
         subject: "Follow-up: Proposal for [Project Name]",
         body: `Dear [Client Name],
 
-I wanted to follow up on the proposal we sent for [Project Name].
+   I wanted to follow up on the proposal we sent for [Project Name].
 
-I hope you've had a chance to review the attached proposal. We're very interested in working with you on this project and believe our solution offers excellent value for your investment.
+   I hope you've had a chance to review the attached proposal. We're very interested in working with you on this project and believe our solution offers excellent value for your investment.
 
-If you have any questions about our approach, timeline, or pricing, I'd be happy to schedule a call to discuss them in detail.
+   If you have any questions about our approach, timeline, or pricing, I'd be happy to schedule a call to discuss them in detail.
 
-We're also flexible and open to adjusting our proposal based on your feedback or any changes in your requirements.
+   We're also flexible and open to adjusting our proposal based on your feedback or any changes in your requirements.
 
-Please let me know your thoughts or if you need any additional information.
+   Please let me know your thoughts or if you need any additional information.
 
-Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
+   Best regards,
+${contactDetails}`,
         company_id: userData.company_id,
         template_type: "proposal" as const,
       },
@@ -214,22 +271,154 @@ OH PLUS
   useEffect(() => {
     const fetchProposal = async () => {
       try {
-        const proposalData = await getProposalById(params.id)
+        const proposalData = await getProposalById(resolvedParams.id)
 
         if (!proposalData) {
           throw new Error("Proposal not found")
         }
 
         setProposal(proposalData)
+
+        // Read URL parameters
+        const urlParams = new URLSearchParams(window.location.search)
+        const pdfKey = urlParams.get('pdfKey')
+
+        if (pdfKey && !tempPdfLoaded) {
+          // Use pre-generated PDF from IndexedDB
+          try {
+            const pdfData = await getPDFFromIndexedDB(pdfKey)
+            if (pdfData) {
+              const pdfFile = new File([pdfData.blob], pdfData.filename, {
+                type: "application/pdf",
+              })
+
+              const proposalPDFs: Attachment[] = [
+                {
+                  name: pdfData.filename,
+                  size: formatFileSize(pdfData.blob.size),
+                  type: "proposal",
+                  file: pdfFile,
+                },
+              ]
+
+              setAttachments(proposalPDFs)
+              setTempPdfLoaded(true)
+
+              // Clean up IndexedDB
+              await deletePDFFromIndexedDB(pdfKey)
+            } else {
+              console.warn('PDF not found in IndexedDB, no PDF attachment will be included')
+              setTempPdfLoaded(true)
+            }
+          } catch (error) {
+            console.error('Error retrieving PDF from IndexedDB:', error)
+            setTempPdfLoaded(true)
+          }
+        } else if (!pdfKey && !tempPdfLoaded) {
+          // No PDF available
+          console.warn('No PDF key provided, no PDF attachment will be included')
+          setTempPdfLoaded(true)
+        }
+
+        // Set proposal data
+        setProposal(proposalData)
+
+        // Initialize template settings from proposal
+        if (proposalData.templateSize) {
+          setSelectedSize(proposalData.templateSize)
+        }
+        if (proposalData.templateOrientation) {
+          setSelectedOrientation(proposalData.templateOrientation)
+        }
+        if (proposalData.templateLayout) {
+          setSelectedLayout(proposalData.templateLayout)
+        }
+        if (proposalData.templateBackground) {
+          setSelectedTemplateBackground(proposalData.templateBackground)
+        }
+
+        // Determine company name - prioritize proposal's companyId, fallback to projectData
+        let finalCompanyName = 'Your Company'
+
+        console.log('Company name resolution:', {
+          projectDataCompanyName: projectData?.company_name,
+          proposalCompanyId: proposalData.companyId
+        })
+
+        // First try to get company name from proposal's companyId
+        let companyIdToUse = proposalData.companyId
+
+        if (!companyIdToUse && proposalData.client?.company_id) {
+          companyIdToUse = proposalData.client.company_id
+          console.log('Using client company_id instead:', companyIdToUse)
+        }
+
+        if (companyIdToUse && typeof companyIdToUse === 'string') {
+          try {
+            console.log('Fetching company data for ID:', companyIdToUse)
+            const companyData = await CompanyService.getCompanyData(companyIdToUse)
+            if (companyData?.name && companyData.name.trim()) {
+              finalCompanyName = companyData.name.trim()
+              console.log('Found company name from proposal:', finalCompanyName)
+            } else {
+              console.log('Company found but no name for ID:', companyIdToUse, 'companyData:', companyData)
+            }
+          } catch (companyError) {
+            console.error("Error fetching company data for ID:", companyIdToUse, companyError)
+          }
+        } else {
+          console.log('No valid companyId in proposal or client:', {
+            proposalCompanyId: proposalData.companyId,
+            clientCompanyId: proposalData.client?.company_id
+          })
+        }
+
+        // If we still don't have a company name, try projectData
+        if (finalCompanyName === 'Your Company' && projectData?.company_name) {
+          finalCompanyName = projectData.company_name
+          console.log('Using company name from projectData:', finalCompanyName)
+        }
+
+        console.log('Final company name:', finalCompanyName)
+
+        setCompanyName(finalCompanyName)
+
+        // Create the contact details section
+        const replyToEmail = emailData.replyTo || userData?.email || user?.email || 'noreply@ohplus.ph'
+        const contactDetails = [
+          'Sales Executive',
+          finalCompanyName,
+          `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
+          `📧 ${replyToEmail}`,
+          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : [])
+        ].join('\n')
+
+        console.log('Contact details construction:', {
+          replyToEmail,
+          userDataEmail: userData?.email,
+          userEmail: user?.email,
+          companyWebsite: projectData?.company_website,
+          finalContactDetails: contactDetails
+        })
+
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
           cc: "",
           replyTo: userData?.email || user?.email || "",
-          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - OH Plus`,
+          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - ${finalCompanyName}`,
+          message: `Hi AAA,
+
+I hope you're doing well!
+
+Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site details and pricing details based on our recent discussion.
+
+If you have any questions or would like to explore other options, feel free to reach out to us. I'll be happy to assist you further. Looking forward to your feedback!
+
+Best regards,
+${contactDetails}`,
         }))
 
-        await generateProposalPDFs(proposalData)
       } catch (error) {
         console.error("Error fetching proposal:", error)
         toast({
@@ -243,7 +432,7 @@ OH PLUS
     }
 
     fetchProposal()
-  }, [params.id, toast])
+  }, [resolvedParams.id, toast])
 
   useEffect(() => {
     if (userData?.company_id) {
@@ -251,56 +440,14 @@ OH PLUS
     }
   }, [userData?.company_id])
 
-  const generateProposalPDFs = async (proposalData: Proposal) => {
-    try {
-      const response = await fetch(`/api/proposals/generate-pdf`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ proposal: proposalData }),
-      })
+  // Calculate total attachment size
+  useEffect(() => {
+    const totalSize = attachments.reduce((sum, attachment) => {
+      return sum + (attachment.file?.size || 0)
+    }, 0)
+    setTotalAttachmentSize(totalSize)
+  }, [attachments])
 
-      if (response.ok) {
-        const pdfBlob = await response.blob()
-        const fileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
-        const pdfFile = new File([pdfBlob], fileName, {
-          type: "application/pdf",
-        })
-
-        const proposalPDFs: Attachment[] = [
-          {
-            name: fileName,
-            size: formatFileSize(pdfBlob.size),
-            type: "proposal",
-            file: pdfFile,
-          },
-        ]
-
-        setAttachments(proposalPDFs)
-      } else {
-        throw new Error("Failed to generate PDF")
-      }
-    } catch (error) {
-      console.error("Error generating proposal PDFs:", error)
-      const fallbackFileName = `OH_PLUS_PROPOSAL_${proposalData.proposalNumber || proposalData.id}.pdf`
-      const fallbackPDFs: Attachment[] = [
-        {
-          name: fallbackFileName,
-          size: "2.3 MB",
-          type: "proposal",
-          url: `https://ohplus.ph/api/proposals/${proposalData.id}/pdf`,
-        },
-      ]
-      setAttachments(fallbackPDFs)
-
-      toast({
-        title: "Warning",
-        description: "Could not generate proposal PDF. Using fallback attachment.",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleBack = () => {
     router.back()
@@ -386,22 +533,53 @@ OH PLUS
         }
       }
 
+      console.log("Sending email request to /api/send-email", {
+        to: toEmails,
+        cc: ccEmails,
+        subject: emailData.subject,
+        hasAttachments: attachments.length > 0,
+        attachmentCount: attachments.length,
+        companyId: userData?.company_id,
+        userId: user?.uid
+      })
+
       const response = await fetch("/api/send-email", {
         method: "POST",
         body: formData,
       })
 
+      console.log("Email API response received", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+
       // Check if response is ok before trying to parse JSON
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+        console.log("Email API returned error response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type')
+        })
+
         try {
           // Read the response body once
           const responseText = await response.text()
+          console.log("Email API error response content", {
+            responseText: responseText.substring(0, 500), // First 500 chars to avoid huge logs
+            isHtml: responseText.includes('<!DOCTYPE') || responseText.includes('<html'),
+            length: responseText.length
+          })
+
           // Try to parse as JSON first
           try {
             const errorData = JSON.parse(responseText)
+            console.log("Parsed error data from API", errorData)
             errorMessage = errorData.error || errorMessage
           } catch (jsonParseError) {
+            console.log("Failed to parse error response as JSON", jsonParseError)
             // If it's not JSON, check if it's HTML
             if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
               errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
@@ -410,6 +588,7 @@ OH PLUS
             }
           }
         } catch (readError) {
+          console.log("Failed to read error response body", readError)
           // If we can't read the response at all
           errorMessage = `Server error (HTTP ${response.status}). Please check your connection and try again.`
         }
@@ -417,6 +596,7 @@ OH PLUS
       }
 
       const result = await response.json()
+      console.log("Email API success response", result)
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to send email")
@@ -427,7 +607,7 @@ OH PLUS
           body: emailData.message,
           created: serverTimestamp(),
           from: user?.email || "noreply@ohplus.ph",
-          proposalId: params.id,
+          proposalId: resolvedParams.id,
           sentAt: serverTimestamp(),
           status: "sent",
           subject: emailData.subject,
@@ -608,6 +788,21 @@ OH PLUS
     })
   }
 
+  const handleViewAttachment = (attachment: Attachment) => {
+    if (attachment.file) {
+      const url = URL.createObjectURL(attachment.file)
+      window.open(url, '_blank')
+    } else if (attachment.url) {
+      window.open(attachment.url, '_blank')
+    } else {
+      toast({
+        title: "Cannot view attachment",
+        description: "No file data available for this attachment.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleAddAttachment = () => {
     fileInputRef.current?.click()
   }
@@ -616,11 +811,25 @@ OH PLUS
     const files = event.target.files
     if (!files) return
 
+    const maxTotalSize = 35 * 1024 * 1024 // 35MB to leave buffer before 40MB limit
+    let newFilesAdded = 0
+
     Array.from(files).forEach((file) => {
+      // Check individual file size
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check if adding this file would exceed total limit
+      if (totalAttachmentSize + file.size > maxTotalSize) {
+        toast({
+          title: "Total size limit approaching",
+          description: `Adding ${file.name} would exceed the recommended total size limit. Consider compressing files or removing attachments.`,
           variant: "destructive",
         })
         return
@@ -634,16 +843,19 @@ OH PLUS
       }
 
       setAttachments((prev) => [...prev, newAttachment])
+      newFilesAdded++
     })
 
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
 
-    toast({
-      title: "Files added",
-      description: `${files.length} file(s) have been added to your email.`,
-    })
+    if (newFilesAdded > 0) {
+      toast({
+        title: "Files added",
+        description: `${newFilesAdded} file(s) have been added to your email.`,
+      })
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -682,85 +894,131 @@ OH PLUS
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
-                    <Input
-                      value={emailData.to}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
-                      placeholder="Enter recipient email"
-                      className="w-full"
-                    />
-                  </div>
+           <div className="lg:col-span-3">
+             <Card>
+               <CardContent className="p-6">
+                 <div className="space-y-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
+                     <Input
+                       value={emailData.to}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
+                       placeholder="Enter recipient email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
-                    <Input
-                      value={emailData.cc}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
-                      placeholder="Enter CC email"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
+                     <Input
+                       value={emailData.cc}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
+                       placeholder="Enter CC email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
-                    <Input
-                      value={emailData.replyTo}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
-                      placeholder="Enter reply-to email"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
+                     <Input
+                       value={emailData.replyTo}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
+                       placeholder="Enter reply-to email"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
-                    <Input
-                      value={emailData.subject}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
-                      placeholder="Enter email subject"
-                      className="w-full"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+                     <Input
+                       value={emailData.subject}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
+                       placeholder="Enter email subject"
+                       className="w-full"
+                     />
+                   </div>
 
-                  <div>
-                    <Textarea
-                      value={emailData.message}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
-                      placeholder="Enter your message"
-                      className="w-full min-h-[200px] resize-none"
-                    />
-                  </div>
+                   <div>
+                     <Textarea
+                       value={emailData.message}
+                       onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
+                       placeholder="Enter your message"
+                       className="w-full min-h-[200px] resize-none"
+                     />
+                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
-                    <div className="space-y-2">
-                      {attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <Paperclip className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-700">{attachment.name}</span>
-                            <span className="text-xs text-gray-500">({attachment.size})</span>
-                            {attachment.type === "user-upload" && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
-                            )}
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
 
-          <div className="lg:col-span-1">
+                     {/* File size warning */}
+                     {totalAttachmentSize > 30 * 1024 * 1024 && (
+                       <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                         <div className="flex items-center">
+                           <div className="flex-shrink-0">
+                             <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                             </svg>
+                           </div>
+                           <div className="ml-3">
+                             <h3 className="text-sm font-medium text-yellow-800">
+                               Large attachment size detected
+                             </h3>
+                             <div className="mt-1 text-sm text-yellow-700">
+                               <p>
+                                 Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
+                                 Email services have a 40MB limit. Consider removing or compressing files.
+                               </p>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     )}
+
+                     <div className="space-y-2">
+                       {attachments.map((attachment, index) => (
+                         <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                           <div className="flex items-center space-x-2">
+                             <Paperclip className="h-4 w-4 text-gray-500" />
+                             <span className="text-sm text-gray-700">{attachment.name}</span>
+                             <span className="text-xs text-gray-500">({attachment.size})</span>
+                             {attachment.type === "user-upload" && (
+                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                             )}
+                           </div>
+                           <div className="flex items-center space-x-1">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => handleViewAttachment(attachment)}
+                               title="View attachment"
+                             >
+                               <Eye className="h-4 w-4" />
+                             </Button>
+                             <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
+                               <X className="h-4 w-4" />
+                             </Button>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+
+                     <div className="mt-4">
+                       <Button
+                         onClick={handleAddAttachment}
+                         variant="outline"
+                         className="w-full bg-white hover:bg-gray-50 border-gray-200 hover:border-blue-300"
+                       >
+                         <Upload className="h-4 w-4 mr-2" />
+                         Add File
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+
+           <div className="lg:col-span-1">
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-gray-900 mb-4">Templates:</h3>
@@ -814,29 +1072,14 @@ OH PLUS
         </div>
 
         <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleSendEmail}
-            disabled={sending}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-          >
-            {sending ? "Sending..." : "Send Email"}
-          </Button>
-        </div>
-
-        {/* Floating Attachment Button */}
-        <div className="fixed left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 z-50">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handleAddAttachment}
-              variant="outline"
-              size="lg"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-lg bg-white shadow-lg hover:shadow-xl border-gray-200 hover:border-blue-300 flex flex-col items-center justify-center p-1 sm:p-2 transition-all duration-200"
-            >
-              <Upload className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-gray-600" />
-            </Button>
-            <span className="text-xs text-gray-600 mt-1 sm:mt-2 font-medium hidden md:block">Add File</span>
-          </div>
-        </div>
+           <Button
+             onClick={handleSendEmail}
+             disabled={sending}
+             className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+           >
+             {sending ? "Sending..." : "Send Email"}
+           </Button>
+         </div>
 
         <input
           ref={fileInputRef}

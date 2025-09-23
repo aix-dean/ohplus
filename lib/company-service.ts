@@ -39,6 +39,7 @@ export class CompanyService {
           phone: data.phone || "",
           website: data.website || "",
           company_profile: data.company_profile || "",
+          logo: data.logo || "",
           business_type: data.business_type || "",
           position: data.position || "",
           createdAt: data.created_at?.toDate() || new Date(),
