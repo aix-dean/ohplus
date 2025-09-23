@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { format } from "date-fns"
 import type { DateRange } from "react-day-picker"
+import { getSalesEvents } from "@/lib/planner-service"
+import type { SalesEvent } from "@/lib/planner-service"
 
 interface SitePerformanceData {
   bestPerforming: {
@@ -28,6 +30,18 @@ interface ConversionRateData {
   rate: number
 }
 
+interface OccupancyPerformanceData {
+  monthlyData: { [month: number]: number }
+  bestMonth: {
+    name: string
+    percentage: number
+  }
+  worstMonth: {
+    name: string
+    percentage: number
+  }
+}
+
 export default function Dashboard() {
   const { userData } = useAuth()
   const [sitePerformance, setSitePerformance] = useState<SitePerformanceData>({
@@ -42,11 +56,18 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [conversionYear, setConversionYear] = useState("2025")
   const [conversionDateRange, setConversionDateRange] = useState<DateRange | undefined>()
+  const [occupancyYear, setOccupancyYear] = useState("2025")
+  const [calendarEvents, setCalendarEvents] = useState<SalesEvent[]>([])
   const [occupancy, setOccupancy] = useState({
     staticUnavailable: 0,
     staticTotal: 0,
     dynamicUnavailable: 0,
     dynamicTotal: 0
+  })
+  const [occupancyPerformance, setOccupancyPerformance] = useState<OccupancyPerformanceData>({
+    monthlyData: {},
+    bestMonth: { name: "Dec", percentage: 20 },
+    worstMonth: { name: "Sep", percentage: 5 }
   })
 
   useEffect(() => {
@@ -60,6 +81,18 @@ export default function Dashboard() {
       fetchConversionRate()
     }
   }, [userData?.company_id, conversionYear, conversionDateRange])
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      fetchOccupancyPerformance()
+    }
+  }, [userData?.company_id, occupancyYear])
+
+  useEffect(() => {
+    if (userData?.company_id) {
+      fetchCalendarEvents()
+    }
+  }, [userData?.company_id])
 
   const fetchSitePerformance = async () => {
     try {
@@ -110,6 +143,137 @@ export default function Dashboard() {
       console.error("Error fetching conversion rate:", error)
     }
   }
+
+  const fetchOccupancyPerformance = async () => {
+    try {
+      const params = new URLSearchParams({
+        companyId: userData!.company_id!,
+        year: occupancyYear
+      })
+
+      const response = await fetch(`/api/business/dashboard?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.occupancyPerformance) {
+          setOccupancyPerformance(data.occupancyPerformance)
+        }
+        setOccupancy(data.occupancy)
+      } else {
+        console.error("Failed to fetch occupancy performance")
+      }
+    } catch (error) {
+      console.error("Error fetching occupancy performance:", error)
+    }
+  }
+
+  const fetchCalendarEvents = async () => {
+    if (!userData?.company_id) return
+
+    try {
+      const isAdmin = userData.role === "admin"
+      const userDepartment = "business-dev"
+      const events = await getSalesEvents(isAdmin, userDepartment)
+      setCalendarEvents(events)
+    } catch (error) {
+      console.error("Error fetching calendar events:", error)
+      setCalendarEvents([])
+    }
+  }
+
+  const generateLineGraph = () => {
+    const { monthlyData } = occupancyPerformance
+    const elements: React.JSX.Element[] = []
+    const width = 300
+    const height = 120
+    const chartHeight = 60 // Available height for chart (from 80 to 20)
+    const baseY = 80 // Base Y position
+
+    // Find max percentage for scaling
+    const maxPercentage = Math.max(...Object.values(monthlyData), 1)
+
+    // Generate data points
+    const points: { x: number; y: number; percentage: number }[] = []
+    for (let month = 0; month < 12; month++) {
+      const percentage = monthlyData[month] || 0
+      const x = (month / 11) * (width - 40) + 20 // Add padding
+      const y = baseY - (percentage / maxPercentage) * chartHeight
+      points.push({ x, y, percentage })
+    }
+
+    // Create smooth curve path
+    let pathData = ''
+    points.forEach((point, index) => {
+      if (index === 0) {
+        pathData += `M ${point.x} ${point.y}`
+      } else {
+        const prevPoint = points[index - 1]
+        const controlX1 = prevPoint.x + (point.x - prevPoint.x) / 3
+        const controlX2 = point.x - (point.x - prevPoint.x) / 3
+        pathData += ` C ${controlX1} ${prevPoint.y}, ${controlX2} ${point.y}, ${point.x} ${point.y}`
+      }
+    })
+
+    // Create area fill path
+    const areaPathData = pathData + ` L ${points[points.length - 1].x} ${baseY} L ${points[0].x} ${baseY} Z`
+
+    // Add grid lines
+    for (let i = 0; i <= 4; i++) {
+      const y = baseY - (i / 4) * chartHeight
+      elements.push(
+        <line
+          key={`grid-${i}`}
+          x1="20"
+          y1={y}
+          x2={width - 20}
+          y2={y}
+          stroke="#e5e7eb"
+          strokeWidth="0.5"
+          opacity="0.3"
+        />
+      )
+    }
+
+    // Add area fill
+    elements.push(
+      <path
+        key="area"
+        d={areaPathData}
+        fill="url(#lineGradient)"
+        opacity="0.3"
+      />
+    )
+
+    // Add line
+    elements.push(
+      <path
+        key="line"
+        d={pathData}
+        fill="none"
+        stroke="#4169e1"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    )
+
+    // Add data points
+    points.forEach((point, index) => {
+      elements.push(
+        <circle
+          key={`point-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#4169e1"
+          stroke="white"
+          strokeWidth="2"
+        />
+      )
+    })
+
+    return elements
+  }
+
   return (
     <div className="min-h-screen">
         {/* Main Content */}
@@ -121,36 +285,89 @@ export default function Dashboard() {
             <Card className="bg-[#ffffee] border-[#ffdea2] border-2">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-[#333333]">
-                  Today <span className="text-sm font-normal">12, Sep</span>
+                  Today <span className="text-sm font-normal">{new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <div className="bg-[#7fdb97]/30 p-2 rounded text-xs">
-                    <div className="font-medium">RR0332 - Start Date</div>
-                  </div>
-                  <div className="bg-[#73bbff]/30 p-2 rounded text-xs">
-                    <div className="font-medium">SA0012 - Deadline</div>
-                  </div>
-                  <div className="bg-[#ff9696]/30 p-2 rounded text-xs">
-                    <div className="font-medium">NAN305 - Yearly Maintenan...</div>
-                  </div>
-                  <div className="bg-[#ffe522]/30 p-2 rounded text-xs">
-                    <div className="font-medium">Attend Supplier's Expo @ .....</div>
-                  </div>
-                </div>
+                {(() => {
+                  const today = new Date()
+                  const todayEvents = calendarEvents.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === today.toDateString()
+                  })
 
-                <div className="pt-4 border-t">
-                  <div className="font-medium text-[#333333] mb-2">13, Sep</div>
-                  <div className="text-sm text-gray-600">No events for this day.</div>
-                </div>
+                  const tomorrow = new Date(today)
+                  tomorrow.setDate(today.getDate() + 1)
+                  const tomorrowEvents = calendarEvents.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === tomorrow.toDateString()
+                  })
 
-                <div className="pt-4 border-t">
-                  <div className="font-medium text-[#333333] mb-2">14, Sep</div>
-                  <div className="bg-[#ff9696]/30 p-2 rounded text-xs">
-                    <div className="font-medium">NAN305 - Yearly Maintenan...</div>
-                  </div>
-                </div>
+                  const dayAfterTomorrow = new Date(today)
+                  dayAfterTomorrow.setDate(today.getDate() + 2)
+                  const dayAfterEvents = calendarEvents.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === dayAfterTomorrow.toDateString()
+                  })
+
+                  return (
+                    <>
+                      <div className="space-y-2">
+                        {todayEvents.length > 0 ? (
+                          todayEvents.slice(0, 4).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                              <div className="text-[10px] text-gray-600 truncate">{event.location}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-600">No events for today.</div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t">
+                        <div className="font-medium text-[#333333] mb-2">{tomorrow.toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
+                        {tomorrowEvents.length > 0 ? (
+                          tomorrowEvents.slice(0, 2).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-600">No events for this day.</div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t">
+                        <div className="font-medium text-[#333333] mb-2">{dayAfterTomorrow.toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
+                        {dayAfterEvents.length > 0 ? (
+                          dayAfterEvents.slice(0, 2).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-600">No events for this day.</div>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
               </CardContent>
             </Card>
 
@@ -211,7 +428,7 @@ export default function Dashboard() {
             <Card className="bg-white">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-[#333333]">Occupancy Performance</CardTitle>
-                <Select defaultValue="2025">
+                <Select value={occupancyYear} onValueChange={setOccupancyYear}>
                   <SelectTrigger className="w-20">
                     <SelectValue />
                   </SelectTrigger>
@@ -224,13 +441,12 @@ export default function Dashboard() {
               <CardContent>
                 <div className="h-32 bg-gradient-to-t from-[#4169e1] to-[#73bbff] rounded mb-4 relative">
                   <svg className="w-full h-full" viewBox="0 0 300 120">
-                    <path d="M0,80 Q50,60 100,70 T200,50 T300,60" fill="none" stroke="white" strokeWidth="2" />
-                    <path
-                      d="M0,80 Q50,60 100,70 T200,50 T300,60 L300,120 L0,120 Z"
-                      fill="url(#gradient)"
-                      opacity="0.7"
-                    />
+                    {generateLineGraph()}
                     <defs>
+                      <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#4169e1" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#73bbff" stopOpacity="0.2" />
+                      </linearGradient>
                       <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor="#73bbff" stopOpacity="0.8" />
                         <stop offset="100%" stopColor="#4169e1" stopOpacity="0.3" />
@@ -242,12 +458,12 @@ export default function Dashboard() {
                   <div className="text-sm">
                     <span className="text-gray-600">Best month:</span>
                     <br />
-                    <span className="font-semibold">Dec- 100%</span>
+                    <span className="font-semibold">{occupancyPerformance.bestMonth.name}- {occupancyPerformance.bestMonth.percentage}%</span>
                   </div>
                   <div className="text-sm">
                     <span className="text-gray-600">Worst month:</span>
                     <br />
-                    <span className="font-semibold">Sep- 40%</span>
+                    <span className="font-semibold">{occupancyPerformance.worstMonth.name}- {occupancyPerformance.worstMonth.percentage}%</span>
                   </div>
                 </div>
               </CardContent>

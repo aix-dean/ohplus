@@ -16,7 +16,6 @@ import { Switch } from "@/components/ui/switch"
 import { type SalesEvent, type RecurrenceType, createEvent } from "@/lib/planner-service"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { usePermission } from "@/hooks/use-permissions"
 
 interface EventDialogProps {
   isOpen: boolean
@@ -28,7 +27,6 @@ interface EventDialogProps {
 
 export function EventDialog({ isOpen, onClose, event, onEventSaved, department }: EventDialogProps) {
   const { user, userData } = useAuth()
-  const { hasAccess: hasPermission } = usePermission("events", "create")
   const isEditing = !!event?.id
   const [startDate, setStartDate] = useState<Date | undefined>(event?.start instanceof Date ? event.start : new Date())
   const [endDate, setEndDate] = useState<Date | undefined>(
@@ -94,11 +92,6 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department }
   const onSubmit = async (data: any) => {
     if (!user?.uid || !userData) return
 
-    // Check permissions
-    if (!hasPermission) {
-      alert("You don't have permission to create events")
-      return
-    }
 
     try {
       setIsSubmitting(true)

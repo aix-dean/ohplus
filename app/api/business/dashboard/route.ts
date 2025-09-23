@@ -152,6 +152,86 @@ export async function GET(request: NextRequest) {
     // Get occupancy data
     const occupancy = await getOccupancyData(companyId)
 
+    // Calculate monthly occupancy performance (booking counts by month)
+    const monthlyOccupancy: { [month: number]: number } = {}
+    let occupancyYear = year
+
+    // If no year specified, use current year
+    if (!occupancyYear) {
+      occupancyYear = new Date().getFullYear().toString()
+    }
+
+    const yearNum = parseInt(occupancyYear)
+    const yearStart = new Date(yearNum, 0, 1) // Jan 1
+    const yearEnd = new Date(yearNum + 1, 0, 1) // Jan 1 next year
+
+    // Filter bookings for the year
+    const yearBookings = filteredBookings.filter(booking => {
+      let bookingStart: Date
+      if (typeof booking.start_date === 'string') {
+        bookingStart = new Date(booking.start_date)
+      } else if (booking.start_date && typeof booking.start_date.toDate === 'function') {
+        bookingStart = booking.start_date.toDate()
+      } else {
+        return false
+      }
+      return bookingStart >= yearStart && bookingStart < yearEnd
+    })
+
+    // Group by month (0-11)
+    yearBookings.forEach(booking => {
+      let bookingStart: Date
+      if (typeof booking.start_date === 'string') {
+        bookingStart = new Date(booking.start_date)
+      } else if (booking.start_date && typeof booking.start_date.toDate === 'function') {
+        bookingStart = booking.start_date.toDate()
+      } else {
+        return
+      }
+      const month = bookingStart.getMonth()
+      monthlyOccupancy[month] = (monthlyOccupancy[month] || 0) + 1
+    })
+
+    // Calculate total bookings for the year
+    const totalYearBookings = Object.values(monthlyOccupancy).reduce((sum, count) => sum + count, 0)
+
+    // Convert to percentages
+    const monthlyPercentages: { [month: number]: number } = {}
+    for (let month = 0; month < 12; month++) {
+      const count = monthlyOccupancy[month] || 0
+      monthlyPercentages[month] = totalYearBookings > 0 ? Math.round((count / totalYearBookings) * 100) : 0
+    }
+
+    // Find best and worst months based on percentages
+    let bestMonth = -1
+    let worstMonth = -1
+    let maxPercentage = -1
+    let minPercentage = Infinity
+
+    for (let month = 0; month < 12; month++) {
+      const percentage = monthlyPercentages[month] || 0
+      if (percentage > maxPercentage) {
+        maxPercentage = percentage
+        bestMonth = month
+      }
+      if (percentage < minPercentage) {
+        minPercentage = percentage
+        worstMonth = month
+      }
+    }
+
+    // If no bookings, set defaults
+    if (bestMonth === -1) {
+      bestMonth = 11 // December
+      maxPercentage = 20
+    }
+    if (worstMonth === -1) {
+      worstMonth = 8 // September
+      minPercentage = 5
+    }
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
     return NextResponse.json({
       bestPerforming: {
         name: bestPerforming.name,
@@ -168,7 +248,18 @@ export async function GET(request: NextRequest) {
         bookings: bookingsCount,
         rate: conversionRate
       },
-      occupancy
+      occupancy,
+      occupancyPerformance: {
+        monthlyData: monthlyPercentages,
+        bestMonth: {
+          name: monthNames[bestMonth],
+          percentage: maxPercentage
+        },
+        worstMonth: {
+          name: monthNames[worstMonth],
+          percentage: minPercentage
+        }
+      }
     })
 
   } catch (error) {

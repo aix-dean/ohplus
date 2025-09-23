@@ -64,7 +64,6 @@ export default function BusinessDevPlannerPage() {
    const router = useRouter()
    const searchParams = useSearchParams()
    const { userData, user } = useAuth()
-   const { hasAccess: hasEventPermission } = usePermission("events", "create")
    const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
    const [events, setEvents] = useState<SalesEvent[]>([])
    const [bookings, setBookings] = useState<Booking[]>([])
@@ -1552,7 +1551,6 @@ export default function BusinessDevPlannerPage() {
             )}
             <Button
               onClick={() => setEventDialogOpen(true)}
-              disabled={!hasEventPermission}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
