@@ -17,6 +17,7 @@ import { collection, getDocs, doc, setDoc, getDoc, addDoc, serverTimestamp, GeoP
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { db, tenantAuth } from "@/lib/firebase"
 import { assignRoleToUser } from "@/lib/hardcoded-access-service"
+import WelcomePage from "./welcome-page"
 
 const createAnalyticsDocument = async () => {
   try {
@@ -68,6 +69,7 @@ export default function LoginPage() {
   const [fileName, setFileName] = useState("")
   const [isValidating, setIsValidating] = useState(false)
   const [pointPersonData, setPointPersonData] = useState<any>(null)
+  const [showWelcome, setShowWelcome] = useState(false)
   const pointPersonDataRef = useRef<any>(null)
 
   const { user, userData, getRoleDashboardPath, refreshUserData, login, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
@@ -76,7 +78,7 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && userData) {
+    if (user && userData && !showWelcome) {
       const dashboardPath = getRoleDashboardPath(userData.roles || [])
       if (dashboardPath) {
         // Add a small delay to prevent immediate back-and-forth redirects
@@ -86,7 +88,7 @@ export default function LoginPage() {
         return () => clearTimeout(timer)
       }
     }
-  }, [user, userData, router, getRoleDashboardPath])
+  }, [user, userData, router, getRoleDashboardPath, showWelcome])
 
   // Fetch point_person data from companies collection
   const fetchPointPersonData = async (email: string) => {
@@ -376,11 +378,8 @@ export default function LoginPage() {
       // End registration
       endRegistration()
 
-      console.log("Registration completed successfully, navigating...")
-      // Navigate to IT user management page
-      console.log("Navigating to /it/user-management")
-      router.push("/it/user-management")
-      console.log("Navigation set")
+      console.log("Registration completed successfully, showing welcome page...")
+      setShowWelcome(true)
     } catch (error: any) {
       console.error("Registration failed:", error)
       console.log("Error code:", error.code, "Error message:", error.message)
@@ -416,6 +415,7 @@ export default function LoginPage() {
     setFileName("")
     setIsValidating(false)
     setPointPersonData(null)
+    setShowWelcome(false)
     pointPersonDataRef.current = null
     // Don't reset email here
   }
@@ -428,6 +428,7 @@ export default function LoginPage() {
     setIsActivated(false)
     setFileName("")
     setIsValidating(false)
+    setShowWelcome(false)
   }
 
   const handleDragOverStep3 = useCallback((e: React.DragEvent) => {
@@ -441,32 +442,61 @@ export default function LoginPage() {
   }, [])
 
   const handleDropStep3 = useCallback(async (e: React.DragEvent) => {
+    console.log('handleDropStep3 called')
     e.preventDefault()
     setIsDragOver(false)
 
     const files = Array.from(e.dataTransfer.files)
+    console.log('Dropped files:', files.map(f => f.name))
     const activationFile = files.find((file) => file.name.endsWith('.lic'))
+    console.log('Activation file found:', activationFile?.name)
 
     if (activationFile) {
+      console.log('Starting validation process for file:', activationFile.name)
       setIsValidating(true)
       const formData = new FormData()
       formData.append('activationKey', activationFile)
 
       try {
+        console.log('Calling OHPlus Activation Key Validator API...')
         const response = await fetch('/api/validate-activation', {
           method: 'POST',
           body: formData
         })
+        console.log('API response received, status:', response.status)
         const result = await response.json()
+        console.log('API result parsed:', result)
 
-        console.log('API response:', result)
+        console.log('OHPlus Activation Key Validator API Full Success Response (200 OK):', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries()),
+          data: result
+        })
 
         if (result.success) {
+          console.log('API returned success, proceeding with companyId validation')
+          // Additional validation: check if callback companyId matches step 1 company_id
+          const callbackCompanyId = result.data.companyId
+          const step1CompanyId = pointPersonDataRef.current.company_id
+          console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
+
+          if (callbackCompanyId !== step1CompanyId) {
+            console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+            setError('Invalid activation key: Company ID does not match.')
+            toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
+            setIsValidating(false)
+            return
+          }
+
+          console.log('Company ID validation passed, proceeding with registration')
           console.log('File authenticated')
           setFileName(activationFile.name)
           setUploadedFile(activationFile)
           try {
             // Complete registration first
+            console.log('Calling handleCompleteRegistration')
             await handleCompleteRegistration(result.data, activationFile)
             // Only show success after successful registration
             setIsActivated(true)
@@ -476,42 +506,74 @@ export default function LoginPage() {
             setError('Registration failed. Please try again.')
           }
         } else {
-          console.log('File not valid')
+          console.log('File not valid, result:', result)
           setError(result.error || 'Invalid activation key')
           toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
         }
       } catch (error) {
+        console.error('Failed to validate activation key, error:', error)
         setError('Failed to validate activation key')
       } finally {
         setIsValidating(false)
       }
+    } else {
+      console.log('No .lic file found in dropped files')
     }
   }, [])
 
   const handleFileSelectStep3 = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileSelectStep3 called')
     const files = e.target.files
+    console.log('Selected files:', files ? Array.from(files).map(f => f.name) : 'none')
     if (files && files.length > 0) {
       const file = files[0]
+      console.log('Processing file:', file.name)
       if (file.name.endsWith('.lic')) {
+        console.log('Starting validation process for file:', file.name)
         setIsValidating(true)
         const formData = new FormData()
         formData.append('activationKey', file)
 
         try {
+          console.log('Calling OHPlus Activation Key Validator API...')
           const response = await fetch('/api/validate-activation', {
             method: 'POST',
             body: formData
           })
+          console.log('API response received, status:', response.status)
           const result = await response.json()
+          console.log('API result parsed:', result)
 
-          console.log('API response:', result)
+          console.log('OHPlus Activation Key Validator API Full Success Response (200 OK):', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries()),
+            data: result
+          })
 
           if (result.success) {
+            console.log('API returned success, proceeding with companyId validation')
+            // Additional validation: check if callback companyId matches step 1 company_id
+            const callbackCompanyId = result.data.companyId
+            const step1CompanyId = pointPersonDataRef.current.company_id
+            console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
+
+            if (callbackCompanyId !== step1CompanyId) {
+              console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+              setError('Invalid activation key: Company ID does not match.')
+              toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
+              setIsValidating(false)
+              return
+            }
+
+            console.log('Company ID validation passed, proceeding with registration')
             console.log('File authenticated')
             setFileName(file.name)
             setUploadedFile(file)
             try {
               // Complete registration first
+              console.log('Calling handleCompleteRegistration')
               await handleCompleteRegistration(result.data, file)
               // Only show success after successful registration
               setIsActivated(true)
@@ -521,20 +583,28 @@ export default function LoginPage() {
               setError('Registration failed. Please try again.')
             }
           } else {
-            console.log('File not valid')
+            console.log('File not valid, result:', result)
             setError(result.error || 'Invalid activation key')
             toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
           }
         } catch (error) {
+          console.error('Failed to validate activation key, error:', error)
           setError('Failed to validate activation key')
         } finally {
           setIsValidating(false)
         }
       } else {
+        console.log('File does not end with .lic')
         setError('Please select a .lic file')
       }
+    } else {
+      console.log('No files selected')
     }
   }, [])
+
+  if (showWelcome) {
+    return <WelcomePage onStartTour={() => router.push("/it/user-management")} />
+  }
 
   return currentStep === 3 ? (
     <div className="min-h-screen flex">
