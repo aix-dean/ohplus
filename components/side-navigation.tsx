@@ -1292,7 +1292,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
-                  { title: "Requests", href: "/treasury/quotations", icon: FileText },
+                  { title: "Requests", href: "/treasury/requests", icon: FileText },
                   { title: "Planner", href: "/treasury/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
