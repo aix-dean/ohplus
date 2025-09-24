@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { tenantAuth, auth, db, TENANT_ID } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
@@ -84,6 +84,7 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  updateUserActivity: () => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
   startRegistration: () => void
@@ -294,6 +295,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error
     }
   }, [])
+
+  const updateUserActivity = useCallback(async () => {
+    if (!user?.uid) return
+
+    try {
+      const userDocRef = doc(db, "iboard_users", user.uid)
+      await updateDoc(userDocRef, {
+        lastActivity: serverTimestamp()
+      })
+    } catch (error) {
+      console.error("Error updating user activity:", error)
+    }
+  }, [user?.uid])
 
   const startRegistration = useCallback(() => {
     setIsRegistering(true)
@@ -808,6 +822,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserData,
     refreshSubscriptionData,
     assignLicenseKey,
+    updateUserActivity,
     getRoleDashboardPath,
     hasRole,
     startRegistration,

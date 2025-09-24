@@ -18,6 +18,12 @@ import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { searchServiceAssignments, type SearchResult, type SearchResponse } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
+import { ActiveUsersGrid } from "@/components/active-users-grid"
+import { salesQuotaService } from "@/lib/sales-quota-service"
+import { SalesQuotaBreakdownDialog } from "@/components/sales-quota-breakdown-dialog"
+import type { SalesQuotaSummary } from "@/lib/types/sales-quota"
+import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
 
 // Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,12 +62,21 @@ export default function AdminDashboardPage() {
     [date: string]: CalendarEvent[];
   }>({});
   const [loadingCalendar, setLoadingCalendar] = useState(true);
+  const [events, setEvents] = useState<SalesEvent[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(true)
   const [pettyCashConfig, setPettyCashConfig] = useState<PettyCashConfig | null>(null);
   const [pettyCashCycle, setPettyCashCycle] = useState<PettyCashCycle | null>(null);
   const [pettyCashBalance, setPettyCashBalance] = useState(0);
   const [loadingPettyCash, setLoadingPettyCash] = useState(true);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [loadingOccupancy, setLoadingOccupancy] = useState(true);
+
+  // Sales Quota state
+  const [salesQuotaSummary, setSalesQuotaSummary] = useState<SalesQuotaSummary | null>(null);
+  const [loadingSalesQuota, setLoadingSalesQuota] = useState(true);
+  const [isSalesQuotaDialogOpen, setIsSalesQuotaDialogOpen] = useState(false);
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
 
   // Product counts for Occupancy Index
   const [staticCount, setStaticCount] = useState(0);
@@ -176,6 +191,26 @@ export default function AdminDashboardPage() {
     fetchPettyCashData();
   }, [userData?.company_id]);
 
+  // Fetch events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!userData?.company_id) return;
+
+      setLoadingEvents(true);
+      try {
+        const fetchedEvents = await getSalesEvents(true, "admin");
+        setEvents(fetchedEvents);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+        setEvents([]);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+
+    fetchEvents();
+  }, [userData?.company_id]);
+
   // Fetch product counts for Occupancy Index
   useEffect(() => {
     const fetchProductCounts = async () => {
@@ -197,6 +232,39 @@ export default function AdminDashboardPage() {
     };
 
     fetchProductCounts();
+  }, [userData?.company_id]);
+
+  // Fetch sales quota data
+  useEffect(() => {
+    const fetchSalesQuotaData = async () => {
+      if (!userData?.company_id) return;
+
+      setLoadingSalesQuota(true);
+      try {
+        const currentDate = new Date();
+        const summary = await salesQuotaService.getSalesQuotaSummary(
+          userData.company_id,
+          currentDate.getMonth() + 1, // getMonth() returns 0-11, we need 1-12
+          currentDate.getFullYear()
+        );
+        setSalesQuotaSummary(summary);
+      } catch (error) {
+        console.error("Error fetching sales quota data:", error);
+        // Set default values if no data exists
+        setSalesQuotaSummary({
+          averageAchievement: 0,
+          totalAssociates: 0,
+          associatesOnTrack: 0,
+          associatesBelowTarget: 0,
+          totalTargets: 0,
+          totalActual: 0,
+        });
+      } finally {
+        setLoadingSalesQuota(false);
+      }
+    };
+
+    fetchSalesQuotaData();
   }, [userData?.company_id]);
 
   // Search service assignments when search term or page changes
@@ -263,6 +331,11 @@ export default function AdminDashboardPage() {
   const handleServiceAssignmentsPreviousPage = () => {
     setServiceAssignmentsCurrentPage(prev => Math.max(1, prev - 1));
   };
+
+  const handleEventClick = (event: SalesEvent) => {
+    setSelectedEventForDetails(event)
+    setEventDetailsDialogOpen(true)
+  }
 
   // Calculate paginated service assignments for non-search mode
   const serviceAssignmentsStartIndex = (serviceAssignmentsCurrentPage - 1) * serviceAssignmentsItemsPerPage;
@@ -723,14 +796,22 @@ export default function AdminDashboardPage() {
                         {(() => {
                           const today = new Date();
                           const todayKey = today.toDateString();
-                          const todayEvents = calendarEvents[todayKey] || [];
+                          const todayCalendarEvents = calendarEvents[todayKey] || [];
+                          const todaySalesEvents = events.filter(event =>
+                            event.start instanceof Date &&
+                            event.start.toDateString() === todayKey
+                          );
 
-                          return todayEvents.length > 0 ? (
-                            todayEvents.map((event) => (
+                          const allTodayEvents = [...todayCalendarEvents, ...todaySalesEvents];
+
+                          return allTodayEvents.length > 0 ? (
+                            allTodayEvents.map((event, index) => (
                               <div
-                                key={event.id}
-                                className="p-2 rounded text-sm"
-                                style={{ backgroundColor: event.color }}
+                                key={`today-${index}`}
+                                className="p-2 rounded text-sm mb-1"
+                                style={{
+                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                }}
                               >
                                 <span className="font-medium">
                                   {event.title}
@@ -767,15 +848,22 @@ export default function AdminDashboardPage() {
                           const tomorrow = new Date();
                           tomorrow.setDate(tomorrow.getDate() + 1);
                           const tomorrowKey = tomorrow.toDateString();
-                          const tomorrowEvents =
-                            calendarEvents[tomorrowKey] || [];
+                          const tomorrowCalendarEvents = calendarEvents[tomorrowKey] || [];
+                          const tomorrowSalesEvents = events.filter(event =>
+                            event.start instanceof Date &&
+                            event.start.toDateString() === tomorrowKey
+                          );
 
-                          return tomorrowEvents.length > 0 ? (
-                            tomorrowEvents.map((event) => (
+                          const allTomorrowEvents = [...tomorrowCalendarEvents, ...tomorrowSalesEvents];
+
+                          return allTomorrowEvents.length > 0 ? (
+                            allTomorrowEvents.map((event, index) => (
                               <div
-                                key={event.id}
-                                className="p-2 rounded text-sm"
-                                style={{ backgroundColor: event.color }}
+                                key={`tomorrow-${index}`}
+                                className="p-2 rounded text-sm mb-1"
+                                style={{
+                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                }}
                               >
                                 <span className="font-medium">
                                   {event.title}
@@ -812,15 +900,22 @@ export default function AdminDashboardPage() {
                           const dayAfter = new Date();
                           dayAfter.setDate(dayAfter.getDate() + 2);
                           const dayAfterKey = dayAfter.toDateString();
-                          const dayAfterEvents =
-                            calendarEvents[dayAfterKey] || [];
+                          const dayAfterCalendarEvents = calendarEvents[dayAfterKey] || [];
+                          const dayAfterSalesEvents = events.filter(event =>
+                            event.start instanceof Date &&
+                            event.start.toDateString() === dayAfterKey
+                          );
 
-                          return dayAfterEvents.length > 0 ? (
-                            dayAfterEvents.map((event) => (
+                          const allDayAfterEvents = [...dayAfterCalendarEvents, ...dayAfterSalesEvents];
+
+                          return allDayAfterEvents.length > 0 ? (
+                            allDayAfterEvents.map((event, index) => (
                               <div
-                                key={event.id}
-                                className="p-2 rounded text-sm"
-                                style={{ backgroundColor: event.color }}
+                                key={`dayAfter-${index}`}
+                                className="p-2 rounded text-sm mb-1"
+                                style={{
+                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                }}
                               >
                                 <span className="font-medium">
                                   {event.title}
@@ -889,109 +984,57 @@ export default function AdminDashboardPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Active Users</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    {/* Users List - Left Side */}
-                    <div className="flex-1">
-                      <div className="flex flex-wrap gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">SALES</span>
-                          <span className="text-sm">Noemi Abellanada</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">SALES</span>
-                          <span className="text-sm">Matthew Espanto</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">LOGISTICS</span>
-                          <span className="text-sm">May Tuyan</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                          <span className="text-sm font-medium">LOGISTICS</span>
-                          <span className="text-sm">James Polido</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                          <span className="text-sm font-medium">SOFT ADMIN</span>
-                          <span className="text-sm">Mel Mendoza</span>
-                        </div>
-                        <div className="text-center text-[#a1a1a1]">...</div>
-                      </div>
-                    </div>
-
-                    {/* Circular Progress - Right Side */}
-                    <div className="flex-1 flex justify-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center justify-center mb-2">
-                          <div className="relative w-20 h-20">
-                            <svg
-                              className="w-20 h-20 transform -rotate-90"
-                              viewBox="0 0 36 36"
-                            >
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#e0e0e0"
-                                strokeWidth="2"
-                              />
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#18da69"
-                                strokeWidth="2"
-                                strokeDasharray={`${occupancyPercentage}, 100`}
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold">{occupancyPercentage}%</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-center gap-4 text-xs">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                            <span>Online</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                            <span>Offline</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <CardContent className="p-0">
+                  {userData?.company_id && (
+                    <ActiveUsersGrid companyId={userData.company_id} />
+                  )}
                 </CardContent>
               </Card>
             </div>
 
             {/* Sales Quota Index - Row 2, Column 2 */}
             <div className="lg:col-span-1">
-              <Card className="bg-[#ffffff] shadow-sm h-full px-2">
+              <Card
+                className="bg-[#ffffff] shadow-sm h-full px-2 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setIsSalesQuotaDialogOpen(true)}
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Sales Quota Index</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-4">
-                    <div className="w-full bg-[#e0e0e0] rounded-full h-3">
-                      <div
-                        className="bg-[#18da69] h-3 rounded-full"
-                        style={{ width: "75%" }}
-                      ></div>
+                  {loadingSalesQuota ? (
+                    <div className="flex items-center justify-center h-20">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#18da69]"></div>
                     </div>
-                    <div className="flex justify-end mt-1">
-                      <span className="text-sm font-medium">75%</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-[#a1a1a1]">
-                    Sales Team Leader to set targets per sales associate.
-                    Sales Quota Index here is the average of the entire Sales
-                    Team. When this is clicked, breakdown per sales associate
-                    is showed.
-                  </p>
+                  ) : (
+                    <>
+                      <div className="mb-4">
+                        <div className="w-full bg-[#e0e0e0] rounded-full h-3">
+                          <div
+                            className="bg-[#18da69] h-3 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(salesQuotaSummary?.averageAchievement || 0, 100)}%`
+                            }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-end mt-1">
+                          <span className="text-sm font-medium">
+                            {salesQuotaSummary?.averageAchievement || 0}%
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-[#a1a1a1]">
+                        Sales Team Leader to set targets per sales associate.
+                        Sales Quota Index here is the average of the entire Sales
+                        Team. Click to view breakdown per sales associate.
+                      </p>
+                      {salesQuotaSummary && salesQuotaSummary.totalAssociates > 0 && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          {salesQuotaSummary.associatesOnTrack} of {salesQuotaSummary.totalAssociates} associates on track
+                        </div>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1215,7 +1258,7 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="py-3 px-4 text-[#000000]">
                             {assignment?.coveredDateEnd
-                              ? assignment.coveredDateEnd.toDate().toLocaleDateString()
+                              ? new Date(assignment.coveredDateEnd).toLocaleDateString()
                               : "N/A"}
                           </td>
                           <td className="py-3 px-4 text-[#000000]">
@@ -1257,6 +1300,20 @@ export default function AdminDashboardPage() {
           isOpen={isAddExpenseOpen}
           onClose={() => setIsAddExpenseOpen(false)}
           onSubmit={handleAddExpense}
+        />
+
+        <SalesQuotaBreakdownDialog
+          isOpen={isSalesQuotaDialogOpen}
+          onClose={() => setIsSalesQuotaDialogOpen(false)}
+          companyId={userData?.company_id || ""}
+          month={new Date().getMonth() + 1}
+          year={new Date().getFullYear()}
+        />
+
+        <EventDetailsDialog
+          isOpen={eventDetailsDialogOpen}
+          onClose={() => setEventDetailsDialogOpen(false)}
+          event={selectedEventForDetails}
         />
       </div>
     </RouteProtection>
