@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Search, ChevronDown, X, FileText, Loader2, CheckCircle, PlusCircle } from "lucide-react"
+import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState, useRef } from "react"
@@ -12,10 +12,6 @@ import { liteClient } from "algoliasearch/lite"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { getAllClients, type Client } from "@/lib/client-service"
-import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
-import { useDebounce } from "@/hooks/use-debounce"
 
 interface JobOrderCount {
   [productId: string]: number
@@ -85,19 +81,7 @@ export default function ProjectMonitoringPage() {
 
   const searchClient = liteClient(process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!, process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY!)
 
-  // Quote mode states
-  const [quoteMode, setQuoteMode] = useState(false)
-  const [selectedSites, setSelectedSites] = useState<Product[]>([])
-  const [selectedClientForQuote, setSelectedClientForQuote] = useState<Client | null>(null)
-  const [dashboardClientSearchTerm, setDashboardClientSearchTerm] = useState("")
-  const [dashboardClientSearchResults, setDashboardClientSearchResults] = useState<Client[]>([])
-  const [isSearchingDashboardClients, setIsSearchingDashboardClients] = useState(false)
-  const debouncedDashboardClientSearchTerm = useDebounce(dashboardClientSearchTerm, 500)
-  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
-  const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"quotation" | null>(null)
-  const [isCreatingDocument, setIsCreatingDocument] = useState(false)
 
-  const clientSearchRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setCurrentPage(1)
@@ -345,110 +329,6 @@ export default function ProjectMonitoringPage() {
     }
   }
 
-  // Quote mode functions
-  const handleQuoteMode = () => {
-    setQuoteMode(true)
-    setSelectedSites([])
-    setSelectedClientForQuote(null)
-    setDashboardClientSearchTerm("")
-  }
-
-  const handleCancelQuote = () => {
-    setQuoteMode(false)
-    setSelectedSites([])
-    setSelectedClientForQuote(null)
-    setDashboardClientSearchTerm("")
-  }
-
-  const handleClientSelectForQuote = (client: Client) => {
-    setSelectedClientForQuote(client)
-    setDashboardClientSearchTerm(client.company || client.name || "")
-  }
-
-  const handleSiteSelect = (product: Product) => {
-    setSelectedSites((prev) => {
-      const isSelected = prev.some((p) => p.id === product.id)
-      if (isSelected) {
-        return prev.filter((p) => p.id !== product.id)
-      } else {
-        return [...prev, product]
-      }
-    })
-  }
-
-  const openCreateQuotationDateDialog = () => {
-    if (selectedSites.length === 0) {
-      alert("Please select at least one site for the quotation.")
-      return
-    }
-    if (!selectedClientForQuote) {
-      alert("Please select a client first.")
-      return
-    }
-    setActionAfterDateSelection("quotation")
-    setIsDateRangeDialogOpen(true)
-  }
-
-  const handleDatesSelected = async (startDate: Date, endDate: Date) => {
-    if (!user?.uid || !userData?.company_id) {
-      alert("Authentication required")
-      return
-    }
-
-    setIsCreatingDocument(true)
-    try {
-      const sitesData = selectedSites.map((site) => ({
-        id: site.id!,
-        name: site.name,
-        location: site.specs_rental?.location || (site as any).light?.location || "N/A",
-        price: site.price || 0,
-        type: site.type || "Unknown",
-        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-        content_type: site.content_type || "",
-        specs_rental: site.specs_rental,
-      }))
-      const clientData = {
-        id: selectedClientForQuote!.id,
-        name: selectedClientForQuote!.name,
-        email: selectedClientForQuote!.email,
-        company: selectedClientForQuote!.company,
-        phone: selectedClientForQuote!.phone,
-        address: selectedClientForQuote!.address,
-        designation: selectedClientForQuote!.designation,
-        industry: selectedClientForQuote!.industry,
-        company_id: selectedClientForQuote!.company_id
-      }
-
-      const options = {
-        startDate,
-        endDate,
-        company_id: userData.company_id,
-        client_company_id: selectedClientForQuote!.company_id,
-        page_id: selectedSites.length > 1 ? `PAGE-${Date.now()}` : undefined,
-        created_by_first_name: userData.first_name,
-        created_by_last_name: userData.last_name,
-      }
-
-      let quotationIds: string[]
-
-      if (selectedSites.length > 1) {
-        quotationIds = await createMultipleQuotations(clientData, sitesData, user.uid, options)
-        alert(`Successfully created ${quotationIds.length} quotations for the selected sites.`)
-      } else {
-        const quotationId = await createDirectQuotation(clientData, sitesData, user.uid, options)
-        quotationIds = [quotationId]
-        alert("Quotation has been created successfully.")
-      }
-
-      router.push(`/sales/quotations/${quotationIds[quotationIds.length - 1]}`)
-    } catch (error) {
-      console.error("Error creating quotation:", error)
-      alert("Failed to create quotation. Please try again.")
-    } finally {
-      setIsCreatingDocument(false)
-      setIsDateRangeDialogOpen(false)
-    }
-  }
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -590,39 +470,7 @@ export default function ProjectMonitoringPage() {
     fetchBookings()
    }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length, searchQuery])
 
-   // Fetch clients for quote mode
-   useEffect(() => {
-     const fetchClients = async () => {
-       if (quoteMode && userData?.company_id) {
-         setIsSearchingDashboardClients(true)
-         try {
-           const result = await getAllClients()
-           setDashboardClientSearchResults(result)
-         } catch (error) {
-           console.error("Error fetching clients for quote mode:", error)
-           setDashboardClientSearchResults([])
-         } finally {
-           setIsSearchingDashboardClients(false)
-         }
-       } else {
-         setDashboardClientSearchResults([])
-       }
-     }
-     fetchClients()
-   }, [quoteMode, userData?.company_id])
 
-   useEffect(() => {
-     const handleClickOutside = (event: MouseEvent) => {
-       if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
-         // Close any open dropdowns if needed
-       }
-     }
-
-     document.addEventListener("mousedown", handleClickOutside)
-     return () => {
-       document.removeEventListener("mousedown", handleClickOutside)
-     }
-   }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -652,81 +500,9 @@ export default function ProjectMonitoringPage() {
             />
           </div>
 
-          {/* Quote Button */}
-          <div className="flex-1 flex justify-end">
-            {!quoteMode ? (
-              <Button
-                onClick={handleQuoteMode}
-                className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-              >
-                Quote
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCancelQuote}
-                variant="outline"
-              >
-                Cancel Quote
-              </Button>
-            )}
-          </div>
         </div>
       </div>
 
-      {quoteMode && (
-        <div className="bg-white border-b border-gray-200 px-4 py-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-700">Select Client:</span>
-            <div className="relative w-64" ref={clientSearchRef}>
-              <Input
-                placeholder="Search or select client..."
-                value={selectedClientForQuote ? (selectedClientForQuote.company || selectedClientForQuote.name) : dashboardClientSearchTerm}
-                onChange={(e) => {
-                  setDashboardClientSearchTerm(e.target.value)
-                  setSelectedClientForQuote(null)
-                }}
-                className="pr-10"
-              />
-              {isSearchingDashboardClients && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
-              )}
-              {dashboardClientSearchResults.length > 0 && (
-                <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
-                  <div className="max-h-[200px] overflow-y-auto">
-                    <div className="p-2">
-                      <div
-                        className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                        onClick={() => {/* Add new client */}}
-                      >
-                        <PlusCircle className="h-4 w-4 text-blue-500" />
-                        <span className="font-medium text-blue-700">Add New Client</span>
-                      </div>
-                      {dashboardClientSearchResults.map((result) => (
-                        <div
-                          key={result.id}
-                          className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                          onClick={() => handleClientSelectForQuote(result)}
-                        >
-                          <div>
-                            <p className="font-medium">{result.name} ({result.company})</p>
-                            <p className="text-xs text-gray-500">{result.email}</p>
-                          </div>
-                          {selectedClientForQuote?.id === result.id && (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              )}
-            </div>
-            {selectedClientForQuote && (
-              <span className="text-sm text-green-600">Client selected: {selectedClientForQuote.company || selectedClientForQuote.name}</span>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="p-4">
         {loading ? (
@@ -739,28 +515,21 @@ export default function ProjectMonitoringPage() {
                 .map((product) => (
                   <div
                     key={product.id}
-                    className={`bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow relative ${quoteMode && selectedSites.some(p => p.id === product.id) ? 'border-green-500 bg-green-50' : ''}`}
+                    className="bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => {
-                      if (quoteMode) {
-                        handleSiteSelect(product)
+                      console.log('Product ID:', product.id)
+                      console.log('Latest JO IDs:', latestJoIds)
+                      console.log('Latest JO ID for this product:', latestJoIds[product.id!])
+                      if (latestJoIds[product.id!]) {
+                        router.push(`/admin/project-bulletin/details/${latestJoIds[product.id!]}`)
                       } else {
-                        if (latestJoIds[product.id!]) {
-                          router.push(`/admin/project-bulletin/details/${latestJoIds[product.id!]}`)
-                        }
+                        console.log('No latest JO ID found for product:', product.id)
                       }
                     }}
                   >
                     <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
                       <span style={{ padding: '0 2px' }}>{latestJoNumbers[product.id!] || 'No JO'}</span>
                     </div>
-
-                    {quoteMode && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedSites.some(p => p.id === product.id) ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>
-                          {selectedSites.some(p => p.id === product.id) && <CheckCircle className="h-4 w-4 text-white" />}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Project Title Banner */}
                     <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef", borderRadius: "10px" }}>
@@ -822,27 +591,6 @@ export default function ProjectMonitoringPage() {
         )}
       </div>
 
-      {quoteMode && selectedSites.length > 0 && selectedClientForQuote && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <Button
-            onClick={openCreateQuotationDateDialog}
-            className="gap-2 bg-green-600 text-white hover:bg-green-700"
-            disabled={isCreatingDocument}
-          >
-            {isCreatingDocument ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4" />
-                Create Quotation
-              </>
-            )}
-          </Button>
-        </div>
-      )}
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
@@ -920,15 +668,6 @@ export default function ProjectMonitoringPage() {
         </div>
       )}
 
-      <DateRangeCalendarDialog
-        isOpen={isDateRangeDialogOpen}
-        onClose={() => setIsDateRangeDialogOpen(false)}
-        onSelectDates={handleDatesSelected}
-        onSkipDates={() => {}}
-        selectedSiteIds={selectedSites.map((site) => site.id || "")}
-        selectedClientId={selectedClientForQuote?.id}
-        showSkipButton={false}
-      />
     </div>
   )
 }
