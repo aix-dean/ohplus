@@ -76,8 +76,8 @@ export function PDFViewer({ fileUrl, className = "" }: PDFViewerProps) {
         )}
 
         <iframe
-          src={`${fileUrl}#view=FitH&toolbar=0&navpanes=0`}
-          className="w-full h-[1100px] border-0"
+          src={`${fileUrl}#view=fitH&toolbar=0&navpanes=0&statusbar=0`}
+          className={`w-full ${className}`}
           onLoad={handleIframeLoad}
           onError={handleIframeError}
           title="PDF Viewer"

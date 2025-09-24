@@ -9,20 +9,22 @@ import { useAuth } from "@/contexts/auth-context"
 import { bookingService, type Booking } from "@/lib/booking-service"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
-import { format, differenceInMonths } from "date-fns"
+import { format, differenceInMonths, parse } from "date-fns"
 import { Arrow } from "@radix-ui/react-dropdown-menu"
 import { ArrowLeft } from "lucide-react"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
+import type { Collectible } from "@/lib/types/collectible"
+import type { Invoice } from "@/lib/types/invoice"
 
 interface CollectibleFormData {
   billingType: string
-  rate: string
+  rate: number
   startDate: string
   endDate: string
   totalMonths: string
   depositRequired: string
   depositTerms: string
-  depositAmount: string
+  depositAmount: number
   advanceRequired: string
   advanceTerms: string
 }
@@ -162,31 +164,91 @@ export default function CreateCollectiblesPage() {
 
     setSubmitting(true)
     try {
-      const collectibleData = {
-        booking_id: bookingId,
-        company_id: userData.company_id,
-        client_name: booking.client?.name || "",
-        billing_type: formData.billingType,
-        rate: parseFloat(formData.rate),
-        start_date: new Date(formData.startDate),
-        end_date: new Date(formData.endDate),
-        total_months: parseInt(formData.totalMonths),
-        deposit_required: formData.depositRequired,
-        deposit_terms: formData.depositTerms,
-        deposit_amount: parseFloat(formData.depositAmount),
-        advance_required: formData.advanceRequired,
-        advance_terms: formData.advanceTerms,
-        status: "pending",
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
+      const paymentSchedule = calculatePaymentSchedule()
+      const collectiblesToCreate: Omit<Collectible, 'id'>[] = []
+
+      for (const payment of paymentSchedule) {
+        let dueDate: Date | null = null
+        let period: string | undefined = undefined
+
+        if (formData.billingType === "One Time") {
+          period = "One Time"
+          dueDate = new Date(formData.startDate)
+        } else if (payment.date === "Deposit (deductible)") {
+          period = "Deposit"
+          dueDate = new Date(formData.startDate)
+        } else if (payment.date.includes("-")) {
+          // Monthly payment: "Jan 01, 2024-Jan 31, 2024"
+          const [startStr] = payment.date.split("-")
+          dueDate = parse(startStr, "MMM dd, yyyy", new Date())
+          period = format(dueDate, "MMMM yyyy")
+        }
+
+        const collectibleData: Omit<Collectible, 'id'> = {
+          booking_id: bookingId,
+          company_id: userData.company_id,
+          product: {
+            id: booking.product_id,
+            name: booking.product_name,
+            owner: booking.product_owner,
+          },
+          client: {
+            id: booking.client.id,
+            name: booking.client.name,
+            company_name: booking.client.company_name,
+            company_id: booking.client.company_id,
+          },
+          booking: {
+            id: bookingId,
+            project_name: booking.project_name,
+            reservation_id: booking.reservation_id,
+            start_date: booking.start_date,
+            end_date: booking.end_date,
+          },
+          billing_type: formData.billingType,
+          rate: parseFloat(formData.rate),
+          total_months: parseInt(formData.totalMonths),
+          deposit_required: formData.depositRequired,
+          deposit_terms: formData.depositTerms,
+          deposit_amount: parseFloat(formData.depositAmount),
+          advance_required: formData.advanceRequired,
+          advance_terms: formData.advanceTerms,
+          amount: payment.amount,
+          vat_amount: payment.amount * 0.12,
+          with_holding_tax: payment.amount * 0.05,
+          due_date: dueDate,
+          period,
+          status: "pending",
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+        }
+
+        collectiblesToCreate.push(collectibleData)
       }
 
-      await addDoc(collection(db, "collectibles"), collectibleData)
+      // Create all collectible documents
+      const collectibleRefs = await Promise.all(
+        collectiblesToCreate.map(data => addDoc(collection(db, "collectibles"), data))
+      )
+
+      // Create corresponding invoice documents
+      const invoicesToCreate: Omit<Invoice, 'id'>[] = collectibleRefs.map((ref, index) => {
+        const collectibleData = collectiblesToCreate[index]
+        return {
+          collectible_id: ref.id,
+          ...collectibleData,
+          contract_pdf_url: booking.projectCompliance?.signedContract?.fileUrl,
+        }
+      })
+
+      await Promise.all(
+        invoicesToCreate.map(data => addDoc(collection(db, "invoices"), data))
+      )
 
       // Show success and redirect
       router.push("/treasury/requests")
     } catch (error) {
-      console.error("Error creating collectible:", error)
+      console.error("Error creating collectibles:", error)
     } finally {
       setSubmitting(false)
     }
@@ -454,10 +516,10 @@ export default function CreateCollectiblesPage() {
                   <div className="h-full">
                     <h3 className="text-white text-center bg-[#A1A1A1] w-80 rounded-xl mx-auto py-1 text-xl font-semibold mb-6">Contract Preview</h3>
                     {booking?.projectCompliance?.signedContract?.fileUrl ? (
-                      <div className="h-full flex flex-col">
+                      <div className="h-auto flex flex-col">
                         <PDFViewer
                           fileUrl={booking.projectCompliance.signedContract.fileUrl}
-                          className="flex-1 min-h-[1100px]"
+                          className="flex-1 h-[1000px]"
                         />
                       </div>
                     ) : (

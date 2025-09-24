@@ -1,372 +1,356 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Search, Grid3X3, List, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react"
-import Link from "next/link"
-import { collection, getDocs, query, where, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useState, useEffect } from "react"
+import { RouteProtection } from "@/components/route-protection"
 import { useAuth } from "@/contexts/auth-context"
-import { syncQuotationCollectionStatus } from "@/lib/quotation-collection-service"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import type { Collectible } from "@/lib/types/collectible"
 
-interface Collectible {
-  id: string
-  created: string
-  company_id: string
-  type: "sites" | "supplies"
-  updated: string
-  deleted: boolean
-  client_name: string
-  net_amount: number
-  total_amount: number
-  mode_of_payment: string
-  bank_name: string
-  bi_no: string
-  or_no: string
-  invoice_no: string
-  next_collection_date: string
-  status: "pending" | "collected" | "overdue" | "paid"
-  // Sites specific fields
-  booking_no?: string
-  site?: string
-  covered_period?: string
-  bir_2307?: string
-  collection_date?: string
-  // Supplies specific fields
-  date?: string
-  product?: string
-  transfer_date?: string
-  bs_no?: string
-  due_for_collection?: string
-  date_paid?: string
-  net_amount_collection?: number
-}
-
-export default function TreasuryCollectiblesPage() {
-  const [collectibles, setCollectibles] = useState<Collectible[]>([])
-  const [filteredCollectibles, setFilteredCollectibles] = useState<Collectible[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [loading, setLoading] = useState(true)
-  const { user } = useAuth()
-
-  useEffect(() => {
-    const fetchCollectibles = async () => {
-      if (!user?.company_id && !user?.uid) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-        const collectiblesRef = collection(db, "collectibles")
-
-        // Query collectibles for the current user's company
-        const q = query(
-          collectiblesRef,
-          where("company_id", "==", user.company_id || user.uid),
-          where("deleted", "==", false), // Only fetch non-deleted records
-          orderBy("created", "desc"),
-        )
-
-        const querySnapshot = await getDocs(q)
-        const fetchedCollectibles: Collectible[] = []
-
-        querySnapshot.forEach((doc) => {
-          fetchedCollectibles.push({ id: doc.id, ...doc.data() } as Collectible)
-        })
-
-        setCollectibles(fetchedCollectibles)
-      } catch (error) {
-        console.error("Error fetching treasury collectibles:", error)
-        setCollectibles([])
-      } finally {
-        setLoading(false)
-      }
+function CollectiblesTable({
+  collectibles,
+  loading,
+  onClientClick,
+  onViewContract,
+  onGenerateInvoice,
+  selectedCollectible,
+  isModalOpen,
+  setIsModalOpen,
+  formatDate
+}: {
+  collectibles: Collectible[]
+  loading: boolean
+  onClientClick: (collectible: Collectible) => void
+  onViewContract: (item: any) => void
+  onGenerateInvoice: (item: any) => void
+  selectedCollectible: Collectible | null
+  isModalOpen: boolean
+  setIsModalOpen: (open: boolean) => void
+  formatDate: (timestamp: any) => string
+}) {
+  // Calculate client data from selectedCollectible
+  const selectedClientData = selectedCollectible ? (() => {
+    let duration = "N/A"
+    if (selectedCollectible.booking?.start_date && selectedCollectible.booking?.end_date) {
+      const startDate = selectedCollectible.booking.start_date.toDate ? selectedCollectible.booking.start_date.toDate() : new Date(selectedCollectible.booking.start_date)
+      const endDate = selectedCollectible.booking.end_date.toDate ? selectedCollectible.booking.end_date.toDate() : new Date(selectedCollectible.booking.end_date)
+      const months = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+      duration = `${months} month${months !== 1 ? 's' : ''}`
     }
 
-    fetchCollectibles()
-  }, [user])
-
-  // Filter collectibles (soft delete - only show deleted: false)
-  useEffect(() => {
-    let filtered = collectibles.filter((item) => !item.deleted)
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (item) =>
-          item.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.invoice_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.or_no.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+    return {
+      reservationId: selectedCollectible.booking?.reservation_id || "N/A",
+      projectName: selectedCollectible.booking?.project_name || "N/A",
+      client: selectedCollectible.client?.name || "N/A",
+      site: selectedCollectible.product?.name || "N/A",
+      dimension: "N/A", // Not in collectible
+      contractDuration: duration,
+      bookingDates: selectedCollectible.booking?.start_date && selectedCollectible.booking?.end_date ?
+        `${formatDate(selectedCollectible.booking.start_date)} to ${formatDate(selectedCollectible.booking.end_date)}` : "N/A",
+      illumination: "N/A",
+      leaseRatePerMonth: selectedCollectible.rate?.toLocaleString() || "N/A",
+      totalLease: selectedCollectible.rate && selectedCollectible.total_months ? (selectedCollectible.rate * selectedCollectible.total_months).toLocaleString() : "N/A",
+      subtotal: selectedCollectible.rate && selectedCollectible.total_months ? (selectedCollectible.rate * selectedCollectible.total_months).toLocaleString() : "N/A",
+      vat: selectedCollectible.vat_amount?.toLocaleString() || "N/A",
+      total: selectedCollectible.amount && selectedCollectible.vat_amount ? (selectedCollectible.amount + selectedCollectible.vat_amount).toLocaleString() : "N/A",
+      sales: "N/A",
     }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((item) => item.status === statusFilter)
-    }
-
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((item) => item.type === typeFilter)
-    }
-
-    setFilteredCollectibles(filtered)
-  }, [collectibles, searchTerm, statusFilter, typeFilter])
-
-  const handleSoftDelete = async (id: string) => {
-    try {
-      const collectibleRef = doc(db, "collectibles", id)
-      await updateDoc(collectibleRef, {
-        deleted: true,
-        updated: serverTimestamp(),
-      })
-
-      // Update local state
-      setCollectibles((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, deleted: true, updated: new Date().toISOString().split("T")[0] } : item,
-        ),
-      )
-    } catch (error) {
-      console.error("Error soft deleting treasury collectible:", error)
-    }
-  }
-
-  const handleMarkAsPaid = async (id: string) => {
-    try {
-      const collectibleRef = doc(db, "collectibles", id)
-      await updateDoc(collectibleRef, {
-        status: "paid",
-        updated: serverTimestamp(),
-      })
-
-      await syncQuotationCollectionStatus(id)
-
-      // Update local state
-      setCollectibles((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, status: "paid" as const, updated: new Date().toISOString().split("T")[0] } : item,
-        ),
-      )
-    } catch (error) {
-      console.error("Error marking treasury collectible as paid:", error)
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      pending: "secondary",
-      collected: "default",
-      overdue: "destructive",
-      paid: "default", // Added paid status with default variant (green)
-    } as const
-
-    if (status === "paid") {
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{status}</Badge>
-    }
-
-    return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(amount)
-  }
-
-  const displayValue = (value: string | number | undefined | null): string => {
-    if (value === null || value === undefined || value === "" || (typeof value === "string" && value.trim() === "")) {
-      return "-"
-    }
-    return String(value)
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Treasury Collectibles</h1>
-            <p className="text-muted-foreground">Manage your treasury collection records and track payments</p>
+  })() : null
+  console.log(`collectibles:`, selectedClientData)
+  return (
+    <div className="bg-[#ffffff] rounded-lg shadow-sm">
+      {/* Header */}
+      <div className="p-6 border-b border-[#d9d9d9]">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-semibold text-[#333333]">Collectibles</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="text-[#b7b7b7]">
+              <List className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="text-[#b7b7b7]">
+              <Grid3X3 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">Loading treasury collectibles...</p>
+
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#b7b7b7]" />
+          <Input
+            placeholder="Search"
+            className="pl-10 bg-[#fafafa] border-[#d9d9d9] text-[#333333] placeholder:text-[#b7b7b7]"
+          />
         </div>
       </div>
-    )
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#d9d9d9]">
+              <th className="text-left p-4 font-medium text-[#333333]">Sales Invoice #</th>
+              <th className="text-left p-4 font-medium text-[#333333]">Client</th>
+              <th className="text-left p-4 font-medium text-[#333333]">Cover Dates</th>
+              <th className="text-left p-4 font-medium text-[#333333]">Amount</th>
+              <th className="text-left p-4 font-medium text-[#333333]">Due date</th>
+              <th className="text-left p-4 font-medium text-[#333333]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="p-4 text-center text-[#b7b7b7]">Loading collectibles...</td>
+              </tr>
+            ) : collectibles.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-4 text-center text-[#b7b7b7]">No collectibles found</td>
+              </tr>
+            ) : (
+              collectibles.map((item, index) => (
+                <tr key={item.id || index} className="border-b border-[#d9d9d9] hover:bg-[#fafafa]">
+                  <td className="p-4">
+                    <span className="text-[#2d3fff] underline cursor-pointer">{item.id?.slice(-4) || "-"}</span>
+                  </td>
+                  <td className="p-4">
+                    <span
+                      className="bg-[#d9d9d9] px-3 py-1 rounded-full text-sm text-[#333333] cursor-pointer hover:bg-[#c4c4c4] transition-colors"
+                      onClick={() => onClientClick(item)}
+                    >
+                      {item.client?.name || "N/A"}
+                    </span>
+                  </td>
+                  <td className="p-4 text-[#333333]">{item.period || "N/A"}</td>
+                  <td className="p-4">
+                    <span className="text-[#2d3fff] font-medium">{item.amount?.toLocaleString() || "N/A"}</span>
+                  </td>
+                  <td className="p-4 text-[#333333]">{item.due_date ? formatDate(item.due_date) : "N/A"}</td>
+                  <td className="p-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#b7b7b7] hover:text-[#333333] hover:bg-[#fafafa] p-1 h-8 w-8"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-white border border-[#d9d9d9] shadow-lg">
+                        <DropdownMenuItem
+                          // onClick={() => handleViewContract(item)}
+                          className="text-[#333333] hover:bg-[#fafafa] cursor-pointer px-3 py-2"
+                        >
+                          View Contract
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          // onClick={() => handleGenerateInvoice(item)}
+                          className="text-[#333333] hover:bg-[#fafafa] cursor-pointer px-3 py-2"
+                        >
+                          Generate Invoice
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {/* Reservation Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md mx-auto bg-white p-6">
+          {selectedClientData && (
+            
+            <div className="space-y-4">
+              <div className="text-center">
+                <p className="text-sm text-[#b7b7b7] mb-1">Reservation ID</p>
+                <h2 className="text-3xl font-bold text-[#000000]">{selectedClientData.reservationId}</h2>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Project Name:</span>
+                  <span className="text-[#333333]">{selectedClientData.projectName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Client:</span>
+                  <span className="text-[#333333]">{selectedClientData.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Site:</span>
+                  <span className="text-[#333333]">{selectedClientData.site}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-center my-6">
+                <div className="w-24 h-24 bg-[#d9d9d9] rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[#000000]">Site</p>
+                    <p className="text-sm font-medium text-[#000000]">Photo</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Dimension:</span>
+                  <span className="text-[#333333]">{selectedClientData.dimension}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Contract Duration:</span>
+                  <span className="text-[#333333]">{selectedClientData.contractDuration}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Booking Dates:</span>
+                  <span className="text-[#333333]">{selectedClientData.bookingDates}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Illumination:</span>
+                  <span className="text-[#333333]">{selectedClientData.illumination}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Lease Rate/month:</span>
+                  <span className="text-[#333333]">{selectedClientData.leaseRatePerMonth}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Total lease:</span>
+                  <span className="text-[#333333]">{selectedClientData.totalLease}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-[#d9d9d9] pt-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Lease rate per month:</span>
+                  <span className="text-[#333333]">{selectedClientData.leaseRatePerMonth}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Duration:</span>
+                  <span className="text-[#333333]">{selectedClientData.contractDuration}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">Subtotal:</span>
+                  <span className="text-[#333333]">{selectedClientData.subtotal}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-[#000000]">12% VAT:</span>
+                  <span className="text-[#333333]">{selectedClientData.vat}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span className="text-[#000000]">TOTAL:</span>
+                  <span className="text-[#000000]">{selectedClientData.total}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <span className="font-medium text-[#000000]">Sales:</span>
+                <span className="text-[#333333]">{selectedClientData.sales}</span>
+              </div>
+
+              <div className="pt-6">
+                <Button
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-full bg-white border border-[#d9d9d9] text-[#000000] hover:bg-[#fafafa]"
+                >
+                  OK
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default function CollectiblesPage() {
+  const { userData } = useAuth()
+  const [collectibles, setCollectibles] = useState<Collectible[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedCollectible, setSelectedCollectible] = useState<Collectible | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Fetch collectibles data
+  const fetchCollectibles = async () => {
+    if (!userData?.company_id) return
+
+    setLoading(true)
+    try {
+      const collectiblesRef = collection(db, "collectibles")
+      const q = query(
+        collectiblesRef,
+        where("company_id", "==", userData.company_id),
+        orderBy("created", "desc")
+      )
+
+      const querySnapshot = await getDocs(q)
+      const collectiblesData: Collectible[] = []
+
+      querySnapshot.forEach((doc) => {
+        collectiblesData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Collectible)
+      })
+
+      setCollectibles(collectiblesData)
+    } catch (error) {
+      console.error("Error fetching collectibles:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCollectibles()
+  }, [userData?.company_id])
+
+  // Format date helper
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  const handleClientClick = (collectible: Collectible) => {
+    setSelectedCollectible(collectible)
+    setIsModalOpen(true)
+  }
+
+  const handleViewContract = (item: any) => {
+    console.log("View Contract for:", item.client, item.invoiceNumber)
+    // Add your view contract logic here
+  }
+
+  const handleGenerateInvoice = (item: any) => {
+    console.log("Generate Invoice for:", item.client, item.invoiceNumber)
+    // Add your generate invoice logic here
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Treasury Collectibles</h1>
-          <p className="text-muted-foreground">Manage your treasury collection records and track payments</p>
-        </div>
-        <Link href="/treasury/collectibles/create">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Collectible
-          </Button>
-        </Link>
+    <RouteProtection requiredRoles="treasury">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <CollectiblesTable
+          collectibles={collectibles}
+          loading={loading}
+          onClientClick={handleClientClick}
+          onViewContract={handleViewContract}
+          onGenerateInvoice={handleGenerateInvoice}
+          selectedCollectible={selectedCollectible}
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          formatDate={formatDate}
+        />
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by client name, invoice no, or OR no..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="collected">Collected</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem> {/* Added paid status to filter options */}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="sites">Sites</SelectItem>
-                <SelectItem value="supplies">Supplies</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Treasury Collectibles Records</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredCollectibles.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No treasury collectibles found</p>
-              <Link href="/treasury/collectibles/create">
-                <Button className="mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Collectible
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Client Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Invoice No</TableHead>
-                    <TableHead>OR No</TableHead>
-                    <TableHead>BI No</TableHead>
-                    <TableHead>Net Amount</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Payment Mode</TableHead>
-                    <TableHead>Bank Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Next Collection</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCollectibles.map((collectible) => (
-                    <TableRow key={collectible.id}>
-                      <TableCell className="font-medium">{displayValue(collectible.client_name)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{collectible.type}</Badge>
-                      </TableCell>
-                      <TableCell>{displayValue(collectible.invoice_no)}</TableCell>
-                      <TableCell>{displayValue(collectible.or_no)}</TableCell>
-                      <TableCell>{displayValue(collectible.bi_no)}</TableCell>
-                      <TableCell>{collectible.net_amount ? formatCurrency(collectible.net_amount) : "-"}</TableCell>
-                      <TableCell>{collectible.total_amount ? formatCurrency(collectible.total_amount) : "-"}</TableCell>
-                      <TableCell>{displayValue(collectible.mode_of_payment)}</TableCell>
-                      <TableCell>{displayValue(collectible.bank_name)}</TableCell>
-                      <TableCell className="whitespace-nowrap min-w-[100px]">
-                        {getStatusBadge(collectible.status)}
-                      </TableCell>
-                      <TableCell>{displayValue(collectible.next_collection_date)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/treasury/collectibles/details/${collectible.id}`}
-                                className="flex items-center"
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/treasury/collectibles/edit/${collectible.id}`}
-                                className="flex items-center"
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleMarkAsPaid(collectible.id)}
-                              className="flex items-center text-green-600 focus:text-green-600"
-                            >
-                              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Mark As Paid
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleSoftDelete(collectible.id)}
-                              className="flex items-center text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    </RouteProtection>
   )
 }

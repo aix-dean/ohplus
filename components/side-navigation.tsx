@@ -118,6 +118,7 @@ const navigationItems = [
     icon: Wallet,
     items: [
       { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
+      { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
       { title: "Requests", href: "/treasury/quotations", icon: FileText },
       { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
     ],
