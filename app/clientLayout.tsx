@@ -7,6 +7,7 @@ import { TopNavigation } from "@/components/top-navigation"
 import { SideNavigation } from "@/components/side-navigation"
 import { Menu, X } from "lucide-react"
 import { useResponsive } from "@/hooks/use-responsive"
+import { useUserActivity } from "@/hooks/use-user-activity"
 
 export default function ClientLayout({
   children,
@@ -16,6 +17,9 @@ export default function ClientLayout({
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isMobile, isTablet } = useResponsive()
+
+  // Track user activity for active users feature
+  useUserActivity()
 
   const isSmallScreen = isMobile || isTablet
 

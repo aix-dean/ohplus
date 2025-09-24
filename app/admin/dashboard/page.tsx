@@ -18,6 +18,7 @@ import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { searchServiceAssignments, type SearchResult, type SearchResponse } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
+import { ActiveUsersTable } from "@/components/active-users-table"
 
 // Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -889,81 +890,10 @@ export default function AdminDashboardPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Active Users</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    {/* Users List - Left Side */}
-                    <div className="flex-1">
-                      <div className="flex flex-wrap gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">SALES</span>
-                          <span className="text-sm">Noemi Abellanada</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">SALES</span>
-                          <span className="text-sm">Matthew Espanto</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                          <span className="text-sm font-medium">LOGISTICS</span>
-                          <span className="text-sm">May Tuyan</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                          <span className="text-sm font-medium">LOGISTICS</span>
-                          <span className="text-sm">James Polido</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                          <span className="text-sm font-medium">SOFT ADMIN</span>
-                          <span className="text-sm">Mel Mendoza</span>
-                        </div>
-                        <div className="text-center text-[#a1a1a1]">...</div>
-                      </div>
-                    </div>
-
-                    {/* Circular Progress - Right Side */}
-                    <div className="flex-1 flex justify-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center justify-center mb-2">
-                          <div className="relative w-20 h-20">
-                            <svg
-                              className="w-20 h-20 transform -rotate-90"
-                              viewBox="0 0 36 36"
-                            >
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#e0e0e0"
-                                strokeWidth="2"
-                              />
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#18da69"
-                                strokeWidth="2"
-                                strokeDasharray={`${occupancyPercentage}, 100`}
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold">{occupancyPercentage}%</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-center gap-4 text-xs">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
-                            <span>Online</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
-                            <span>Offline</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <CardContent className="p-0">
+                  {userData?.company_id && (
+                    <ActiveUsersTable companyId={userData.company_id} />
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1215,7 +1145,7 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="py-3 px-4 text-[#000000]">
                             {assignment?.coveredDateEnd
-                              ? assignment.coveredDateEnd.toDate().toLocaleDateString()
+                              ? new Date(assignment.coveredDateEnd).toLocaleDateString()
                               : "N/A"}
                           </td>
                           <td className="py-3 px-4 text-[#000000]">
