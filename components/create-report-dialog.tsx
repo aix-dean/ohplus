@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product, uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { collection, query, where, getDocs, limit } from "firebase/firestore"
+import { collection, query, where, getDocs, limit, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { postReport, type ReportData } from "@/lib/report-service"
 
@@ -529,6 +529,9 @@ export function CreateReportDialog({
       console.log("Building report data with product:", product)
       console.log("Product name for siteName:", product.name)
 
+      // Convert date to timestamp
+      const dateTimestamp = Timestamp.fromDate(new Date(date))
+
       // Use better fallback for site name
       const siteName = product.name ||
         product.specs_rental?.location ||
@@ -543,13 +546,13 @@ export function CreateReportDialog({
         sellerId: product.seller_id || user.uid,
         client: effectiveJobOrder?.clientCompany || "No Client",
         clientId: effectiveJobOrder?.clientName || "no-client-id",
-        joNumber: selectedJO === "none" ? (effectiveJobOrder?.joNumber || undefined) : selectedJO,
+        joNumber: selectedJO !== "none" ? selectedJO : undefined,
         joType: effectiveJobOrder?.joType || "General",
         bookingDates: {
-          start: date,
-          end: date,
+          start: dateTimestamp,
+          end: dateTimestamp,
         },
-        breakdate: date,
+        breakdate: dateTimestamp,
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,

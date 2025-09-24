@@ -81,21 +81,59 @@ export default function ProjectMonitoringPage() {
       const jobOrdersQuery = query(jobOrdersRef, where("company_id", "==", userData.company_id))
       const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
 
-      // Create a map of joNumber to product_id
-      const joNumberToProductId: { [joNumber: string]: string } = {}
+      // Group job orders by product_id and find the latest joNumber for each product
+      const latestJoNumbersMap: { [productId: string]: string } = {}
+      const jobOrdersByProduct: { [productId: string]: JobOrder[] } = {}
       jobOrdersSnapshot.forEach((doc) => {
         const data = doc.data()
-        if (data.joNumber && data.product_id && productIds.includes(data.product_id)) {
-          joNumberToProductId[data.joNumber] = data.product_id
+        const productId = data.product_id
+        if (productId && productIds.includes(productId)) {
+          if (!jobOrdersByProduct[productId]) {
+            jobOrdersByProduct[productId] = []
+          }
+          jobOrdersByProduct[productId].push({ id: doc.id, ...data } as JobOrder)
         }
       })
 
-      // Get all joNumbers for the products
-      const joNumbers = Object.keys(joNumberToProductId)
+      // For each product, sort job orders by createdAt descending and get the latest joNumber
+      Object.keys(jobOrdersByProduct).forEach((productId) => {
+        const jobOrders = jobOrdersByProduct[productId]
+        if (jobOrders.length > 0) {
+          jobOrders.sort((a, b) => {
+            let aTime: Date
+            let bTime: Date
+
+            if (a.createdAt?.toDate) {
+              aTime = a.createdAt.toDate()
+            } else if (a.createdAt) {
+              aTime = new Date(a.createdAt)
+            } else {
+              aTime = new Date(0)
+            }
+
+            if (b.createdAt?.toDate) {
+              bTime = b.createdAt.toDate()
+            } else if (b.createdAt) {
+              bTime = new Date(b.createdAt)
+            } else {
+              bTime = new Date(0)
+            }
+
+            return bTime.getTime() - aTime.getTime()
+          })
+
+          const latestJo = jobOrders[0]
+          latestJoNumbersMap[productId] = latestJo.joNumber
+          console.log('Latest job order found:', latestJo.joNumber, 'for product:', productId)
+        }
+      })
+
+      // Get all latest joNumbers for the products
+      const joNumbers = Object.values(latestJoNumbersMap)
 
       if (joNumbers.length === 0) return
 
-      // Fetch reports for these joNumbers and company
+      // Fetch reports for these latest joNumbers and company
       const reportsRef = collection(db, "reports")
       const reportsQuery = query(
         reportsRef,
@@ -104,17 +142,19 @@ export default function ProjectMonitoringPage() {
       )
       const reportsSnapshot = await getDocs(reportsQuery)
 
-      // Group reports by product_id
+      // Group reports by product_id using the latestJoNumbersMap
       const reportsByProduct: ProductReports = {}
       reportsSnapshot.forEach((doc) => {
         const reportData = { id: doc.id, ...doc.data() } as Report
-        const productId = joNumberToProductId[reportData.joNumber]
+        // Find the productId for this joNumber
+        const productId = Object.keys(latestJoNumbersMap).find(key => latestJoNumbersMap[key] === reportData.joNumber)
 
         if (productId) {
           if (!reportsByProduct[productId]) {
             reportsByProduct[productId] = []
           }
           reportsByProduct[productId].push(reportData)
+          console.log('Report found for product:', productId, 'joNumber:', reportData.joNumber)
         }
       })
 

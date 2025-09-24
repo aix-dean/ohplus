@@ -15,10 +15,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import type { Booking } from "@/lib/booking-service"
 import { getProductById } from "@/lib/firebase-service"
-import { SalesEvent, getSalesEvents, createEvent } from "@/lib/planner-service"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
+import { EventDialog } from "@/components/event-dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -78,15 +77,8 @@ export default function AdminPlannerPage() {
   const [siteProductLoading, setSiteProductLoading] = useState(false)
   const [events, setEvents] = useState<SalesEvent[]>([])
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
-  const [newEvent, setNewEvent] = useState({
-    title: "",
-    type: "meeting" as SalesEvent["type"],
-    department: "admin",
-    start: new Date(),
-    end: new Date(),
-    location: "",
-    description: "",
-  })
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -355,6 +347,11 @@ export default function AdminPlannerPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date())
+  }
+
+  const handleEventClick = (event: SalesEvent) => {
+    setSelectedEventForDetails(event)
+    setEventDetailsDialogOpen(true)
   }
 
   // View title based on current view and date
@@ -692,45 +689,6 @@ export default function AdminPlannerPage() {
     }
   }
 
-  // Handle create event
-  const handleCreateEvent = async () => {
-    try {
-      await createEvent(
-        userData?.uid || "",
-        newEvent.department,
-        true, // isAdmin
-        "admin", // userDepartment
-        {
-          title: newEvent.title,
-          start: newEvent.start,
-          end: newEvent.end,
-          location: newEvent.location,
-          type: newEvent.type,
-          clientId: "",
-          clientName: "",
-          description: newEvent.description,
-          status: "scheduled",
-          color: "",
-          allDay: false,
-          reminder: false,
-          createdBy: userData?.uid || "",
-        }
-      )
-      setEventDialogOpen(false)
-      setNewEvent({
-        title: "",
-        type: "meeting",
-        department: "admin",
-        start: new Date(),
-        end: new Date(),
-        location: "",
-        description: "",
-      })
-      fetchEvents()
-    } catch (error) {
-      console.error("Error creating event:", error)
-    }
-  }
 
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
@@ -881,7 +839,7 @@ export default function AdminPlannerPage() {
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          // Could navigate to event details if available
+                          handleEventClick(event)
                         }}
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
@@ -1665,87 +1623,15 @@ export default function AdminPlannerPage() {
           )}
         </div>
 
-        <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Event</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Title</label>
-                <Input
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
-                  placeholder="Event title"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Type</label>
-                <Select value={newEvent.type} onValueChange={(value: SalesEvent["type"]) => setNewEvent({...newEvent, type: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="holiday">Holiday</SelectItem>
-                    <SelectItem value="party">Party</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Department</label>
-                <Select value={newEvent.department} onValueChange={(value) => setNewEvent({...newEvent, department: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="it">IT</SelectItem>
-                    <SelectItem value="treasury">Treasury</SelectItem>
-                    <SelectItem value="business-dev">Business Dev</SelectItem>
-                    <SelectItem value="logistics">Logistics</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Start Date & Time</label>
-                <Input
-                  type="datetime-local"
-                  value={newEvent.start.toISOString().slice(0,16)}
-                  onChange={(e) => setNewEvent({...newEvent, start: new Date(e.target.value)})}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">End Date & Time</label>
-                <Input
-                  type="datetime-local"
-                  value={newEvent.end.toISOString().slice(0,16)}
-                  onChange={(e) => setNewEvent({...newEvent, end: new Date(e.target.value)})}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Location</label>
-                <Input
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
-                  placeholder="Event location"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <Textarea
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
-                  placeholder="Event description"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEventDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateEvent}>Create Event</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="admin"
+        />
 
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
@@ -1755,6 +1641,12 @@ export default function AdminPlannerPage() {
             fetchAssignments()
           }}
           department="ADMIN"
+        />
+
+        <EventDetailsDialog
+          isOpen={eventDetailsDialogOpen}
+          onClose={() => setEventDetailsDialogOpen(false)}
+          event={selectedEventForDetails}
         />
       </div>
     </div>
