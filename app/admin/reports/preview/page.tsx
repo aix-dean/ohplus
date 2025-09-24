@@ -428,8 +428,10 @@ export default function AdminReportPreviewPage() {
   const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
     setIsSendDialogOpen(false)
 
-    if (option === "email") {
-      console.log("Send via email")
+    if (option === "email" && report?.id) {
+      router.push(`/admin/reports/compose/${report.id}`)
+    } else if (option === "email") {
+      console.log("Report ID not available")
     } else {
       console.log(`Send via ${option}`)
     }
