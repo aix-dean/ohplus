@@ -18,7 +18,6 @@ import type { Booking } from "@/lib/booking-service"
 import type { SalesEvent } from "@/lib/planner-service"
 import { getProductById, getServiceAssignmentsByDepartment } from "@/lib/firebase-service"
 import { getSalesEvents } from "@/lib/planner-service"
-import { EventDetailsDialog } from "@/components/event-details-dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -80,8 +79,6 @@ export default function TreasuryPlannerPage() {
   // Events state
   const [events, setEvents] = useState<SalesEvent[]>([])
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
-  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<SalesEvent | null>(null)
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -302,11 +299,6 @@ export default function TreasuryPlannerPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date())
-  }
-
-  const handleEventClick = (event: SalesEvent) => {
-    setSelectedEvent(event)
-    setEventDetailsDialogOpen(true)
   }
 
   // View title based on current view and date
@@ -792,7 +784,7 @@ export default function TreasuryPlannerPage() {
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-purple-50 border-purple-200`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEventClick(event)
+                          // Could navigate to event details if available
                         }}
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
@@ -1594,12 +1586,6 @@ export default function TreasuryPlannerPage() {
             fetchEvents()
           }}
           department="treasury"
-        />
-
-        <EventDetailsDialog
-          isOpen={eventDetailsDialogOpen}
-          onClose={() => setEventDetailsDialogOpen(false)}
-          event={selectedEvent}
         />
       </div>
     </div>

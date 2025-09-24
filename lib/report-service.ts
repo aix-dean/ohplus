@@ -26,10 +26,10 @@ export interface ReportData {
   joNumber?: string
   joType?: string
   bookingDates: {
-    start: Timestamp
-    end: Timestamp
+    start: string
+    end: string
   }
-  breakdate: Timestamp
+  breakdate: string
   sales: string
   reportType: string
   date: string

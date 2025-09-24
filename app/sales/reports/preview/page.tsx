@@ -12,7 +12,7 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { doc, getDoc, Timestamp } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { CongratulationsDialog } from "@/components/congratulations-dialog"
 
@@ -118,32 +118,13 @@ export default function SalesReportPreviewPage() {
     }
   }
 
-  // Helper function to reconstruct Firestore Timestamps from JSON
-  const reconstructTimestamp = (obj: any): any => {
-    if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
-      return new Timestamp(obj.seconds, obj.nanoseconds)
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(reconstructTimestamp)
-    }
-    if (obj && typeof obj === 'object') {
-      const reconstructed: any = {}
-      for (const [key, value] of Object.entries(obj)) {
-        reconstructed[key] = reconstructTimestamp(value)
-      }
-      return reconstructed
-    }
-    return obj
-  }
-
   const loadPreviewData = () => {
     try {
       const reportDataString = sessionStorage.getItem("previewReportData")
       const productDataString = sessionStorage.getItem("previewProductData")
 
       if (reportDataString && productDataString) {
-        const parsedReportData = JSON.parse(reportDataString)
-        const reportData = reconstructTimestamp(parsedReportData)
+        const reportData = JSON.parse(reportDataString)
         const productData = JSON.parse(productDataString)
 
         console.log("Loaded preview report data:", reportData)
@@ -260,17 +241,8 @@ export default function SalesReportPreviewPage() {
     }
   }
 
-  const formatDate = (dateValue: string | any) => {
-    let date: Date
-    if (typeof dateValue === 'string') {
-      date = new Date(dateValue)
-    } else if (dateValue && typeof dateValue.toDate === 'function') {
-      // Handle Firestore Timestamp
-      date = dateValue.toDate()
-    } else {
-      date = new Date(dateValue)
-    }
-    return date.toLocaleDateString("en-US", {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -415,28 +387,11 @@ export default function SalesReportPreviewPage() {
     router.back()
   }
 
-  const calculateInstallationDuration = (startDate: any, endDate: any) => {
+  const calculateInstallationDuration = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return 0
 
-    let start: Date
-    let end: Date
-
-    if (typeof startDate === 'string') {
-      start = new Date(startDate)
-    } else if (startDate && typeof startDate.toDate === 'function') {
-      start = startDate.toDate()
-    } else {
-      start = new Date(startDate)
-    }
-
-    if (typeof endDate === 'string') {
-      end = new Date(endDate)
-    } else if (endDate && typeof endDate.toDate === 'function') {
-      end = endDate.toDate()
-    } else {
-      end = new Date(endDate)
-    }
-
+    const start = new Date(startDate)
+    const end = new Date(endDate)
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
