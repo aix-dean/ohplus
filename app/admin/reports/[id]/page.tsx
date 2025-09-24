@@ -171,8 +171,18 @@ export default function AdminReportViewPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateInput: string | any) => {
+    if (!dateInput) return "N/A"
+    let date: Date
+    if (typeof dateInput === 'string') {
+      date = new Date(dateInput)
+    } else if (dateInput && typeof dateInput.toDate === 'function') {
+      date = dateInput.toDate()
+    } else {
+      return "N/A"
+    }
+    if (isNaN(date.getTime())) return "N/A"
+    return date.toLocaleDateString("en-US", {
       year: "2-digit",
       month: "2-digit",
       day: "2-digit",
@@ -316,8 +326,10 @@ export default function AdminReportViewPage() {
   const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
     setIsSendDialogOpen(false)
 
-    if (option === "email") {
-      console.log("Send via email")
+    if (option === "email" && report?.id) {
+      router.push(`/admin/reports/compose/${report.id}`)
+    } else if (option === "email") {
+      console.log("Report ID not available")
     } else {
       console.log(`Send via ${option}`)
     }
@@ -331,11 +343,24 @@ export default function AdminReportViewPage() {
     router.push(`/admin/reports/${params.id}/edit`)
   }
 
-  const calculateInstallationDuration = (startDate: string, endDate: string) => {
+  const calculateInstallationDuration = (startDate: string | any, endDate: string | any) => {
     if (!startDate || !endDate) return 0
 
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    let start: Date, end: Date
+    if (typeof startDate === 'string') {
+      start = new Date(startDate)
+    } else if (startDate && typeof startDate.toDate === 'function') {
+      start = startDate.toDate()
+    } else {
+      return 0
+    }
+    if (typeof endDate === 'string') {
+      end = new Date(endDate)
+    } else if (endDate && typeof endDate.toDate === 'function') {
+      end = endDate.toDate()
+    } else {
+      return 0
+    }
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
