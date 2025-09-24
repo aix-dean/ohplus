@@ -235,10 +235,10 @@ export function SideNavigation() {
       <nav className="p-3 space-y-4 flex-1 min-h-0 overflow-y-auto pb-16">
         {currentSection === "cms" ? (
           <>
-            {/* Notification Section */}
+            {/* Updates Center Section */}
             <div className="bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -286,7 +286,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -321,7 +321,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -358,7 +358,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -394,7 +394,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -408,7 +408,7 @@ export function SideNavigation() {
             {/* Dynamic notification component based on section */}
             {currentSection === "business" && <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -435,7 +435,7 @@ export function SideNavigation() {
             {currentSection === "it" && <ITNotifications />}
             {currentSection === "finance" && <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -597,7 +597,7 @@ export function SideNavigation() {
             </div>}
             {currentSection === "accounting" && <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -639,7 +639,7 @@ export function SideNavigation() {
             </div>}
             {currentSection === "treasury" && <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -689,7 +689,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -711,7 +711,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -734,7 +734,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -757,7 +757,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -780,7 +780,6 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -816,7 +815,6 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -840,7 +838,6 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -864,7 +861,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -891,7 +888,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -913,7 +910,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -924,10 +921,10 @@ export function SideNavigation() {
           </>
         ) : currentSection === "finance" ? (
           <>
-            {/* Notification Section */}
+            {/* Updates Center Section */}
             <div className="bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -1112,7 +1109,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1145,7 +1142,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1156,10 +1153,10 @@ export function SideNavigation() {
           </>
         ) : currentSection === "accounting" ? (
           <>
-            {/* Notification Section */}
+            {/* Updates Center Section */}
             <div className="bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -1224,7 +1221,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1260,7 +1257,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1297,7 +1294,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1332,7 +1329,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1369,7 +1366,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1409,7 +1406,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1420,10 +1417,10 @@ export function SideNavigation() {
           </>
         ) : currentSection === "treasury" ? (
           <>
-            {/* Notification Section */}
+            {/* Updates Center Section */}
             <div className="bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">Updates Center</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -1473,7 +1470,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1505,7 +1502,7 @@ export function SideNavigation() {
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      
                       <span className="flex-1">{item.title}</span>
                     </Link>
                   )
@@ -1534,7 +1531,7 @@ export function SideNavigation() {
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                     )}
                   >
-                    <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                    
                     <span className="flex-1">{item.title}</span>
                   </Link>
                 )

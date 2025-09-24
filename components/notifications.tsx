@@ -75,7 +75,7 @@ export function Notifications({ config }: NotificationsProps) {
     return (
       <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium">Notification</h3>
+          <h3 className="text-sm font-medium">Updates Center</h3>
           {unreadCount > 0 && (
             <Badge variant="secondary" className={`${getBadgeBgClass()} text-xs`}>
               {unreadCount}
@@ -101,7 +101,7 @@ export function Notifications({ config }: NotificationsProps) {
   return (
     <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium">Notification</h3>
+        <h3 className="text-sm font-medium">Updates Center</h3>
         {unreadCount > 0 && (
           <Badge variant="secondary" className={`${getBadgeBgClass()} text-xs`}>
             {unreadCount}
