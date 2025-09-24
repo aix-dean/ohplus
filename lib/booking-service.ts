@@ -4,6 +4,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   orderBy,
   limit,
   startAfter,
@@ -394,7 +395,7 @@ export class BookingService {
 
       const lastSnapshot = await getDocs(lastQuery)
       const lastDoc = lastSnapshot.docs[lastSnapshot.docs.length - 1]
-      
+
       return {
         data: salesRecords,
         totalCount,
@@ -406,6 +407,141 @@ export class BookingService {
       }
     } catch (error) {
       console.error("Error getting paginated sales records:", error)
+      throw error
+    }
+  }
+
+  async getCollectiblesBookings(
+    companyId: string,
+    options?: PaginationOptions,
+    filters?: FilterOptions,
+  ): Promise<Booking[]> {
+    try {
+      const bookingsRef = collection(db, "booking")
+      let q = query(bookingsRef, where("company_id", "==", companyId), orderBy("created", "desc"))
+
+      // Apply filters - default to RESERVED status for collectibles
+      if (filters?.status) {
+        q = query(q, where("status", "==", filters.status))
+      } else {
+        q = query(q, where("status", "==", "RESERVED"))
+      }
+
+      if (filters?.type) {
+        q = query(q, where("type", "==", filters.type))
+      }
+
+      if (options) {
+        if (options.lastDoc) {
+          q = query(q, startAfter(options.lastDoc))
+        }
+        q = query(q, limit(options.pageSize))
+      }
+
+      const querySnapshot = await getDocs(q)
+      const bookings: Booking[] = []
+
+      querySnapshot.forEach((doc) => {
+        bookings.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Booking)
+      })
+
+      return bookings
+    } catch (error) {
+      console.error("Error fetching collectibles bookings:", error)
+      throw error
+    }
+  }
+
+  async getCollectiblesCount(companyId: string, filters?: FilterOptions): Promise<number> {
+    try {
+      const bookingsRef = collection(db, "booking")
+      let q = query(bookingsRef, where("company_id", "==", companyId))
+
+      // Apply filters - default to RESERVED status for collectibles
+      if (filters?.status) {
+        q = query(q, where("status", "==", filters.status))
+      } else {
+        q = query(q, where("status", "==", "RESERVED"))
+      }
+
+      if (filters?.type) {
+        q = query(q, where("type", "==", filters.type))
+      }
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error fetching collectibles count:", error)
+      throw error
+    }
+  }
+
+  async getPaginatedCollectibles(
+    companyId: string,
+    options: PaginationOptions,
+    filters?: FilterOptions,
+  ): Promise<PaginatedResult<Booking>> {
+    try {
+      const [totalCount, bookings] = await Promise.all([
+        this.getCollectiblesCount(companyId, filters),
+        this.getCollectiblesBookings(companyId, options, filters),
+      ])
+
+      const totalPages = Math.ceil(totalCount / options.pageSize)
+
+      // Get the last document for cursor-based pagination
+      const bookingsRef = collection(db, "booking")
+      let lastQuery = query(
+        bookingsRef,
+        where("company_id", "==", companyId),
+        orderBy("created", "desc"),
+        limit(options.pageSize * options.page),
+      )
+
+      // Apply same filters to last query
+      if (filters?.status) {
+        lastQuery = query(lastQuery, where("status", "==", filters.status))
+      } else {
+        lastQuery = query(lastQuery, where("status", "==", "RESERVED"))
+      }
+
+      if (filters?.type) {
+        lastQuery = query(lastQuery, where("type", "==", filters.type))
+      }
+
+      const lastSnapshot = await getDocs(lastQuery)
+      const lastDoc = lastSnapshot.docs[lastSnapshot.docs.length - 1]
+
+      return {
+        data: bookings,
+        totalCount,
+        hasNextPage: options.page < totalPages,
+        hasPreviousPage: options.page > 1,
+        currentPage: options.page,
+        totalPages,
+        lastDoc,
+      }
+    } catch (error) {
+      console.error("Error getting paginated collectibles:", error)
+      throw error
+    }
+  }
+
+  async getBookingById(bookingId: string): Promise<Booking | null> {
+    try {
+      const bookingDoc = await getDoc(doc(db, "booking", bookingId))
+      if (bookingDoc.exists()) {
+        return {
+          id: bookingDoc.id,
+          ...bookingDoc.data(),
+        } as Booking
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching booking by ID:", error)
       throw error
     }
   }
