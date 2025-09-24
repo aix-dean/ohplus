@@ -42,7 +42,7 @@ export function Notifications({ config }: NotificationsProps) {
   }
 
   const getGradientClasses = () => {
-    return 'bg-white/20 backdrop-blur-sm border border-white/30'
+    return 'bg-white/55 backdrop-blur-sm border border-white/30'
   }
 
   const getAvatarBgClass = () => {
@@ -73,7 +73,7 @@ export function Notifications({ config }: NotificationsProps) {
 
   if (loading) {
     return (
-      <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
+      <div className={`rounded-[20px] p-3 text-gray-900 ${getGradientClasses()}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium">Updates Center</h3>
           {unreadCount > 0 && (
@@ -92,14 +92,14 @@ export function Notifications({ config }: NotificationsProps) {
           </div>
         </div>
         <div className="flex justify-end mt-3">
-          <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+          <button className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">See All</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
+    <div className={`rounded-[20px] p-3 text-gray-900 ${getGradientClasses()}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium">Updates Center</h3>
         {unreadCount > 0 && (
@@ -121,12 +121,6 @@ export function Notifications({ config }: NotificationsProps) {
               onClick={() => handleNotificationClick(notification)}
               className="flex items-center space-x-3 cursor-pointer bg-white/10 backdrop-blur-sm border border-white/20 rounded p-1 transition-colors"
             >
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className={`${getAvatarBgClass()} text-white text-xs`}>
-                  {notification.department_from?.charAt(0) || "N"}
-                </AvatarFallback>
-              </Avatar>
-
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-gray-900 truncate">{notification.title}</div>
                 <div className="text-xs text-gray-600 truncate">{notification.description}</div>
@@ -142,7 +136,7 @@ export function Notifications({ config }: NotificationsProps) {
       </div>
 
       <div className="flex justify-end mt-3">
-        <button onClick={handleSeeAll} className="text-xs text-white/90 hover:text-white transition-colors">
+        <button onClick={handleSeeAll} className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">
           See All
         </button>
       </div>
