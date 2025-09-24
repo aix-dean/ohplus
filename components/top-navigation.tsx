@@ -144,7 +144,7 @@ export function TopNavigation() {
   const navBgColor = isSalesSection
     ? "bg-department-sales-red"
     : isAdminSection
-      ? "bg-department-accounting-purple"
+      ? "bg-[#2a31b4]"
       : isCmsSection
         ? "bg-department-creatives-orange"
         : isItSection
@@ -159,7 +159,7 @@ export function TopNavigation() {
                   ? "bg-[#4169e1]"
                   : isLogisticsSection
                     ? "bg-[#48a7fa]"
-                    : "bg-[#0a1433]"
+                    : "bg-[#48a7fa]"
 
   const diagonalBgColor = isSalesSection
     ? "bg-card-content-sales"
@@ -200,7 +200,7 @@ export function TopNavigation() {
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
       <svg
-        className="absolute top-0 right-0 h-full w-[320px] z-0 hidden md:block"
+        className="absolute top-0 right-0 h-full w-[280px] z-0 hidden md:block"
         viewBox="0 0 100 16"
         preserveAspectRatio="none"
       >
@@ -216,7 +216,7 @@ export function TopNavigation() {
             isFinanceSection ? '#04933480' :
             isBusinessSection ? '#a0b4f0' :
             isAccountingSection ? '#2A31B480' :
-            '#E3F2FD'
+            '#98d3fd'
           }
         />
       </svg>
@@ -254,38 +254,31 @@ export function TopNavigation() {
                    className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
                    aria-label="View notifications"
                  >
-                   <Bell className="h-5 w-5 md:h-6 md:w-6" />
+                   <img src="/icons8-notification-90.png" className="h-[25px] w-[25px]]" alt="Notifications" />
                    {unreadCount > 0 && (
                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
                        {unreadCount}
                      </span>
                    )}
                  </button>
+                 {/* Message button */}
+                 <button
+                   className="ml-3 p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
+                   aria-label="View messages"
+                 >
+                   <img src="/icons8-sms-90.png" className="h-[25px] w-[25px]" alt="Messages" />
+                 </button>
                  {/* Profile button */}
                  <div className="ml-3 relative z-10">
                    <Link href="/account">
                      <button
                        type="button"
-                       className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:ring-4 transition-all"
+                       className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                       aria-label="Go to profile"
                      >
-                       <span className="sr-only">Go to profile</span>
-                       <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                         <User className="h-5 w-5 text-gray-500" />
-                       </div>
+                       <img src="/icons8-test-account-90 1.png" className="h-[25px] w-[25px]" alt="Account" />
                      </button>
                    </Link>
-                 </div>
-                 {/* Logout button */}
-                 <div className="ml-3 relative z-10">
-                   <button
-                     type="button"
-                     onClick={handleLogout}
-                     className="bg-white rounded-lg px-3 py-2 flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-gray-50 transition-all"
-                     aria-label="Sign out"
-                   >
-                     <LogOut className="h-4 w-4 text-gray-700" />
-                     <span className="ml-2 text-sm font-medium text-gray-700">Logout</span>
-                   </button>
                  </div>
                </div>
              )}
@@ -323,7 +316,7 @@ export function TopNavigation() {
                   onClick={() => handleMobileNavigation("/settings")}
                   className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/settings") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
                 >
-                  <Settings className="mr-3 h-5 w-5" />
+                  <Settings className="mr-3 h-5 w-5 opacity-50" />
                   <span className="text-base">Settings</span>
                 </button>
 
@@ -331,7 +324,7 @@ export function TopNavigation() {
                   onClick={() => handleMobileNavigation("/account")}
                   className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/account") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
                 >
-                  <User className="mr-3 h-5 w-5" />
+                  <User className="mr-3 h-5 w-5 opacity-50" />
                   <span className="text-base">Account</span>
                 </button>
 
@@ -340,18 +333,11 @@ export function TopNavigation() {
                     onClick={() => handleMobileNavigation("/admin")}
                     className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/admin") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
                   >
-                    <Settings className="mr-3 h-5 w-5" />
+                    <Settings className="mr-3 h-5 w-5 opacity-50" />
                     <span className="text-base">Admin</span>
                   </button>
                 )}
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left py-3 px-4 rounded-md flex items-center text-gray-700"
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  <span className="text-base">Logout</span>
-                </button>
               </div>
             </div>
           </div>
