@@ -713,7 +713,7 @@ export default function AdminPlannerPage() {
           return (
             <div
               key={`day-${i}`}
-              className={`min-h-[80px] sm:min-h-[120px] border rounded-md p-1 ${
+              className={`min-h-[100px] sm:min-h-[140px] border rounded-md p-1 ${
                 day ? "bg-white" : "bg-gray-50"
               } ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
             >
@@ -722,7 +722,7 @@ export default function AdminPlannerPage() {
                   <div className={`text-right p-1 text-xs sm:text-sm ${isToday ? "font-bold text-blue-600" : ""}`}>
                     {day}
                   </div>
-                  <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
+                  <div className="overflow-y-auto max-h-[70px] sm:max-h-[100px]">
                     {dayAssignments.slice(0, 3).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
@@ -759,18 +759,18 @@ export default function AdminPlannerPage() {
                     {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
                       <div
                         key={`event-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200 min-h-[60px] sm:min-h-[70px]`}
                         onClick={(e) => {
                           e.stopPropagation()
                           handleEventClick(event)
                         }}
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-start gap-1">
                           <span>🎉</span>
-                          <span className="truncate font-medium">{event.title}</span>
+                          <span className="font-medium break-words">{event.title}</span>
                         </div>
-                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 mt-0.5 break-words">
                           {event.location}
                         </div>
                         <div className="flex items-center justify-between mt-0.5">
@@ -923,18 +923,18 @@ export default function AdminPlannerPage() {
                 {dayEvents.slice(0, 2).map((event, j) => (
                   <div
                     key={`event-${i}-${j}`}
-                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-green-50 border-green-200`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-green-50 border-green-200 min-h-[80px] sm:min-h-[100px]`}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleEventClick(event)
                     }}
                     title={`${event.title} - ${event.type} at ${event.location}`}
                   >
-                    <div className="font-medium truncate flex items-center gap-1">
+                    <div className="font-medium flex items-start gap-1">
                       <span>🎉</span>
-                      <span>{event.title}</span>
+                      <span className="break-words">{event.title}</span>
                     </div>
-                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
+                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 break-words">
                       {event.location}
                     </div>
                     <div className="flex items-center justify-between mt-1 sm:mt-2">
@@ -944,7 +944,7 @@ export default function AdminPlannerPage() {
                       >
                         {event.type}
                       </Badge>
-                      <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
                         {formatTime(event.start as Date)}
                       </span>
                     </div>
@@ -1010,7 +1010,7 @@ export default function AdminPlannerPage() {
             {hours.map((hour) => (
               <div
                 key={`hour-${hour}`}
-                className="h-16 sm:h-20 border-b border-gray-200 p-1 sm:p-2 text-right text-[10px] sm:text-sm text-gray-500"
+                className="h-20 sm:h-24 border-b border-gray-200 p-1 sm:p-2 text-right text-[10px] sm:text-sm text-gray-500"
               >
                 {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
               </div>
@@ -1032,7 +1032,7 @@ export default function AdminPlannerPage() {
               return (
                 <div
                   key={`content-${hour}`}
-                  className={`h-16 sm:h-20 border-b border-gray-200 p-1 relative ${isCurrentHour ? "bg-blue-50" : ""}`}
+                  className={`h-20 sm:h-24 border-b border-gray-200 p-1 relative ${isCurrentHour ? "bg-blue-50" : ""}`}
                 >
                   {hourAssignments.map((assignment, i) => {
                     const minutes = assignment.alarmTime ? Number.parseInt(assignment.alarmTime.split(":")[1]) : 0
@@ -1076,15 +1076,15 @@ export default function AdminPlannerPage() {
                   {hourEvents.map((event, i) => {
                     const minutes = event.start instanceof Date ? event.start.getMinutes() : 0
                     const topPosition = (minutes / 60) * 100
-  
+
                     return (
                       <div
                         key={`event-${hour}-${i}`}
                         className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 bg-green-50 border-green-200`}
                         style={{
                           top: `${topPosition}%`,
-                          height: "40%",
-                          maxHeight: "95%",
+                          minHeight: "25%", // Minimum height for content
+                          maxHeight: "60px", // Allow more height for content
                           zIndex: hourAssignments.length + i + 1,
                         }}
                         onClick={(e) => {
@@ -1093,11 +1093,11 @@ export default function AdminPlannerPage() {
                         }}
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
-                        <div className="font-medium truncate flex items-center gap-1">
+                        <div className="font-medium flex items-start gap-1">
                           <span>🎉</span>
-                          <span>{event.title}</span>
+                          <span className="break-words">{event.title}</span>
                         </div>
-                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
+                        <div className="text-[6px] sm:text-[8px] text-gray-600 break-words">
                           {event.location}
                         </div>
                         <div className="flex items-center justify-between mt-0 sm:mt-1">
