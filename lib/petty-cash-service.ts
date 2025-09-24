@@ -26,11 +26,6 @@ export async function uploadFileToFirebase(file: File, path: string): Promise<st
       return
     }
 
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    if (file.size > maxSize) {
-      reject(new Error("File size too large. Maximum size is 10MB."))
-      return
-    }
 
     // Create unique filename
     const timestamp = Date.now()

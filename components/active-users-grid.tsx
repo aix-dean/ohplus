@@ -1,9 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
-import { ResponsiveTable } from "@/components/responsive-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -21,9 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
-import { Search, MoreHorizontal, User, Clock, Shield, LogOut } from "lucide-react"
+import { MoreHorizontal, User, Shield, LogOut } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDebounce } from "@/hooks/use-debounce"
 
 interface ActiveUser {
   id: string
@@ -37,25 +34,23 @@ interface ActiveUser {
   lastActivity: string
   photoURL?: string
   phoneNumber?: string
+  status?: 'online' | 'idle' | 'offline'
 }
 
 interface ActiveUsersTableProps {
   companyId: string
 }
 
-export function ActiveUsersTable({ companyId }: ActiveUsersTableProps) {
+export function ActiveUsersGrid({ companyId }: ActiveUsersTableProps) {
   const { userData } = useAuth()
   const { toast } = useToast()
 
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<ActiveUser | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isForceLogoutLoading, setIsForceLogoutLoading] = useState(false)
-
-  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   // Fetch active users with real-time updates
   useEffect(() => {
@@ -87,22 +82,39 @@ export function ActiveUsersTable({ companyId }: ActiveUsersTableProps) {
     fetchActiveUsers()
 
     // Set up polling for real-time updates (fallback for environments without WebSocket)
-    const interval = setInterval(fetchActiveUsers, 30000) // Poll every 30 seconds
+    const interval = setInterval(fetchActiveUsers, 60000) // Poll every 60 seconds
 
     return () => clearInterval(interval)
   }, [companyId, userData?.uid])
 
-  // Filter users based on search term
-  const filteredUsers = useMemo(() => {
-    if (!debouncedSearchTerm) return activeUsers
+  // Calculate user status based on last activity
+  const getUserStatus = useCallback((lastActivity: string): 'online' | 'idle' | 'offline' => {
+    const lastActivityDate = new Date(lastActivity)
+    const now = new Date()
+    const diffMinutes = (now.getTime() - lastActivityDate.getTime()) / (1000 * 60)
 
-    const searchLower = debouncedSearchTerm.toLowerCase()
-    return activeUsers.filter(user =>
-      user.displayName?.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      user.department?.toLowerCase().includes(searchLower)
-    )
-  }, [activeUsers, debouncedSearchTerm])
+    if (diffMinutes < 5) return 'online'
+    if (diffMinutes < 30) return 'idle'
+    return 'offline'
+  }, [])
+
+  // Enhanced users with status
+  const usersWithStatus = useMemo(() => {
+    return activeUsers.map(user => ({
+      ...user,
+      status: getUserStatus(user.lastActivity)
+    }))
+  }, [activeUsers, getUserStatus])
+
+  // Use all users (no filtering since search was removed)
+  const filteredUsers = usersWithStatus
+
+  // Calculate summary stats
+  const summaryStats = useMemo(() => {
+    const total = filteredUsers.length
+    const online = filteredUsers.filter(user => user.status === 'online').length
+    return { total, online }
+  }, [filteredUsers])
 
   // Handle viewing user details
   const handleViewDetails = useCallback((user: ActiveUser) => {
@@ -144,106 +156,45 @@ export function ActiveUsersTable({ companyId }: ActiveUsersTableProps) {
     }
   }, [companyId, userData?.uid, toast])
 
-  // Table columns configuration
-  const columns = useMemo(() => [
-    {
-      header: "User",
-      accessorKey: "displayName" as keyof ActiveUser,
-      cell: (user: ActiveUser) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="font-medium">{user.displayName}</div>
-            <div className="text-sm text-muted-foreground">{user.email}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Department",
-      accessorKey: "department" as keyof ActiveUser,
-      cell: (user: ActiveUser) => (
-        <Badge variant="outline">{user.department || "No Department"}</Badge>
-      ),
-      hideOnMobile: true,
-    },
-    {
-      header: "Role",
-      accessorKey: "roles" as keyof ActiveUser,
-      cell: (user: ActiveUser) => (
-        <div className="flex flex-wrap gap-1">
-          {user.roles?.length > 0 ? (
-            user.roles.slice(0, 2).map(role => (
-              <Badge key={role} variant="secondary" className="text-xs">
-                {role}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground text-sm">No roles</span>
-          )}
-          {user.roles?.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
-              +{user.roles.length - 2}
-            </Badge>
-          )}
-        </div>
-      ),
-      hideOnMobile: true,
-    },
-    {
-      header: "Last Activity",
-      accessorKey: "lastActivity" as keyof ActiveUser,
-      cell: (user: ActiveUser) => {
-        const lastActivity = new Date(user.lastActivity)
-        const now = new Date()
-        const diffMinutes = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60))
+  // Calculate online percentage
+  const onlinePercentage = summaryStats.total > 0 ? Math.round((summaryStats.online / summaryStats.total) * 100) : 0
 
-        let timeString
-        if (diffMinutes < 1) {
-          timeString = "Just now"
-        } else if (diffMinutes < 60) {
-          timeString = `${diffMinutes}m ago`
-        } else {
-          timeString = lastActivity.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
+  // User List Item Component
+  const UserListItem = ({ user }: { user: ActiveUser }) => {
+    const statusColor = {
+      online: 'bg-[#18da69]',
+      idle: 'bg-yellow-500',
+      offline: 'bg-[#c4c4c4]'
+    }[user.status || 'offline']
 
-        return (
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm">{timeString}</span>
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+            <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+            <span className="text-sm font-medium uppercase">
+              {user.department || 'NO DEPT'}
+            </span>
+            <span className="text-sm">{user.displayName}</span>
           </div>
-        )
-      },
-    },
-    {
-      header: "Actions",
-      cell: (user: ActiveUser) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleViewDetails(user)}>
-              <User className="w-4 h-4 mr-2" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleForceLogout(user)}
-              disabled={isForceLogoutLoading}
-              className="text-destructive"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Force Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ], [handleViewDetails, handleForceLogout, isForceLogoutLoading])
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={() => handleViewDetails(user)}>
+            <User className="w-4 h-4 mr-2" />
+            View Details
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleForceLogout(user)}
+            disabled={isForceLogoutLoading}
+            className="text-destructive"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Force Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
 
   // Empty state component
   const emptyState = (
@@ -257,43 +208,82 @@ export function ActiveUsersTable({ companyId }: ActiveUsersTableProps) {
   )
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Active Users ({filteredUsers.length})
-          </CardTitle>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search users..."
-              className="pl-8 w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+    <>
+      {error ? (
+        <div className="text-center py-8">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      ) : (
+        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+          <div className="flex justify-between items-center">
+            {/* Users List - Left Side */}
+            <div className="flex-1">
+              {filteredUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Active Users</h3>
+                  <p className="text-muted-foreground">
+                    There are currently no users active in the system.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {filteredUsers.slice(0, 5).map(user => (
+                    <UserListItem key={user.uid} user={user} />
+                  ))}
+                  {filteredUsers.length > 5 && (
+                    <div className="text-center text-[#a1a1a1]">...</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Circular Progress - Right Side */}
+            <div className="flex-1 flex justify-center">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center justify-center mb-2">
+                  <div className="relative w-20 h-20">
+                    <svg
+                      className="w-20 h-20 transform -rotate-90"
+                      viewBox="0 0 36 36"
+                    >
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#e0e0e0"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#18da69"
+                        strokeWidth="2"
+                        strokeDasharray={`${onlinePercentage}, 100`}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xl font-bold">{onlinePercentage}%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-4 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-[#18da69]"></div>
+                    <span>Online</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-[#c4c4c4]"></div>
+                    <span>Offline</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        {error ? (
-          <div className="text-center py-8">
-            <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>
-              Try Again
-            </Button>
-          </div>
-        ) : (
-          <ResponsiveTable
-            data={filteredUsers}
-            columns={columns}
-            keyField="uid"
-            isLoading={loading}
-            emptyState={emptyState}
-          />
-        )}
-      </CardContent>
+      )}
 
       {/* User Details Modal */}
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
@@ -377,6 +367,6 @@ export function ActiveUsersTable({ companyId }: ActiveUsersTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   )
 }
