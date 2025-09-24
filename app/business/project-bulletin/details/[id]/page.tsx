@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore"
 
 interface JobOrder {
@@ -89,6 +88,7 @@ interface Report {
     fileName: string
     fileType: string
     fileUrl: string
+    note?: string
   }>
   // Add other fields as needed
 }
@@ -96,7 +96,6 @@ interface Report {
 export default function JobOrderDetailsPage() {
   const params = useParams()
   const router = useRouter()
-  const { userData } = useAuth()
   const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [booking, setBooking] = useState<Booking | null>(null)
@@ -111,16 +110,11 @@ export default function JobOrderDetailsPage() {
   const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
 
   const fetchReports = async (joNumber: string, page: number = 1) => {
-    if (!userData?.company_id) return
-
     try {
-      const companyId = userData.company_id
-      console.log('Fetching reports for joNumber:', joNumber, 'companyId:', companyId)
       const reportsRef = collection(db, "reports")
       let reportsQuery = query(
         reportsRef,
         where("joNumber", "==", joNumber),
-        where("companyId", "==", companyId),
         orderBy("updated", "desc"),
         limit(itemsPerPage + 1)
       )
@@ -130,7 +124,6 @@ export default function JobOrderDetailsPage() {
         reportsQuery = query(
           reportsRef,
           where("joNumber", "==", joNumber),
-          where("companyId", "==", companyId),
           orderBy("updated", "desc"),
           startAfter(lastDoc),
           limit(itemsPerPage + 1)
@@ -142,11 +135,6 @@ export default function JobOrderDetailsPage() {
         id: doc.id,
         ...doc.data(),
       })) as Report[]
-
-      console.log('Found reports:', reportsData.length, 'for joNumber:', joNumber)
-      if (reportsData.length > 0) {
-        console.log('Sample report:', reportsData[0])
-      }
 
       const newLastVisible = reportsSnapshot.docs[reportsSnapshot.docs.length - 1]
       setHasMore(reportsSnapshot.docs.length > itemsPerPage)
@@ -328,7 +316,7 @@ export default function JobOrderDetailsPage() {
   return (
     <div className="space-y-6 relative">
       <div className="flex items-center gap-3 py-2">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/admin/project-bulletin')} className="p-1 h-8 w-8">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-1 h-8 w-8">
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
@@ -417,7 +405,7 @@ export default function JobOrderDetailsPage() {
                     <td className="px-4 py-3 text-sm text-gray-900">
                       <button
                         className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                        onClick={() => router.push(`/admin/reports/${report.id}`)}
+                        onClick={() => router.push(`/business/reports/${report.id}`)}
                       >
                         {getUpdateText(report)}
                       </button>
@@ -486,7 +474,7 @@ export default function JobOrderDetailsPage() {
           open={createReportDialogOpen}
           onOpenChange={setCreateReportDialogOpen}
           siteId={jobOrder.product_id}
-          module="admin"
+          module="sales"
           hideJobOrderSelection={true}
           preSelectedJobOrder={jobOrder.joNumber}
         />
