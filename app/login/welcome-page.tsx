@@ -2,9 +2,10 @@ import { Button } from "@/components/ui/button"
 
 interface WelcomePageProps {
   onStartTour: () => void
+  userName?: string
 }
 
-export default function WelcomePage({ onStartTour }: WelcomePageProps) {
+export default function WelcomePage({ onStartTour, userName }: WelcomePageProps) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
       <div className="max-w-7xl w-full flex items-center gap-20">
@@ -34,7 +35,7 @@ export default function WelcomePage({ onStartTour }: WelcomePageProps) {
           <h1 className="text-5xl font-bold text-foreground leading-tight">
             Welcome aboard,
             <br />
-            Pioneer!
+            {userName || "Pioneer"}!
           </h1>
 
           {/* Description text */}

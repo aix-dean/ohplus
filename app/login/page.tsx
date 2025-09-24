@@ -64,6 +64,8 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1: email+password, 2: new password, 3: file upload
   const [isActivated, setIsActivated] = useState(false)
   const [fileName, setFileName] = useState("")
@@ -606,7 +608,7 @@ export default function LoginPage() {
   }, [])
 
   if (showWelcome) {
-    return <WelcomePage onStartTour={() => router.push("/it/user-management")} />
+    return <WelcomePage onStartTour={() => router.push("/it/user-management")} userName={pointPersonDataRef.current?.point_person?.first_name} />
   }
 
   return currentStep === 3 ? (
@@ -827,15 +829,44 @@ export default function LoginPage() {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
-                <Input type="password" placeholder="New password" className="h-11 border-gray-200 rounded-lg text-xl" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-                <Input
-                  type="password"
-                  placeholder="Confirm new password"
-                  className="h-11 border-gray-200 rounded-lg text-xl"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? "text" : "password"}
+                    placeholder="New password"
+                    className="h-11 border-gray-200 rounded-lg text-xl pr-10"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    className="h-11 border-gray-200 rounded-lg text-xl pr-10"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                  </Button>
+                </div>
                 <Button className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg mt-4" type="submit" disabled={isLoading}>
                   {isLoading ? "Processing..." : "OK"}
                 </Button>

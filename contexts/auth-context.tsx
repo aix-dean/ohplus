@@ -88,6 +88,7 @@ interface AuthContextType {
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
   startRegistration: () => void
   endRegistration: () => void
+  debugUserPermissions: () => { permissions: string[], roles: RoleType[], role: string | null | undefined }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -149,7 +150,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!usersSnapshot.empty) {
           const userDoc = usersSnapshot.docs[0]
           const data = userDoc.data()
+          console.log("=== FETCH USER DATA DEBUG ===")
           console.log("User document data:", data)
+          console.log("Permissions in user document:", data.permissions)
+          console.log("Type of permissions:", typeof data.permissions)
+          console.log("Length of permissions:", data.permissions?.length || 0)
 
           // Fetch roles from user_roles collection
           const userRoles = await getUserRoles(firebaseUser.uid)
@@ -160,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             license_key: data.license_key || null,
-            role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
+            role: data.role || (userRoles.length > 0 ? userRoles[0] : null), // Prioritize role from iboard_users document
             roles: userRoles, // Add the roles array from user_roles collection
             permissions: data.permissions || [],
             project_id: data.project_id,
@@ -211,8 +216,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("Final fetchedUserData with roles:", fetchedUserData)
         console.log("Roles array:", fetchedUserData.roles)
         console.log("Primary role:", fetchedUserData.role)
+        console.log("Final permissions in fetchedUserData:", fetchedUserData.permissions)
 
         setUserData(fetchedUserData)
+        console.log("✅ UserData state updated with permissions:", fetchedUserData.permissions)
 
         // Fetch subscription data if license key is available
         if (fetchedUserData.license_key) {
@@ -402,6 +409,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let licenseKey = generateLicenseKey()
       let companyId = null
       let assignedRole: RoleType = "admin" // Default to admin for new org creators
+      let invitationPermissions: string[] = [] // Initialize permissions array
+      let invitationEmail: string = "" // Initialize invitation email
 
       if (orgCode) {
         console.log("Processing invitation code:", orgCode)
@@ -413,18 +422,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const invitationData = invitationDoc.data()
           console.log("Invitation data found:", invitationData)
 
+          // Check if max_usage is still greater than used_by.length
+          const maxUsage = invitationData.max_usage || 1 // Default to 1 if not set
+          const currentUsage = invitationData.used_by ? invitationData.used_by.length : 0
+
+          if (currentUsage >= maxUsage) {
+            throw new Error("This invitation code has reached its maximum usage limit.")
+          }
+
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
 
-          // Validate and assign role from invitation
+          // Validate and assign role and permissions from invitation
           const invitationRole = invitationData.role
-          if (invitationRole && ["admin", "sales", "logistics", "cms"].includes(invitationRole)) {
+          invitationPermissions = invitationData.permissions || []
+          invitationEmail = invitationData.invited_email || invitationData.email || ""
+
+          if (invitationRole && ["admin", "sales", "logistics", "cms", "it", "business", "treasury", "accounting", "finance"].includes(invitationRole)) {
             assignedRole = invitationRole as RoleType
           } else {
             assignedRole = "sales" // Default fallback for invited users
           }
 
+          console.log("=== INVITATION DATA DEBUG ===")
+          console.log("Full invitation data:", invitationData)
+          console.log("=== ROLE ASSIGNMENT DEBUG ===")
+          console.log("Invitation role from data:", invitationData.role)
+          console.log("Allowed roles check:", ["admin", "sales", "logistics", "cms", "it", "business", "treasury", "accounting", "finance"].includes(invitationData.role))
           console.log("Assigned role from invitation:", assignedRole)
+          console.log("Assigned permissions from invitation:", invitationPermissions)
+          console.log("Invitation email:", invitationEmail)
+          console.log("Available email fields in invitation:", {
+            invited_email: invitationData.invited_email,
+            email: invitationData.email
+          })
+          console.log("Permissions field type:", typeof invitationData.permissions)
+          console.log("Permissions field value:", invitationData.permissions)
 
           const updateData: any = {
             used: true,
@@ -444,9 +477,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("No invitation found for code:", orgCode)
           assignedRole = "sales" // Default for invalid invitation codes
         }
+
+        // Validate email matches invitation email if invitation has email
+        if (invitationEmail && personalInfo.email !== invitationEmail) {
+          throw new Error("Email address must match the invitation code email address.")
+        }
       }
 
+      console.log("=== FINAL ROLE ASSIGNMENT ===")
       console.log("Creating user with role:", assignedRole)
+      console.log("Role type:", typeof assignedRole)
+      console.log("Role value:", assignedRole)
 
       // Create user document in iboard_users collection
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
@@ -456,7 +497,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         license_key: licenseKey,
         company_id: companyId,
         role: assignedRole,
-        permissions: [],
+        permissions: invitationPermissions, // Use permissions from invitation code
         type: "OHPLUS",
         created: serverTimestamp(),
         updated: serverTimestamp(),
@@ -469,6 +510,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onboarding: true, // New users need to complete onboarding
       }
 
+      console.log("=== USER DOCUMENT CREATION DEBUG ===")
+      console.log("Creating user document with data:", userData)
+      console.log("Invitation permissions being set:", invitationPermissions)
+      console.log("Type of invitation permissions:", typeof invitationPermissions)
+      console.log("Length of invitation permissions:", invitationPermissions.length)
+
       // For new organizations, set company_id to the user's uid
       if (!orgCode) {
         userData.company_id = firebaseUser.uid
@@ -476,6 +523,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
       console.log("User document created in iboard_users collection")
+      console.log("✅ User document creation completed successfully")
+      console.log("Final user data that was saved:", userData)
 
       // Also assign the role to the user_roles collection
       try {
@@ -628,15 +677,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to check if user has a specific role or any of the roles in an array
   const hasRole = useCallback(
     (requiredRoles: RoleType | RoleType[]): boolean => {
-      if (!userData || !userData.roles || userData.roles.length === 0) {
+      if (!userData) {
+        console.log("hasRole: No userData available")
         return false
       }
 
-      if (Array.isArray(requiredRoles)) {
-        return requiredRoles.some((role) => userData.roles.includes(role))
+      console.log("=== HAS ROLE DEBUG ===")
+      console.log("Required roles:", requiredRoles)
+      console.log("User roles from collection:", userData.roles)
+      console.log("User role from document:", userData.role)
+
+      // First check userData.roles (from user_roles collection)
+      if (userData.roles && userData.roles.length > 0) {
+        if (Array.isArray(requiredRoles)) {
+          const hasRoleInCollection = requiredRoles.some((role) => userData.roles.includes(role))
+          console.log("Checking roles in collection:", requiredRoles, "Result:", hasRoleInCollection)
+          if (hasRoleInCollection) {
+            console.log("✅ Found role in user_roles collection")
+            return true
+          }
+        } else if (userData.roles.includes(requiredRoles)) {
+          console.log("✅ Found role in user_roles collection:", requiredRoles)
+          return true
+        }
       }
 
-      return userData.roles.includes(requiredRoles)
+      // Fallback: check userData.role (from iboard_users document)
+      if (userData.role) {
+        if (Array.isArray(requiredRoles)) {
+          const hasRoleInDocument = requiredRoles.includes(userData.role as RoleType)
+          console.log("Checking roles in document:", requiredRoles, "User role:", userData.role, "Result:", hasRoleInDocument)
+          if (hasRoleInDocument) {
+            console.log("✅ Found role in iboard_users document")
+            return true
+          }
+        } else {
+          const hasRoleInDocument = userData.role === requiredRoles
+          console.log("Checking role in document:", requiredRoles, "User role:", userData.role, "Result:", hasRoleInDocument)
+          if (hasRoleInDocument) {
+            console.log("✅ Found role in iboard_users document")
+            return true
+          }
+        }
+      }
+
+      console.log("❌ Role not found in either location")
+      return false
     },
     [userData],
   )
@@ -691,6 +777,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null
   }, [])
 
+  // Debug function to check current user permissions
+  const debugUserPermissions = useCallback(() => {
+    console.log("=== CURRENT USER PERMISSIONS DEBUG ===")
+    console.log("User:", user?.uid)
+    console.log("UserData:", userData)
+    console.log("User permissions:", userData?.permissions)
+    console.log("User roles:", userData?.roles)
+    console.log("User role:", userData?.role)
+    return {
+      permissions: userData?.permissions || [],
+      roles: userData?.roles || [],
+      role: userData?.role
+    }
+  }, [user, userData])
+
   const value = {
     user,
     userData,
@@ -711,6 +812,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasRole,
     startRegistration,
     endRegistration,
+    debugUserPermissions,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

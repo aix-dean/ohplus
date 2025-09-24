@@ -37,7 +37,7 @@ const tourSteps = [
   {
     title: "Oscar's Intelligence",
     text: "The Intelligence Board is where I place the important insights and numbers you might find useful. Think of it as your go-to spot for smart updates about how things are going.",
-    arrowPosition: "top-120 left-44",
+    arrowPosition: "bottom-0 left-8",
     image: "/onboarding-oscar.png"
   },
   {
