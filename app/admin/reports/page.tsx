@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
-import { searchReports, type SearchResponse } from "@/lib/algolia-service"
-import { type ReportData } from "@/lib/report-service"
+import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
 export default function AdminReportsPage() {
+  const [reports, setReports] = useState<ReportData[]>([])
   const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -29,11 +29,12 @@ export default function AdminReportsPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const loadReports = async () => {
-      await filterReports()
-    }
-    loadReports()
-  }, [searchQuery, filterType, activeTab, showDrafts, userData])
+    fetchReports()
+  }, [])
+
+  useEffect(() => {
+    filterReports()
+  }, [reports, searchQuery, filterType, activeTab, showDrafts])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -46,63 +47,66 @@ export default function AdminReportsPage() {
     }
   }, [])
 
-
-  const filterReports = async () => {
+  const fetchReports = async () => {
     try {
       setLoading(true)
-      // Build filters
-      const filters: string[] = []
-
-      // Company filter
-      if (userData?.company_id) {
-        filters.push(`companyId:${userData.company_id}`)
-      }
-
-      // Category filter based on activeTab
-      if (activeTab === "From Sales") {
-        filters.push(`category:sales`)
-      } else if (activeTab === "From Management") {
-        filters.push(`category:management`)
-      } else if (activeTab === "From Admin") {
-        filters.push(`category:admin`)
-      }
-
-      // Status filter
-      if (showDrafts) {
-        filters.push(`status:draft`)
-      } else {
-        filters.push(`NOT status:draft`)
-      }
-
-      // Report type filter
-      if (filterType !== "All") {
-        filters.push(`reportType:${filterType}`)
-      }
-
-      const filtersString = filters.join(" AND ")
-
-      const searchResponse = await searchReports(searchQuery, filtersString ? undefined : userData?.company_id || undefined, 0, 50, filtersString || undefined)
-      console.log("Filtered reports data:", searchResponse)
-      if (searchResponse.error) {
-        throw new Error(searchResponse.error)
-      }
-      // Map hits to ReportData format
-      const reportsData: ReportData[] = searchResponse.hits.map((hit: any) => ({
-        id: hit.objectID,
-        ...hit,
-        attachments: hit.attachments || [],
-      }))
-      setFilteredReports(reportsData)
+      const reportsData = await getReports()
+      console.log("Fetched reports data:", reportsData)
+      setReports(reportsData)
     } catch (error) {
-      console.error("Error filtering reports:", error)
+      console.error("Error fetching reports:", error)
       toast({
         title: "Error",
-        description: "Failed to filter reports",
+        description: "Failed to load reports",
         variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
+  }
+
+  const filterReports = () => {
+    let filtered = [...reports]
+
+    // Filter by company ID - only show reports from the same company
+    if (userData?.company_id) {
+      filtered = filtered.filter((report) => report.companyId === userData.company_id)
+    }
+
+    // Filter by tab (department)
+    if (activeTab === "From Sales") {
+      filtered = filtered.filter((report) => report.category === "sales")
+    } else if (activeTab === "From Management") {
+      filtered = filtered.filter((report) => report.category === "management")
+    } else if (activeTab === "From Admin") {
+      filtered = filtered.filter((report) => report.category === "admin")
+    }
+
+    // Filter by drafts
+    if (showDrafts) {
+      filtered = filtered.filter((report) => report.status === "draft")
+    } else {
+      filtered = filtered.filter((report) => report.status !== "draft")
+    }
+
+    // Filter by report type
+    if (filterType !== "All") {
+      filtered = filtered.filter((report) => report.reportType === filterType)
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (report) =>
+          report.siteName?.toLowerCase().includes(query) ||
+          report.reportType?.toLowerCase().includes(query) ||
+          report.createdByName?.toLowerCase().includes(query) ||
+          report.id?.toLowerCase().includes(query),
+      )
+    }
+
+    setFilteredReports(filtered)
   }
 
   const formatDate = (date: any) => {

@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname === '/register') {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  // Middleware logic can be added here if needed
 }
 
 export const config = {

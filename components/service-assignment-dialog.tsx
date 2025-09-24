@@ -25,6 +25,7 @@ interface ServiceAssignmentDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
   initialProjectSite?: string
+  department: string
 }
 
 export function ServiceAssignmentDialog({
@@ -32,6 +33,7 @@ export function ServiceAssignmentDialog({
   onOpenChange,
   onSuccess,
   initialProjectSite,
+  department,
 }: ServiceAssignmentDialogProps) {
   const { user, userData } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -168,7 +170,7 @@ export function ServiceAssignmentDialog({
         requestedBy: {
           id: user.uid,
           name: user.displayName || "Unknown User",
-          department: "LOGISTICS",
+          department: department,
         },
         message: formData.message,
         coveredDateStart: formData.startDate,
@@ -405,7 +407,7 @@ export function ServiceAssignmentDialog({
               <div className="grid grid-cols-4 items-center gap-3">
                 <Label className="text-right text-sm font-medium">Requested By:</Label>
                 <div className="col-span-3 flex items-center gap-2">
-                  <span>(LOGISTICS) {user?.displayName || "Current User"}</span>
+                  <span>({department}) {user?.displayName || "Current User"}</span>
                   <div className="h-6 w-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs">
                     {user?.displayName?.[0] || "U"}
                   </div>

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
+import { ArrowLeft, UserPlus, Settings, Shield, Users, Search } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -395,14 +395,6 @@ export default function ITDepartmentDetailsPage() {
           >
             <Shield className="h-4 w-4" />
             Roles & Access
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/invitation-codes"))}
-          >
-            <Mail className="h-4 w-4" />
-            Generate Codes
           </Button>
           <Button className="gap-2" onClick={handleAddUser}>
             <UserPlus className="h-4 w-4" />

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,7 @@ interface SendReportDialogProps {
 export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
    const { toast } = useToast()
    const router = useRouter()
+   const pathname = usePathname()
    const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
    const [productImageUrl, setProductImageUrl] = useState<string>("")
    const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false)
@@ -71,7 +72,8 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
 
   const handleEmailShare = () => {
     onClose()
-    router.push(`/sales/reports/compose/${report.id}`)
+    const department = pathname.includes('/admin') ? 'admin' : 'sales'
+    router.push(`/${department}/reports/compose/${report.id}`)
   }
 
   const handleWhatsAppShare = () => {

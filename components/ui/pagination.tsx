@@ -5,6 +5,7 @@ interface PaginationProps {
   currentPage: number
   itemsPerPage: number
   totalItems: number // This will be the count of items on the current page, not the total across all pages
+  totalOverall?: number // Total items across all pages for display
   onNextPage: () => void
   onPreviousPage: () => void
   hasMore: boolean
@@ -14,12 +15,14 @@ export function Pagination({
   currentPage,
   itemsPerPage,
   totalItems,
+  totalOverall,
   onNextPage,
   onPreviousPage,
   hasMore,
 }: PaginationProps) {
   const startItem = (currentPage - 1) * itemsPerPage + 1
   const endItem = startItem + totalItems - 1
+  const displayTotal = totalOverall ?? totalItems
 
   return (
     <div className="flex items-center justify-between px-4 py-3 sm:px-6">
@@ -35,7 +38,7 @@ export function Pagination({
         <div>
           <p className="text-sm text-gray-700">
             Showing <span className="font-medium">{startItem}</span> to <span className="font-medium">{endItem}</span> of{" "}
-            <span className="font-medium">{totalItems}</span> results
+            <span className="font-medium">{displayTotal}</span> results
           </p>
         </div>
         <div>

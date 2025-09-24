@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,8 @@ import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
+import { EventDialog } from "@/components/event-dialog"
+import { getSalesEvents, type SalesEvent } from "@/lib/planner-service"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -55,16 +57,19 @@ const formatDate = (date: Date) => {
 }
 
 export default function LogisticsPlannerPage() {
-  const router = useRouter()
-  const { userData } = useAuth()
-  const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<CalendarViewType>("month")
-  const [searchTerm, setSearchTerm] = useState("")
+   const router = useRouter()
+   const { userData } = useAuth()
+   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
+   const [events, setEvents] = useState<SalesEvent[]>([])
+   const [loading, setLoading] = useState(true)
+   const [currentDate, setCurrentDate] = useState(new Date())
+   const [view, setView] = useState<CalendarViewType>("month")
+   const [searchTerm, setSearchTerm] = useState("")
 
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
+   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
+   const [eventDialogOpen, setEventDialogOpen] = useState(false)
+   const [selectedEvent, setSelectedEvent] = useState<SalesEvent | null>(null)
 
   // Fetch service assignments with actual data
   const fetchAssignments = useCallback(async () => {
@@ -201,9 +206,21 @@ export default function LogisticsPlannerPage() {
     }
   }, [userData])
 
+  // Fetch events for logistics department
+  const fetchEvents = useCallback(async () => {
+    try {
+      const fetchedEvents = await getSalesEvents(userData?.role === 'admin', 'logistics')
+      setEvents(fetchedEvents)
+    } catch (error) {
+      console.error("Error fetching events:", error)
+      setEvents([])
+    }
+  }, [userData])
+
   useEffect(() => {
     fetchAssignments()
-  }, [fetchAssignments])
+    fetchEvents()
+  }, [fetchAssignments, fetchEvents])
 
   // Navigation functions
   const goToPrevious = () => {
@@ -295,6 +312,102 @@ export default function LogisticsPlannerPage() {
     }
 
     return currentDate.toLocaleDateString([], options)
+  }
+
+  // Filter events based on current view and search term
+  const getFilteredEvents = () => {
+    if (!events || events.length === 0) {
+      return []
+    }
+
+    let filtered = [...events]
+
+    // Apply search filter if any
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(
+        (event) =>
+          event.title?.toLowerCase().includes(term) ||
+          event.location?.toLowerCase().includes(term) ||
+          event.description?.toLowerCase().includes(term) ||
+          event.clientName?.toLowerCase().includes(term),
+      )
+    }
+
+    // Filter based on current view and date range
+    switch (view) {
+      case "month":
+        const monthFiltered = filtered.filter((event) => {
+          if (event.start instanceof Date) {
+            return (
+              event.start.getMonth() === currentDate.getMonth() &&
+              event.start.getFullYear() === currentDate.getFullYear()
+            )
+          }
+          return false
+        })
+        return monthFiltered
+
+      case "week":
+        const weekStart = new Date(currentDate)
+        weekStart.setDate(currentDate.getDate() - currentDate.getDay())
+        weekStart.setHours(0, 0, 0, 0)
+
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6)
+        weekEnd.setHours(23, 59, 59, 999)
+
+        return filtered.filter((event) => {
+          if (event.start instanceof Date) {
+            return event.start >= weekStart && event.start <= weekEnd
+          }
+          return false
+        })
+
+      case "day":
+        const dayStart = new Date(currentDate)
+        dayStart.setHours(0, 0, 0, 0)
+
+        const dayEnd = new Date(currentDate)
+        dayEnd.setHours(23, 59, 59, 999)
+
+        return filtered.filter((event) => {
+          if (event.start instanceof Date) {
+            return event.start >= dayStart && event.start <= dayEnd
+          }
+          return false
+        })
+
+      case "hour":
+        const hourStart = new Date(currentDate)
+        hourStart.setMinutes(0, 0, 0)
+
+        const hourEnd = new Date(hourStart)
+        hourEnd.setHours(hourStart.getHours() + 1)
+
+        return filtered.filter((event) => {
+          if (event.start instanceof Date) {
+            return event.start >= hourStart && event.start < hourEnd
+          }
+          return false
+        })
+
+      case "minute":
+        const minuteStart = new Date(currentDate)
+        minuteStart.setSeconds(0, 0)
+
+        const minuteEnd = new Date(minuteStart)
+        minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
+
+        return filtered.filter((event) => {
+          if (event.start instanceof Date) {
+            return event.start >= minuteStart && event.start < minuteEnd
+          }
+          return false
+        })
+    }
+
+    return filtered
   }
 
   // Filter assignments based on current view and search term
@@ -551,23 +664,24 @@ export default function LogisticsPlannerPage() {
   // Render calendar based on current view
   const renderCalendar = () => {
     const filteredAssignments = getFilteredAssignments()
+    const filteredEvents = getFilteredEvents()
 
     switch (view) {
       case "month":
-        return renderMonthView(filteredAssignments)
+        return renderMonthView(filteredAssignments, filteredEvents)
       case "week":
-        return renderWeekView(filteredAssignments)
+        return renderWeekView(filteredAssignments, filteredEvents)
       case "day":
-        return renderDayView(filteredAssignments)
+        return renderDayView(filteredAssignments, filteredEvents)
       case "hour":
-        return renderHourView(filteredAssignments)
+        return renderHourView(filteredAssignments, filteredEvents)
       case "minute":
-        return renderMinuteView(filteredAssignments)
+        return renderMinuteView(filteredAssignments, filteredEvents)
     }
   }
 
-  // Month view renderer with actual assignment data
-  const renderMonthView = (assignments: ServiceAssignment[]) => {
+  // Month view renderer with actual assignment and event data
+  const renderMonthView = (assignments: ServiceAssignment[], events: SalesEvent[]) => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const daysInMonth = getDaysInMonth(year, month)
@@ -607,6 +721,18 @@ export default function LogisticsPlannerPage() {
       }
     })
 
+    // Group events by day - use start date
+    const eventsByDay: { [key: number]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        if (event.start.getMonth() === month && event.start.getFullYear() === year) {
+          const day = event.start.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          eventsByDay[day].push(event)
+        }
+      }
+    })
+
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">
         {/* Day headers */}
@@ -622,6 +748,7 @@ export default function LogisticsPlannerPage() {
             day && new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year
 
           const dayAssignments = day ? assignmentsByDay[day] || [] : []
+          const dayEvents = day ? eventsByDay[day] || [] : []
 
           return (
             <div
@@ -636,7 +763,8 @@ export default function LogisticsPlannerPage() {
                     {day}
                   </div>
                   <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
-                    {dayAssignments.slice(0, 3).map((assignment, j) => (
+                    {/* Render assignments */}
+                    {dayAssignments.slice(0, 2).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
@@ -664,9 +792,42 @@ export default function LogisticsPlannerPage() {
                         </div>
                       </div>
                     ))}
-                    {dayAssignments.length > 3 && (
+
+                    {/* Render events */}
+                    {dayEvents.slice(0, 2).map((event, j) => (
+                      <div
+                        key={`event-${day}-${j}`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-purple-50 border-purple-200`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Could open event details or edit dialog
+                        }}
+                        title={`${event.title} - ${event.type} at ${event.start instanceof Date ? formatTime(event.start) : ''}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>📅</span>
+                          <span className="truncate font-medium">{event.title}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                          {event.location || 'No location'}
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <Badge
+                            variant="outline"
+                            className="bg-purple-100 text-purple-800 border-purple-200 text-[6px] sm:text-[8px] px-1 py-0"
+                          >
+                            {event.type}
+                          </Badge>
+                          <span className="text-[6px] sm:text-[8px] text-gray-500">
+                            {event.start instanceof Date ? formatTime(event.start) : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {(dayAssignments.length > 2 || dayEvents.length > 2) && (
                       <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
-                        +{dayAssignments.length - 3} more
+                        +{(dayAssignments.length - 2) + (dayEvents.length - 2)} more
                       </div>
                     )}
                   </div>
@@ -679,8 +840,8 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Week view renderer with actual assignment data
-  const renderWeekView = (assignments: ServiceAssignment[]) => {
+  // Week view renderer with actual assignment and event data
+  const renderWeekView = (assignments: ServiceAssignment[], events: SalesEvent[]) => {
     const weekStart = new Date(currentDate)
     weekStart.setDate(currentDate.getDate() - currentDate.getDay())
     weekStart.setHours(0, 0, 0, 0)
@@ -719,6 +880,16 @@ export default function LogisticsPlannerPage() {
       }
     })
 
+    // Group events by day - use start date
+    const eventsByDay: { [key: string]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        const dayKey = event.start.toDateString()
+        if (!eventsByDay[dayKey]) eventsByDay[dayKey] = []
+        eventsByDay[dayKey].push(event)
+      }
+    })
+
     return (
       <div className="grid grid-cols-7 gap-1 sm:gap-2 mt-4">
         {/* Day headers */}
@@ -744,6 +915,7 @@ export default function LogisticsPlannerPage() {
         {days.map((day, i) => {
           const isToday = day.toDateString() === new Date().toDateString()
           const dayAssignments = assignmentsByDay[day.toDateString()] || []
+          const dayEvents = eventsByDay[day.toDateString()] || []
 
           return (
             <div
@@ -751,6 +923,7 @@ export default function LogisticsPlannerPage() {
               className={`border rounded-md overflow-hidden ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
             >
               <div className="overflow-y-auto h-[250px] sm:h-[400px] p-1">
+                {/* Render assignments */}
                 {dayAssignments.map((assignment, j) => (
                   <div
                     key={`assignment-${i}-${j}`}
@@ -788,9 +961,48 @@ export default function LogisticsPlannerPage() {
                     </div>
                   </div>
                 ))}
-                {dayAssignments.length === 0 && (
+
+                {/* Render events */}
+                {dayEvents.map((event, j) => (
+                  <div
+                    key={`event-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-purple-50 border-purple-200`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Could open event details
+                    }}
+                    title={`${event.title} - ${event.type}`}
+                  >
+                    <div className="font-medium truncate flex items-center gap-1">
+                      <span>📅</span>
+                      <span>{event.title}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
+                      {event.location || 'No location'}
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1 truncate">
+                      {event.clientName || 'No client'}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className="bg-purple-100 text-purple-800 border-purple-200 text-[8px] sm:text-xs px-1"
+                      >
+                        {event.type}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
+                        {event.start instanceof Date ? formatTime(event.start) : ''}
+                      </span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1">
+                      {event.description && `📝 ${event.description}`}
+                    </div>
+                  </div>
+                ))}
+
+                {(dayAssignments.length === 0 && dayEvents.length === 0) && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
-                    No assignments
+                    No items
                   </div>
                 )}
               </div>
@@ -801,8 +1013,8 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Day view renderer with actual assignment data
-  const renderDayView = (assignments: ServiceAssignment[]) => {
+  // Day view renderer with actual assignment and event data
+  const renderDayView = (assignments: ServiceAssignment[], events: SalesEvent[]) => {
     // Create array of hours
     const hours = Array(24)
       .fill(null)
@@ -902,8 +1114,8 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Hour view renderer with actual assignment data
-  const renderHourView = (assignments: ServiceAssignment[]) => {
+  // Hour view renderer with actual assignment and event data
+  const renderHourView = (assignments: ServiceAssignment[], events: SalesEvent[]) => {
     // Create array of 5-minute intervals
     const intervals = Array(12)
       .fill(null)
@@ -1002,8 +1214,8 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Minute view renderer with actual assignment data
-  const renderMinuteView = (assignments: ServiceAssignment[]) => {
+  // Minute view renderer with actual assignment and event data
+  const renderMinuteView = (assignments: ServiceAssignment[], events: SalesEvent[]) => {
     // Create array of 1-minute intervals for a 15-minute window
     const baseMinute = Math.floor(currentDate.getMinutes() / 15) * 15
     const intervals = Array(15)
@@ -1109,7 +1321,18 @@ export default function LogisticsPlannerPage() {
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-bold">Logistics Calendar</h1>
-          <div className="text-sm text-gray-500">{assignments.length} service assignments loaded</div>
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => setEventDialogOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Event
+            </Button>
+            <div className="text-sm text-gray-500">
+              {assignments.length} assignments, {events.length} events loaded
+            </div>
+          </div>
         </div>
 
         {/* Debug info */}
@@ -1289,6 +1512,17 @@ export default function LogisticsPlannerPage() {
             // Refresh assignments after creating a new one
             fetchAssignments()
           }}
+          department="LOGISTICS"
+        />
+
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="logistics"
         />
       </div>
     </div>

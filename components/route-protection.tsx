@@ -19,8 +19,8 @@ export function RouteProtection({ children, requiredRoles, redirectTo = "/unauth
   const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
-    // Wait until auth state is loaded and user data with roles is available
-    if (loading || (user && (!userData || !userData.roles || userData.roles.length === 0))) return
+    // Wait until auth state is loaded and user data is available
+    if (loading || (user && !userData)) return
 
     // If not logged in, redirect to login
     if (!user) {
@@ -30,6 +30,13 @@ export function RouteProtection({ children, requiredRoles, redirectTo = "/unauth
 
     // If user doesn't have required role(s)
     if (!hasRole(requiredRoles)) {
+      console.log("=== ROUTE PROTECTION DEBUG ===")
+      console.log("User:", user?.uid)
+      console.log("UserData:", userData)
+      console.log("Required roles:", requiredRoles)
+      console.log("User roles from collection:", userData?.roles)
+      console.log("User role from document:", userData?.role)
+      console.log("Has role result:", hasRole(requiredRoles))
       router.push(redirectTo)
       return
     }

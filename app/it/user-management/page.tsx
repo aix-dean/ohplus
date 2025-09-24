@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserPlus, Settings, Mail, Shield, Users, Search } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
 import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
+import { OnboardingTooltip } from "@/components/onboarding-tooltip"
 import {
   Dialog,
   DialogContent,
@@ -196,6 +197,22 @@ export default function ITUserManagementPage() {
       setUsersByDepartment({})
     }
   }, [filteredUsers])
+
+  const handleCloseOnboarding = async () => {
+    if (!userData?.uid) return
+
+    try {
+      const userDocRef = doc(db, "iboard_users", userData.uid)
+      await updateDoc(userDocRef, {
+        onboarding: false,
+        updated: new Date(),
+      })
+      // Refresh user data to update the context
+      refreshUserData()
+    } catch (error) {
+      console.error("Error updating onboarding status:", error)
+    }
+  }
 
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
@@ -382,7 +399,6 @@ export default function ITUserManagementPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">User Management ({users.length})</h1>
-          <p className="text-muted-foreground">Manage users and their roles.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -416,74 +432,96 @@ export default function ITUserManagementPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loading || Object.keys(usersByDepartment).length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <Card key={`skeleton-${i}`} className="h-fit">
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-1 w-full mt-2" />
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Card key={`skeleton-${i}`} className="p-6 bg-white shadow-sm border border-gray-200 rounded-xl">
+              <Skeleton className="h-1 w-full rounded-full mb-4 -mt-2" />
+              <div className="mb-6">
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <div className="mb-6">
+                <div className="flex justify-between mb-2">
+                  <Skeleton className="h-4 w-12" />
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-6" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                </div>
                 {Array.from({ length: 3 }).map((_, j) => (
-                  <div key={`user-skeleton-${j}`} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-32" />
-                      </div>
-                      <Skeleton className="h-8 w-8 rounded" />
+                  <div key={`user-skeleton-${j}`} className="flex justify-between py-1">
+                    <Skeleton className="h-4 w-32" />
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-6 w-6 rounded" />
                     </div>
                   </div>
                 ))}
-                <div className="pt-4 border-t">
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              </CardContent>
+              </div>
+              <Skeleton className="h-10 w-full" />
             </Card>
           ))
         ) : (
-          Object.entries(usersByDepartment).map(([department, departmentUsers]) => (
-            <Card key={department} className="h-fit">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  {department}
-                  <Badge variant="secondary" className="ml-auto">
-                    {departmentUsers.length}
-                  </Badge>
-                </CardTitle>
-                <div className={`h-1 w-full ${departmentColors[department] || 'bg-gray-300'} mt-2`}></div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {departmentUsers.slice(0, 5).map((user) => (
-                  <div key={user.id} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h4 className="font-medium">{user.displayName}</h4>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+          Object.entries(usersByDepartment).map(([department, departmentUsers]) => {
+            const memberCount = departmentUsers.length
+            const memberText = memberCount === 1 ? "member" : "members"
+
+            return (
+              <Card key={department} className="p-6 bg-white shadow-sm border border-gray-200 rounded-xl">
+                <div className={`h-1 ${departmentColors[department] || 'bg-gray-300'} rounded-full mb-4 -mt-2`} />
+
+                <div className="mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">{department}</h2>
+                  <p className="text-gray-600">
+                    {memberCount} {memberText}
+                  </p>
+                </div>
+
+                {departmentUsers.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                      <span>Name</span>
+                      <div className="flex items-center gap-2">
+                        <span></span>
+                        <span>Role</span>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
-                        <Settings className="h-4 w-4" />
-                      </Button>
                     </div>
-                  </div>
-                ))}
-                {departmentUsers.length > 5 && (
-                  <div className="text-center text-sm text-muted-foreground py-2">
-                    +{departmentUsers.length - 5} more users
+                    {departmentUsers.slice(0, 5).map((user) => {
+                      // Find the role that corresponds to this department
+                      const departmentRole = Object.entries(roleToDepartment).find(
+                        ([roleId, deptName]) => deptName === department
+                      )?.[0]
+
+                      return (
+                        <div key={user.id} className="flex justify-between text-sm text-gray-900 py-1">
+                          <span>{user.displayName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600">
+                              {departmentRole ? roles.find(r => r.id === departmentRole)?.name : 'No Role'}
+                            </span>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleEditRoles(user)}>
+                              <Settings className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {departmentUsers.length > 5 && (
+                      <div className="text-center text-sm text-muted-foreground py-2">
+                        +{departmentUsers.length - 5} more users
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
-                  >
-                    View More Details
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+
+                <Button
+                  variant="outline"
+                  className="w-full text-gray-600 border-gray-300 hover:bg-gray-50 bg-transparent"
+                  onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+                >
+                  +Add Teammates
+                </Button>
+              </Card>
+            )
+          })
         )}
       </div>
 
@@ -574,6 +612,10 @@ export default function ITUserManagementPage() {
           userName={addedUserData.name}
           userRole={addedUserData.role}
         />
+      )}
+
+      {userData?.onboarding && (
+        <OnboardingTooltip onClose={handleCloseOnboarding} />
       )}
     </div>
   )

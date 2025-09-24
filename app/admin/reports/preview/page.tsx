@@ -24,7 +24,7 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export default function AdminReportPreviewPage() {
@@ -124,13 +124,32 @@ export default function AdminReportPreviewPage() {
     }
   }
 
+  // Helper function to reconstruct Firestore Timestamps from JSON
+  const reconstructTimestamp = (obj: any): any => {
+    if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+      return new Timestamp(obj.seconds, obj.nanoseconds)
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(reconstructTimestamp)
+    }
+    if (obj && typeof obj === 'object') {
+      const reconstructed: any = {}
+      for (const [key, value] of Object.entries(obj)) {
+        reconstructed[key] = reconstructTimestamp(value)
+      }
+      return reconstructed
+    }
+    return obj
+  }
+
   const loadPreviewData = () => {
     try {
       const reportDataString = sessionStorage.getItem("previewReportData")
       const productDataString = sessionStorage.getItem("previewProductData")
 
       if (reportDataString && productDataString) {
-        const reportData = JSON.parse(reportDataString)
+        const parsedReportData = JSON.parse(reportDataString)
+        const reportData = reconstructTimestamp(parsedReportData)
         const productData = JSON.parse(productDataString)
 
         console.log("Loaded preview report data:", reportData)
@@ -255,8 +274,17 @@ export default function AdminReportPreviewPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateValue: string | any) => {
+    let date: Date
+    if (typeof dateValue === 'string') {
+      date = new Date(dateValue)
+    } else if (dateValue && typeof dateValue.toDate === 'function') {
+      // Handle Firestore Timestamp
+      date = dateValue.toDate()
+    } else {
+      date = new Date(dateValue)
+    }
+    return date.toLocaleDateString("en-US", {
       year: "2-digit",
       month: "2-digit",
       day: "2-digit",
@@ -400,8 +428,10 @@ export default function AdminReportPreviewPage() {
   const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
     setIsSendDialogOpen(false)
 
-    if (option === "email") {
-      console.log("Send via email")
+    if (option === "email" && report?.id) {
+      router.push(`/admin/reports/compose/${report.id}`)
+    } else if (option === "email") {
+      console.log("Report ID not available")
     } else {
       console.log(`Send via ${option}`)
     }
@@ -415,11 +445,28 @@ export default function AdminReportPreviewPage() {
     router.back()
   }
 
-  const calculateInstallationDuration = (startDate: string, endDate: string) => {
+  const calculateInstallationDuration = (startDate: any, endDate: any) => {
     if (!startDate || !endDate) return 0
 
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    let start: Date
+    let end: Date
+
+    if (typeof startDate === 'string') {
+      start = new Date(startDate)
+    } else if (startDate && typeof startDate.toDate === 'function') {
+      start = startDate.toDate()
+    } else {
+      start = new Date(startDate)
+    }
+
+    if (typeof endDate === 'string') {
+      end = new Date(endDate)
+    } else if (endDate && typeof endDate.toDate === 'function') {
+      end = endDate.toDate()
+    } else {
+      end = new Date(endDate)
+    }
+
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays

@@ -15,6 +15,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import type { Booking } from "@/lib/booking-service"
 import { getProductById } from "@/lib/firebase-service"
+import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
+import { EventDialog } from "@/components/event-dialog"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -72,6 +75,10 @@ export default function AdminPlannerPage() {
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
   const [siteProduct, setSiteProduct] = useState<any>(null)
   const [siteProductLoading, setSiteProductLoading] = useState(false)
+  const [events, setEvents] = useState<SalesEvent[]>([])
+  const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -212,9 +219,21 @@ export default function AdminPlannerPage() {
     }
   }, [userData])
 
+  // Fetch events
+  const fetchEvents = useCallback(async () => {
+    try {
+      const fetchedEvents = await getSalesEvents(true, "admin")
+      setEvents(fetchedEvents)
+    } catch (error) {
+      console.error("Error fetching events:", error)
+      setEvents([])
+    }
+  }, [])
+
   useEffect(() => {
     fetchAssignments()
-  }, [fetchAssignments])
+    fetchEvents()
+  }, [fetchAssignments, fetchEvents])
 
   // Fetch site product details when siteId is provided
   useEffect(() => {
@@ -328,6 +347,11 @@ export default function AdminPlannerPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date())
+  }
+
+  const handleEventClick = (event: SalesEvent) => {
+    setSelectedEventForDetails(event)
+    setEventDetailsDialogOpen(true)
   }
 
   // View title based on current view and date
@@ -665,6 +689,7 @@ export default function AdminPlannerPage() {
     }
   }
 
+
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -734,6 +759,18 @@ export default function AdminPlannerPage() {
       }
     })
 
+    // Group events by day
+    const eventsByDay: { [key: number]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        if (event.start.getMonth() === month && event.start.getFullYear() === year) {
+          const day = event.start.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          eventsByDay[day].push(event)
+        }
+      }
+    })
+
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">
         {/* Day headers */}
@@ -794,6 +831,39 @@ export default function AdminPlannerPage() {
                     {dayAssignments.length > 3 && (
                       <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
                         +{dayAssignments.length - 3} more
+                      </div>
+                    )}
+                    {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
+                      <div
+                        key={`event-${day}-${j}`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEventClick(event)
+                        }}
+                        title={`${event.title} - ${event.type} at ${event.location}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>🎉</span>
+                          <span className="truncate font-medium">{event.title}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                          {event.location}
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <Badge
+                            variant="outline"
+                            className={`text-[6px] sm:text-[8px] px-1 py-0 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
+                          >
+                            {event.type}
+                          </Badge>
+                          <span className="text-[6px] sm:text-[8px] text-gray-500">{formatTime(event.start as Date)}</span>
+                        </div>
+                      </div>
+                    )) : null}
+                    {day && eventsByDay[day]?.length > 2 && (
+                      <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline">
+                        +{eventsByDay[day].length - 2} more events
                       </div>
                     )}
                   </div>
@@ -1388,9 +1458,19 @@ export default function AdminPlannerPage() {
                 Back to Site
               </Button>
             )}
+            {!siteId && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setEventDialogOpen(true)}
+                className="flex items-center gap-2"
+              >
+                Add Event
+              </Button>
+            )}
           </div>
           <div className="text-sm text-gray-500">
-            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments loaded`}
+            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments, ${events.length} events loaded`}
           </div>
         </div>
 
@@ -1543,6 +1623,16 @@ export default function AdminPlannerPage() {
           )}
         </div>
 
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="admin"
+        />
+
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}
@@ -1550,6 +1640,13 @@ export default function AdminPlannerPage() {
             // Refresh assignments after creating a new one
             fetchAssignments()
           }}
+          department="ADMIN"
+        />
+
+        <EventDetailsDialog
+          isOpen={eventDetailsDialogOpen}
+          onClose={() => setEventDetailsDialogOpen(false)}
+          event={selectedEventForDetails}
         />
       </div>
     </div>
