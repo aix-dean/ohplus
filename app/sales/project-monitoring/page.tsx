@@ -51,6 +51,7 @@ interface Booking {
   status?: string
   created?: any
   quotation_id?: string
+  project_name?: string
 }
 
 export default function ProjectMonitoringPage() {
@@ -63,6 +64,7 @@ export default function ProjectMonitoringPage() {
   const [latestJoNumbers, setLatestJoNumbers] = useState<{ [productId: string]: string }>({})
   const [latestJoIds, setLatestJoIds] = useState<{ [productId: string]: string }>({})
   const [productReports, setProductReports] = useState<ProductReports>({})
+  const [projectNames, setProjectNames] = useState<{ [productId: string]: string }>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -356,6 +358,15 @@ export default function ProjectMonitoringPage() {
 
         setBookings(fetchedBookings)
 
+        // Create project names map
+        const namesMap: { [productId: string]: string } = {}
+        fetchedBookings.forEach((booking) => {
+          if (booking.product_id && booking.project_name) {
+            namesMap[booking.product_id] = booking.project_name
+          }
+        })
+        setProjectNames(namesMap)
+
         // Only update lastVisibleDocs if we are moving to a new page
         if (newLastVisible && currentPage === lastVisibleDocs.length) {
           setLastVisibleDocs((prev) => [...prev, newLastVisible])
@@ -465,7 +476,7 @@ export default function ProjectMonitoringPage() {
 
                     {/* Project Title Banner */}
                     <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef", borderRadius: "10px" }}>
-                      <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+                      <h3 className="font-semibold text-lg">{projectNames[product.id!] || "No Project Name"}</h3>
                     </div>
 
                     {/* Project Location */}
