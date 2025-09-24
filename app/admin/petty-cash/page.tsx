@@ -60,6 +60,13 @@ export default function PettyCashPage() {
     console.log("onHandAmount state changed to:", onHandAmount)
   }, [onHandAmount])
 
+  // Calculate on-hand amount as config amount minus current cycle total
+  useEffect(() => {
+    const calculatedOnHand = configData.pettyCashAmount - (currentCycle?.total || 0)
+    setOnHandAmount(calculatedOnHand)
+    console.log("Calculated on-hand amount:", calculatedOnHand, "config:", configData.pettyCashAmount, "cycle total:", currentCycle?.total || 0)
+  }, [configData.pettyCashAmount, currentCycle?.total])
+
   // Load existing configuration on component mount
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -82,9 +89,7 @@ export default function PettyCashPage() {
             pettyCashAmount: existingConfig.amount,
             warnAmount: existingConfig.warning_amount,
           })
-          // Set on-hand amount to the configured petty cash amount
-          setOnHandAmount(existingConfig.amount)
-          console.log("On-hand amount set to:", existingConfig.amount)
+          console.log("Configuration loaded, on-hand will be calculated automatically")
         } else {
           console.log("No configuration found in database")
         }
@@ -259,9 +264,6 @@ export default function PettyCashPage() {
       )
       setExpenseCycles(transformedCycles)
 
-      // Update on-hand amount
-      setOnHandAmount(onHandAmount - data.amount)
-
       toast({
         title: "Success",
         description: "Expense added successfully",
@@ -321,11 +323,7 @@ export default function PettyCashPage() {
 
       // Update local state
       setConfigData(data)
-      console.log("Config data updated:", data)
-
-      // Update on-hand amount to match the new petty cash amount
-      setOnHandAmount(data.pettyCashAmount)
-      console.log("On-hand amount updated to:", data.pettyCashAmount)
+      console.log("Config data updated, on-hand will be recalculated automatically")
 
       // Close dialog
       setIsConfigOpen(false)
@@ -387,9 +385,6 @@ export default function PettyCashPage() {
         nextCycleNo,
       )
       console.log("New cycle created with ID:", newCycleId, "cycle_no:", nextCycleNo)
-
-      // Update on-hand amount
-      setOnHandAmount(config.amount)
 
       toast({
         title: "Success",

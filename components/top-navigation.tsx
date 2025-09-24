@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { DepartmentDropdown } from "@/components/department-dropdown"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -46,6 +47,7 @@ export function TopNavigation() {
     const segments = path.split("/").filter(Boolean)
     if (segments.length === 0) return "Dashboard"
 
+    if (path === "/it") return "Dashboard"
     if (path === "/sales/dashboard") return "Sales - Dashboard"
     if (path === "/logistics/dashboard") return "Logistics - Dashboard"
     if (path === "/cms/dashboard") return "CMS - Dashboard"
@@ -132,23 +134,52 @@ export function TopNavigation() {
   const isLogisticsSection = pathname.startsWith("/logistics")
   const isCmsSection = pathname.startsWith("/cms")
   const isAdminSection = pathname.startsWith("/admin")
+  const isItSection = pathname.startsWith("/it")
+  const isFinanceSection = pathname.startsWith("/finance")
+  const isTreasurySection = pathname.startsWith("/treasury")
+  const isAccountingSection = pathname.startsWith("/accounting")
+  const isBusinessSection = pathname.startsWith("/business")
   const isAccountPage = pathname === "/account" // New check for account page
 
   const navBgColor = isSalesSection
-    ? "bg-[#ff3333]"
+    ? "bg-department-sales-red"
     : isAdminSection
-      ? "bg-[#6b46c1]"
+      ? "bg-department-accounting-purple"
       : isCmsSection
-        ? "bg-[#f97316]"
-        : "bg-[#0a1433]"
+        ? "bg-department-creatives-orange"
+        : isItSection
+          ? "bg-[#2a31b4]"
+          : isFinanceSection
+            ? "bg-department-finance-green"
+            : isTreasurySection
+              ? "bg-[#379334]"
+              : isAccountingSection
+                ? "bg-department-accounting-purple"
+                : isBusinessSection
+                  ? "bg-[#4169e1]"
+                  : isLogisticsSection
+                    ? "bg-[#48a7fa]"
+                    : "bg-[#0a1433]"
 
   const diagonalBgColor = isSalesSection
-    ? "bg-[#ffcccc]"
+    ? "bg-card-content-sales"
     : isAdminSection
-      ? "bg-[#c4b5fd]"
+      ? "bg-card-content-accounting"
       : isCmsSection
-        ? "bg-[#fed7aa]"
-        : "bg-[#38b6ff]"
+        ? "bg-card-content-creatives"
+        : isItSection
+          ? "bg-card-content-it"
+          : isFinanceSection
+            ? "bg-card-content-finance"
+            : isTreasurySection
+              ? "bg-card-content-treasury"
+              : isAccountingSection
+                ? "bg-card-content-accounting"
+                : isBusinessSection
+                  ? "bg-card-content-businessdev"
+                  : isLogisticsSection
+                    ? "bg-card-content-logistics"
+                    : "bg-card-content-logistics"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
@@ -168,86 +199,96 @@ export function TopNavigation() {
   return (
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
-      <div
-  className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} z-0 hidden md:block`}
-  style={{
-    maxWidth: "100vw",
-    overflow: "hidden",
-    clipPath: "polygon(0 0, 100% 0, 100% 100%, 20px 100%)", // <-- adjust last value for skew amount
-  }}
-></div>
+      <svg
+        className="absolute top-0 right-0 h-full w-[320px] z-0 hidden md:block"
+        viewBox="0 0 100 16"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M 5 0 Q 15 8 5 16 L 100 16 L 100 0 Z"
+          fill={
+            isSalesSection ? '#f49998' :
+            isLogisticsSection ? '#98d3fd' :
+            isCmsSection ? '#FFF3E0' :
+            isAdminSection ? '#9498d9' :
+            isTreasurySection ? '#81c999' :
+            isItSection ? '#9498d9' :
+            isFinanceSection ? '#04933480' :
+            isBusinessSection ? '#a0b4f0' :
+            isAccountingSection ? '#2A31B480' :
+            '#E3F2FD'
+          }
+        />
+      </svg>
 
-      <div className="top-nav-container text-white relative z-10 overflow-hidden">
+      <div className="top-nav-container text-white relative z-10">
         <div className="top-nav-content flex items-center justify-between w-full px-4 md:px-8">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <button
-                onClick={() => router.back()}
-                className="mr-3 p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-                aria-label="Go back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h1 className="text-xl font-semibold text-white">
-                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")}
+              <DepartmentDropdown />
+              <h1 className="text-xl font-semibold text-white ml-4">
+                {(() => {
+                  let title = pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")
+                  return title.includes(" - ") ? title.split(" - ").slice(1).join(" - ") : title
+                })()}
               </h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
 
           <div className="top-nav-right flex items-center h-full relative z-20 flex-shrink-0">
-            {" "}
-            {/* Added relative z-20 and flex-shrink-0 */}
-            {/* User controls section (bell and profile) - Conditionally rendered */}
-            {!isAccountPage && ( // Only render if NOT on the account page
-              <div className="flex items-center mr-6 md:mr-12 relative z-10">
-                {" "}
-                {/* Added relative z-10 */}
-                <button
-                  className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
-                  aria-label="View notifications"
-                >
-                  <Bell className="h-5 w-5 md:h-6 md:w-6" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-                {/* Profile button */}
-                <div className="ml-3 relative z-10">
-                  <Link href="/account">
-                    <button
-                      type="button"
-                      className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:ring-4 transition-all"
-                    >
-                      <span className="sr-only">Go to profile</span>
-                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                        <User className="h-5 w-5 text-gray-500" />
-                      </div>
-                    </button>
-                  </Link>
-                </div>
-                {/* Logout button */}
-                <div className="ml-3 relative z-10">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="bg-white rounded-lg px-3 py-2 flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-gray-50 transition-all"
-                    aria-label="Sign out"
-                  >
-                    <LogOut className="h-4 w-4 text-gray-700" />
-                    <span className="ml-2 text-sm font-medium text-gray-700">Logout</span>
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* Date display in the light blue section with adjusted padding */}
-            <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
-              {" "}
-              {/* Adjusted pl-8 */}
-              <span className="text-sm font-medium text-[#0a1433]">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
-            </div>
+             {" "}
+             {/* Added relative z-20 and flex-shrink-0 */}
+             {/* Date display in the light blue section with adjusted padding */}
+             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
+               {" "}
+               {/* Adjusted pl-8 */}
+               <span className="text-sm font-medium text-white">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
+             </div>
+             {/* User controls section (bell and profile) - Conditionally rendered */}
+             {!isAccountPage && ( // Only render if NOT on the account page
+               <div className="flex items-center mr-6 md:mr-12 relative z-10">
+                 {" "}
+                 {/* Added relative z-10 */}
+                 <button
+                   className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
+                   aria-label="View notifications"
+                 >
+                   <Bell className="h-5 w-5 md:h-6 md:w-6" />
+                   {unreadCount > 0 && (
+                     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                       {unreadCount}
+                     </span>
+                   )}
+                 </button>
+                 {/* Profile button */}
+                 <div className="ml-3 relative z-10">
+                   <Link href="/account">
+                     <button
+                       type="button"
+                       className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:ring-4 transition-all"
+                     >
+                       <span className="sr-only">Go to profile</span>
+                       <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                         <User className="h-5 w-5 text-gray-500" />
+                       </div>
+                     </button>
+                   </Link>
+                 </div>
+                 {/* Logout button */}
+                 <div className="ml-3 relative z-10">
+                   <button
+                     type="button"
+                     onClick={handleLogout}
+                     className="bg-white rounded-lg px-3 py-2 flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-gray-50 transition-all"
+                     aria-label="Sign out"
+                   >
+                     <LogOut className="h-4 w-4 text-gray-700" />
+                     <span className="ml-2 text-sm font-medium text-gray-700">Logout</span>
+                   </button>
+                 </div>
+               </div>
+             )}
             {/* Mobile menu button */}
             <div className="top-nav-mobile md:hidden">
               <button

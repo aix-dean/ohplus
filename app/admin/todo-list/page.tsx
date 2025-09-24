@@ -409,6 +409,11 @@ export default function TodoApp() {
       return
     }
 
+    if (!newTodo.title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+
     try {
       setCreating(true)
 
@@ -800,7 +805,7 @@ export default function TodoApp() {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
                   Cancel
                 </Button>
-                <Button onClick={handleCreateTodo} disabled={creating} className="flex-1 bg-blue-500 hover:bg-blue-600">
+                <Button onClick={handleCreateTodo} disabled={creating || !newTodo.title.trim()} className="flex-1 bg-blue-500 hover:bg-blue-600">
                   {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Save
                 </Button>
@@ -955,6 +960,11 @@ export default function TodoApp() {
                 <Button
                   onClick={async () => {
                     if (!selectedTodo) return
+
+                    if (!selectedTodo.title.trim()) {
+                      toast.error("Title is required")
+                      return
+                    }
 
                     try {
                       let newAttachmentUrls: string[] = []

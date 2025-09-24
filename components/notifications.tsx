@@ -42,41 +42,32 @@ export function Notifications({ config }: NotificationsProps) {
   }
 
   const getGradientClasses = () => {
-    switch (config.colorScheme) {
-      case 'blue':
-        return 'bg-gradient-to-br from-blue-400 to-blue-500'
-      case 'sky':
-        return 'bg-gradient-to-br from-sky-300 to-sky-400'
-      case 'purple':
-        return 'bg-gradient-to-br from-purple-400 to-purple-500'
-      default:
-        return 'bg-gradient-to-br from-blue-400 to-blue-500'
-    }
+    return 'bg-white/20 backdrop-blur-sm border border-white/30'
   }
 
   const getAvatarBgClass = () => {
     switch (config.colorScheme) {
       case 'blue':
-        return 'bg-white/30'
+        return 'bg-blue-500'
       case 'sky':
-        return 'bg-white/30'
+        return 'bg-sky-500'
       case 'purple':
-        return 'bg-white/30'
+        return 'bg-purple-500'
       default:
-        return 'bg-white/30'
+        return 'bg-blue-500'
     }
   }
 
   const getBadgeBgClass = () => {
     switch (config.colorScheme) {
       case 'blue':
-        return 'bg-white/20'
+        return 'bg-blue-100 text-blue-800'
       case 'sky':
-        return 'bg-white/20'
+        return 'bg-sky-100 text-sky-800'
       case 'purple':
-        return 'bg-white/20'
+        return 'bg-purple-100 text-purple-800'
       default:
-        return 'bg-white/20'
+        return 'bg-blue-100 text-blue-800'
     }
   }
 
@@ -84,9 +75,9 @@ export function Notifications({ config }: NotificationsProps) {
     return (
       <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium">Notification</h3>
+          <h3 className="text-sm font-medium">Updates Center</h3>
           {unreadCount > 0 && (
-            <Badge variant="secondary" className={`${getBadgeBgClass()} text-white text-xs`}>
+            <Badge variant="secondary" className={`${getBadgeBgClass()} text-xs`}>
               {unreadCount}
             </Badge>
           )}
@@ -110,9 +101,9 @@ export function Notifications({ config }: NotificationsProps) {
   return (
     <div className={`rounded-lg p-3 text-white ${getGradientClasses()}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium">Notification</h3>
+        <h3 className="text-sm font-medium">Updates Center</h3>
         {unreadCount > 0 && (
-          <Badge variant="secondary" className={`${getBadgeBgClass()} text-white text-xs`}>
+          <Badge variant="secondary" className={`${getBadgeBgClass()} text-xs`}>
             {unreadCount}
           </Badge>
         )}
@@ -121,14 +112,14 @@ export function Notifications({ config }: NotificationsProps) {
       <div className="space-y-2 max-h-32 overflow-y-auto">
         {notifications.length === 0 ? (
           <div className="text-center py-2">
-            <p className="text-xs text-white/80">No notifications yet</p>
+            <p className="text-xs text-gray-600">No notifications yet</p>
           </div>
         ) : (
           notifications.slice(0, 3).map((notification) => (
             <div
               key={notification.id}
               onClick={() => handleNotificationClick(notification)}
-              className="flex items-center space-x-3 cursor-pointer hover:bg-white/10 rounded p-1 transition-colors"
+              className="flex items-center space-x-3 cursor-pointer bg-white/10 backdrop-blur-sm border border-white/20 rounded p-1 transition-colors"
             >
               <Avatar className="w-8 h-8">
                 <AvatarFallback className={`${getAvatarBgClass()} text-white text-xs`}>
@@ -137,9 +128,9 @@ export function Notifications({ config }: NotificationsProps) {
               </Avatar>
 
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-white truncate">{notification.title}</div>
-                <div className="text-xs text-white/80 truncate">{notification.description}</div>
-                <div className="text-xs text-white/60">
+                <div className="text-xs font-medium text-gray-900 truncate">{notification.title}</div>
+                <div className="text-xs text-gray-600 truncate">{notification.description}</div>
+                <div className="text-xs text-gray-500">
                   {notification.created && formatDistanceToNow(notification.created.toDate(), { addSuffix: true })}
                 </div>
               </div>
@@ -181,5 +172,13 @@ export function AdminNotifications() {
     department: "Admin",
     colorScheme: "purple",
     notificationsPath: "/admin/notifications"
+  }} />
+}
+
+export function ITNotifications() {
+  return <Notifications config={{
+    department: "IT",
+    colorScheme: "purple",
+    notificationsPath: "/it/notifications"
   }} />
 }

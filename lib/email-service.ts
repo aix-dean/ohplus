@@ -14,18 +14,28 @@ import {
 import { db } from "@/lib/firebase"
 
 // Email types (simplified - no attachments stored in Firestore)
+export interface EmailAttachment {
+  fileName: string
+  fileSize: number
+  fileType: string
+  fileUrl: string
+}
+
 export interface Email {
   id?: string
   from: string
   to: string[]
   cc?: string[]
   bcc?: string[]
+  reply_to?: string
   subject: string
   body: string
+  attachments?: EmailAttachment[]
   templateId?: string
   reportId?: string
   status: "draft" | "sending" | "sent" | "failed"
   userId: string
+  company_id?: string
   created?: Timestamp
   sent?: Timestamp
   error?: string
@@ -43,7 +53,7 @@ export interface EmailTemplate {
 }
 
 class EmailService {
-  private emailsCollection = "compose_emails"
+  private emailsCollection = "emails"
   private templatesCollection = "email_templates"
 
   // Email CRUD operations

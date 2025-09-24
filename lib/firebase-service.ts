@@ -19,6 +19,87 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+
+// Algolia client for service assignments indexing
+let algoliasearch: any = null
+let serviceAssignmentsIndex: any = null
+
+// Initialize Algolia client for service assignments
+function initializeServiceAssignmentsAlgolia() {
+  if (typeof window === 'undefined') {
+    // Server-side
+    try {
+      algoliasearch = require('algoliasearch')
+      const client = algoliasearch(
+        process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID,
+        process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
+      )
+      serviceAssignmentsIndex = client.initIndex(process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME)
+    } catch (error) {
+      console.warn('Algolia client not available for service assignments:', error)
+    }
+  }
+}
+
+// Index service assignment in Algolia
+async function indexServiceAssignment(serviceAssignment: ServiceAssignment) {
+  if (!serviceAssignmentsIndex) {
+    initializeServiceAssignmentsAlgolia()
+  }
+
+  if (!serviceAssignmentsIndex) {
+    console.warn('Algolia index not available for service assignments, skipping indexing')
+    return
+  }
+
+  try {
+    const algoliaObject = {
+      objectID: serviceAssignment.id,
+      id: serviceAssignment.id,
+      saNumber: serviceAssignment.saNumber,
+      joNumber: serviceAssignment.joNumber || '',
+      projectSiteId: serviceAssignment.projectSiteId,
+      projectSiteName: serviceAssignment.projectSiteName,
+      projectSiteLocation: serviceAssignment.projectSiteLocation,
+      serviceType: serviceAssignment.serviceType,
+      assignedTo: serviceAssignment.assignedTo,
+      jobDescription: serviceAssignment.jobDescription,
+      requestedBy: serviceAssignment.requestedBy,
+      message: serviceAssignment.message,
+      status: serviceAssignment.status,
+      coveredDateStart: serviceAssignment.coveredDateStart?.toISOString() || '',
+      coveredDateEnd: serviceAssignment.coveredDateEnd?.toISOString() || '',
+      alarmDate: serviceAssignment.alarmDate?.toISOString() || '',
+      alarmTime: serviceAssignment.alarmTime,
+      created: serviceAssignment.created?.toISOString() || '',
+      company_id: serviceAssignment.company_id || '',
+    }
+
+    await serviceAssignmentsIndex.saveObject(algoliaObject)
+    console.log('Service assignment indexed in Algolia:', serviceAssignment.id)
+  } catch (error) {
+    console.error('Error indexing service assignment in Algolia:', error)
+  }
+}
+
+// Remove service assignment from Algolia index
+async function removeServiceAssignmentFromIndex(serviceAssignmentId: string) {
+  if (!serviceAssignmentsIndex) {
+    initializeServiceAssignmentsAlgolia()
+  }
+
+  if (!serviceAssignmentsIndex) {
+    console.warn('Algolia index not available for service assignments, skipping removal')
+    return
+  }
+
+  try {
+    await serviceAssignmentsIndex.deleteObject(serviceAssignmentId)
+    console.log('Service assignment removed from Algolia index:', serviceAssignmentId)
+  } catch (error) {
+    console.error('Error removing service assignment from Algolia index:', error)
+  }
+}
 import type { QuotationProduct, ProjectCompliance, ClientCompliance } from "@/lib/types/quotation"
 
 // Initialize Firebase Storage
@@ -125,6 +206,7 @@ export interface Product {
 export interface ServiceAssignment {
   id: string
   saNumber: string
+  joNumber?: string
   projectSiteId: string
   projectSiteName: string
   projectSiteLocation: string
@@ -146,6 +228,7 @@ export interface ServiceAssignment {
   status: string
   created: any
   updated: any
+  company_id?: string
 }
 
 // Booking interface
@@ -847,6 +930,221 @@ export async function getServiceAssignments(): Promise<ServiceAssignment[]> {
   }
 }
 
+export async function getServiceAssignmentsByCompanyId(companyId: string): Promise<ServiceAssignment[]> {
+  try {
+    const assignmentsRef = collection(db, "service_assignments")
+    const q = query(assignmentsRef, where("company_id", "==", companyId))
+    const querySnapshot = await getDocs(q)
+
+    const assignments: ServiceAssignment[] = []
+    querySnapshot.forEach((doc) => {
+      assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+    })
+
+    return assignments
+  } catch (error) {
+    console.error("Error fetching service assignments by company ID:", error)
+    return []
+  }
+}
+
+// Calendar Event interface for unified calendar display
+export interface CalendarEvent {
+  id: string
+  title: string
+  type: 'service_assignment' | 'booking' | 'planner' | 'job_order'
+  date: Date
+  color: string
+  description?: string
+}
+
+// Get calendar events for the 3-day window from all collections
+export async function getCalendarEventsForWindow(companyId: string): Promise<{[date: string]: CalendarEvent[]}> {
+  const eventsByDate: {[date: string]: CalendarEvent[]} = {}
+
+  try {
+    // Calculate the 3-day window: today, tomorrow, day after tomorrow
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(today.getDate() + 1)
+
+    const dayAfterTomorrow = new Date(today)
+    dayAfterTomorrow.setDate(today.getDate() + 2)
+
+    const windowStart = today
+    const windowEnd = dayAfterTomorrow
+
+    // Helper function to safely convert dates
+    const convertToDate = (dateValue: any): Date | null => {
+      if (!dateValue) return null
+      if (dateValue.toDate) return dateValue.toDate() // Firestore Timestamp
+      if (dateValue instanceof Date) return dateValue // Already a Date
+      if (typeof dateValue === 'string') return new Date(dateValue) // String date
+      return null
+    }
+
+    // Helper function to add event to the correct date
+    const addEventToDate = (event: CalendarEvent, eventDate: Date) => {
+      const dateKey = eventDate.toDateString()
+      if (!eventsByDate[dateKey]) {
+        eventsByDate[dateKey] = []
+      }
+      eventsByDate[dateKey].push(event)
+    }
+
+    // 1. Service Assignments - check if start/end dates fall within 3-day window
+    const serviceAssignmentsRef = collection(db, "service_assignments")
+    const saQuery = query(serviceAssignmentsRef, where("company_id", "==", companyId))
+    const saSnapshot = await getDocs(saQuery)
+
+    saSnapshot.forEach((doc) => {
+      const data = doc.data()
+      const startDate = convertToDate(data.coveredDateStart)
+      const endDate = convertToDate(data.coveredDateEnd)
+
+      // Check start date
+      if (startDate && startDate >= windowStart && startDate <= windowEnd) {
+        addEventToDate({
+          id: doc.id,
+          title: `${data.saNumber}: ${data.serviceType}`,
+          type: 'service_assignment',
+          date: startDate,
+          color: '#7fdb97', // green
+          description: data.jobDescription
+        }, startDate)
+      }
+
+      // Check end date (only if different from start date)
+      if (endDate && endDate >= windowStart && endDate <= windowEnd &&
+          (!startDate || endDate.getTime() !== startDate.getTime())) {
+        addEventToDate({
+          id: `${doc.id}_end`,
+          title: `${data.saNumber}: ${data.serviceType} (End)`,
+          type: 'service_assignment',
+          date: endDate,
+          color: '#7fdb97', // green
+          description: data.jobDescription
+        }, endDate)
+      }
+    })
+
+    // 2. Bookings - check if start/end dates fall within 3-day window
+    const bookingsRef = collection(db, "booking")
+    const bookingQuery = query(bookingsRef, where("company_id", "==", companyId))
+    const bookingSnapshot = await getDocs(bookingQuery)
+
+    bookingSnapshot.forEach((doc) => {
+      const data = doc.data()
+      const startDate = convertToDate(data.start_date)
+      const endDate = convertToDate(data.end_date)
+
+      // Check start date
+      if (startDate && startDate >= windowStart && startDate <= windowEnd) {
+        addEventToDate({
+          id: doc.id,
+          title: `${data.reservation_id || doc.id}: ${data.product_name || data.type || 'Booking'}`,
+          type: 'booking',
+          date: startDate,
+          color: '#73bbff', // blue
+          description: data.project_name || data.notes
+        }, startDate)
+      }
+
+      // Check end date (only if different from start date)
+      if (endDate && endDate >= windowStart && endDate <= windowEnd &&
+          (!startDate || endDate.getTime() !== startDate.getTime())) {
+        addEventToDate({
+          id: `${doc.id}_end`,
+          title: `${data.reservation_id || doc.id}: ${data.product_name || data.type || 'Booking'} (End)`,
+          type: 'booking',
+          date: endDate,
+          color: '#73bbff', // blue
+          description: data.project_name || data.notes
+        }, endDate)
+      }
+    })
+
+    // 3. Planner events - check if start/end dates fall within 3-day window
+    const plannerRef = collection(db, "planner")
+    const plannerQuery = query(plannerRef, where("createdBy", "==", companyId)) // Note: planner uses createdBy, not company_id
+    const plannerSnapshot = await getDocs(plannerQuery)
+
+    plannerSnapshot.forEach((doc) => {
+      const data = doc.data()
+      const startDate = convertToDate(data.start)
+      const endDate = convertToDate(data.end)
+
+      // Check start date
+      if (startDate && startDate >= windowStart && startDate <= windowEnd) {
+        addEventToDate({
+          id: doc.id,
+          title: `${data.title}: ${data.type || 'Event'}`,
+          type: 'planner',
+          date: startDate,
+          color: '#ff9696', // red
+          description: data.description
+        }, startDate)
+      }
+
+      // Check end date (only if different from start date)
+      if (endDate && endDate >= windowStart && endDate <= windowEnd &&
+          (!startDate || endDate.getTime() !== startDate.getTime())) {
+        addEventToDate({
+          id: `${doc.id}_end`,
+          title: `${data.title}: ${data.type || 'Event'} (End)`,
+          type: 'planner',
+          date: endDate,
+          color: '#ff9696', // red
+          description: data.description
+        }, endDate)
+      }
+    })
+
+    // 4. Job Orders - check if relevant dates fall within 3-day window
+    const jobOrdersRef = collection(db, "job_orders")
+    const joQuery = query(jobOrdersRef, where("company_id", "==", companyId))
+    const joSnapshot = await getDocs(joQuery)
+
+    joSnapshot.forEach((doc) => {
+      const data = doc.data()
+      const datesToCheck = [
+        { field: 'dateRequested', label: 'Requested' },
+        { field: 'deadline', label: 'Deadline' },
+        { field: 'contractPeriodStart', label: 'Contract Start' },
+        { field: 'contractPeriodEnd', label: 'Contract End' }
+      ]
+
+      datesToCheck.forEach(({ field, label }) => {
+        const dateValue = convertToDate(data[field])
+        if (dateValue && dateValue >= windowStart && dateValue <= windowEnd) {
+          addEventToDate({
+            id: `${doc.id}_${field}`,
+            title: `${data.joNumber}: ${data.joType} (${label})`,
+            type: 'job_order',
+            date: dateValue,
+            color: '#ffe522', // yellow
+            description: data.jobDescription
+          }, dateValue)
+        }
+      })
+    })
+
+  } catch (error) {
+    console.error("Error fetching calendar events:", error)
+  }
+
+  return eventsByDate
+}
+
+// Legacy function for backward compatibility - now delegates to the new function
+export async function getCalendarEventsForDate(companyId: string, targetDate: Date): Promise<CalendarEvent[]> {
+  const eventsByDate = await getCalendarEventsForWindow(companyId)
+  const dateKey = targetDate.toDateString()
+  return eventsByDate[dateKey] || []
+}
+
 export async function getServiceAssignmentById(assignmentId: string): Promise<ServiceAssignment | null> {
   try {
     const assignmentDoc = await getDoc(doc(db, "service_assignments", assignmentId))
@@ -876,6 +1174,40 @@ export async function updateServiceAssignment(
     }
 
     await updateDoc(assignmentRef, updateData)
+
+    // Re-index the updated service assignment in Algolia
+    try {
+      const updatedDoc = await getDoc(assignmentRef)
+      if (updatedDoc.exists()) {
+        const updatedData = updatedDoc.data()
+        const updatedAssignment = {
+          id: assignmentId,
+          saNumber: updatedData.saNumber,
+          joNumber: updatedData.joNumber || '',
+          projectSiteId: updatedData.projectSiteId,
+          projectSiteName: updatedData.projectSiteName,
+          projectSiteLocation: updatedData.projectSiteLocation,
+          serviceType: updatedData.serviceType,
+          assignedTo: updatedData.assignedTo,
+          jobDescription: updatedData.jobDescription,
+          requestedBy: updatedData.requestedBy,
+          message: updatedData.message,
+          status: updatedData.status,
+          coveredDateStart: updatedData.coveredDateStart?.toDate() || null,
+          coveredDateEnd: updatedData.coveredDateEnd?.toDate() || null,
+          alarmDate: updatedData.alarmDate?.toDate() || null,
+          alarmTime: updatedData.alarmTime,
+          created: updatedData.created?.toDate(),
+          updated: new Date(),
+          company_id: updatedData.company_id || '',
+        } as ServiceAssignment
+
+        // Re-index asynchronously
+        indexServiceAssignment(updatedAssignment)
+      }
+    } catch (indexError) {
+      console.error('Error re-indexing updated service assignment:', indexError)
+    }
   } catch (error) {
     console.error("Error updating service assignment:", error)
     throw error
@@ -892,6 +1224,18 @@ export async function createServiceAssignment(assignmentData: Omit<ServiceAssign
 
     const docRef = await addDoc(collection(db, "service_assignments"), newAssignment)
     console.log("Service assignment created with ID:", docRef.id)
+
+    // Index the service assignment in Algolia
+    const assignmentForIndexing = {
+      id: docRef.id,
+      ...assignmentData,
+      created: new Date(),
+      updated: new Date(),
+    } as ServiceAssignment
+
+    // Index asynchronously (don't await to avoid blocking)
+    indexServiceAssignment(assignmentForIndexing)
+
     return docRef.id
   } catch (error) {
     console.error("Error creating service assignment:", error)
@@ -1697,6 +2041,105 @@ export async function getProposalTemplatesCount(companyId: string, searchTerm = 
   } catch (error) {
     console.error("Error getting proposal templates count:", error)
     return 0
+  }
+}
+
+// Get occupancy data for all products in one efficient query
+export async function getOccupancyData(companyId: string, currentDate: Date = new Date()): Promise<{
+  staticUnavailable: number;
+  staticTotal: number;
+  dynamicUnavailable: number;
+  dynamicTotal: number;
+}> {
+  try {
+    console.log(`Getting occupancy data for company:`, companyId)
+
+    // Get all products for the company
+    const productsRef = collection(db, "products")
+    const productsQuery = query(
+      productsRef,
+      where("company_id", "==", companyId),
+      where("deleted", "==", false)
+    )
+
+    const productsSnapshot = await getDocs(productsQuery)
+    const allProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product))
+
+    console.log(`Found ${allProducts.length} total products`)
+
+    // Get all bookings for the company
+    const bookingsRef = collection(db, "booking")
+    const bookingsQuery = query(bookingsRef, where("company_id", "==", companyId))
+    const bookingsSnapshot = await getDocs(bookingsQuery)
+    const allBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking))
+
+    console.log(`Found ${allBookings.length} total bookings`)
+
+    // Group bookings by product_id for faster lookup
+    const bookingsByProduct = new Map<string, Booking[]>()
+    allBookings.forEach(booking => {
+      if (!bookingsByProduct.has(booking.product_id)) {
+        bookingsByProduct.set(booking.product_id, [])
+      }
+      bookingsByProduct.get(booking.product_id)!.push(booking)
+    })
+
+    // Initialize counters
+    let staticUnavailable = 0
+    let staticTotal = 0
+    let dynamicUnavailable = 0
+    let dynamicTotal = 0
+
+    // Process each product
+    for (const product of allProducts) {
+      if (!product.id) continue // Skip products without ID
+
+      const productBookings = bookingsByProduct.get(product.id) || []
+      const isUnavailable = productBookings.some((booking) => {
+        // Skip completed or cancelled bookings
+        if (booking.status === "COMPLETED" || booking.status === "CANCELLED") {
+          return false
+        }
+
+        // Convert dates to Date objects (handle both string and Timestamp)
+        const startDate = booking.start_date ? (typeof booking.start_date === 'string' ? new Date(booking.start_date) : booking.start_date.toDate()) : null
+        const endDate = booking.end_date ? (typeof booking.end_date === 'string' ? new Date(booking.end_date) : booking.end_date.toDate()) : null
+
+        // Check if current date falls within booking period
+        if (startDate && endDate) {
+          return currentDate >= startDate && currentDate <= endDate
+        }
+
+        return false
+      })
+
+      // Check content type and increment counters
+      const contentType = (product.content_type || "").toLowerCase()
+      if (contentType === "static") {
+        staticTotal++
+        if (isUnavailable) staticUnavailable++
+      } else if (contentType === "dynamic") {
+        dynamicTotal++
+        if (isUnavailable) dynamicUnavailable++
+      }
+    }
+
+    console.log(`Occupancy results: Static ${staticUnavailable}/${staticTotal}, Dynamic ${dynamicUnavailable}/${dynamicTotal}`)
+
+    return {
+      staticUnavailable,
+      staticTotal,
+      dynamicUnavailable,
+      dynamicTotal
+    }
+  } catch (error) {
+    console.error(`Error getting occupancy data:`, error)
+    return {
+      staticUnavailable: 0,
+      staticTotal: 0,
+      dynamicUnavailable: 0,
+      dynamicTotal: 0
+    }
   }
 }
 
