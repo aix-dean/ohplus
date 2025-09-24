@@ -453,6 +453,8 @@ export default function AccountCreationPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
+  const [invitationEmail, setInvitationEmail] = useState<string>("")
+  const [isInvitationValid, setIsInvitationValid] = useState<boolean>(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
   const [termsDialogOpen, setTermsDialogOpen] = useState(false)
@@ -463,6 +465,20 @@ export default function AccountCreationPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
+
+  // Debug: Log when invitation email changes
+  useEffect(() => {
+    if (invitationEmail) {
+      console.log("Invitation email set:", invitationEmail)
+    }
+  }, [invitationEmail])
+
+  // Debug: Log when form data email changes
+  useEffect(() => {
+    if (formData.email) {
+      console.log("Form data email set:", formData.email)
+    }
+  }, [formData.email])
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -496,9 +512,40 @@ export default function AccountCreationPage() {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
 
+          // Check if max_usage is still greater than used_by.length
+          const maxUsage = invitationData.max_usage || 1 // Default to 1 if not set
+          const currentUsage = invitationData.used_by ? invitationData.used_by.length : 0
+
+          if (currentUsage >= maxUsage) {
+            setErrorMessage("This invitation code has reached its maximum usage limit.")
+            setIsInvitationValid(false)
+            return
+          }
+
+          // Set invitation data
           if (invitationData.role) {
             setInvitationRole(invitationData.role)
           }
+
+          if (invitationData.invited_email || invitationData.email) {
+            const emailToUse = invitationData.invited_email || invitationData.email
+            console.log("Auto-filling email:", emailToUse)
+            console.log("Available email fields:", {
+              invited_email: invitationData.invited_email,
+              email: invitationData.email
+            })
+            setInvitationEmail(emailToUse)
+            // Auto-fill the email in form data
+            setFormData(prev => {
+              const newFormData = { ...prev, email: emailToUse }
+              console.log("Updated form data with email:", newFormData)
+              return newFormData
+            })
+          } else {
+            console.log("No email found in invitation data:", invitationData)
+          }
+
+          setIsInvitationValid(true)
         } else {
           setErrorMessage("Invalid invitation code.")
         }
@@ -542,8 +589,14 @@ export default function AccountCreationPage() {
   const handleRegister = async () => {
     setErrorMessage(null)
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.cellphone || !formData.password || !formData.confirmPassword) {
+    if (!formData.firstName || !formData.lastName || !formData.cellphone || !formData.password || !formData.confirmPassword) {
       setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    // If there's an invitation code, email should be auto-filled, but check if it's valid
+    if (orgCode && !formData.email) {
+      setErrorMessage("Email address is required for invitation code registration.")
       return
     }
 
@@ -749,7 +802,7 @@ export default function AccountCreationPage() {
             {/* Email Address */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
+                Email Address {invitationEmail && ""}
               </Label>
               <Input
                 id="email"
@@ -757,8 +810,16 @@ export default function AccountCreationPage() {
                 placeholder="Email Address"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                disabled={!!invitationEmail}
+                className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                  invitationEmail ? "bg-gray-100 cursor-not-allowed" : ""
+                }`}
               />
+              {invitationEmail && (
+                <p className="text-sm text-gray-500">
+                  Email is locked to the invitation code email address
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -834,9 +895,9 @@ export default function AccountCreationPage() {
             <Button
               type="submit"
               className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg mt-6"
-              disabled={loading}
+              disabled={loading || !isInvitationValid}
             >
-              Confirm
+              {loading ? "Creating Account..." : "Confirm"}
             </Button>
           </form>
 
