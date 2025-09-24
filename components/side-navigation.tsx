@@ -1314,7 +1314,6 @@ export function SideNavigation() {
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
                   { title: "To-do-list", href: "/admin/todo-list", icon: ClipboardList },
                   { title: "Reports", href: "/admin/reports", icon: BarChart3 },
-                  { title: "User Management", href: "/admin/user-management", icon: Users },
 
                 ].map((item) => {
                   const Icon = item.icon
