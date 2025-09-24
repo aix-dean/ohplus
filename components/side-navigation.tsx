@@ -1307,6 +1307,7 @@ export function SideNavigation() {
                   { title: "Assets", href: "/admin/assets", icon: Package },
                   { title: "Petty Cash", href: "/admin/petty-cash", icon: DollarSign },
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
+                  { title: "Reports", href: "/admin/reports", icon: BarChart3 },
                   { title: "To-do-list", href: "/admin/todo-list", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
