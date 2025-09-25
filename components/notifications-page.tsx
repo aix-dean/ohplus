@@ -180,3 +180,19 @@ export function ITNotificationsPage() {
     notificationsPath: "/it/notifications"
   }} />
 }
+
+export function TreasuryNotificationsPage() {
+  return <NotificationsPage config={{
+    department: "Treasury",
+    colorScheme: "green",
+    notificationsPath: "/treasury/notifications"
+  }} />
+}
+
+export function BusinessDevNotificationsPage() {
+  return <NotificationsPage config={{
+    department: "Business Dev",
+    colorScheme: "blue",
+    notificationsPath: "/business/notifications"
+  }} />
+}

@@ -53,6 +53,8 @@ export function Notifications({ config }: NotificationsProps) {
         return 'bg-sky-500'
       case 'purple':
         return 'bg-purple-500'
+      case 'green':
+        return 'bg-green-500'
       default:
         return 'bg-blue-500'
     }
@@ -66,6 +68,8 @@ export function Notifications({ config }: NotificationsProps) {
         return 'bg-sky-100 text-sky-800'
       case 'purple':
         return 'bg-purple-100 text-purple-800'
+      case 'green':
+        return 'bg-green-100 text-green-800'
       default:
         return 'bg-blue-100 text-blue-800'
     }
@@ -174,5 +178,21 @@ export function ITNotifications() {
     department: "IT",
     colorScheme: "purple",
     notificationsPath: "/it/notifications"
+  }} />
+}
+
+export function TreasuryNotifications() {
+  return <Notifications config={{
+    department: "Treasury",
+    colorScheme: "green",
+    notificationsPath: "/treasury/notifications"
+  }} />
+}
+
+export function BusinessDevNotifications() {
+  return <Notifications config={{
+    department: "Business Dev",
+    colorScheme: "blue",
+    notificationsPath: "/business/notifications"
   }} />
 }
