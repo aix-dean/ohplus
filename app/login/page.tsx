@@ -734,8 +734,9 @@ export default function LoginPage() {
 
 
       {/* Left side - Login Form */}
-      <div className="flex-1 flex items-center justify-center bg-white p-8 order-1 md:order-1">
-        <div className="w-full max-w-md space-y-6">
+      <div className="flex-1 flex flex-col justify-center items-center bg-white p-8 order-1 md:order-1 min-h-0">
+        {/* Full width container for login form */}
+        <div className="w-full max-w-md space-y-6 flex-1 flex flex-col justify-center">
           <div className="space-y-2">
             <h1 className="text-4xl font-bold text-gray-900">Welcome!</h1>
           </div>
@@ -763,12 +764,33 @@ export default function LoginPage() {
                   <Input id="password" type="password" placeholder="Password" className="h-12 border-gray-200 rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
 
+                {/* Forgot Password link */}
+                <div className="flex justify-end mb-4">
+                  <button
+                    type="button"
+                    className="text-sm text-blue-600 hover:text-blue-800 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+                    onClick={() => {
+                      router.push('/forgot-password');
+                    }}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
                 <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg" type="submit" disabled={isLoading}>
                   {isLoading ? "Verifying..." : "Login"}
                 </Button>
               </form>
             ) : null}
           </div>
+        </div>
+
+        {/* Promotional text at the bottom of the first column */}
+        <div className="mt-auto pt-6 text-center">
+          <p className="text-gray-500 italic text-sm leading-relaxed">
+            Looking to streamline your OOH business? Explore our ERP with a free demo. Email us at{" "}
+            <span className="font-bold">inquiry@aix.ph</span>
+          </p>
         </div>
       </div>
 
