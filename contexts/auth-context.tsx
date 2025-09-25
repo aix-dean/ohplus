@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             license_key: data.license_key || null,
-            role: data.role || (userRoles.length > 0 ? userRoles[0] : null), // Prioritize role from iboard_users document
+            role: (userRoles.length > 0 ? userRoles[0] : null) || data.role, // Prioritize role from user_roles collection
             roles: userRoles, // Add the roles array from user_roles collection
             permissions: data.permissions || [],
             project_id: data.project_id,
@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             displayName: firebaseUser.displayName,
             license_key: null,
             company_id: null,
-            role: userRoles.length > 0 ? userRoles[0] : null,
+            role: userRoles.length > 0 ? userRoles[0] : null, // Use role from user_roles collection
             roles: userRoles,
             permissions: [],
             onboarding: false, // Skip onboarding for new users
