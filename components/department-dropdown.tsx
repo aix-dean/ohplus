@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { ChevronDown, Building2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { type RoleType } from "@/lib/hardcoded-access-service"
 import { cn } from "@/lib/utils"
+import { doc, onSnapshot, collection, query, where } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface DepartmentOption {
   name: string
@@ -74,20 +76,45 @@ const departmentMapping: Record<RoleType, DepartmentOption> = {
 export function DepartmentDropdown() {
   const [isOpen, setIsOpen] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [userRoles, setUserRoles] = useState<RoleType[]>([])
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { userData } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
-  // Use roles from userData (should be populated by auth context)
-  const userRoles = userData?.roles || []
+  // Set up real-time snapshot listener for user's roles
+  useEffect(() => {
+    if (!userData?.uid) {
+      setUserRoles([])
+      return
+    }
+
+    const userRolesCollection = collection(db, "user_roles")
+    const userRolesQuery = query(userRolesCollection, where("userId", "==", userData.uid))
+    const unsubscribe = onSnapshot(userRolesQuery, (querySnapshot) => {
+      const roles: RoleType[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.roleId && [
+          "admin", "sales", "logistics", "cms", "it", "business",
+          "treasury", "accounting", "finance"
+        ].includes(data.roleId)) {
+          roles.push(data.roleId as RoleType)
+        }
+      })
+
+      setUserRoles(roles)
+    }, (error) => {
+      console.error("Error in user roles snapshot listener:", error)
+      setUserRoles([])
+    })
+
+    return () => unsubscribe()
+  }, [userData?.uid])
 
   if (!userRoles || userRoles.length === 0) {
-    console.log("DepartmentDropdown: No user roles found, not rendering")
     return null // Don't show dropdown if user has no roles
   }
-
-  console.log("DepartmentDropdown: User roles found:", userRoles)
 
   // Get accessible departments based on user roles
   const accessibleDepartments = userRoles
@@ -100,25 +127,17 @@ export function DepartmentDropdown() {
   ) || accessibleDepartments[0]
 
   const handleDepartmentSelect = (department: DepartmentOption) => {
-    console.log("Department select triggered for:", department.name, "path:", department.path)
-    try {
-      router.push(department.path)
-      console.log("Router.push called successfully")
-    } catch (error) {
-      console.error("Error in router.push:", error)
-    }
+    router.push(department.path)
     setIsOpen(false)
   }
 
   const handleButtonClick = () => {
-    console.log("Dropdown button clicked, isOpen:", isOpen)
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       const newPosition = {
         top: rect.bottom + window.scrollY,
         left: rect.left + window.scrollX
       }
-      console.log("Calculated position:", newPosition)
       setDropdownPosition(newPosition)
     }
     setIsOpen(!isOpen)
@@ -163,31 +182,26 @@ export function DepartmentDropdown() {
       </button>
 
       {isOpen && hasMultipleRoles && (
-        <>
-          {console.log("Rendering dropdown")}
-          {/* Dropdown */}
-          <div className="absolute top-full left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999] text-gray-900 mt-1">
-            <div className="py-1" onClick={() => console.log("Dropdown container clicked")}>
-              {accessibleDepartments.map((department) => (
-                <button
-                  key={department.role}
-                  onClick={(e) => {
-                    console.log("Dropdown item clicked:", department.name)
-                    e.stopPropagation()
-                    handleDepartmentSelect(department)
-                  }}
-                  className={cn(
-                    "w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 transition-colors flex items-center space-x-3",
-                    department.role === currentDepartment.role && "bg-gray-200 font-medium"
-                  )}
-                >
-                  <div className={cn("w-3 h-3 rounded-full", department.color)} />
-                  <span>{department.name}</span>
-                </button>
-              ))}
-            </div>
+        <div className="absolute top-full left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999] text-gray-900 mt-1">
+          <div className="py-1">
+            {accessibleDepartments.map((department) => (
+              <button
+                key={department.role}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDepartmentSelect(department)
+                }}
+                className={cn(
+                  "w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 transition-colors flex items-center space-x-3",
+                  department.role === currentDepartment.role && "bg-gray-200 font-medium"
+                )}
+              >
+                <div className={cn("w-3 h-3 rounded-full", department.color)} />
+                <span>{department.name}</span>
+              </button>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

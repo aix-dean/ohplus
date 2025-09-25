@@ -670,7 +670,9 @@ The OH Plus Team`,
             <span className="w-4 text-center">•</span>
             <span className="font-medium text-gray-700 w-32">Size</span>
             <span className="text-gray-700">: </span>
-            <span className="text-gray-700">100ft (H) x 60ft (W)</span>
+            <span className="text-gray-700">
+              {item?.specs?.height ? `${item.specs.height}ft (H)` : "N/A"} x {item?.specs?.width ? `${item.specs.width}ft (W)` : "N/A"}
+            </span>
           </div>
 
           <div className="flex items-center">
@@ -754,11 +756,6 @@ The OH Plus Team`,
             <span className="text-gray-700">: {currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
           </div>
 
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Illumination</span>
-            <span className="text-gray-700">: 10 units of 1000 watts metal Halide</span>
-          </div>
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>

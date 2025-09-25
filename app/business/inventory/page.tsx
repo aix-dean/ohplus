@@ -638,7 +638,9 @@ export default function BusinessInventoryPage() {
 
       setShowAddSiteDialog(false)
 
-      // Refresh the product list
+      // Clear cache and refresh the product list and navigate to page 1
+      setPageCache(new Map())
+      setCurrentPage(1)
       fetchProducts(1)
       fetchTotalCount()
 
