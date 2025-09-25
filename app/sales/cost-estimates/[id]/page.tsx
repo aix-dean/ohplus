@@ -1338,13 +1338,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               <span className="font-medium text-gray-700 w-32">Proposal to</span>
               <span className="text-gray-700">: {costEstimate?.client.company}</span>
             </div>
-            {siteLineItems.length > 0 && (
-              <div className="flex items-center">
-                <span className="w-4 text-center">•</span>
-                <span className="font-medium text-gray-700 w-32">Illumination</span>
-                <span className="text-gray-700">: {siteLineItems[0].quantity} units of lighting system</span>
-              </div>
-            )}
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
