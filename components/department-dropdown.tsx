@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { ChevronDown, Building2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { type RoleType } from "@/lib/hardcoded-access-service"
 import { cn } from "@/lib/utils"
-import { doc, onSnapshot } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 interface DepartmentOption {
   name: string
@@ -76,31 +74,20 @@ const departmentMapping: Record<RoleType, DepartmentOption> = {
 export function DepartmentDropdown() {
   const [isOpen, setIsOpen] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
-  const [userRoles, setUserRoles] = useState<RoleType[]>([])
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { userData } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
-  // Set up snapshot listener for user's roles
-  useEffect(() => {
-    if (!userData?.uid) return
+  // Use roles from userData (should be populated by auth context)
+  const userRoles = userData?.roles || []
 
-    const userDocRef = doc(db, "iboard_users", userData.uid)
-    const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data()
-        const roles = data.roles as RoleType[] || []
-        setUserRoles(roles)
-      }
-    })
-
-    return () => unsubscribe()
-  }, [userData?.uid])
-
-  if (!userRoles || userRoles.length <= 1) {
-    return null // Don't show dropdown if user has only one role or no roles
+  if (!userRoles || userRoles.length === 0) {
+    console.log("DepartmentDropdown: No user roles found, not rendering")
+    return null // Don't show dropdown if user has no roles
   }
+
+  console.log("DepartmentDropdown: User roles found:", userRoles)
 
   // Get accessible departments based on user roles
   const accessibleDepartments = userRoles
@@ -153,19 +140,29 @@ export function DepartmentDropdown() {
   //   }
   // }, [isOpen])
 
+  const hasMultipleRoles = userRoles.length > 1
+
   return (
     <div className="relative">
       <button
         ref={buttonRef}
-        onClick={handleButtonClick}
-        className="flex items-center space-x-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white"
+        onClick={hasMultipleRoles ? handleButtonClick : undefined}
+        disabled={!hasMultipleRoles}
+        className={cn(
+          "flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-white",
+          hasMultipleRoles
+            ? "bg-white/10 hover:bg-white/20 cursor-pointer"
+            : "bg-white/5 cursor-default"
+        )}
       >
         <Building2 className="h-4 w-4" />
         <span className="text-sm font-medium">{currentDepartment.name}</span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+        {hasMultipleRoles && (
+          <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+        )}
       </button>
 
-      {isOpen && (
+      {isOpen && hasMultipleRoles && (
         <>
           {console.log("Rendering dropdown")}
           {/* Dropdown */}
