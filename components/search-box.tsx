@@ -152,13 +152,13 @@ export function SearchBox({
   }
 
   return (
-    <div className="relative w-full max-w-md" ref={searchRef}>
+    <div className="relative w-full" ref={searchRef}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#b7b7b7]" />
         <Input
           type="search"
-          placeholder="Search products, clients..."
-          className="pl-10 pr-10"
+          placeholder="Search"
+          className="pl-10 pr-10 bg-white border-[#d9d9d9] text-[#333333]"
           value={query}
           onChange={handleInputChange}
           onFocus={() => {

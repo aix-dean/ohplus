@@ -37,6 +37,27 @@ import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplet
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
+// Category options based on site type
+const STATIC_CATEGORIES = [
+  "Billboard",
+  "Wallboard",
+  "Transit Ads",
+  "Column",
+  "Bridgeway billboard",
+  "Banner",
+  "Lampost",
+  "Lightbox",
+  "Building Wrap",
+  "Gantry",
+  "Toll Plaza"
+]
+
+const DIGITAL_CATEGORIES = [
+  "Digital Billboard",
+  "LED Poster",
+  "Digital Transit Ads"
+]
+
 export default function BusinessInventoryPage() {
   const router = useRouter()
   const { user, userData, subscriptionData, refreshUserData } = useAuth()
@@ -202,6 +223,15 @@ export default function BusinessInventoryPage() {
       setPriceUnit("per month")
     } else if (siteType === "digital") {
       setPriceUnit("per spot")
+    }
+  }, [siteType])
+
+  // Update category based on site type
+  useEffect(() => {
+    if (siteType === "static") {
+      setCategory(STATIC_CATEGORIES[0])
+    } else if (siteType === "digital") {
+      setCategory(DIGITAL_CATEGORIES[0])
     }
   }, [siteType])
 
@@ -916,9 +946,11 @@ export default function BusinessInventoryPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="LED">LED</SelectItem>
-                    <SelectItem value="Billboard">Billboard</SelectItem>
-                    <SelectItem value="Transit">Transit</SelectItem>
+                    {(siteType === "static" ? STATIC_CATEGORIES : DIGITAL_CATEGORIES).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

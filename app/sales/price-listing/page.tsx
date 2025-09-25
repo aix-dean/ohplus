@@ -64,7 +64,7 @@ const getSiteCode = (product: Product | null) => {
 }
 
 function PriceListingContent() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [productsWithBookings, setProductsWithBookings] = useState<Record<string, boolean>>({})
