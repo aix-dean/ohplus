@@ -154,7 +154,7 @@ export default function UploadPage() {
         permissions: [],
         created: serverTimestamp(),
         updated: serverTimestamp(),
-        onboarding: true,
+        onboarding: false, // Skip onboarding for new users
       }
 
       await setDoc(userDocRef, userData)

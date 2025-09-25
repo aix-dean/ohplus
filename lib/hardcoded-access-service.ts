@@ -365,18 +365,28 @@ export function getRoleById(roleId: RoleType): HardcodedRole | null {
 // Get user roles from Firestore
 export async function getUserRoles(userId: string): Promise<RoleType[]> {
   try {
+    console.log("=== GET USER ROLES DEBUG ===")
+    console.log("Getting roles for user:", userId)
+
     const userRolesCollection = collection(db, "user_roles")
     const userRolesQuery = query(userRolesCollection, where("userId", "==", userId))
     const userRolesSnapshot = await getDocs(userRolesQuery)
 
+    console.log("User roles snapshot size:", userRolesSnapshot.size)
+
     const roles: RoleType[] = []
     userRolesSnapshot.forEach((doc) => {
       const data = doc.data()
+      console.log("Role document data:", data)
       if (data.roleId && HARDCODED_ROLES[data.roleId as RoleType]) {
         roles.push(data.roleId as RoleType)
+        console.log("Added role:", data.roleId)
+      } else {
+        console.log("Invalid role or role not found:", data.roleId)
       }
     })
 
+    console.log("Final roles array:", roles)
     return roles
   } catch (error) {
     console.error("Error getting user roles:", error)
@@ -387,13 +397,19 @@ export async function getUserRoles(userId: string): Promise<RoleType[]> {
 // Assign role to user
 export async function assignRoleToUser(userId: string, roleId: RoleType, assignedBy?: string): Promise<void> {
   try {
+    console.log("=== ASSIGN ROLE DEBUG ===")
+    console.log("Assigning role:", roleId, "to user:", userId)
+
     // Check if role exists
     if (!HARDCODED_ROLES[roleId]) {
+      console.error("Role does not exist:", roleId)
       throw new Error(`Role ${roleId} does not exist`)
     }
 
     // Check if user already has this role
     const existingRoles = await getUserRoles(userId)
+    console.log("Existing roles for user:", existingRoles)
+
     if (existingRoles.includes(roleId)) {
       console.log(`User ${userId} already has role ${roleId}`)
       return
@@ -407,8 +423,13 @@ export async function assignRoleToUser(userId: string, roleId: RoleType, assigne
       createdAt: serverTimestamp(),
     }
 
+    console.log("Creating role assignment document:", userRoleData)
     await addDoc(collection(db, "user_roles"), userRoleData)
-    console.log(`Role ${roleId} assigned to user ${userId}`)
+    console.log(`Role ${roleId} assigned to user ${userId} successfully`)
+
+    // Verify the role was assigned
+    const updatedRoles = await getUserRoles(userId)
+    console.log("Updated roles after assignment:", updatedRoles)
   } catch (error) {
     console.error("Error assigning role to user:", error)
     throw new Error("Failed to assign role to user")

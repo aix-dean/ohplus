@@ -18,6 +18,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth"
 import { db, tenantAuth } from "@/lib/firebase"
 import { assignRoleToUser } from "@/lib/hardcoded-access-service"
 import WelcomePage from "./welcome-page"
+import Step4Welcome from "./step-4-welcome"
 
 const createAnalyticsDocument = async () => {
   try {
@@ -72,6 +73,8 @@ export default function LoginPage() {
   const [isValidating, setIsValidating] = useState(false)
   const [pointPersonData, setPointPersonData] = useState<any>(null)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [pendingRegistration, setPendingRegistration] = useState<any>(null)
+  const [isStartingTour, setIsStartingTour] = useState(false)
   const pointPersonDataRef = useRef<any>(null)
 
   const { user, userData, getRoleDashboardPath, refreshUserData, login, loginOHPlusOnly, startRegistration, endRegistration } = useAuth()
@@ -80,17 +83,27 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && userData && !showWelcome) {
-      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+    if (user && userData && currentStep < 4) {
+      // Use roles from userData.roles array (populated from user_roles collection)
+      const userRoles = userData?.roles || []
+      console.log('Redirecting with user roles:', userRoles)
+
+      const dashboardPath = getRoleDashboardPath(userRoles as any)
       if (dashboardPath) {
         // Add a small delay to prevent immediate back-and-forth redirects
         const timer = setTimeout(() => {
           router.push(dashboardPath)
         }, 1000) // 1 second delay
         return () => clearTimeout(timer)
+      } else {
+        // Fallback to IT dashboard if no specific dashboard path found
+        const timer = setTimeout(() => {
+          router.push("/it/user-management")
+        }, 1000) // 1 second delay
+        return () => clearTimeout(timer)
       }
     }
-  }, [user, userData, router, getRoleDashboardPath, showWelcome])
+  }, [user, userData, router, getRoleDashboardPath, currentStep])
 
   // Fetch point_person data from companies collection
   const fetchPointPersonData = async (email: string) => {
@@ -328,9 +341,31 @@ export default function LoginPage() {
       console.log("Created user ID:", firebaseUser.uid)
       console.log("User creation successful, proceeding to document creation")
 
+      console.log("=== USER DOCUMENT CREATION DEBUG ===")
       console.log("Creating user document in iboard_users...")
+      console.log("Firebase user UID:", firebaseUser.uid)
+      console.log("Firebase user email:", firebaseUser.email)
+
       // Create user document in iboard_users collection with type="OHPLUS"
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+      console.log("User document reference:", userDocRef.path)
+
+      // Get permissions and roles from pending registration or use defaults
+      const permissions = pendingRegistration?.permissions || ["admin", "it"]
+      const roles = pendingRegistration?.roles || ["admin", "it"]
+      console.log('Using permissions for user registration:', permissions)
+      console.log('Using roles for user registration:', roles)
+
+      // Determine primary role based on roles array
+      let primaryRole = "admin" // Default role
+      if (roles.includes("business")) {
+        primaryRole = "business"
+      } else if (roles.includes("it")) {
+        primaryRole = "it"
+      }
+
+      console.log('Primary role determined:', primaryRole)
+
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
@@ -341,36 +376,76 @@ export default function LoginPage() {
         gender: point_person.gender || "",
         company_id: company_id,
         type: "OHPLUS",
-        role: "admin",
-        permissions: ["admin", "it"],
+        role: primaryRole,
+        roles: roles, // Store the roles array
+        permissions: permissions,
         activation: activationData,
         created: serverTimestamp(),
         updated: serverTimestamp(),
-        onboarding: true,
+        onboarding: true, // Show onboarding tour for new users
       }
+
+      console.log("User data to be saved:", userData)
       console.log("User data to be created in iboard_users:", userData)
       console.log("About to call setDoc for iboard_users")
 
-      await setDoc(userDocRef, userData)
-      console.log("User document created in iboard_users collection with type OHPLUS")
-      console.log("setDoc completed successfully")
+      try {
+        await setDoc(userDocRef, userData)
+        console.log("✅ User document created in iboard_users collection with type OHPLUS")
+        console.log("✅ setDoc completed successfully")
+      } catch (setDocError: any) {
+        console.error("❌ Error creating user document:", setDocError)
+        console.error("❌ setDoc error details:", {
+          code: setDocError.code,
+          message: setDocError.message,
+          stack: setDocError.stack
+        })
+        throw setDocError
+      }
 
       console.log("Verifying iboard_users document creation...")
-      const docSnap = await getDoc(userDocRef)
-      if (!docSnap.exists()) {
-        throw new Error("Failed to create iboard_users document")
+      let docSnap = await getDoc(userDocRef)
+
+      // Retry up to 3 times if document doesn't exist immediately
+      let retryCount = 0
+      while (!docSnap.exists() && retryCount < 3) {
+        console.log(`Document not found, retrying... (${retryCount + 1}/3)`)
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+        docSnap = await getDoc(userDocRef)
+        retryCount++
       }
-      console.log("iboard_users document verified successfully")
+
+      if (!docSnap.exists()) {
+        console.error("❌ Failed to create iboard_users document - document does not exist after retries")
+        console.error("❌ Document reference:", userDocRef.path)
+        console.error("❌ This is the critical error causing the login redirect")
+        throw new Error("Failed to create iboard_users document after retries")
+      }
+
+      console.log("✅ iboard_users document verified successfully")
+      console.log("✅ Document data:", docSnap.data())
+      console.log("✅ User registration completed successfully - user should stay logged in")
       console.log('warren')
 
-      console.log("Assigning roles...")
-      // Assign roles "admin" and "it" to user_roles collection
-      try {
-        await assignRoleToUser(firebaseUser.uid, "admin", firebaseUser.uid)
-        console.log("Role 'admin' assigned to user_roles collection")
+      console.log("=== ROLE ASSIGNMENT DEBUG ===")
+      console.log("Assigning roles based on roles array:", roles)
+      console.log("Firebase user UID:", firebaseUser.uid)
 
-        await assignRoleToUser(firebaseUser.uid, "it", firebaseUser.uid)
-        console.log("Role 'it' assigned to user_roles collection")
+      // Assign roles based on roles array from step 4 selection
+      try {
+        // Assign all roles from the roles array
+        for (const role of roles) {
+          console.log(`Assigning role '${role}' to user ${firebaseUser.uid}`)
+          await assignRoleToUser(firebaseUser.uid, role, firebaseUser.uid)
+          console.log(`Role '${role}' assigned to user_roles collection`)
+        }
+
+        console.log("All roles assigned successfully")
+
+        // Verify roles were assigned
+        const { getUserRoles } = await import("@/lib/hardcoded-access-service")
+        const assignedRoles = await getUserRoles(firebaseUser.uid)
+        console.log("Verified assigned roles:", assignedRoles)
       } catch (roleError) {
         console.error("Error assigning roles to user_roles collection:", roleError)
       }
@@ -383,9 +458,19 @@ export default function LoginPage() {
       // End registration
       endRegistration()
 
-      console.log("Registration completed successfully, showing welcome page...")
-      setShowWelcome(true)
+      console.log("Registration completed successfully, redirecting to dashboard...")
+      // Refresh user data to get the latest roles and permissions
+      await refreshUserData()
+
+      // Use roles from userData.roles array (populated from user_roles collection)
+      const userRoles = userData?.roles || []
+      console.log('Final user roles after registration:', userRoles)
+
+      // For new OHPLUS users, always redirect to IT management first
+      console.log('Redirecting new OHPLUS user to IT user management')
+      router.push("/it/user-management")
     } catch (error: any) {
+      console.error("=== REGISTRATION FAILED ===")
       console.error("Registration failed:", error)
       console.log("Error code:", error.code, "Error message:", error.message)
       console.log("handleCompleteRegistration failed - no iboard_users created")
@@ -421,6 +506,7 @@ export default function LoginPage() {
     setIsValidating(false)
     setPointPersonData(null)
     setShowWelcome(false)
+    setPendingRegistration(null)
     pointPersonDataRef.current = null
     // Don't reset email here
   }
@@ -434,6 +520,43 @@ export default function LoginPage() {
     setFileName("")
     setIsValidating(false)
     setShowWelcome(false)
+    setPendingRegistration(null)
+  }
+
+  const handleStep4Next = (permissions: string[], roles: string[]) => {
+    console.log('=== handleStep4Next CALLED ===')
+    console.log('Current step before:', currentStep)
+    console.log('Permissions received:', permissions)
+    console.log('Roles received:', roles)
+
+    // Store permissions and roles for later use in registration
+    setPendingRegistration((prev: any) => ({
+      ...prev,
+      permissions: permissions,
+      roles: roles
+    }))
+
+    setCurrentStep(5) // Move to welcome page
+    setShowWelcome(true)
+    console.log('Current step after:', currentStep)
+  }
+
+  const handleStartTour = async () => {
+    console.log('=== START TOUR DEBUG ===')
+    console.log('Pending registration:', pendingRegistration)
+
+    setIsStartingTour(true)
+    try {
+      if (pendingRegistration) {
+        console.log('Completing registration before navigation...')
+        await handleCompleteRegistration(pendingRegistration.activationData, pendingRegistration.file)
+      } else {
+        console.error('No pending registration data found')
+        setError('Registration data not found. Please restart the process.')
+      }
+    } finally {
+      setIsStartingTour(false)
+    }
   }
 
   const handleDragOverStep3 = useCallback((e: React.DragEvent) => {
@@ -447,7 +570,8 @@ export default function LoginPage() {
   }, [])
 
   const handleDropStep3 = useCallback(async (e: React.DragEvent) => {
-    console.log('handleDropStep3 called')
+    console.log('=== handleDropStep3 START ===')
+    console.log('Current step before:', currentStep)
     e.preventDefault()
     setIsDragOver(false)
 
@@ -481,6 +605,7 @@ export default function LoginPage() {
         })
 
         if (result.success) {
+          console.log('=== VALIDATION SUCCESS ===')
           console.log('API returned success, proceeding with companyId validation')
           // Additional validation: check if callback companyId matches step 1 company_id
           const callbackCompanyId = result.data.companyId
@@ -488,30 +613,35 @@ export default function LoginPage() {
           console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
 
           if (callbackCompanyId !== step1CompanyId) {
-            console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+            console.log('❌ Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
             setError('Invalid activation key: Company ID does not match.')
             toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
             setIsValidating(false)
             return
           }
 
-          console.log('Company ID validation passed, proceeding with registration')
-          console.log('File authenticated')
+          console.log('✅ Company ID validation passed, proceeding with registration')
+          console.log('✅ File authenticated')
           setFileName(activationFile.name)
           setUploadedFile(activationFile)
-          try {
-            // Complete registration first
-            console.log('Calling handleCompleteRegistration')
-            await handleCompleteRegistration(result.data, activationFile)
-            // Only show success after successful registration
-            setIsActivated(true)
-            toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
-          } catch (error) {
-            console.error('Registration failed:', error)
-            setError('Registration failed. Please try again.')
-          }
+
+          // Store registration data for later completion
+          setPendingRegistration({
+            activationData: result.data,
+            file: activationFile
+          })
+
+          // Show success without completing registration
+          setIsActivated(true)
+          toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
+
+          // Proceed to step 4
+          console.log('✅ File validation successful, proceeding to step 4')
+          console.log('Current step before setCurrentStep(4):', currentStep)
+          setCurrentStep(4)
+          console.log('Current step after setCurrentStep(4):', currentStep)
         } else {
-          console.log('File not valid, result:', result)
+          console.log('❌ API returned failure:', result)
           setError(result.error || 'Invalid activation key')
           toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
         }
@@ -527,7 +657,8 @@ export default function LoginPage() {
   }, [])
 
   const handleFileSelectStep3 = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('handleFileSelectStep3 called')
+    console.log('=== handleFileSelectStep3 START ===')
+    console.log('Current step before:', currentStep)
     const files = e.target.files
     console.log('Selected files:', files ? Array.from(files).map(f => f.name) : 'none')
     if (files && files.length > 0) {
@@ -558,6 +689,7 @@ export default function LoginPage() {
           })
 
           if (result.success) {
+            console.log('=== FILE SELECT VALIDATION SUCCESS ===')
             console.log('API returned success, proceeding with companyId validation')
             // Additional validation: check if callback companyId matches step 1 company_id
             const callbackCompanyId = result.data.companyId
@@ -565,30 +697,35 @@ export default function LoginPage() {
             console.log('Comparing companyIds - Callback:', callbackCompanyId, 'Step1:', step1CompanyId)
 
             if (callbackCompanyId !== step1CompanyId) {
-              console.log('Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
+              console.log('❌ Company ID mismatch - Callback companyId:', callbackCompanyId, 'Step 1 company_id:', step1CompanyId)
               setError('Invalid activation key: Company ID does not match.')
               toast({ title: "Invalid Activation Key", description: "The activation key does not match your company. Please contact your administrator.", variant: "destructive" })
               setIsValidating(false)
               return
             }
 
-            console.log('Company ID validation passed, proceeding with registration')
-            console.log('File authenticated')
+            console.log('✅ Company ID validation passed, proceeding with registration')
+            console.log('✅ File authenticated')
             setFileName(file.name)
             setUploadedFile(file)
-            try {
-              // Complete registration first
-              console.log('Calling handleCompleteRegistration')
-              await handleCompleteRegistration(result.data, file)
-              // Only show success after successful registration
-              setIsActivated(true)
-              toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
-            } catch (error) {
-              console.error('Registration failed:', error)
-              setError('Registration failed. Please try again.')
-            }
+
+            // Store registration data for later completion
+            setPendingRegistration({
+              activationData: result.data,
+              file: file
+            })
+
+            // Show success without completing registration
+            setIsActivated(true)
+            toast({ title: "Activation Key Validated", description: "Your license file has been successfully authenticated." })
+
+            // Proceed to step 4
+            console.log('✅ File validation successful in file select, proceeding to step 4')
+            console.log('Current step before setCurrentStep(4):', currentStep)
+            setCurrentStep(4)
+            console.log('Current step after setCurrentStep(4):', currentStep)
           } else {
-            console.log('File not valid, result:', result)
+            console.log('❌ File not valid, result:', result)
             setError(result.error || 'Invalid activation key')
             toast({ title: "Invalid Activation Key", description: result.error || "The uploaded file is not a valid activation key.", variant: "destructive" })
           }
@@ -608,8 +745,25 @@ export default function LoginPage() {
   }, [])
 
   if (showWelcome) {
-    return <WelcomePage onStartTour={() => router.push("/it/user-management")} userName={pointPersonDataRef.current?.point_person?.first_name} />
+    return <WelcomePage onStartTour={handleStartTour} userName={pointPersonDataRef.current?.point_person?.first_name} isLoading={isStartingTour} />
   }
+
+  if (currentStep === 4) {
+    console.log('=== RENDERING STEP 4 ===')
+    console.log('Current step is 4, showing Welcome screen')
+    console.log('pointPersonDataRef.current:', pointPersonDataRef.current)
+    return <Step4Welcome onNext={handleStep4Next} />
+  }
+
+  if (currentStep === 5) {
+    return <WelcomePage onStartTour={handleStartTour} userName={pointPersonDataRef.current?.point_person?.first_name} />
+  }
+
+  console.log('=== RENDER CHECK ===')
+  console.log('Current step:', currentStep)
+  console.log('showWelcome:', showWelcome)
+  console.log('isActivated:', isActivated)
+  console.log('isValidating:', isValidating)
 
   return currentStep === 3 ? (
     <div className="min-h-screen flex">
