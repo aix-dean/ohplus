@@ -34,7 +34,7 @@ import {
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
-import { LogisticsNotifications, SalesNotifications, AdminNotifications, ITNotifications } from "@/components/notifications"
+import { LogisticsNotifications, SalesNotifications, AdminNotifications, ITNotifications, TreasuryNotifications, BusinessDevNotifications } from "@/components/notifications"
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -404,35 +404,10 @@ export function SideNavigation() {
             </div>
 
           </>
-        ) : currentSection === "business" || currentSection === "it" ? (
+        ) : currentSection === "business" || currentSection === "it" || currentSection === "finance" || currentSection === "accounting" || currentSection === "treasury" ? (
           <>
             {/* Dynamic notification component based on section */}
-            {currentSection === "business" && <div className="bg-[#fbe0e0] backdrop-blur-sm border border-white/30 rounded-[20px] p-3 text-gray-900">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Updates Center</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">See All</button>
-              </div>
-            </div>}
+            {currentSection === "business" && <BusinessDevNotifications />}
             {currentSection === "it" && <ITNotifications />}
             {currentSection === "finance" && <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] p-3 text-gray-900">
               <div className="flex items-center justify-between mb-3">
@@ -638,32 +613,7 @@ export function SideNavigation() {
                 <button className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">See All</button>
               </div>
             </div>}
-            {currentSection === "treasury" && <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] p-3 text-gray-900">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Updates Center</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">See All</button>
-              </div>
-            </div>}
+            {currentSection === "treasury" && <TreasuryNotifications />}
 
             {/* To Go Section */}
             <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] shadow-sm">
@@ -1409,33 +1359,7 @@ export function SideNavigation() {
            </>
         ) : currentSection === "treasury" ? (
           <>
-            {/* Updates Center Section */}
-            <div className="bg-[#fbe0e0] backdrop-blur-sm border border-green-500/30 rounded-[20px] p-3 text-gray-900">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Updates Center</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
-                  </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-gray-900/90 hover:text-gray-900 transition-colors">See All</button>
-              </div>
-            </div>
+            <AdminNotifications />
 
             {/* To Go Section */}
             <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] shadow-sm">

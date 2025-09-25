@@ -21,7 +21,7 @@ export interface Notification {
 
 export interface NotificationConfig {
   department: string
-  colorScheme: 'blue' | 'sky' | 'purple'
+  colorScheme: 'blue' | 'sky' | 'purple' | 'green'
   notificationsPath: string
 }
 
