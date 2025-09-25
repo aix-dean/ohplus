@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,20 +29,48 @@ interface AddUserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: (userData: { email: string; name: string; role: string }) => void
+  initialRole?: string
+  remainingSlots?: number
+  departmentName?: string
 }
 
-export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogProps) {
-  const { userData } = useAuth()
+export function AddUserDialog({ open, onOpenChange, onSuccess, initialRole, remainingSlots, departmentName }: AddUserDialogProps) {
+  const { userData, projectData } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [roles] = useState<HardcodedRole[]>(getAllRoles())
+  const [roles] = useState<HardcodedRole[]>(getAllRoles().filter(role => !['accounting', 'finance'].includes(role.id)))
+
+  // Department color mapping for bullet points
+  const departmentColors: Record<string, string> = {
+    "Administrator": "bg-violet-500",
+    "Sales Team": "bg-red-500",
+    "Logistics Team": "bg-blue-500",
+    "Content Management": "bg-yellow-500",
+    "IT Team": "bg-teal-500",
+    "Business Development": "bg-purple-500",
+    "Treasury": "bg-green-500",
+    "Accounting": "bg-blue-600",
+    "Finance": "bg-emerald-500",
+  }
+
+  const getDepartmentColor = (dept?: string) => {
+    return departmentColors[dept || ''] || 'bg-blue-500'
+  }
   const [formData, setFormData] = useState({
     recipientEmail: "",
-    recipientName: "",
-    role: "admin", // Change default to admin since that's one of the hardcoded roles
-    subject: `Invitation to join ${userData?.companyName || "our organization"}`,
+    firstName: "",
+    lastName: "",
+    role: initialRole || "admin", // Use initialRole if provided
+    subject: `Invitation to join ${projectData?.company_name || "our organization"}`,
     message: `You've been invited to join our organization. Use the invitation code below to register your account and start collaborating with our team.`,
     validityDays: 30,
   })
+
+  // Update role when initialRole changes
+  useEffect(() => {
+    if (initialRole) {
+      setFormData((prev) => ({ ...prev, role: initialRole }))
+    }
+  }, [initialRole])
 
   const generateRandomCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -103,13 +131,13 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
         },
         body: JSON.stringify({
           recipientEmail: formData.recipientEmail,
-          recipientName: formData.recipientName,
+          recipientName: `${formData.firstName} ${formData.lastName}`.trim(),
           subject: formData.subject,
           message: formData.message,
           invitationCode: invitationCode,
           registrationUrl,
           senderName: userData?.displayName || userData?.email,
-          companyName: userData?.companyName || "OH Plus",
+          companyName: projectData?.company_name || "OH Plus",
           role: formData.role,
           expiresAt: expiresAt.toLocaleDateString(),
         }),
@@ -124,16 +152,17 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
       // Reset form
       setFormData({
         recipientEmail: "",
-        recipientName: "",
+        firstName: "",
+        lastName: "",
         role: "admin",
-        subject: `Invitation to join ${userData?.companyName || "our organization"}`,
+        subject: `Invitation to join ${projectData?.company_name || "our organization"}`,
         message: `You've been invited to join our organization. Use the invitation code below to register your account and start collaborating with our team.`,
         validityDays: 30,
       })
 
       onSuccess?.({
         email: formData.recipientEmail,
-        name: formData.recipientName,
+        name: `${formData.firstName} ${formData.lastName}`.trim(),
         role: formData.role,
       })
       onOpenChange(false)
@@ -149,177 +178,86 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <UserPlus className="h-5 w-5" />
             <span>Add New User</span>
           </DialogTitle>
-          <DialogDescription>
-            Send an invitation email to a new user with a registration link and access code
-          </DialogDescription>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div>You can add {remainingSlots || 0} more teammates</div>
+            <div className="flex items-center gap-2">
+              <span>Add to:</span>
+              <div className={`w-2 h-2 rounded-full ${getDepartmentColor(departmentName)}`} />
+              <span>{departmentName || 'New User'}</span>
+            </div>
+          </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* User Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">User Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recipientEmail">Email Address *</Label>
-                <Input
-                  id="recipientEmail"
-                  type="email"
-                  value={formData.recipientEmail}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, recipientEmail: e.target.value }))}
-                  placeholder="user@example.com"
-                  required
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="recipientEmail" className="text-sm font-medium">Email *</Label>
+              <Input
+                id="recipientEmail"
+                type="email"
+                value={formData.recipientEmail}
+                onChange={(e) => setFormData((prev) => ({ ...prev, recipientEmail: e.target.value }))}
+                placeholder="user@example.com"
+                required
+                className="col-span-2"
+              />
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="recipientName">Full Name</Label>
-                <Input
-                  id="recipientName"
-                  type="text"
-                  value={formData.recipientName}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, recipientName: e.target.value }))}
-                  placeholder="John Doe"
-                />
-                <p className="text-xs text-muted-foreground">Optional - used for personalization</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="role" className="text-sm font-medium">Role</Label>
+              {initialRole ? (
+                <div className="col-span-2 px-3 py-2 bg-muted rounded-md text-sm">
+                  {roles.find((r) => r.id === formData.role)?.name || formData.role}
+                </div>
+              ) : (
                 <Select
                   value={formData.role}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="col-span-2">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
                     {roles.map((role) => (
                       <SelectItem key={role.id} value={role.id}>
-                        <div>
-                          <div className="font-medium">{role.name}</div>
-                          <div className="text-xs text-muted-foreground">{role.description}</div>
-                        </div>
+                        {role.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+            </div>
 
-                {selectedRoleData && (
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{selectedRoleData.name}</Badge>
-                      <span className="text-sm text-muted-foreground">{selectedRoleData.description}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+              <Input
+                id="firstName"
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
+                placeholder="John"
+                className="col-span-2"
+              />
+            </div>
 
-          {/* Email Content */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Invitation Email</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject Line</Label>
-                <Input
-                  id="subject"
-                  type="text"
-                  value={formData.subject}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="message">Personal Message</Label>
-                <Textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, message: e.target.value }))}
-                  placeholder="Add a personal message to the invitation..."
-                  rows={4}
-                />
-                <p className="text-xs text-muted-foreground">
-                  This message will be included in the email along with the invitation code and registration
-                  instructions
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="validity">Code Validity (Days)</Label>
-                <Input
-                  id="validity"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={formData.validityDays}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, validityDays: Number.parseInt(e.target.value) || 30 }))
-                  }
-                  required
-                />
-                <p className="text-xs text-muted-foreground">How long the invitation code remains valid</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Email:</span>
-                  <span className="ml-2">{formData.recipientEmail || "Not specified"}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Role:</span>
-                  <Badge variant="outline" className="ml-2">
-                    {selectedRoleData?.name || formData.role}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="font-medium">Valid for:</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {formData.validityDays} days
-                  </Badge>
-                </div>
-                <div>
-                  <span className="font-medium">Usage:</span>
-                  <Badge variant="secondary" className="ml-2">
-                    Single use
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800">
-                  <strong>📧 What happens next:</strong>
-                  <br />
-                  1. An invitation code will be generated automatically
-                  <br />
-                  2. An email will be sent to {formData.recipientEmail || "the recipient"} with the registration link
-                  <br />
-                  3. They can click the link to register with the pre-filled invitation code
-                  <br />
-                  4. Once registered, they'll have {selectedRoleData?.name || formData.role} access to your organization
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
+                placeholder="Doe"
+                className="col-span-2"
+              />
+            </div>
+          </div>
         </form>
 
         <DialogFooter>

@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import { AddUserDialog } from "@/components/add-user-dialog"
 import { UserAddedSuccessDialog } from "@/components/user-added-success-dialog"
+import { AddTeammateDialog } from "@/components/add-teammate-dialog"
 import { OnboardingTooltip } from "@/components/onboarding-tooltip"
 import {
   Dialog,
@@ -47,7 +48,7 @@ interface User {
 }
 
 export default function ITUserManagementPage() {
-  const { userData, refreshUserData } = useAuth()
+  const { userData, refreshUserData, subscriptionData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [roles] = useState<HardcodedRole[]>(getAllRoles())
   const [loading, setLoading] = useState(true)
@@ -72,6 +73,12 @@ export default function ITUserManagementPage() {
   const [usersByDepartment, setUsersByDepartment] = useState<Record<string, User[]>>({})
   const [isUserAddedSuccessDialogOpen, setIsUserAddedSuccessDialogOpen] = useState(false)
   const [addedUserData, setAddedUserData] = useState<{ email: string; name: string; role: string } | null>(null)
+  const [isAddTeammateDialogOpen, setIsAddTeammateDialogOpen] = useState(false)
+  const [selectedDepartmentForTeammate, setSelectedDepartmentForTeammate] = useState<string>("")
+  const [isChooseFromTeamListDialogOpen, setIsChooseFromTeamListDialogOpen] = useState(false)
+  const [selectedUsersForAssignment, setSelectedUsersForAssignment] = useState<string[]>([])
+  const [availableUsersForAssignment, setAvailableUsersForAssignment] = useState<{user: User, roles: RoleType[]}[]>([])
+  const [initialRoleForAddUser, setInitialRoleForAddUser] = useState<string>("")
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
@@ -130,6 +137,74 @@ export default function ITUserManagementPage() {
       user.displayName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
   )
+
+  // Calculate remaining teammate slots
+  const calculateRemainingSlots = () => {
+    if (!subscriptionData?.maxUsers) return 0
+    const maxUsers = subscriptionData.maxUsers === -1 ? Infinity : subscriptionData.maxUsers
+    const currentUsers = users.length
+    return Math.max(0, maxUsers - currentUsers)
+  }
+
+  // Get users not in the selected department
+  const getUsersNotInDepartment = async (department: string) => {
+    if (!users.length) return []
+
+    const departmentRole = Object.entries(roleToDepartment).find(
+      ([roleId, deptName]) => deptName === department
+    )?.[0] as RoleType
+
+    if (!departmentRole) return users.map(user => ({ user, roles: [] as RoleType[] }))
+
+    const usersNotInDepartment: {user: User, roles: RoleType[]}[] = []
+
+    for (const user of users) {
+      try {
+        const userRoles = await getUserRoles(user.id)
+        if (!userRoles.includes(departmentRole)) {
+          usersNotInDepartment.push({ user, roles: userRoles })
+        }
+      } catch (error) {
+        console.error(`Error getting roles for user ${user.id}:`, error)
+        // Still include user but with empty roles
+        usersNotInDepartment.push({ user, roles: [] })
+      }
+    }
+
+    return usersNotInDepartment
+  }
+
+  // Handle assigning selected users to department
+  const handleAssignUsersToDepartment = async () => {
+    if (!selectedUsersForAssignment.length || !selectedDepartmentForTeammate) return
+
+    const departmentRole = Object.entries(roleToDepartment).find(
+      ([roleId, deptName]) => deptName === selectedDepartmentForTeammate
+    )?.[0] as RoleType
+
+    if (!departmentRole) return
+
+    try {
+      for (const userId of selectedUsersForAssignment) {
+        await assignRoleToUser(userId, departmentRole, userData?.uid)
+      }
+
+      toast({
+        title: "Success",
+        description: `Assigned ${selectedUsersForAssignment.length} user(s) to ${selectedDepartmentForTeammate}.`,
+      })
+
+      setIsChooseFromTeamListDialogOpen(false)
+      setSelectedUsersForAssignment([])
+    } catch (error) {
+      console.error("Error assigning users to department:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to assign users to department. Please try again.",
+      })
+    }
+  }
 
   // Role to department mapping
   const roleToDepartment: Record<string, string> = {
@@ -343,6 +418,40 @@ export default function ITUserManagementPage() {
     })
   }
 
+  const handleAddTeammate = (department: string) => {
+    handleActionWithCompanyCheck(() => {
+      setSelectedDepartmentForTeammate(department)
+      setIsAddTeammateDialogOpen(true)
+    })
+  }
+
+  const handleChooseFromTeamList = async () => {
+    setIsAddTeammateDialogOpen(false)
+    const availableUsers = await getUsersNotInDepartment(selectedDepartmentForTeammate)
+    setAvailableUsersForAssignment(availableUsers)
+    setIsChooseFromTeamListDialogOpen(true)
+  }
+
+  const handleCreateNewTeammate = () => {
+    // Map department to role
+    const departmentToRole: Record<string, string> = {
+      "Administrator": "admin",
+      "Sales Team": "sales",
+      "Logistics Team": "logistics",
+      "Content Management": "cms",
+      "IT Team": "it",
+      "Business Development": "business",
+      "Treasury": "treasury",
+      "Accounting": "accounting",
+      "Finance": "finance",
+    }
+
+    const role = departmentToRole[selectedDepartmentForTeammate] || "user"
+    setInitialRoleForAddUser(role)
+    setIsAddTeammateDialogOpen(false)
+    setIsAddUserDialogOpen(true)
+  }
+
   // Component to display user roles
   function UserRolesBadges({ userId }: { userId: string }) {
     const [userRoles, setUserRoles] = useState<RoleType[]>([])
@@ -372,6 +481,25 @@ export default function ITUserManagementPage() {
     }
 
     return <div className="flex flex-wrap gap-1">{userRoles.map((roleId) => getRoleBadge(roleId))}</div>
+  }
+
+  // Component to display user designation (roles as text)
+  function UserDesignation({ roles: userRoles }: { roles: RoleType[] }) {
+    if (userRoles.length === 0) {
+      return <span className="text-muted-foreground text-sm">No designation</span>
+    }
+
+    return (
+      <div className="text-sm">
+        {userRoles.map((roleId) => (
+          <span key={roleId}>
+            {roles.find((r) => r.id === roleId)?.name}
+          </span>
+        )).reduce((prev, curr, index) => (
+          index === 0 ? [curr] : [...prev, <span key={`comma-${index}`} className="text-muted-foreground">, </span>, curr]
+        ), [] as React.ReactNode[])}
+      </div>
+    )
   }
 
   if (loading) {
@@ -465,7 +593,11 @@ export default function ITUserManagementPage() {
             const memberText = memberCount === 1 ? "member" : "members"
 
             return (
-              <Card key={department} className="p-6 bg-white shadow-sm border border-gray-200 rounded-xl">
+              <Card
+                key={department}
+                className="p-6 bg-white shadow-sm border border-gray-200 rounded-xl cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+              >
                 <div className={`h-1 ${departmentColors[department] || 'bg-gray-300'} rounded-full mb-4 -mt-2`} />
 
                 <div className="mb-6">
@@ -497,9 +629,6 @@ export default function ITUserManagementPage() {
                             <span className="text-gray-600">
                               {departmentRole ? roles.find(r => r.id === departmentRole)?.name : 'No Role'}
                             </span>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleEditRoles(user)}>
-                              <Settings className="h-3 w-3" />
-                            </Button>
                           </div>
                         </div>
                       )
@@ -515,7 +644,10 @@ export default function ITUserManagementPage() {
                 <Button
                   variant="outline"
                   className="w-full text-gray-600 border-gray-300 hover:bg-gray-50 bg-transparent"
-                  onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddTeammate(department)
+                  }}
                 >
                   +Add Teammates
                 </Button>
@@ -541,47 +673,58 @@ export default function ITUserManagementPage() {
           setAddedUserData(userData)
           setIsUserAddedSuccessDialogOpen(true)
         }}
+        initialRole={initialRoleForAddUser}
+        remainingSlots={calculateRemainingSlots()}
+        departmentName={selectedDepartmentForTeammate}
       />
 
       <Dialog open={isEditRolesDialogOpen} onOpenChange={setIsEditRolesDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit User Roles</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="pb-3">
+            <DialogTitle className="text-lg">Edit User Roles</DialogTitle>
+            <DialogDescription className="text-sm">
               {selectedUser && (
                 <span>
-                  Manage roles for <strong>{selectedUser.displayName || selectedUser.email}</strong>
+                  Select roles for <strong>{selectedUser.displayName || selectedUser.email}</strong>
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="py-2">
             {roleDialogLoading ? (
-              <div className="flex items-center justify-center py-4">
+              <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                <span className="ml-2">Loading roles...</span>
+                <span className="ml-2 text-sm">Loading roles...</span>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto">
                 {roles.map((role) => (
-                  <div key={role.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                  <div
+                    key={role.id}
+                    className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                  >
                     <Checkbox
                       id={`role-${role.id}`}
                       checked={selectedRoles[role.id] || false}
                       onCheckedChange={(checked) =>
                         setSelectedRoles((prev) => ({ ...prev, [role.id]: checked === true }))
                       }
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
-                    <div className="flex-1">
-                      <Label htmlFor={`role-${role.id}`} className="flex items-center gap-2 cursor-pointer">
-                        <span className="font-medium">{role.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor={`role-${role.id}`}
+                          className="font-medium text-sm cursor-pointer flex-1"
+                        >
+                          {role.name}
+                        </Label>
                         {getRoleBadge(role.id)}
-                      </Label>
-                      <div className="text-sm text-muted-foreground mt-1">{role.description}</div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        <strong>Permissions:</strong> {role.permissions.length} modules
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {role.description}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -589,12 +732,19 @@ export default function ITUserManagementPage() {
             )}
           </div>
 
-          <DialogFooter className="sm:justify-end">
+          <DialogFooter className="pt-4 border-t">
             <Button variant="outline" onClick={() => setIsEditRolesDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleSaveRoles} disabled={roleDialogLoading}>
-              {roleDialogLoading ? "Saving..." : "Save Changes"}
+              {roleDialogLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -613,6 +763,101 @@ export default function ITUserManagementPage() {
           userRole={addedUserData.role}
         />
       )}
+
+      <AddTeammateDialog
+        open={isAddTeammateDialogOpen}
+        onOpenChange={setIsAddTeammateDialogOpen}
+        departmentName={selectedDepartmentForTeammate}
+        remainingSlots={calculateRemainingSlots()}
+        onChooseFromTeamList={handleChooseFromTeamList}
+        onCreateNewTeammate={handleCreateNewTeammate}
+      />
+
+      <Dialog open={isChooseFromTeamListDialogOpen} onOpenChange={setIsChooseFromTeamListDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose from Team List</DialogTitle>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div>You can add {calculateRemainingSlots()} more teammates</div>
+              <div className="flex items-center gap-2">
+                <span>Add to:</span>
+                <div className={`w-2 h-2 rounded-full ${departmentColors[selectedDepartmentForTeammate] || 'bg-gray-300'}`} />
+                <span>{selectedDepartmentForTeammate}</span>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {availableUsersForAssignment.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="w-12 p-3">
+                        <Checkbox
+                          checked={selectedUsersForAssignment.length === availableUsersForAssignment.length && availableUsersForAssignment.length > 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedUsersForAssignment(availableUsersForAssignment.map(u => u.user.id))
+                            } else {
+                              setSelectedUsersForAssignment([])
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Designation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="max-h-60 overflow-y-auto">
+                    {availableUsersForAssignment.map(({ user, roles }) => (
+                      <tr key={user.id} className="border-t hover:bg-muted/50">
+                        <td className="p-3">
+                          <Checkbox
+                            id={`user-${user.id}`}
+                            checked={selectedUsersForAssignment.includes(user.id)}
+                            onCheckedChange={(checked) =>
+                              setSelectedUsersForAssignment((prev) =>
+                                checked
+                                  ? [...prev, user.id]
+                                  : prev.filter((id) => id !== user.id)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-3">
+                          <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
+                            {user.displayName}
+                          </Label>
+                        </td>
+                        <td className="p-3">
+                          <UserDesignation roles={roles} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                No users available to assign to this department
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsChooseFromTeamListDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignUsersToDepartment}
+              disabled={!selectedUsersForAssignment.length}
+            >
+              Assign to {selectedDepartmentForTeammate}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {userData?.onboarding && (
         <OnboardingTooltip onClose={handleCloseOnboarding} />
