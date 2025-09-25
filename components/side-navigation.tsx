@@ -118,7 +118,7 @@ const navigationItems = [
     title: "Treasury",
     icon: Wallet,
     items: [
-      { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
+      { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
       { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
       { title: "Requests", href: "/treasury/quotations", icon: FileText },
       { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
@@ -713,7 +713,7 @@ export function SideNavigation() {
                   )
                 })}
                 {currentSection === "treasury" && [
-                  { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
+                  { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/quotations", icon: FileText },
                 ].map((item) => {
@@ -1368,7 +1368,7 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Dashboard", href: "/treasury", icon: LayoutDashboard },
+                  { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/requests", icon: FileText },
                   { title: "Planner", href: "/treasury/planner", icon: Calendar },
