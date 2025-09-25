@@ -1,261 +1,76 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  CreditCard,
-  PieChart,
-  BarChart3,
-  FileText,
-  Banknote,
-} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { RouteProtection } from "@/components/route-protection"
+
+const data = [
+  { month: "Jan", amount: 8500000 },
+  { month: "Feb", amount: 9200000 },
+  { month: "Mar", amount: 7800000 },
+  { month: "Apr", amount: 10100000 },
+  { month: "May", amount: 8900000 },
+  { month: "Jun", amount: 9500000 },
+  { month: "Jul", amount: 11200000 },
+  { month: "Aug", amount: 10800000 },
+  { month: "Sep", amount: 7600000 },
+  { month: "Oct", amount: 9800000 },
+  { month: "Nov", amount: 10200000 },
+  { month: "Dec", amount: 9300000 },
+]
 
 export default function TreasuryPage() {
   return (
     <RouteProtection requiredRoles="treasury">
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Treasury Dashboard</h2>
-        <div className="flex items-center space-x-2">
-          <Button>
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Report
-          </Button>
+        <div className="flex items-center justify-between space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight">Treasury Dashboard</h2>
         </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cash Position</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Monthly Treasury Collections</CardTitle>
+            <Select defaultValue="2025">
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2024">2024</SelectItem>
+                <SelectItem value="2023">2023</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱8,750,000</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +5.2% from last month
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Credit</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱2,500,000</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-blue-600 flex items-center">
-                <Banknote className="h-3 w-3 mr-1" />
-                Credit line utilization: 35%
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Daily Cash Flow</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱125,000</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-red-600 flex items-center">
-                <TrendingDown className="h-3 w-3 mr-1" />
-                -2.1% from yesterday
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Investment Portfolio</CardTitle>
-            <PieChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱3,200,000</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +7.8% portfolio return
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Recent Treasury Activities */}
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Recent Treasury Activities</CardTitle>
-            <CardDescription>Latest cash management and investment activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  id: "TRS-001",
-                  description: "Term Deposit Maturity",
-                  amount: "₱500,000",
-                  type: "Investment",
-                  status: "Completed",
-                  date: "2024-01-15",
-                },
-                {
-                  id: "TRS-002",
-                  description: "Foreign Exchange Transaction",
-                  amount: "₱250,000",
-                  type: "FX Trade",
-                  status: "Pending",
-                  date: "2024-01-14",
-                },
-                {
-                  id: "TRS-003",
-                  description: "Cash Sweep to Investment",
-                  amount: "₱1,000,000",
-                  type: "Transfer",
-                  status: "Completed",
-                  date: "2024-01-13",
-                },
-                {
-                  id: "TRS-004",
-                  description: "Credit Line Utilization",
-                  amount: "₱750,000",
-                  type: "Credit",
-                  status: "Active",
-                  date: "2024-01-12",
-                },
-              ].map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className={`p-2 rounded-full ${
-                        activity.type === "Investment"
-                          ? "bg-green-100 text-green-600"
-                          : activity.type === "FX Trade"
-                            ? "bg-purple-100 text-purple-600"
-                            : activity.type === "Transfer"
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-orange-100 text-orange-600"
-                      }`}
-                    >
-                      {activity.type === "Investment" ? (
-                        <PieChart className="h-4 w-4" />
-                      ) : activity.type === "FX Trade" ? (
-                        <TrendingUp className="h-4 w-4" />
-                      ) : activity.type === "Transfer" ? (
-                        <DollarSign className="h-4 w-4" />
-                      ) : (
-                        <CreditCard className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{activity.description}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {activity.id} • {activity.date}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{activity.amount}</p>
-                    <Badge
-                      variant={
-                        activity.status === "Completed"
-                          ? "default"
-                          : activity.status === "Pending"
-                            ? "secondary"
-                            : activity.status === "Active"
-                              ? "outline"
-                              : "outline"
-                      }
-                    >
-                      {activity.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+            <div className="h-48 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data}>
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `${value / 1000000}M`}
+                  />
+                  <Bar dataKey="amount" fill="#22d3ee" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common treasury management tasks</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <DollarSign className="mr-2 h-4 w-4" />
-              Cash Transfer
-            </Button>
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <PieChart className="mr-2 h-4 w-4" />
-              Investment Management
-            </Button>
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <CreditCard className="mr-2 h-4 w-4" />
-              Credit Facilities
-            </Button>
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              FX Trading
-            </Button>
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Risk Analysis
-            </Button>
-            <Button className="w-full justify-start bg-transparent" variant="outline">
-              <FileText className="mr-2 h-4 w-4" />
-              Treasury Reports
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Treasury Analytics Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cash Flow Forecast</CardTitle>
-            <CardDescription>Projected cash inflows and outflows for the next 30 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-              <BarChart3 className="h-8 w-8 mr-2" />
-              Cash flow forecast chart would go here
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Investment Performance</CardTitle>
-            <CardDescription>Portfolio performance and asset allocation</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-              <PieChart className="h-8 w-8 mr-2" />
-              Investment performance chart would go here
+            <div className="flex justify-between text-sm">
+              <div>
+                <span className="text-muted-foreground">Best month:</span>
+                <br />
+                <span className="font-semibold">Jul - 11,200,000</span>
+              </div>
+              <div className="text-right">
+                <span className="text-muted-foreground">Worst month:</span>
+                <br />
+                <span className="font-semibold">Sep - 7,600,000</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
     </RouteProtection>
   )
 }

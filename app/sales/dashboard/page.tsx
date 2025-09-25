@@ -10,6 +10,7 @@ import {
   MapPin,
   LayoutGrid,
   List,
+  Grid3X3,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -1239,119 +1240,58 @@ function SalesDashboardContent() {
           >
             {/* Left Column: Main Dashboard Content */}
             <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
-              {/* Header with title, actions, and search box */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div className="flex flex-col gap-2">
-                  {!proposalCreationMode && (
-                    <h1 className="text-xl md:text-2xl font-bold">
-                      {userData?.first_name
-                        ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                        : "Dashboard"}
-                    </h1>
-                  )}
-                  {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
-                  {!(proposalCreationMode || ceQuoteMode) && (
-                    <div className="w-full sm:w-64 md:w-80">
-                      <SearchBox
-                        onSearchResults={handleSearchResults}
-                        onSearchError={handleSearchError}
-                        onSearchLoading={handleSearchLoading}
-                        onSearchClear={handleSearchClear}
-                        userId={user?.uid}
-                      />
-                    </div>
-                  )}
+              {/* Dashboard Header */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h1 className="text-2xl font-semibold text-[#333333]">
+                    {userData?.first_name
+                      ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                      : "Dashboard"}
+                  </h1>
+
+                  {/* Navigation Tabs */}
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleInitiateProposalFlow}>
+                      Proposal
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleCeMode}>
+                      Cost Estimate
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
+                      Quotation
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
+                      Job Order
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
+                      Collab
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto mt-2">
-                  {/* Proposal Creation Mode Controls (on dashboard) */}
-                  {proposalCreationMode && (
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                      <span className="text-sm text-blue-700">
-                        {selectedClientForProposal ? (
-                          <>
-                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                          </>
-                        ) : (
-                          "Select a client"
-                        )}
-                        {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
-                      </span>
-                      <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* CE/Quote Mode Controls (on dashboard) */}
-                  {ceQuoteMode && (
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                      <span className="text-sm text-blue-700">
-                        {selectedClientForProposal ? (
-                          <>
-                            Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
-                          </>
-                        ) : (
-                          "Select a client"
-                        )}
-                        {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
-                      </span>
-                      <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Action Buttons (only visible when not in any selection mode) */}
-                  {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleInitiateProposalFlow}
-                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      >
-                        Planning & Proposals
-                      </Button>
-                      <Button onClick={handleCeMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                        CE
-                      </Button>
-                      <Button onClick={handleQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                        Quote
-                      </Button>
-                      <Button
-                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                        onClick={() => setIsCollabPartnerDialogOpen(true)}
-                      >
-                        Collab
-                      </Button>
-                      <Button
-                        onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
-                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      >
-                        Job Order
-                      </Button>
-                    </div>
-                  )}
-
-                  {!isMobile && (
-                    <div className="border rounded-md p-1 flex">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="icon"
-                        className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                        onClick={() => setViewMode("grid")}
-                      >
-                        <LayoutGrid size={18} />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="icon"
-                        className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                        onClick={() => setViewMode("list")}
-                      >
-                        <List size={18} />
-                      </Button>
-                    </div>
-                  )}
+                {/* Search and View Controls */}
+                <div className="flex justify-between items-center">
+                  <div className="relative">
+                    {!(proposalCreationMode || ceQuoteMode) && (
+                      <div className="w-80">
+                        <SearchBox
+                          onSearchResults={handleSearchResults}
+                          onSearchError={handleSearchError}
+                          onSearchLoading={handleSearchLoading}
+                          onSearchClear={handleSearchClear}
+                          userId={user?.uid}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("list")}>
+                      <List className="w-4 h-4 text-[#b7b7b7]" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("grid")}>
+                      <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -1467,7 +1407,7 @@ function SalesDashboardContent() {
                           mobileColumns={1}
                           tabletColumns={2}
                           desktopColumns={5}
-                          gap="sm"
+                          gap="xl"
                         >
                           {searchResults.map((result) => (
                             <Card
@@ -2014,11 +1954,13 @@ export default function SalesDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="sales">
-      <div className="h-screen overflow-hidden">
-        <SalesDashboardContent />
+      <div className="min-h-screen bg-[#fafafa] p-6">
+        <div className="max-w-7xl mx-auto">
+          <SalesDashboardContent />
 
-        {/* Render SalesChatWidget without the floating button */}
-        <SalesChatWidget />
+          {/* Render SalesChatWidget without the floating button */}
+          <SalesChatWidget />
+        </div>
       </div>
     </RouteProtection>
   )
@@ -2116,95 +2058,44 @@ function ProductCard({
   }
 
   return (
-    <Card
+    <div
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-sm rounded-2xl transition-all hover:shadow-md bg-white flex flex-col",
-
-        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
-        selectionMode ? "hover:border-green-300" : "",
+        "bg-white rounded-lg border-2 p-4 hover:shadow-md transition-shadow cursor-pointer",
+        isSelected ? "border-green-500" : "border-gray-200",
       )}
       onClick={handleClick}
     >
-      <div className="relative h-44 p-3">
-        <div className="relative h-full w-full rounded-xl overflow-hidden">
-          <Image
-            src={thumbnailUrl || "/placeholder.svg"}
-            alt={product.name || "Product image"}
-            fill
-            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/abstract-geometric-sculpture.png"
-              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-            }}
-          />
-
-          {/* Status Badge - Bottom Left */}
-          <div className="absolute bottom-3 left-3">
-            <div
-              className="px-3 py-1 rounded-md text-xs font-bold text-white shadow-sm"
-              style={{ backgroundColor: statusInfo.color }}
-            >
-              {statusInfo.label}
-            </div>
+      {/* Site Photo */}
+      <div className="bg-[#d9d9d9] rounded-lg aspect-square flex items-center justify-center mb-4">
+        {thumbnailUrl ? (
+          <div className="relative w-full h-full">
+            <Image
+              src={thumbnailUrl}
+              alt={product.name || "Product image"}
+              fill
+              className="object-cover rounded-lg"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = "/abstract-geometric-sculpture.png"
+                target.className = "opacity-50 object-contain rounded-lg"
+              }}
+            />
           </div>
-        </div>
-
-        {/* Selection indicator */}
-        {selectionMode && (
-          <div className="absolute top-5 right-5 z-10">
-            <div
-              className={cn(
-                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
-                isSelected ? "text-white" : "text-gray-500",
-              )}
-            >
-              {isSelected && <CheckCircle className="h-4 w-4" />}
-            </div>
+        ) : (
+          <div className="text-center text-[#b7b7b7]">
+            <div className="text-sm font-medium">Site</div>
+            <div className="text-sm font-medium">Photo</div>
           </div>
         )}
       </div>
-      <CardContent className="p-4 flex-1 flex flex-col h-full">
-        <div className="flex flex-col gap-2 flex-1">
-          {/* Location/Site Name - Top text with gray color and smaller font */}
-          <div
-            className="font-medium truncate"
-            style={{
-              color: "#737373",
-              fontSize: "13.6px",
-              lineHeight: "1.2",
-            }}
-          >
-            {location}
-          </div>
 
-          {/* Product Name - Bottom text with black color, larger font and bold */}
-          <h3
-            className="font-bold truncate"
-            style={{
-              color: "#000000",
-              fontSize: "15.2px",
-              lineHeight: "1.3",
-            }}
-          >
-            {product.name || "No name available"}
-          </h3>
-
-          {/* Price - More prominent */}
-          <div className="text-sm font-semibold text-gray-900 mt-1">{formattedPrice}</div>
-          {/* Hide Create Report button when in selectionMode */}
-          {!selectionMode && (
-            <Button
-              variant="outline"
-              className="mt-auto w-full h-9 text-sm bg-[#efefef] hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors"
-              onClick={handleCreateReport}
-            >
-              Create Report
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      {/* Site Information */}
+      <div className="space-y-1 text-sm">
+        {siteCode && <div className="text-[#b7b7b7]">Site Code: {siteCode}</div>}
+        <div className="text-[#333333] font-medium">{product.name || "No name available"}</div>
+        <div className="text-[#333333]">{location}</div>
+        <div className="text-[#333333] font-medium">{formattedPrice}</div>
+      </div>
+    </div>
   )
 }
