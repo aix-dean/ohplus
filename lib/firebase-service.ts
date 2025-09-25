@@ -424,7 +424,7 @@ export async function getPaginatedUserProducts(
     const { searchTerm = "", active, content_type } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+    const constraints: any[] = [where("company_id", "==", userId), orderBy("created", "desc"), limit(itemsPerPage)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -519,7 +519,7 @@ export function getPaginatedUserProductsRealtime(
   const { searchTerm = "", active, content_type } = options
 
   // Start with basic constraints
-  const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+  const constraints: any[] = [where("company_id", "==", userId), orderBy("created", "desc"), limit(itemsPerPage)]
 
   // Add active filter if specified
   if (active !== undefined) {

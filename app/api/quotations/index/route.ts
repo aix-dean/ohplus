@@ -34,6 +34,7 @@ async function indexQuotation(quotation: any) {
         client_company_name: quotation.client_company_name,
         client_phone: quotation.client_phone,
         client_address: quotation.client_address,
+        client_designation: quotation.client_designation,
         items: quotation.items,
         seller_id: quotation.seller_id,
         status: quotation.status,
