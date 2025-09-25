@@ -40,7 +40,7 @@ type ServiceAssignment = {
   updatedAt?: Date
 }
 
-type CalendarViewType = "month" | "week" | "day" | "hour" | "minute"
+type CalendarViewType = "month" | "week" | "day"
 
 // Helper functions for date manipulation
 const getDaysInMonth = (year: number, month: number) => {
@@ -313,12 +313,6 @@ export default function AdminPlannerPage() {
       case "day":
         newDate.setDate(currentDate.getDate() - 1)
         break
-      case "hour":
-        newDate.setHours(currentDate.getHours() - 1)
-        break
-      case "minute":
-        newDate.setMinutes(currentDate.getMinutes() - 15)
-        break
     }
     setCurrentDate(newDate)
   }
@@ -334,12 +328,6 @@ export default function AdminPlannerPage() {
         break
       case "day":
         newDate.setDate(currentDate.getDate() + 1)
-        break
-      case "hour":
-        newDate.setHours(currentDate.getHours() + 1)
-        break
-      case "minute":
-        newDate.setMinutes(currentDate.getMinutes() + 15)
         break
     }
     setCurrentDate(newDate)
@@ -380,18 +368,6 @@ export default function AdminPlannerPage() {
         options.day = "numeric"
         options.year = "numeric"
         break
-      case "hour":
-        options.weekday = "short"
-        options.month = "short"
-        options.day = "numeric"
-        options.hour = "numeric"
-        options.minute = "numeric"
-        break
-      case "minute":
-        options.hour = "numeric"
-        options.minute = "numeric"
-        options.second = "numeric"
-        return `${currentDate.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at ${currentDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
     }
 
     return currentDate.toLocaleDateString([], options)
@@ -582,59 +558,6 @@ export default function AdminPlannerPage() {
             return false
           })
 
-        case "hour":
-          const hourStart = new Date(currentDate)
-          hourStart.setMinutes(0, 0, 0)
-
-          const hourEnd = new Date(hourStart)
-          hourEnd.setHours(hourStart.getHours() + 1)
-
-          return filtered.filter((assignment) => {
-            // For hour view, check if alarmDate + alarmTime falls within this hour
-            if (assignment.alarmDate && assignment.alarmTime) {
-              const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-              const assignmentDateTime = new Date(assignment.alarmDate)
-              assignmentDateTime.setHours(hours, minutes, 0, 0)
-
-              const inHour = assignmentDateTime >= hourStart && assignmentDateTime < hourEnd
-              return inHour
-            }
-
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart < hourEnd && assignment.coveredDateEnd >= hourStart
-              return overlaps
-            }
-
-            return false
-          })
-
-        case "minute":
-          const minuteStart = new Date(currentDate)
-          minuteStart.setSeconds(0, 0)
-
-          const minuteEnd = new Date(minuteStart)
-          minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
-
-          return filtered.filter((assignment) => {
-            // For minute view, check if alarmDate + alarmTime falls within this 15-minute window
-            if (assignment.alarmDate && assignment.alarmTime) {
-              const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-              const assignmentDateTime = new Date(assignment.alarmDate)
-              assignmentDateTime.setHours(hours, minutes, 0, 0)
-
-              const inWindow = assignmentDateTime >= minuteStart && assignmentDateTime < minuteEnd
-              return inWindow
-            }
-
-            // Fallback: check covered dates
-            if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-              const overlaps = assignment.coveredDateStart < minuteEnd && assignment.coveredDateEnd >= minuteStart
-              return overlaps
-            }
-
-            return false
-          })
 
         default:
           return filtered
@@ -790,7 +713,7 @@ export default function AdminPlannerPage() {
           return (
             <div
               key={`day-${i}`}
-              className={`min-h-[80px] sm:min-h-[120px] border rounded-md p-1 ${
+              className={`min-h-[100px] sm:min-h-[140px] border rounded-md p-1 ${
                 day ? "bg-white" : "bg-gray-50"
               } ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
             >
@@ -799,7 +722,7 @@ export default function AdminPlannerPage() {
                   <div className={`text-right p-1 text-xs sm:text-sm ${isToday ? "font-bold text-blue-600" : ""}`}>
                     {day}
                   </div>
-                  <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
+                  <div className="overflow-y-auto max-h-[70px] sm:max-h-[100px]">
                     {dayAssignments.slice(0, 3).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
@@ -836,18 +759,18 @@ export default function AdminPlannerPage() {
                     {day ? eventsByDay[day]?.slice(0, 2).map((event, j) => (
                       <div
                         key={`event-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border cursor-pointer hover:bg-gray-100 bg-green-50 border-green-200 min-h-[60px] sm:min-h-[70px]`}
                         onClick={(e) => {
                           e.stopPropagation()
                           handleEventClick(event)
                         }}
                         title={`${event.title} - ${event.type} at ${event.location}`}
                       >
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-start gap-1">
                           <span>🎉</span>
-                          <span className="truncate font-medium">{event.title}</span>
+                          <span className="font-medium break-words">{event.title}</span>
                         </div>
-                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 mt-0.5 break-words">
                           {event.location}
                         </div>
                         <div className="flex items-center justify-between mt-0.5">
@@ -917,6 +840,16 @@ export default function AdminPlannerPage() {
       }
     })
 
+    // Group events by day
+    const eventsByDay: { [key: string]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        const dayKey = event.start.toDateString()
+        if (!eventsByDay[dayKey]) eventsByDay[dayKey] = []
+        eventsByDay[dayKey].push(event)
+      }
+    })
+
     return (
       <div className="grid grid-cols-7 gap-1 sm:gap-2 mt-4">
         {/* Day headers */}
@@ -942,7 +875,8 @@ export default function AdminPlannerPage() {
         {days.map((day, i) => {
           const isToday = day.toDateString() === new Date().toDateString()
           const dayAssignments = assignmentsByDay[day.toDateString()] || []
-
+          const dayEvents = eventsByDay[day.toDateString()] || []
+  
           return (
             <div
               key={`day-${i}`}
@@ -986,9 +920,44 @@ export default function AdminPlannerPage() {
                     </div>
                   </div>
                 ))}
-                {dayAssignments.length === 0 && (
+                {dayEvents.slice(0, 2).map((event, j) => (
+                  <div
+                    key={`event-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-green-50 border-green-200 min-h-[80px] sm:min-h-[100px]`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEventClick(event)
+                    }}
+                    title={`${event.title} - ${event.type} at ${event.location}`}
+                  >
+                    <div className="font-medium flex items-start gap-1">
+                      <span>🎉</span>
+                      <span className="break-words">{event.title}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 break-words">
+                      {event.location}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[8px] sm:text-xs px-1 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
+                      >
+                        {event.type}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
+                        {formatTime(event.start as Date)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {dayEvents.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayEvents.length - 2} more events
+                  </div>
+                )}
+                {dayAssignments.length === 0 && dayEvents.length === 0 && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
-                    No assignments
+                    No assignments or events
                   </div>
                 )}
               </div>
@@ -1021,6 +990,18 @@ export default function AdminPlannerPage() {
       }
     })
 
+    // Group events by hour based on start time
+    const eventsByHour: { [key: number]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        if (event.start.toDateString() === currentDate.toDateString()) {
+          const hour = event.start.getHours()
+          if (!eventsByHour[hour]) eventsByHour[hour] = []
+          eventsByHour[hour].push(event)
+        }
+      }
+    })
+
     return (
       <div className="mt-4 border rounded-md overflow-hidden">
         <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[80px_1fr] divide-x">
@@ -1029,9 +1010,9 @@ export default function AdminPlannerPage() {
             {hours.map((hour) => (
               <div
                 key={`hour-${hour}`}
-                className="h-16 sm:h-20 border-b border-gray-200 p-1 sm:p-2 text-right text-[10px] sm:text-sm text-gray-500"
+                className="h-20 sm:h-24 border-b border-gray-200 p-1 sm:p-2 text-right text-[10px] sm:text-sm text-gray-500"
               >
-                {hour === 0 ? "12a" : hour < 12 ? `${hour}a` : hour === 12 ? "12p" : `${hour - 12}p`}
+                {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
               </div>
             ))}
           </div>
@@ -1040,22 +1021,23 @@ export default function AdminPlannerPage() {
           <div>
             {hours.map((hour) => {
               const hourAssignments = assignmentsByHour[hour] || []
+              const hourEvents = eventsByHour[hour] || []
               const currentHour = new Date().getHours()
               const isCurrentHour =
                 hour === currentHour &&
                 currentDate.getDate() === new Date().getDate() &&
                 currentDate.getMonth() === new Date().getMonth() &&
                 currentDate.getFullYear() === new Date().getFullYear()
-
+  
               return (
                 <div
                   key={`content-${hour}`}
-                  className={`h-16 sm:h-20 border-b border-gray-200 p-1 relative ${isCurrentHour ? "bg-blue-50" : ""}`}
+                  className={`h-20 sm:h-24 border-b border-gray-200 p-1 relative ${isCurrentHour ? "bg-blue-50" : ""}`}
                 >
                   {hourAssignments.map((assignment, i) => {
                     const minutes = assignment.alarmTime ? Number.parseInt(assignment.alarmTime.split(":")[1]) : 0
                     const topPosition = (minutes / 60) * 100
-
+  
                     return (
                       <div
                         key={`assignment-${hour}-${i}`}
@@ -1091,106 +1073,45 @@ export default function AdminPlannerPage() {
                       </div>
                     )
                   })}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    )
-  }
+                  {hourEvents.map((event, i) => {
+                    const minutes = event.start instanceof Date ? event.start.getMinutes() : 0
+                    const topPosition = (minutes / 60) * 100
 
-  // Hour view renderer with actual assignment data
-  const renderHourView = (assignments: ServiceAssignment[]) => {
-    // Create array of 5-minute intervals
-    const intervals = Array(12)
-      .fill(null)
-      .map((_, i) => i * 5)
-
-    return (
-      <div className="mt-4 border rounded-md overflow-hidden">
-        <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[80px_1fr] divide-x">
-          {/* Time column */}
-          <div className="bg-gray-50">
-            {intervals.map((interval) => {
-              const time = new Date(currentDate)
-              time.setMinutes(interval, 0, 0)
-
-              return (
-                <div
-                  key={`interval-${interval}`}
-                  className="h-12 sm:h-16 border-b border-gray-200 p-1 sm:p-2 text-right text-[8px] sm:text-sm text-gray-500"
-                >
-                  {time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Content column */}
-          <div>
-            {intervals.map((interval) => {
-              const time = new Date(currentDate)
-              time.setMinutes(interval, 0, 0)
-
-              const intervalAssignments = assignments.filter((assignment) => {
-                if (assignment.alarmTime) {
-                  const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-                  const assignmentMinutes = hours * 60 + minutes
-                  const currentMinutes = currentDate.getHours() * 60 + interval
-
-                  return assignmentMinutes >= currentMinutes && assignmentMinutes < currentMinutes + 5
-                }
-                return false
-              })
-
-              const isCurrentInterval =
-                new Date().getHours() === time.getHours() &&
-                Math.floor(new Date().getMinutes() / 5) * 5 === interval &&
-                new Date().getDate() === time.getDate() &&
-                new Date().getMonth() === time.getMonth() &&
-                new Date().getFullYear() === time.getFullYear()
-
-              return (
-                <div
-                  key={`content-${interval}`}
-                  className={`h-12 sm:h-16 border-b border-gray-200 p-1 ${isCurrentInterval ? "bg-blue-50" : ""}`}
-                >
-                  <div className="flex flex-wrap gap-1">
-                    {intervalAssignments.map((assignment, i) => (
+                    return (
                       <div
-                        key={`assignment-${interval}-${i}`}
-                        className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
+                        key={`event-${hour}-${i}`}
+                        className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 bg-green-50 border-green-200`}
+                        style={{
+                          top: `${topPosition}%`,
+                          minHeight: "25%", // Minimum height for content
+                          maxHeight: "60px", // Allow more height for content
+                          zIndex: hourAssignments.length + i + 1,
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/admin/service-assignments/${assignment.id}`)
+                          handleEventClick(event)
                         }}
-                        title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
+                        title={`${event.title} - ${event.type} at ${event.location}`}
                       >
-                        <div className="font-medium truncate flex items-center gap-1">
-                          <span>{getTypeIcon(assignment.serviceType)}</span>
-                          <span>{assignment.saNumber}</span>
+                        <div className="font-medium flex items-start gap-1">
+                          <span>🎉</span>
+                          <span className="break-words">{event.title}</span>
                         </div>
-                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
-                          {assignment.projectSiteName}
+                        <div className="text-[6px] sm:text-[8px] text-gray-600 break-words">
+                          {event.location}
                         </div>
                         <div className="flex items-center justify-between mt-0 sm:mt-1">
                           <Badge
                             variant="outline"
-                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1`}
+                            className={`text-[6px] sm:text-[8px] px-1 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
                           >
-                            {assignment.status}
+                            {event.type}
                           </Badge>
-                          <span className="text-[6px] sm:text-[8px] truncate">{assignment.serviceType}</span>
+                          <span className="text-[6px] sm:text-[8px]">{formatTime(event.start as Date)}</span>
                         </div>
                       </div>
-                    ))}
-                    {intervalAssignments.length === 0 && (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-xs">
-                        No assignments
-                      </div>
-                    )}
-                  </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -1200,106 +1121,7 @@ export default function AdminPlannerPage() {
     )
   }
 
-  // Minute view renderer with actual assignment data
-  const renderMinuteView = (assignments: ServiceAssignment[]) => {
-    // Create array of 1-minute intervals for a 15-minute window
-    const baseMinute = Math.floor(currentDate.getMinutes() / 15) * 15
-    const intervals = Array(15)
-      .fill(null)
-      .map((_, i) => baseMinute + i)
 
-    return (
-      <div className="mt-4 border rounded-md overflow-hidden">
-        <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[80px_1fr] divide-x">
-          {/* Time column */}
-          <div className="bg-gray-50">
-            {intervals.map((minute) => {
-              const time = new Date(currentDate)
-              time.setMinutes(minute, 0, 0)
-
-              return (
-                <div
-                  key={`minute-${minute}`}
-                  className="h-10 sm:h-12 border-b border-gray-200 p-1 sm:p-2 text-right text-[8px] sm:text-sm text-gray-500"
-                >
-                  {time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Content column */}
-          <div>
-            {intervals.map((minute) => {
-              const time = new Date(currentDate)
-              time.setMinutes(minute, 0, 0)
-
-              const minuteAssignments = assignments.filter((assignment) => {
-                if (assignment.alarmTime) {
-                  const [hours, minutes] = assignment.alarmTime.split(":").map(Number)
-                  const assignmentMinutes = hours * 60 + minutes
-                  const currentMinutes = currentDate.getHours() * 60 + minute
-
-                  return assignmentMinutes === currentMinutes
-                }
-                return false
-              })
-
-              const isCurrentMinute =
-                new Date().getHours() === time.getHours() &&
-                new Date().getMinutes() === minute &&
-                new Date().getDate() === time.getDate() &&
-                new Date().getMonth() === time.getMonth() &&
-                new Date().getFullYear() === time.getFullYear()
-
-              return (
-                <div
-                  key={`content-${minute}`}
-                  className={`h-10 sm:h-12 border-b border-gray-200 p-1 ${isCurrentMinute ? "bg-blue-50" : ""}`}
-                >
-                  <div className="flex flex-wrap gap-1">
-                    {minuteAssignments.map((assignment, i) => (
-                      <div
-                        key={`assignment-${minute}-${i}`}
-                        className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded border shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/admin/service-assignments/${assignment.id}`)
-                        }}
-                        title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
-                      >
-                        <div className="font-medium truncate flex items-center gap-1">
-                          <span>{getTypeIcon(assignment.serviceType)}</span>
-                          <span>{assignment.saNumber}</span>
-                        </div>
-                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
-                          {assignment.projectSiteName}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Badge
-                            variant="outline"
-                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1`}
-                          >
-                            {assignment.status}
-                          </Badge>
-                          <span className="text-[6px] sm:text-[8px] truncate">{assignment.serviceType}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {minuteAssignments.length === 0 && (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-[10px]">
-                        No assignments
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // Booking render functions
   const renderMonthViewBookings = (bookings: Booking[]) => {
@@ -1428,10 +1250,6 @@ export default function AdminPlannerPage() {
         return plannerView === "bookings" ? renderWeekView(filteredItems as any) : renderWeekView(filteredItems as ServiceAssignment[])
       case "day":
         return plannerView === "bookings" ? renderDayView(filteredItems as any) : renderDayView(filteredItems as ServiceAssignment[])
-      case "hour":
-        return plannerView === "bookings" ? renderHourView(filteredItems as any) : renderHourView(filteredItems as ServiceAssignment[])
-      case "minute":
-        return plannerView === "bookings" ? renderMinuteView(filteredItems as any) : renderMinuteView(filteredItems as ServiceAssignment[])
     }
   }
 
@@ -1536,7 +1354,7 @@ export default function AdminPlannerPage() {
                     onValueChange={(v) => setView(v as CalendarViewType)}
                     className="flex-1"
                   >
-                    <TabsList className="grid grid-cols-5 w-full">
+                    <TabsList className="grid grid-cols-3 w-full">
                       <TabsTrigger value="month" className="text-xs">
                         <CalendarIcon size={14} className="mr-1 hidden sm:inline" />
                         <span className="sm:hidden">M</span>
@@ -1552,16 +1370,6 @@ export default function AdminPlannerPage() {
                         <span className="sm:hidden">D</span>
                         <span className="hidden sm:inline">Day</span>
                       </TabsTrigger>
-                      <TabsTrigger value="hour" className="text-xs">
-                        <Clock size={14} className="mr-1 hidden sm:inline" />
-                        <span className="sm:hidden">H</span>
-                        <span className="hidden sm:inline">Hour</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="minute" className="text-xs">
-                        <Clock size={14} className="mr-1 hidden sm:inline" />
-                        <span className="sm:hidden">Min</span>
-                        <span className="hidden sm:inline">Minute</span>
-                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
 
@@ -1575,11 +1383,7 @@ export default function AdminPlannerPage() {
                             ? "week"
                             : view === "week"
                               ? "day"
-                              : view === "day"
-                                ? "hour"
-                                : view === "hour"
-                                  ? "minute"
-                                  : "minute",
+                              : "day",
                         )
                       }
                     >
@@ -1590,15 +1394,11 @@ export default function AdminPlannerPage() {
                       size="icon"
                       onClick={() =>
                         setView(
-                          view === "minute"
-                            ? "hour"
-                            : view === "hour"
-                              ? "day"
-                              : view === "day"
-                                ? "week"
-                                : view === "week"
-                                  ? "month"
-                                  : "month",
+                          view === "day"
+                            ? "week"
+                            : view === "week"
+                              ? "month"
+                              : "month",
                         )
                       }
                     >

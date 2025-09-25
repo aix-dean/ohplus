@@ -1,13 +1,17 @@
 "use client"
 
-import { ArrowLeft, Search, ChevronDown, X } from "lucide-react"
+import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
 import { Pagination } from "@/components/ui/pagination"
+import { liteClient } from "algoliasearch/lite"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface JobOrderCount {
   [productId: string]: number
@@ -56,7 +60,7 @@ interface Booking {
 
 export default function ProjectMonitoringPage() {
   const router = useRouter()
-  const { userData } = useAuth()
+  const { user, userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +77,15 @@ export default function ProjectMonitoringPage() {
   const [itemsPerPage] = useState(15)
   const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any])
   const [hasMore, setHasMore] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const searchClient = liteClient(process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!, process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY!)
+
+
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const fetchProductReports = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -316,6 +329,7 @@ export default function ProjectMonitoringPage() {
     }
   }
 
+
   useEffect(() => {
     const fetchBookings = async () => {
       if (!userData?.company_id) {
@@ -325,76 +339,126 @@ export default function ProjectMonitoringPage() {
 
       try {
         setLoading(true)
-        const bookingsRef = collection(db, "booking")
-        let bookingsQuery = query(
-          bookingsRef,
-          where("company_id", "==", userData.company_id),
-          where("quotation_id", "!=", null),
-          orderBy("created", "desc"),
-          limit(itemsPerPage + 1)
-        )
 
-        const lastDoc = lastVisibleDocs[currentPage - 1]
-        if (lastDoc) {
-          bookingsQuery = query(
+        if (searchQuery) {
+          // Use Algolia search
+          const results = await searchClient.search([{
+            indexName: process.env.NEXT_PUBLIC_ALGOLIA_BOOKING_INDEX_NAME!,
+            query: searchQuery,
+            params: {
+              filters: `company_id:${userData.company_id}`,
+              hitsPerPage: itemsPerPage,
+              page: currentPage - 1
+            }
+          }])
+
+          const { hits, nbPages } = results.results[0] as any
+          setBookings(hits.map((h: any) => ({ id: h.objectID, ...h })) as Booking[])
+          setHasMore(nbPages > currentPage)
+
+          // Create project names map
+          const namesMap: { [productId: string]: string } = {}
+          hits.forEach((booking: any) => {
+            if (booking.product_id && booking.project_name) {
+              namesMap[booking.product_id] = booking.project_name
+            }
+          })
+          setProjectNames(namesMap)
+
+          const productIds = hits.map((b: any) => b.product_id as string).filter((id: string) => Boolean(id))
+          const uniqueProductIds = [...new Set(productIds)]
+          const productData: { [key: string]: Product } = {}
+
+          for (const productId of uniqueProductIds) {
+            try {
+              const productDoc = await getDoc(doc(db, "products", productId))
+              if (productDoc.exists()) {
+                productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+              }
+            } catch (error) {
+              console.error(`Error fetching product ${productId}:`, error)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await fetchJobOrderCounts(uniqueProductIds)
+            await fetchProductReports(uniqueProductIds)
+          }
+        } else {
+          // Use Firestore
+          const bookingsRef = collection(db, "booking")
+          let bookingsQuery = query(
             bookingsRef,
             where("company_id", "==", userData.company_id),
             where("quotation_id", "!=", null),
             orderBy("created", "desc"),
-            startAfter(lastDoc),
             limit(itemsPerPage + 1)
           )
-        }
 
-        const querySnapshot = await getDocs(bookingsQuery)
-        const fetchedBookings: Booking[] = []
-        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-
-        setHasMore(querySnapshot.docs.length > itemsPerPage)
-
-        querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
-          fetchedBookings.push({ id: doc.id, ...doc.data() })
-        })
-
-        setBookings(fetchedBookings)
-
-        // Create project names map
-        const namesMap: { [productId: string]: string } = {}
-        fetchedBookings.forEach((booking) => {
-          if (booking.product_id && booking.project_name) {
-            namesMap[booking.product_id] = booking.project_name
+          const lastDoc = lastVisibleDocs[currentPage - 1]
+          if (lastDoc) {
+            bookingsQuery = query(
+              bookingsRef,
+              where("company_id", "==", userData.company_id),
+              where("quotation_id", "!=", null),
+              orderBy("created", "desc"),
+              startAfter(lastDoc),
+              limit(itemsPerPage + 1)
+            )
           }
-        })
-        setProjectNames(namesMap)
 
-        // Only update lastVisibleDocs if we are moving to a new page
-        if (newLastVisible && currentPage === lastVisibleDocs.length) {
-          setLastVisibleDocs((prev) => [...prev, newLastVisible])
-        }
+          const querySnapshot = await getDocs(bookingsQuery)
+          const fetchedBookings: Booking[] = []
+          const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
 
-        const productIds = fetchedBookings
-          .map((booking) => booking.product_id)
-          .filter((id): id is string => Boolean(id))
+          setHasMore(querySnapshot.docs.length > itemsPerPage)
 
-        const uniqueProductIds = [...new Set(productIds)]
-        const productData: { [key: string]: Product } = {}
+          querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
+            fetchedBookings.push({ id: doc.id, ...doc.data() })
+          })
 
-        for (const productId of uniqueProductIds) {
-          try {
-            const productDoc = await getDoc(doc(db, "products", productId))
-            if (productDoc.exists()) {
-              productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+          setBookings(fetchedBookings)
+
+          // Create project names map
+          const namesMap: { [productId: string]: string } = {}
+          fetchedBookings.forEach((booking) => {
+            if (booking.product_id && booking.project_name) {
+              namesMap[booking.product_id] = booking.project_name
             }
-          } catch (error) {
-            console.error(`Error fetching product ${productId}:`, error)
+          })
+          setProjectNames(namesMap)
+
+          // Only update lastVisibleDocs if we are moving to a new page
+          if (newLastVisible && currentPage === lastVisibleDocs.length) {
+            setLastVisibleDocs((prev) => [...prev, newLastVisible])
           }
-        }
 
-        setProducts(Object.values(productData).filter(p => p.id))
+          const productIds = fetchedBookings
+            .map((booking) => booking.product_id)
+            .filter((id): id is string => Boolean(id))
 
-        if (uniqueProductIds.length > 0) {
-          await fetchJobOrderCounts(uniqueProductIds)
-          await fetchProductReports(uniqueProductIds)
+          const uniqueProductIds = [...new Set(productIds)]
+          const productData: { [key: string]: Product } = {}
+
+          for (const productId of uniqueProductIds) {
+            try {
+              const productDoc = await getDoc(doc(db, "products", productId))
+              if (productDoc.exists()) {
+                productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+              }
+            } catch (error) {
+              console.error(`Error fetching product ${productId}:`, error)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await fetchJobOrderCounts(uniqueProductIds)
+            await fetchProductReports(uniqueProductIds)
+          }
         }
       } catch (error) {
         console.error("Error fetching bookings:", error)
@@ -404,7 +468,9 @@ export default function ProjectMonitoringPage() {
     }
 
     fetchBookings()
-  }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length])
+   }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length, searchQuery])
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -428,24 +494,15 @@ export default function ProjectMonitoringPage() {
             <input
               type="text"
               placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
-          {/* Dropdown Filter */}
-          <div className="flex-1 flex justify-end">
-            <div className="relative">
-              <select className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700">
-                <option value="">Select Site</option>
-                <option value="site1">Site 1</option>
-                <option value="site2">Site 2</option>
-                <option value="site3">Site 3</option>
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-            </div>
-          </div>
         </div>
       </div>
+
 
       <div className="p-4">
         {loading ? (
@@ -534,6 +591,7 @@ export default function ProjectMonitoringPage() {
         )}
       </div>
 
+
       {isDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-lg p-6 w-[600px] max-w-[90vw] max-h-[80vh] relative animate-in zoom-in-95 duration-300">
@@ -609,6 +667,7 @@ export default function ProjectMonitoringPage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

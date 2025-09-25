@@ -8,6 +8,7 @@ import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, get
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
 import { Pagination } from "@/components/ui/pagination"
+import { liteClient } from "algoliasearch/lite"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -54,9 +55,10 @@ interface Booking {
   status?: string
   created?: any
   quotation_id?: string
+  project_name?: string
 }
 
-export default function LogisticsBulletinBoardPage() {
+export default function ProjectMonitoringPage() {
   const router = useRouter()
   const { user, userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -66,6 +68,7 @@ export default function LogisticsBulletinBoardPage() {
   const [latestJoNumbers, setLatestJoNumbers] = useState<{ [productId: string]: string }>({})
   const [latestJoIds, setLatestJoIds] = useState<{ [productId: string]: string }>({})
   const [productReports, setProductReports] = useState<ProductReports>({})
+  const [projectNames, setProjectNames] = useState<{ [productId: string]: string }>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -74,8 +77,15 @@ export default function LogisticsBulletinBoardPage() {
   const [itemsPerPage] = useState(15)
   const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any])
   const [hasMore, setHasMore] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const searchClient = liteClient(process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!, process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY!)
 
 
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const fetchProductReports = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
@@ -86,21 +96,59 @@ export default function LogisticsBulletinBoardPage() {
       const jobOrdersQuery = query(jobOrdersRef, where("company_id", "==", userData.company_id))
       const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
 
-      // Create a map of joNumber to product_id
-      const joNumberToProductId: { [joNumber: string]: string } = {}
+      // Group job orders by product_id and find the latest joNumber for each product
+      const latestJoNumbersMap: { [productId: string]: string } = {}
+      const jobOrdersByProduct: { [productId: string]: JobOrder[] } = {}
       jobOrdersSnapshot.forEach((doc) => {
         const data = doc.data()
-        if (data.joNumber && data.product_id && productIds.includes(data.product_id)) {
-          joNumberToProductId[data.joNumber] = data.product_id
+        const productId = data.product_id
+        if (productId && productIds.includes(productId)) {
+          if (!jobOrdersByProduct[productId]) {
+            jobOrdersByProduct[productId] = []
+          }
+          jobOrdersByProduct[productId].push({ id: doc.id, ...data } as JobOrder)
         }
       })
 
-      // Get all joNumbers for the products
-      const joNumbers = Object.keys(joNumberToProductId)
+      // For each product, sort job orders by createdAt descending and get the latest joNumber
+      Object.keys(jobOrdersByProduct).forEach((productId) => {
+        const jobOrders = jobOrdersByProduct[productId]
+        if (jobOrders.length > 0) {
+          jobOrders.sort((a, b) => {
+            let aTime: Date
+            let bTime: Date
+
+            if (a.createdAt?.toDate) {
+              aTime = a.createdAt.toDate()
+            } else if (a.createdAt) {
+              aTime = new Date(a.createdAt)
+            } else {
+              aTime = new Date(0)
+            }
+
+            if (b.createdAt?.toDate) {
+              bTime = b.createdAt.toDate()
+            } else if (b.createdAt) {
+              bTime = new Date(b.createdAt)
+            } else {
+              bTime = new Date(0)
+            }
+
+            return bTime.getTime() - aTime.getTime()
+          })
+
+          const latestJo = jobOrders[0]
+          latestJoNumbersMap[productId] = latestJo.joNumber
+          console.log('Latest job order found:', latestJo.joNumber, 'for product:', productId)
+        }
+      })
+
+      // Get all latest joNumbers for the products
+      const joNumbers = Object.values(latestJoNumbersMap)
 
       if (joNumbers.length === 0) return
 
-      // Fetch reports for these joNumbers and company
+      // Fetch reports for these latest joNumbers and company
       const reportsRef = collection(db, "reports")
       const reportsQuery = query(
         reportsRef,
@@ -109,23 +157,25 @@ export default function LogisticsBulletinBoardPage() {
       )
       const reportsSnapshot = await getDocs(reportsQuery)
 
-      // Group reports by product_id
+      // Group reports by product_id using the latestJoNumbersMap
       const reportsByProduct: ProductReports = {}
       reportsSnapshot.forEach((doc) => {
         const reportData = { id: doc.id, ...doc.data() } as Report
-        const productId = joNumberToProductId[reportData.joNumber]
+        // Find the productId for this joNumber
+        const productId = Object.keys(latestJoNumbersMap).find(key => latestJoNumbersMap[key] === reportData.joNumber)
 
         if (productId) {
           if (!reportsByProduct[productId]) {
             reportsByProduct[productId] = []
           }
           reportsByProduct[productId].push(reportData)
+          console.log('Report found for product:', productId, 'joNumber:', reportData.joNumber)
         }
       })
 
       // Sort reports by updated timestamp (newest first) for each product
       Object.keys(reportsByProduct).forEach((productId) => {
-        reportsByProduct[productId].sort((a: Report, b: Report) => {
+        reportsByProduct[productId].sort((a, b) => {
           const aTime = a.updated?.toDate ? a.updated.toDate() : new Date(a.updated || a.date || 0)
           const bTime = b.updated?.toDate ? b.updated.toDate() : new Date(b.updated || b.date || 0)
           return bTime.getTime() - aTime.getTime()
@@ -255,7 +305,7 @@ export default function LogisticsBulletinBoardPage() {
         } else if (a.createdAt) {
           aTime = new Date(a.createdAt)
         } else {
-          aTime = new Date(0)
+          aTime = new Date(0) // Default to epoch if no date
         }
 
         if (b.createdAt?.toDate) {
@@ -263,7 +313,7 @@ export default function LogisticsBulletinBoardPage() {
         } else if (b.createdAt) {
           bTime = new Date(b.createdAt)
         } else {
-          bTime = new Date(0)
+          bTime = new Date(0) // Default to epoch if no date
         }
 
         // Sort descending (newest first)
@@ -280,6 +330,7 @@ export default function LogisticsBulletinBoardPage() {
   }
 
 
+
   useEffect(() => {
     const fetchBookings = async () => {
       if (!userData?.company_id) {
@@ -289,67 +340,126 @@ export default function LogisticsBulletinBoardPage() {
 
       try {
         setLoading(true)
-        const bookingsRef = collection(db, "booking")
-        let bookingsQuery = query(
-          bookingsRef,
-          where("company_id", "==", userData.company_id),
-          where("quotation_id", "!=", null),
-          orderBy("created", "desc"),
-          limit(itemsPerPage + 1)
-        )
 
-        const lastDoc = lastVisibleDocs[currentPage - 1]
-        if (lastDoc) {
-          bookingsQuery = query(
+        if (searchQuery) {
+          // Use Algolia search
+          const results = await searchClient.search([{
+            indexName: process.env.NEXT_PUBLIC_ALGOLIA_BOOKING_INDEX_NAME!,
+            query: searchQuery,
+            params: {
+              filters: `company_id:${userData.company_id}`,
+              hitsPerPage: itemsPerPage,
+              page: currentPage - 1
+            }
+          }])
+
+          const { hits, nbPages } = results.results[0] as any
+          setBookings(hits.map((h: any) => ({ id: h.objectID, ...h })) as Booking[])
+          setHasMore(nbPages > currentPage)
+
+          // Create project names map
+          const namesMap: { [productId: string]: string } = {}
+          hits.forEach((booking: any) => {
+            if (booking.product_id && booking.project_name) {
+              namesMap[booking.product_id] = booking.project_name
+            }
+          })
+          setProjectNames(namesMap)
+
+          const productIds = hits.map((b: any) => b.product_id as string).filter((id: string) => Boolean(id))
+          const uniqueProductIds = [...new Set(productIds)]
+          const productData: { [key: string]: Product } = {}
+
+          for (const productId of uniqueProductIds) {
+            try {
+              const productDoc = await getDoc(doc(db, "products", productId))
+              if (productDoc.exists()) {
+                productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+              }
+            } catch (error) {
+              console.error(`Error fetching product ${productId}:`, error)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await fetchJobOrderCounts(uniqueProductIds)
+            await fetchProductReports(uniqueProductIds)
+          }
+        } else {
+          // Use Firestore
+          const bookingsRef = collection(db, "booking")
+          let bookingsQuery = query(
             bookingsRef,
             where("company_id", "==", userData.company_id),
             where("quotation_id", "!=", null),
             orderBy("created", "desc"),
-            startAfter(lastDoc),
             limit(itemsPerPage + 1)
           )
-        }
 
-        const querySnapshot = await getDocs(bookingsQuery)
-        const fetchedBookings: Booking[] = []
-        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-
-        setHasMore(querySnapshot.docs.length > itemsPerPage)
-
-        querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
-          fetchedBookings.push({ id: doc.id, ...doc.data() })
-        })
-
-        setBookings(fetchedBookings)
-
-        // Only update lastVisibleDocs if we are moving to a new page
-        if (newLastVisible && currentPage === lastVisibleDocs.length) {
-          setLastVisibleDocs((prev) => [...prev, newLastVisible])
-        }
-
-        const productIds = fetchedBookings
-          .map((booking) => booking.product_id)
-          .filter((id): id is string => Boolean(id))
-
-        const uniqueProductIds = [...new Set(productIds)]
-        const productData: { [key: string]: Product } = {}
-
-        for (const productId of uniqueProductIds) {
-          try {
-            const productDoc = await getDoc(doc(db, "products", productId))
-            if (productDoc.exists()) {
-              productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
-            }
-          } catch (error) {
-            console.error(`Error fetching product ${productId}:`, error)
+          const lastDoc = lastVisibleDocs[currentPage - 1]
+          if (lastDoc) {
+            bookingsQuery = query(
+              bookingsRef,
+              where("company_id", "==", userData.company_id),
+              where("quotation_id", "!=", null),
+              orderBy("created", "desc"),
+              startAfter(lastDoc),
+              limit(itemsPerPage + 1)
+            )
           }
-        }
 
-        setProducts(Object.values(productData).filter(p => p.id))
+          const querySnapshot = await getDocs(bookingsQuery)
+          const fetchedBookings: Booking[] = []
+          const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
 
-        if (uniqueProductIds.length > 0) {
-          await fetchJobOrderCounts(uniqueProductIds)
-          await fetchProductReports(uniqueProductIds)
+          setHasMore(querySnapshot.docs.length > itemsPerPage)
+
+          querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
+            fetchedBookings.push({ id: doc.id, ...doc.data() })
+          })
+
+          setBookings(fetchedBookings)
+
+          // Create project names map
+          const namesMap: { [productId: string]: string } = {}
+          fetchedBookings.forEach((booking) => {
+            if (booking.product_id && booking.project_name) {
+              namesMap[booking.product_id] = booking.project_name
+            }
+          })
+          setProjectNames(namesMap)
+
+          // Only update lastVisibleDocs if we are moving to a new page
+          if (newLastVisible && currentPage === lastVisibleDocs.length) {
+            setLastVisibleDocs((prev) => [...prev, newLastVisible])
+          }
+
+          const productIds = fetchedBookings
+            .map((booking) => booking.product_id)
+            .filter((id): id is string => Boolean(id))
+
+          const uniqueProductIds = [...new Set(productIds)]
+          const productData: { [key: string]: Product } = {}
+
+          for (const productId of uniqueProductIds) {
+            try {
+              const productDoc = await getDoc(doc(db, "products", productId))
+              if (productDoc.exists()) {
+                productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+              }
+            } catch (error) {
+              console.error(`Error fetching product ${productId}:`, error)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await fetchJobOrderCounts(uniqueProductIds)
+            await fetchProductReports(uniqueProductIds)
+          }
         }
       } catch (error) {
         console.error("Error fetching bookings:", error)
@@ -359,8 +469,7 @@ export default function LogisticsBulletinBoardPage() {
     }
 
     fetchBookings()
-   }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length])
-
+   }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length, searchQuery])
 
 
 
@@ -373,7 +482,7 @@ export default function LogisticsBulletinBoardPage() {
             className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-lg font-medium">Logistics Bulletin Board</span>
+            <span className="text-lg font-medium">Project Bulletin</span>
           </button>
         </div>
       </div>
@@ -386,6 +495,8 @@ export default function LogisticsBulletinBoardPage() {
             <input
               type="text"
               placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -401,8 +512,8 @@ export default function LogisticsBulletinBoardPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {products
-                .filter((product: Product) => latestJoNumbers[product.id!])
-                .map((product: Product) => (
+                .filter((product) => latestJoNumbers[product.id!])
+                .map((product) => (
                   <div
                     key={product.id}
                     className="bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow"
@@ -411,7 +522,7 @@ export default function LogisticsBulletinBoardPage() {
                       console.log('Latest JO IDs:', latestJoIds)
                       console.log('Latest JO ID for this product:', latestJoIds[product.id!])
                       if (latestJoIds[product.id!]) {
-                        router.push(`/logistics/bulletin-board/details/${latestJoIds[product.id!]}`)
+                        router.push(`/business/project-bulletin/details/${latestJoIds[product.id!]}`)
                       } else {
                         console.log('No latest JO ID found for product:', product.id)
                       }
@@ -424,7 +535,7 @@ export default function LogisticsBulletinBoardPage() {
 
                     {/* Project Title Banner */}
                     <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef", borderRadius: "10px" }}>
-                      <h3 className="font-semibold text-lg">Lilo & Stitch</h3>
+                      <h3 className="font-semibold text-lg">{projectNames[product.id!] || "No Project Name"}</h3>
                     </div>
 
                     {/* Project Location */}
@@ -510,11 +621,11 @@ export default function LogisticsBulletinBoardPage() {
             ) : jobOrders.length > 0 ? (
               <div className="max-h-96 overflow-y-auto">
                 <div className="space-y-3">
-                  {jobOrders.map((jobOrder: JobOrder) => (
+                  {jobOrders.map((jobOrder) => (
                     <div
                       key={jobOrder.id}
                       className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/logistics/bulletin-board/details/${jobOrder.id}`)}
+                      onClick={() => router.push(`/business/project-bulletin/details/${jobOrder.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-gray-900">
@@ -525,10 +636,10 @@ export default function LogisticsBulletinBoardPage() {
                             jobOrder.status === "completed"
                               ? "bg-green-100 text-green-800"
                               : jobOrder.status === "in_progress"
-                              ? "bg-blue-100 text-blue-800"
-                              : jobOrder.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
+                                ? "bg-blue-100 text-blue-800"
+                                : jobOrder.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {jobOrder.status || "Unknown"}

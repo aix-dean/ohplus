@@ -402,7 +402,14 @@ export default function JobOrderDetailsPage() {
                     <td className="px-4 py-3 text-sm text-gray-900">{formatDate(report.updated || report.created || report.date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{formatTime(report.updated || report.created)}</td>
                     <td className="px-4 py-3">{getTeamBadge(report.category)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{getUpdateText(report)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      <button
+                        className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                        onClick={() => router.push(`/sales/reports/${report.id}`)}
+                      >
+                        {getUpdateText(report)}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       {report.attachments && report.attachments.length > 0 ? (
                         <button
