@@ -28,6 +28,7 @@ export interface SalesEvent {
   status: "scheduled" | "completed" | "cancelled" | "pending"
   type: 'meeting' | 'holiday' | 'party'
   department: string
+  company_id: string
   isAdminCreated: boolean
   clientId: string
   clientName: string
@@ -67,6 +68,7 @@ export function convertToSalesEvent(id: string, data: any): SalesEvent {
     status: data.status || "pending",
     type: data.type || "meeting",
     department: data.department || "",
+    company_id: data.company_id || "",
     isAdminCreated: data.isAdminCreated || false,
     clientId: data.clientId || "",
     clientName: data.clientName || "",
@@ -87,14 +89,22 @@ export function convertToSalesEvent(id: string, data: any): SalesEvent {
 }
 
 // Get all sales events for a user
-export async function getSalesEvents(isAdmin: boolean, userDepartment: string): Promise<SalesEvent[]> {
+export async function getSalesEvents(isAdmin: boolean, userDepartment: string, companyId?: string): Promise<SalesEvent[]> {
   try {
     const eventsRef = collection(db, "events")
     let q
     if (isAdmin) {
-      q = query(eventsRef, orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, orderBy("start", "asc"))
+      }
     } else {
-      q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("department", "==", userDepartment), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+      }
     }
     const querySnapshot = await getDocs(q)
 
@@ -111,7 +121,7 @@ export async function getSalesEvents(isAdmin: boolean, userDepartment: string): 
 }
 
 // Get sales events for a specific date range, including recurring events
-export async function getSalesEventsByDateRange(isAdmin: boolean, userDepartment: string, startDate: Date, endDate: Date): Promise<SalesEvent[]> {
+export async function getSalesEventsByDateRange(isAdmin: boolean, userDepartment: string, startDate: Date, endDate: Date, companyId?: string): Promise<SalesEvent[]> {
   try {
     const eventsRef = collection(db, "events")
     const startTimestamp = Timestamp.fromDate(startDate)
@@ -120,9 +130,17 @@ export async function getSalesEventsByDateRange(isAdmin: boolean, userDepartment
     // Query events that start within the date range
     let q
     if (isAdmin) {
-      q = query(eventsRef, orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, orderBy("start", "asc"))
+      }
     } else {
-      q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("department", "==", userDepartment), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("department", "==", userDepartment), orderBy("start", "asc"))
+      }
     }
 
     const querySnapshot = await getDocs(q)
@@ -249,7 +267,8 @@ export async function createEvent(
   department: string,
   isAdmin: boolean,
   userDepartment: string,
-  eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt" | "department" | "isAdminCreated">,
+  eventData: Omit<SalesEvent, "id" | "createdAt" | "updatedAt" | "department" | "isAdminCreated" | "company_id">,
+  companyId: string,
 ): Promise<string> {
   try {
     if (!isAdmin && department !== userDepartment) {
@@ -272,6 +291,7 @@ export async function createEvent(
     const newEvent = {
       ...eventData,
       department,
+      company_id: companyId,
       isAdminCreated: isAdmin,
       start: startTimestamp,
       end: endTimestamp,
@@ -346,11 +366,11 @@ export async function deleteSalesEvent(eventId: string, isAdmin: boolean, userDe
 }
 
 // Search sales events by term
-export async function searchSalesEvents(isAdmin: boolean, userDepartment: string, searchTerm: string): Promise<SalesEvent[]> {
+export async function searchSalesEvents(isAdmin: boolean, userDepartment: string, searchTerm: string, companyId?: string): Promise<SalesEvent[]> {
   try {
     // Fetch all user events and filter client-side
     // For production with large datasets, consider using Algolia or Firestore's array-contains
-    const events = await getSalesEvents(isAdmin, userDepartment)
+    const events = await getSalesEvents(isAdmin, userDepartment, companyId)
 
     if (!searchTerm) return events
 
@@ -369,23 +389,42 @@ export async function searchSalesEvents(isAdmin: boolean, userDepartment: string
 }
 
 // Get events by client
-export async function getSalesEventsByClient(isAdmin: boolean, userDepartment: string, clientId: string): Promise<SalesEvent[]> {
+export async function getSalesEventsByClient(isAdmin: boolean, userDepartment: string, clientId: string, companyId?: string): Promise<SalesEvent[]> {
   try {
     const eventsRef = collection(db, "events")
     let q
     if (isAdmin) {
-      q = query(
-        eventsRef,
-        where("clientId", "==", clientId),
-        orderBy("start", "asc"),
-      )
+      if (companyId) {
+        q = query(
+          eventsRef,
+          where("clientId", "==", clientId),
+          where("company_id", "==", companyId),
+          orderBy("start", "asc"),
+        )
+      } else {
+        q = query(
+          eventsRef,
+          where("clientId", "==", clientId),
+          orderBy("start", "asc"),
+        )
+      }
     } else {
-      q = query(
-        eventsRef,
-        where("department", "==", userDepartment),
-        where("clientId", "==", clientId),
-        orderBy("start", "asc"),
-      )
+      if (companyId) {
+        q = query(
+          eventsRef,
+          where("department", "==", userDepartment),
+          where("clientId", "==", clientId),
+          where("company_id", "==", companyId),
+          orderBy("start", "asc"),
+        )
+      } else {
+        q = query(
+          eventsRef,
+          where("department", "==", userDepartment),
+          where("clientId", "==", clientId),
+          orderBy("start", "asc"),
+        )
+      }
     }
 
     const querySnapshot = await getDocs(q)
@@ -403,14 +442,22 @@ export async function getSalesEventsByClient(isAdmin: boolean, userDepartment: s
 }
 
 // Get events by type
-export async function getSalesEventsByType(isAdmin: boolean, userDepartment: string, type: SalesEvent["type"]): Promise<SalesEvent[]> {
+export async function getSalesEventsByType(isAdmin: boolean, userDepartment: string, type: SalesEvent["type"], companyId?: string): Promise<SalesEvent[]> {
   try {
     const eventsRef = collection(db, "events")
     let q
     if (isAdmin) {
-      q = query(eventsRef, where("type", "==", type), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("type", "==", type), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("type", "==", type), orderBy("start", "asc"))
+      }
     } else {
-      q = query(eventsRef, where("department", "==", userDepartment), where("type", "==", type), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("department", "==", userDepartment), where("type", "==", type), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("department", "==", userDepartment), where("type", "==", type), orderBy("start", "asc"))
+      }
     }
 
     const querySnapshot = await getDocs(q)
@@ -428,14 +475,22 @@ export async function getSalesEventsByType(isAdmin: boolean, userDepartment: str
 }
 
 // Get events by status
-export async function getSalesEventsByStatus(isAdmin: boolean, userDepartment: string, status: SalesEvent["status"]): Promise<SalesEvent[]> {
+export async function getSalesEventsByStatus(isAdmin: boolean, userDepartment: string, status: SalesEvent["status"], companyId?: string): Promise<SalesEvent[]> {
   try {
     const eventsRef = collection(db, "events")
     let q
     if (isAdmin) {
-      q = query(eventsRef, where("status", "==", status), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("status", "==", status), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("status", "==", status), orderBy("start", "asc"))
+      }
     } else {
-      q = query(eventsRef, where("department", "==", userDepartment), where("status", "==", status), orderBy("start", "asc"))
+      if (companyId) {
+        q = query(eventsRef, where("department", "==", userDepartment), where("status", "==", status), where("company_id", "==", companyId), orderBy("start", "asc"))
+      } else {
+        q = query(eventsRef, where("department", "==", userDepartment), where("status", "==", status), orderBy("start", "asc"))
+      }
     }
 
     const querySnapshot = await getDocs(q)

@@ -174,7 +174,7 @@ export default function LogisticsPlannerPage() {
     try {
       const isAdmin = userData.role === "admin"
       const userDepartment = "logistics"
-      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment)
+      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment, userData.company_id)
       setEvents(fetchedEvents)
     } catch (error) {
       console.error("Error fetching events:", error)
@@ -1406,6 +1406,7 @@ export default function LogisticsPlannerPage() {
             fetchEvents()
           }}
           department="logistics"
+          companyId={userData?.company_id || undefined}
         />
 
         <EventDetailsDialog

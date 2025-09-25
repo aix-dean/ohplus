@@ -384,13 +384,6 @@ export default function BusinessInventoryPage() {
       return
     }
 
-    // Check if user has license key
-    if (!userData?.license_key) {
-      console.log("No license key found")
-      setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
 
     // Check if subscription exists and is active
     if (!currentSubscription) {
@@ -443,15 +436,6 @@ export default function BusinessInventoryPage() {
         console.error("Error fetching subscription after company registration:", error)
       }
 
-      // Check subscription after company registration
-      if (!userData?.license_key) {
-        console.log("No license key after company registration")
-        setSubscriptionLimitMessage(
-          "Company registered successfully! Now choose a subscription plan to start adding sites.",
-        )
-        setShowSubscriptionLimitDialog(true)
-        return
-      }
 
       if (!currentSubscription) {
         console.log("No subscription found after company registration")
@@ -507,13 +491,6 @@ export default function BusinessInventoryPage() {
         return
       }
 
-      // Check if user has license key
-      if (!userData?.license_key) {
-        console.log("No license key found after company update")
-        setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
-        setShowSubscriptionLimitDialog(true)
-        return
-      }
 
       // Check if subscription exists and is active
       if (!currentSubscription) {
@@ -901,12 +878,12 @@ export default function BusinessInventoryPage() {
 
       {/* Add Site Dialog */}
       <Dialog open={showAddSiteDialog} onOpenChange={setShowAddSiteDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[20px] py-0 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <DialogHeader className="sticky top-0 bg-white z-10 pb-4 border-b px-6 mb-0 min-h-[4rem] flex items-start pt-6">
             <DialogTitle className="text-2xl font-semibold text-[#333333]">+Add site</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
             {/* Left Column */}
             <div className="space-y-6">
               {/* Site Type */}
@@ -1230,29 +1207,31 @@ export default function BusinessInventoryPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-[#c4c4c4]">
-            <Button
-              variant="outline"
-              className="px-8 border-[#c4c4c4] text-[#4e4e4e] hover:bg-gray-50 bg-transparent"
-              onClick={() => setShowAddSiteDialog(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="px-8 bg-[#1d0beb] hover:bg-[#1508d1] text-white"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Uploading...
-                </>
-              ) : (
-                "Upload"
-              )}
-            </Button>
+          <div className="sticky bottom-0 bg-white border-t border-[#c4c4c4] mt-8 pt-6 pb-6 -mb-6">
+            <div className="flex justify-end gap-4 px-6">
+              <Button
+                variant="outline"
+                className="px-8 border-[#c4c4c4] text-[#4e4e4e] hover:bg-gray-50 bg-transparent"
+                onClick={() => setShowAddSiteDialog(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="px-8 bg-[#1d0beb] hover:bg-[#1508d1] text-white"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload"
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
