@@ -1152,6 +1152,8 @@ function SalesDashboardContent() {
 
   const handleCancelCeQuote = () => {
     setCeQuoteMode(false)
+    setCeMode(false)
+    setQuoteMode(false)
     setSelectedSites([])
     setSelectedClientForProposal(null)
     setDashboardClientSearchTerm("")
@@ -1179,6 +1181,23 @@ function SalesDashboardContent() {
           >
             + Collab
           </Button>
+        </div>
+      )}
+
+      {ceQuoteMode && !proposalCreationMode && (
+        <div className="flex items-center justify-between p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelCeQuote}
+              className="p-1 hover:bg-gray-100"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-lg font-semibold text-gray-900">Select Sites</h2>
+          </div>
+          {/* No collab button for CE/Quote mode */}
         </div>
       )}
 
@@ -1241,39 +1260,39 @@ function SalesDashboardContent() {
             {/* Left Column: Main Dashboard Content */}
             <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
               {/* Dashboard Header */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h1 className="text-2xl font-semibold text-[#333333]">
-                    {userData?.first_name
-                      ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                      : "Dashboard"}
-                  </h1>
+              {!(proposalCreationMode || ceQuoteMode) && (
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-semibold text-[#333333]">
+                      {userData?.first_name
+                        ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                        : "Dashboard"}
+                    </h1>
 
-                  {/* Navigation Tabs */}
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleInitiateProposalFlow}>
-                      Proposal
-                    </Button>
-                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleCeMode}>
-                      Cost Estimate
-                    </Button>
-                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
-                      Quotation
-                    </Button>
-                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
-                      Job Order
-                    </Button>
-                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
-                      Collab
-                    </Button>
+                    {/* Navigation Tabs */}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleInitiateProposalFlow}>
+                        Proposal
+                      </Button>
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleCeMode}>
+                        Cost Estimate
+                      </Button>
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
+                        Quotation
+                      </Button>
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
+                        Job Order
+                      </Button>
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
+                        Collab
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Search and View Controls */}
-                <div className="flex justify-between items-center">
-                  <div className="relative">
-                    {!(proposalCreationMode || ceQuoteMode) && (
-                      <div className="w-80">
+                  {/* Search and View Controls */}
+                  <div className="flex justify-between items-center">
+                    <div className="relative">
+                      <div className="w-80 mt-2 mb-2">
                         <SearchBox
                           onSearchResults={handleSearchResults}
                           onSearchError={handleSearchError}
@@ -1282,22 +1301,22 @@ function SalesDashboardContent() {
                           userId={user?.uid}
                         />
                       </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("list")}>
-                      <List className="w-4 h-4 text-[#b7b7b7]" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("grid")}>
-                      <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
-                    </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("list")}>
+                        <List className="w-4 h-4 text-[#b7b7b7]" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("grid")}>
+                        <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs mt-1" ref={clientSearchRef}>
+                <div className="relative w-full max-w-xs mt-2 mb-2" ref={clientSearchRef}>
                   <div className="relative">
                     <Input
                       placeholder="Search or select client..."
@@ -1566,8 +1585,8 @@ function SalesDashboardContent() {
                       <ResponsiveCardGrid
                         mobileColumns={1}
                         tabletColumns={2}
-                        desktopColumns={5}
-                        gap="sm"
+                        desktopColumns={4}
+                        gap="lg"
                       >
                         {products.map((product) => (
                           <ProductCard
@@ -2014,7 +2033,7 @@ function ProductCard({
       className={cn(
         "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
         isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
-        selectionMode ? "hover:border-green-300" : "",
+        selectionMode ? "hover:border-green-300 mr-2" : "",
       )}
       onClick={handleClick}
     >
@@ -2053,14 +2072,12 @@ function ProductCard({
           <h3 className="font-semibold line-clamp-1">{product.name}</h3>
 
           <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-          >
-            Create Report
-          </Button>
+          <div className="mt-1 text-xs text-gray-500 flex items-center">
+            <MapPin size={12} className="mr-1 flex-shrink-0" />
+            <span className="truncate">{location}</span>
+          </div>
         </div>
       </CardContent>
-    </Card>
+    </div>
   )
 }
