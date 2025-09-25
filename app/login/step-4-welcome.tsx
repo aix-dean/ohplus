@@ -27,18 +27,16 @@ export default function Step4Welcome({ onNext }: Step4WelcomeProps) {
 
   // Generate permissions and roles arrays based on selections
   const getPermissions = () => {
-    const permissions: string[] = []
+    const permissions: string[] = ['it']  // Always include IT permission
     if (uploadInventory) permissions.push('business_dev')
     if (setupCompany) permissions.push('admin')
-    if (teammatesWillHandle) permissions.push('it')
     return permissions
   }
 
   const getRoles = () => {
-    const roles: string[] = []
+    const roles: string[] = ['it']  // Always include IT role
     if (uploadInventory) roles.push('business')
     if (setupCompany) roles.push('admin')
-    if (teammatesWillHandle) roles.push('it')
     return roles
   }
 

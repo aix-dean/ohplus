@@ -6,6 +6,8 @@ import { ChevronDown, Building2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { type RoleType } from "@/lib/hardcoded-access-service"
 import { cn } from "@/lib/utils"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface DepartmentOption {
   name: string
@@ -74,17 +76,34 @@ const departmentMapping: Record<RoleType, DepartmentOption> = {
 export function DepartmentDropdown() {
   const [isOpen, setIsOpen] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [userRoles, setUserRoles] = useState<RoleType[]>([])
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { userData } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
-  if (!userData?.roles || userData.roles.length <= 1) {
+  // Set up snapshot listener for user's roles
+  useEffect(() => {
+    if (!userData?.uid) return
+
+    const userDocRef = doc(db, "iboard_users", userData.uid)
+    const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data()
+        const roles = data.roles as RoleType[] || []
+        setUserRoles(roles)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [userData?.uid])
+
+  if (!userRoles || userRoles.length <= 1) {
     return null // Don't show dropdown if user has only one role or no roles
   }
 
   // Get accessible departments based on user roles
-  const accessibleDepartments = userData.roles
+  const accessibleDepartments = userRoles
     .map(role => departmentMapping[role])
     .filter(Boolean)
 

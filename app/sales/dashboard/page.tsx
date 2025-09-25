@@ -1182,24 +1182,6 @@ function SalesDashboardContent() {
         </div>
       )}
 
-      {ceQuoteMode && !proposalCreationMode && (
-        <div className="flex items-center justify-between p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelCeQuote}
-              className="p-1 hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {ceMode ? "Select Sites for Cost Estimate" : "Select Sites for Quotation"}
-            </h2>
-          </div>
-        </div>
-      )}
-
       {/* Main content area */}
       <div className="flex-1 overflow-hidden">
         {loading ? (
@@ -1260,34 +1242,32 @@ function SalesDashboardContent() {
             <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
               {/* Dashboard Header */}
               <div className="mb-6">
-                {!(proposalCreationMode || ceQuoteMode) && (
-                  <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl font-semibold text-[#333333]">
-                      {userData?.first_name
-                        ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                        : "Dashboard"}
-                    </h1>
+                <div className="flex justify-between items-center mb-4">
+                  <h1 className="text-2xl font-semibold text-[#333333]">
+                    {userData?.first_name
+                      ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                      : "Dashboard"}
+                  </h1>
 
-                    {/* Navigation Tabs */}
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleInitiateProposalFlow}>
-                        Proposal
-                      </Button>
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleCeMode}>
-                        Cost Estimate
-                      </Button>
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
-                        Quotation
-                      </Button>
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
-                        Job Order
-                      </Button>
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
-                        Collab
-                      </Button>
-                    </div>
+                  {/* Navigation Tabs */}
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleInitiateProposalFlow}>
+                      Proposal
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleCeMode}>
+                      Cost Estimate
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
+                      Quotation
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
+                      Job Order
+                    </Button>
+                    <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
+                      Collab
+                    </Button>
                   </div>
-                )}
+                </div>
 
                 {/* Search and View Controls */}
                 <div className="flex justify-between items-center">
@@ -1304,16 +1284,14 @@ function SalesDashboardContent() {
                       </div>
                     )}
                   </div>
-                  {!(proposalCreationMode || ceQuoteMode) && (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("list")}>
-                        <List className="w-4 h-4 text-[#b7b7b7]" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("grid")}>
-                        <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("list")}>
+                      <List className="w-4 h-4 text-[#b7b7b7]" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="bg-white border-[#d9d9d9] hover:bg-gray-50" onClick={() => setViewMode("grid")}>
+                      <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -2010,60 +1988,18 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
-  if (!product) {
-    return (
-      <Card className="overflow-hidden border shadow-sm rounded-2xl bg-gray-50">
-        <div className="relative h-48 bg-gray-100 p-3">
-          <div className="relative h-full w-full rounded-xl overflow-hidden bg-gray-200 flex items-center justify-center">
-            <div className="text-gray-400 text-sm">No data available</div>
-          </div>
-        </div>
-        <CardContent className="p-4 flex-1 flex flex-col">
-          <div className="flex flex-col gap-2 flex-1">
-            <div className="text-base font-bold text-gray-400">N/A</div>
-            <h3 className="text-sm text-gray-400">Record not available</h3>
-            <div className="text-sm font-semibold text-gray-400 mt-1">Price not available</div>
-            <Button
-              variant="outline"
-              className="mt-auto w-full h-9 text-sm bg-gray-100 text-gray-400 rounded-lg font-medium cursor-not-allowed"
-              disabled
-            >
-              Create Report
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   // Get the first media item for the thumbnail
   const thumbnailUrl =
     product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
 
   // Determine location based on product type
-  const location = product.specs_rental?.location || (product as any).light?.location || "Unknown location"
+  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
-  const formattedPrice = product.price
-    ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
-    : "Price not set"
+  // Format price if available
+  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
 
   // Get site code
   const siteCode = getSiteCode(product)
-
-  const getStatusInfo = () => {
-    if (product.status === "ACTIVE" || product.status === "OCCUPIED") {
-      return { label: "OPEN", color: "#38b6ff" }
-    }
-    if (product.status === "VACANT" || product.status === "AVAILABLE") {
-      return { label: "AVAILABLE", color: "#00bf63" }
-    }
-    if (product.status === "MAINTENANCE" || product.status === "REPAIR") {
-      return { label: "MAINTENANCE", color: "#ef4444" }
-    }
-    return { label: "OPEN", color: "#38b6ff" }
-  }
-
-  const statusInfo = getStatusInfo()
 
   const handleClick = () => {
     if (selectionMode && onSelect) {
@@ -2073,56 +2009,58 @@ function ProductCard({
     }
   }
 
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(e)
-  }
-
   return (
     <div
       className={cn(
-        "relative bg-white rounded-lg border-2 p-4 hover:shadow-md transition-shadow cursor-pointer",
-        isSelected ? "border-green-500" : "border-gray-200",
+        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      {selectionMode && isSelected && (
-        <div className="absolute top-2 left-2 bg-green-500 rounded-full p-1 z-10">
-          <CheckCircle className="h-4 w-4 text-white" />
-        </div>
-      )}
-      {/* Site Photo */}
-      <div className="bg-[#d9d9d9] rounded-lg aspect-square flex items-center justify-center mb-4">
-        {thumbnailUrl ? (
-          <div className="relative w-full h-full">
-            <Image
-              src={thumbnailUrl}
-              alt={product.name || "Product image"}
-              fill
-              className="object-cover rounded-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = "/abstract-geometric-sculpture.png"
-                target.className = "opacity-50 object-contain rounded-lg"
-              }}
-            />
-          </div>
-        ) : (
-          <div className="text-center text-[#b7b7b7]">
-            <div className="text-sm font-medium">Site</div>
-            <div className="text-sm font-medium">Photo</div>
+      <div className="h-48 bg-gray-200 relative">
+        <Image
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "Product image"}
+          fill
+          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+          }}
+        />
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-2 left-2 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+              )}
+            >
+              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Site Information */}
-      <div className="space-y-1 text-sm">
-        {siteCode && <div className="text-[#b7b7b7]">Site Code: {siteCode}</div>}
-        <div className="text-[#333333] font-medium">{product.name || "No name available"}</div>
-        <div className="text-[#333333]">{location}</div>
-        <div className="text-[#333333] font-medium">{formattedPrice}</div>
-      </div>
-    </div>
+      <CardContent className="p-4">
+        <div className="flex flex-col">
+          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+
+          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+
+          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

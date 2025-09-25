@@ -23,9 +23,10 @@ interface EventDialogProps {
   event?: Partial<SalesEvent>
   onEventSaved: (eventId: string) => void
   department: string
+  companyId?: string
 }
 
-export function EventDialog({ isOpen, onClose, event, onEventSaved, department }: EventDialogProps) {
+export function EventDialog({ isOpen, onClose, event, onEventSaved, department, companyId }: EventDialogProps) {
   const { user, userData } = useAuth()
   const isEditing = !!event?.id
   const [startDate, setStartDate] = useState<Date | undefined>(event?.start instanceof Date ? event.start : new Date())
@@ -135,7 +136,8 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department }
           department, // Fixed department
           userData.role === "admin", // isAdmin
           department, // userDepartment - fixed for planner
-          eventData as any
+          eventData as any,
+          companyId || ""
         )
       }
 

@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, where, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, getDocs, query, where, deleteDoc, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 
 // Hardcoded role definitions
 export type RoleType = "admin" | "sales" | "logistics" | "cms" | "it" | "business" | "treasury" | "accounting" | "finance"
@@ -430,6 +430,19 @@ export async function assignRoleToUser(userId: string, roleId: RoleType, assigne
     // Verify the role was assigned
     const updatedRoles = await getUserRoles(userId)
     console.log("Updated roles after assignment:", updatedRoles)
+
+    // Update the iboard_users document with the new roles array
+    try {
+      const userDocRef = doc(db, "iboard_users", userId)
+      await updateDoc(userDocRef, {
+        roles: updatedRoles,
+        updated: serverTimestamp()
+      })
+      console.log(`Updated iboard_users document with roles:`, updatedRoles)
+    } catch (updateError) {
+      console.error("Error updating iboard_users document:", updateError)
+      // Don't fail the role assignment if updating iboard_users fails
+    }
   } catch (error) {
     console.error("Error assigning role to user:", error)
     throw new Error("Failed to assign role to user")
@@ -447,6 +460,20 @@ export async function removeRoleFromUser(userId: string, roleId: RoleType): Prom
     await Promise.all(deletePromises)
 
     console.log(`Role ${roleId} removed from user ${userId}`)
+
+    // Update the iboard_users document with the updated roles array
+    try {
+      const updatedRoles = await getUserRoles(userId)
+      const userDocRef = doc(db, "iboard_users", userId)
+      await updateDoc(userDocRef, {
+        roles: updatedRoles,
+        updated: serverTimestamp()
+      })
+      console.log(`Updated iboard_users document with roles after removal:`, updatedRoles)
+    } catch (updateError) {
+      console.error("Error updating iboard_users document after role removal:", updateError)
+      // Don't fail the role removal if updating iboard_users fails
+    }
   } catch (error) {
     console.error("Error removing role from user:", error)
     throw new Error("Failed to remove role from user")
