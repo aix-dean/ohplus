@@ -34,8 +34,9 @@ import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/fi
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
 import { getAllJobOrders, type JobOrder } from "@/lib/job-order-service"
+import type { Booking } from "@/lib/booking-service"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 
 const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -273,6 +274,41 @@ const GoogleMap = React.memo(({ location, className }: { location: string; class
   )
 });
 
+// Helper function to convert Firebase timestamp to readable date
+export const formatFirebaseDate = (timestamp: any): string => {
+  if (!timestamp) return ""
+
+  try {
+    // Check if it's a Firebase Timestamp object
+    if (timestamp && typeof timestamp === "object" && timestamp.seconds) {
+      const date = new Date(timestamp.seconds * 1000)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    // If it's already a string or Date, handle accordingly
+    if (typeof timestamp === "string") {
+      return timestamp
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    return ""
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return ""
+  }
+}
+
 function formatDate(dateString: any): string {
   if (!dateString) return "N/A"
 
@@ -367,6 +403,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [quotationRequests, setQuotationRequests] = useState<QuotationRequest[]>([])
   const [quotationRequestsLoading, setQuotationRequestsLoading] = useState(true)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [bookingsLoading, setBookingsLoading] = useState(true)
   const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
   const [costEstimatesLoading, setCostEstimatesLoading] = useState(true)
   const [quotations, setQuotations] = useState<Quotation[]>([])
@@ -457,6 +495,40 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     fetchQuotationRequests()
   }, [params.id])
 
+  // Fetch bookings for this product
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!params.id) return
+
+      setBookingsLoading(true)
+      try {
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const bookingsQuery = query(
+          collection(db, "booking"),
+          where("product_id", "==", productId),
+          orderBy("created", "desc")
+        )
+        const bookingsSnapshot = await getDocs(bookingsQuery)
+        const bookingsData: Booking[] = []
+
+        bookingsSnapshot.forEach((doc) => {
+          bookingsData.push({
+            id: doc.id,
+            ...doc.data(),
+          } as Booking)
+        })
+
+        setBookings(bookingsData)
+      } catch (error) {
+        console.error("Error fetching bookings:", error)
+      } finally {
+        setBookingsLoading(false)
+      }
+    }
+
+    fetchBookings()
+  }, [params.id])
+
   useEffect(() => {
     const fetchCostEstimates = async () => {
       if (!params.id || params.id === "new" || !product) {
@@ -515,12 +587,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             : product.light?.location || ""
 
         const relatedQuotations = allQuotations.filter((quotation) =>
-          quotation.products?.some(
-            (item) =>
-              item.id === productId ||
-              item.name?.toLowerCase().includes(productName.toLowerCase()) ||
-              (productLocation && item.location?.toLowerCase().includes(productLocation.toLowerCase())),
-          ),
+          quotation.items && typeof quotation.items === 'object' &&
+          (quotation.items.product_id === productId ||
+           (quotation.items.name && quotation.items.name.toLowerCase().includes(productName.toLowerCase())) ||
+           (productLocation && quotation.items.location && quotation.items.location.toLowerCase().includes(productLocation.toLowerCase())))
         )
 
         setQuotations(relatedQuotations)
@@ -555,7 +625,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
         const relatedJobOrders = allJobOrders.filter(
           (jobOrder) =>
-            jobOrder.siteId === productId ||
+            jobOrder.product_id === productId ||
             jobOrder.siteName?.toLowerCase().includes(productName.toLowerCase()) ||
             (productLocation && jobOrder.siteLocation?.toLowerCase().includes(productLocation.toLowerCase())),
         )
@@ -882,7 +952,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const getTabCount = (tab: string) => {
     switch (tab) {
       case "booking-summary":
-        return 2 // Hardcoded for now, as the booking summary seems to have static data
+        return bookings.length
       case "ce":
         return costEstimates.length
       case "quote":
@@ -1200,57 +1270,76 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             <TabsContent value="booking-summary" className="mt-0">
               <Card className="rounded-xl shadow-sm border border-gray-200">
                 <CardContent className="p-0">
-                  <div className="grid grid-cols-7 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                    <div>Date</div>
-                    <div>Project ID</div>
-                    <div>Client</div>
-                    <div>Content</div>
-                    <div>Price</div>
-                    <div>Total</div>
-                    <div>Status</div>
-                  </div>
+                  {bookingsLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-gray-500">Loading bookings...</p>
+                    </div>
+                  ) : bookings.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No bookings found for this site.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="grid grid-cols-7 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                        <div>Date</div>
+                        <div>Project ID</div>
+                        <div>Client</div>
+                        <div>Content</div>
+                        <div>Price</div>
+                        <div>Total</div>
+                        <div>Status</div>
+                      </div>
 
-                  <div className="divide-y divide-gray-100">
-                    <div className="grid grid-cols-7 gap-4 p-4 text-sm">
-                      <div className="text-gray-600">
-                        Apr 30, 2025 to
-                        <br />
-                        Jun 30, 2025
-                      </div>
-                      <div className="text-gray-900 font-medium">JO-SU-LS-0013-043025</div>
-                      <div className="text-gray-900">Summit Media</div>
-                      <div className="text-gray-900">Disney-Lilo&Stitch</div>
-                      <div className="text-red-600 font-medium">
-                        ₱2,000,000
-                        <br />
-                        <span className="text-xs">/month</span>
-                      </div>
-                      <div className="text-red-600 font-bold">₱4,000,000</div>
-                      <div>
-                        <Badge className="bg-red-100 text-red-800 border-red-200">Ongoing</Badge>
+                      <div className="divide-y divide-gray-100">
+                        {bookings.map((booking) => {
+                          const getStatusLabel = (status: string) => {
+                            switch (status?.toUpperCase()) {
+                              case "COMPLETED":
+                                return "Completed"
+                              case "RESERVED":
+                                return "Ongoing"
+                              default:
+                                return status || "Unknown"
+                            }
+                          }
+
+                          const getStatusBadge = (status: string) => {
+                            const label = getStatusLabel(status)
+                            if (label === "Completed") {
+                              return <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
+                            } else if (label === "Ongoing") {
+                              return <Badge className="bg-red-100 text-red-800 border-red-200">Ongoing</Badge>
+                            } else {
+                              return <Badge variant="outline">{label}</Badge>
+                            }
+                          }
+
+                          return (
+                            <div key={booking.id} className="grid grid-cols-7 gap-4 p-4 text-sm">
+                              <div className="text-gray-600">
+                                {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"} to
+                                <br />
+                                {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
+                              </div>
+                              <div className="text-gray-900 font-medium">{booking.reservation_id || booking.id}</div>
+                              <div className="text-gray-900">{booking.client?.name || "N/A"}</div>
+                              <div className="text-gray-900">{booking.project_name || booking.product_name || "N/A"}</div>
+                              <div className="text-red-600 font-medium">
+                                ₱{booking.costDetails?.pricePerMonth?.toLocaleString() || "0"}
+                                <br />
+                                <span className="text-xs">/month</span>
+                              </div>
+                              <div className="text-red-600 font-bold">₱{booking.total_cost?.toLocaleString() || "0"}</div>
+                              <div>
+                                {getStatusBadge(booking.status)}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-7 gap-4 p-4 text-sm">
-                      <div className="text-gray-600">
-                        Jan 15, 2025 to
-                        <br />
-                        Mar 25, 2025
-                      </div>
-                      <div className="text-gray-900 font-medium">JO-CC-JD-0012-011525</div>
-                      <div className="text-gray-900">Coca-Cola</div>
-                      <div className="text-gray-900">Jack Daniel</div>
-                      <div className="text-red-600 font-medium">
-                        ₱1,900,000
-                        <br />
-                        <span className="text-xs">/month</span>
-                      </div>
-                      <div className="text-red-600 font-bold">₱5,700,000</div>
-                      <div>
-                        <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1352,22 +1441,19 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     <div className="divide-y divide-gray-100">
                       {quotations.map((quotation) => {
                         const statusConfig = getQuotationStatusConfig(quotation.status)
-                        const totalAmount =
-                          quotation.products?.reduce((sum, product) => sum + (product.total || 0), 0) || 0
-
                         return (
                           <div
                             key={quotation.id}
                             className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                             onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                           >
-                            <div className="text-gray-600">{formatDate(quotation.created)}</div>
+                            <div className="text-gray-600">{quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}</div>
                             <div className="text-gray-900 font-medium">
-                              {quotation.quotationNumber || quotation.id.slice(-8)}
+                              {quotation.quotation_number || quotation.id?.slice(-8) || "N/A"}
                             </div>
                             <div className="text-gray-600">Quotation</div>
                             <div className="text-gray-900">
-                              {quotation.client?.company || quotation.client?.name || "Unknown Client"}
+                              {quotation.client_name || "Unknown Client"}
                             </div>
                             <div>
                               <span
@@ -1377,7 +1463,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 {statusConfig.label}
                               </span>
                             </div>
-                            <div className="text-red-600 font-medium">₱{totalAmount.toLocaleString()}/month</div>
+                            <div className="text-red-600 font-medium">₱{quotation.total_amount?.toLocaleString() || "0"}/month</div>
                           </div>
                         )
                       })}
@@ -1421,13 +1507,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             className="grid grid-cols-5 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                             onClick={() => router.push(`/sales/job-orders/${jobOrder.id}`)}
                           >
-                            <div className="text-gray-600">{formatDate(jobOrder.createdAt)}</div>
+                            <div className="text-gray-600">{jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}</div>
                             <div className="text-gray-900 font-medium">
-                              {jobOrder.jobOrderNumber || jobOrder.id.slice(-8)}
+                              {jobOrder.joNumber || jobOrder.id.slice(-8)}
                             </div>
                             <div className="text-gray-600">Job Order</div>
                             <div className="text-gray-900">
-                              {jobOrder.client?.company || jobOrder.client?.name || "Unknown Client"}
+                              {jobOrder.clientName || "Unknown Client"}
                             </div>
                             <div>
                               <span

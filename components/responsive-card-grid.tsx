@@ -11,7 +11,7 @@ interface ResponsiveCardGridProps {
   mobileColumns?: number
   tabletColumns?: number
   desktopColumns?: number
-  gap?: "none" | "sm" | "md" | "lg"
+  gap?: "none" | "sm" | "md" | "lg" | "xl"
 }
 
 export function ResponsiveCardGrid({
@@ -29,6 +29,7 @@ export function ResponsiveCardGrid({
     sm: "gap-1",
     md: "gap-2",
     lg: "gap-4",
+    xl: "gap-6",
   }
 
   const getGridCols = () => {

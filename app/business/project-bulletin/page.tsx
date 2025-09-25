@@ -1,6 +1,7 @@
 "use client"
 
-import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle } from "lucide-react"
+import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle, MoreVertical, List, Grid3X3 } from "lucide-react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState, useRef } from "react"
@@ -474,49 +475,58 @@ export default function ProjectMonitoringPage() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="flex items-center px-4 py-3">
+    <div className="p-6 bg-[#fafafa] min-h-screen" role="main" aria-labelledby="business-bulletin-title">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => router.back()}
             className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-lg font-medium">Project Bulletin</span>
           </button>
+          <h1 id="business-bulletin-title" className="text-2xl font-semibold text-[#333333]">Project Bulletin</h1>
         </div>
       </div>
 
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center gap-4">
-          {/* Search Bar */}
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
+      <div className="flex items-center justify-between mb-6">
+        <div className="relative w-80">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#b7b7b7] h-4 w-4" aria-hidden="true" />
+          <Input
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-[#ffffff] border-[#c4c4c4] text-[#333333] placeholder:text-[#b7b7b7] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            aria-label="Search projects"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="text-[#b7b7b7] hover:text-[#333333] hover:bg-gray-100 transition-colors" aria-label="List view" title="Switch to list view">
+            <List className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button variant="ghost" size="sm" className="text-[#333333] bg-gray-100" aria-label="Grid view (current)" title="Grid view (currently active)" aria-pressed="true">
+            <Grid3X3 className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
       </div>
 
 
-      <div className="p-4">
+      <div>
         {loading ? (
-          <div className="text-center py-8">Loading...</div>
+          <div className="text-center py-12" role="status" aria-live="polite">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading projects...</p>
+            <span className="sr-only">Loading project data</span>
+          </div>
         ) : products.length > 0 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {products
                 .filter((product) => latestJoNumbers[product.id!])
                 .map((product) => (
                   <div
                     key={product.id}
-                    className="bg-white rounded-lg border border-gray-300 p-4 cursor-pointer hover:shadow-md transition-shadow"
+                    className="bg-[#ffffff] border border-[#c4c4c4] p-4 relative cursor-pointer hover:shadow-lg focus-within:shadow-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                    style={{ width: '461.339px', height: '284px' }}
                     onClick={() => {
                       console.log('Product ID:', product.id)
                       console.log('Latest JO IDs:', latestJoIds)
@@ -527,48 +537,62 @@ export default function ProjectMonitoringPage() {
                         console.log('No latest JO ID found for product:', product.id)
                       }
                     }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Project: ${projectNames[product.id!] || "No Project Name"}, JO Number: ${latestJoNumbers[product.id!] || 'No JO'}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        if (latestJoIds[product.id!]) {
+                          router.push(`/business/project-bulletin/details/${latestJoIds[product.id!]}`)
+                        }
+                      }
+                    }}
                   >
-                    <div className="text-blue-600 text-sm mb-3 rounded inline-block" style={{ backgroundColor: '#e7f1ff', fontWeight: '650' }}>
-                      <span style={{ padding: '0 2px' }}>{latestJoNumbers[product.id!] || 'No JO'}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 text-[#b7b7b7] hover:text-[#333333] hover:bg-gray-100 p-1 transition-colors"
+                      aria-label="More options"
+                      title="More options"
+                    >
+                      <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+
+                    <div className="flex items-start gap-4">
+                      <Image src={product.media?.[0]?.url || '/placeholder.jpg'} alt={`Site image for ${projectNames[product.id!] || "project"}`} width={108} height={108} className="object-cover rounded-lg mb-4" style={{ width: '108.429px', height: '108.429px' }} onError={(e) => { const target = e.target as HTMLImageElement; target.src = '/placeholder.jpg' }} />
+                      <div className="flex-1">
+                        <div className="mb-1" style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{latestJoNumbers[product.id!] || 'No JO'}</div>
+
+                        <h3 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '31px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{projectNames[product.id!] || "No Project Name"}</h3>
+
+                        <div className="mb-2">
+                          <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Site:</span> <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '400', lineHeight: '100%' }}>{product.specs_rental?.location || product.name || "No site code available"}</span>
+                        </div>
+                      </div>
                     </div>
 
+                    <hr className="my-2 border-[#c4c4c4]" />
 
-                    {/* Project Title Banner */}
-                    <div className="text-white px-4 py-2 rounded mb-3 w-fit" style={{ backgroundColor: "#00aeef", borderRadius: "10px" }}>
-                      <h3 className="font-semibold text-lg">{projectNames[product.id!] || "No Project Name"}</h3>
-                    </div>
-
-                    {/* Project Location */}
-                    <div className="text-gray-900 font-medium mb-3">
-                      {product.specs_rental?.location || product.name || "No site code available"}
-                    </div>
-
-                    {/* Last Activity Section */}
                     <div>
-                      <h4 className="text-gray-700 font-medium mb-2">Last Activity:</h4>
-                      <div className="space-y-1 text-sm text-gray-600">
+                      <h4 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Latest Activities:</h4>
+                      <div className="space-y-1">
                         {productReports[product.id!] && productReports[product.id!].length > 0 ? (
                           productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {
                             const reportDate = report.updated?.toDate ? report.updated.toDate() : new Date(report.updated || report.date || 0)
                             const formattedDate = reportDate.toLocaleDateString("en-US", {
-                              month: "numeric",
+                              month: "short",
                               day: "numeric",
-                              year: "2-digit",
-                            })
-                            const formattedTime = reportDate.toLocaleTimeString("en-US", {
-                              hour: "numeric",
-                              minute: "2-digit",
-                              hour12: true,
                             })
 
                             return (
-                              <div key={report.id}>
-                                {formattedDate} {formattedTime} - {report.descriptionOfWork || report.description || "No description available"}
+                              <div key={report.id} style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '300', lineHeight: '100%' }}>
+                                {formattedDate} - {report.descriptionOfWork || report.description || "No description available"}
                               </div>
                             )
                           })
                         ) : (
-                          <div className="text-gray-500 italic">No recent activity</div>
+                          <div style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '300', lineHeight: '100%' }}>No recent activity</div>
                         )}
                       </div>
                     </div>
@@ -589,7 +613,13 @@ export default function ProjectMonitoringPage() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">No products found</div>
+          <div className="text-center py-12" role="status" aria-live="polite">
+            <div className="text-gray-400 mb-4">
+              <Search className="h-12 w-12 mx-auto" aria-hidden="true" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
+            <p className="text-gray-500">Try adjusting your search criteria or check back later.</p>
+          </div>
         )}
       </div>
 
