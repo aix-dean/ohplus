@@ -279,6 +279,20 @@ export async function assignRoleToUser(userId: string, roleId: string): Promise<
         roleId,
         assignedAt: Date.now(),
       })
+
+      // Update the iboard_users document with the new roles array
+      try {
+        const updatedRoles = await getUserRoles(userId)
+        const userDocRef = doc(db, "iboard_users", userId)
+        await updateDoc(userDocRef, {
+          roles: updatedRoles,
+          updated: new Date(),
+        })
+        console.log(`Updated iboard_users document with roles:`, updatedRoles)
+      } catch (updateError) {
+        console.error("Error updating iboard_users document:", updateError)
+        // Don't fail the role assignment if updating iboard_users fails
+      }
     }
   } catch (error) {
     console.error("Error assigning role to user:", error)
@@ -295,6 +309,20 @@ export async function removeRoleFromUser(userId: string, roleId: string): Promis
     userRolesSnapshot.forEach(async (docSnapshot) => {
       await deleteDoc(doc(userRolesCollection, docSnapshot.id))
     })
+
+    // Update the iboard_users document with the updated roles array
+    try {
+      const updatedRoles = await getUserRoles(userId)
+      const userDocRef = doc(db, "iboard_users", userId)
+      await updateDoc(userDocRef, {
+        roles: updatedRoles,
+        updated: new Date(),
+      })
+      console.log(`Updated iboard_users document with roles after removal:`, updatedRoles)
+    } catch (updateError) {
+      console.error("Error updating iboard_users document after role removal:", updateError)
+      // Don't fail the role removal if updating iboard_users fails
+    }
   } catch (error) {
     console.error("Error removing role from user:", error)
     throw new Error("Failed to remove role from user")

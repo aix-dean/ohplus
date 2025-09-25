@@ -174,7 +174,7 @@ export default function TreasuryPlannerPage() {
     try {
       const isAdmin = userData.role === "admin"
       const userDepartment = "treasury"
-      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment)
+      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment, userData.company_id)
       setEvents(fetchedEvents)
     } catch (error) {
       console.error("Error fetching events:", error)
@@ -1406,6 +1406,7 @@ export default function TreasuryPlannerPage() {
             fetchEvents()
           }}
           department="treasury"
+          companyId={userData?.company_id || undefined}
         />
 
         <EventDetailsDialog

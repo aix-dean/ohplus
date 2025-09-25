@@ -174,7 +174,7 @@ export default function ITPlannerPage() {
     try {
       const isAdmin = userData.role === "admin"
       const userDepartment = "it"
-      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment)
+      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment, userData.company_id)
       setEvents(fetchedEvents)
     } catch (error) {
       console.error("Error fetching events:", error)
@@ -1406,6 +1406,7 @@ export default function ITPlannerPage() {
             fetchEvents()
           }}
           department="it"
+          companyId={userData?.company_id}
         />
 
         <EventDetailsDialog

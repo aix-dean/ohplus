@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
+import { getSalesEvents, type SalesEvent } from "@/lib/planner-service"
 
 interface User {
   id: string
@@ -27,6 +28,7 @@ export default function ITPage() {
   const { userData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [departmentCounts, setDepartmentCounts] = useState<Record<string, number>>({})
+  const [events, setEvents] = useState<SalesEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [departmentLoading, setDepartmentLoading] = useState(true)
 
@@ -39,8 +41,6 @@ export default function ITPage() {
     it: "Soft Admin (I.T.)",
     business: "Business Dev.",
     treasury: "Treasury",
-    accounting: "Accounting",
-    finance: "Finance",
   }
 
   useEffect(() => {
@@ -110,6 +110,28 @@ export default function ITPage() {
     calculateDepartmentCounts()
   }, [users])
 
+  // Fetch events for IT department
+  const fetchEvents = async () => {
+    if (!userData?.company_id) {
+      setEvents([])
+      return
+    }
+
+    try {
+      const isAdmin = userData.role === "admin"
+      const userDepartment = "it"
+      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment, userData.company_id)
+      setEvents(fetchedEvents)
+    } catch (error) {
+      console.error("Error fetching events:", error)
+      setEvents([])
+    }
+  }
+
+  useEffect(() => {
+    fetchEvents()
+  }, [userData])
+
   return (
     <RouteProtection requiredRoles="it">
       <div className="min-h-screen bg-gray-50 p-4 md:p-8 pt-6">
@@ -118,45 +140,100 @@ export default function ITPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Schedule Card */}
-          <Card className="border-2 border-orange-200 bg-orange-50">
+          <Card className="bg-[#ffffee] border-[#ffdea2] border-2">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Today 12, Sep</CardTitle>
+              <CardTitle className="text-lg font-semibold text-[#333333]">
+                Today <span className="text-sm font-normal">{new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Today's events */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 bg-green-500 rounded"></div>
-                  <span className="text-sm font-medium">RR0932-</span>
-                  <span className="text-sm text-gray-600">Start Date</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
-                  <span className="text-sm font-medium">SA0512-</span>
-                  <span className="text-sm text-gray-600">Deadline</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 bg-pink-400 rounded"></div>
-                  <span className="text-sm font-medium">NAN305-</span>
-                  <span className="text-sm text-gray-600">Yearly Maintenan..</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 bg-yellow-400 rounded"></div>
-                  <span className="text-sm text-gray-600">Attend Supplier's Expo @.....</span>
-                </div>
+                {(() => {
+                  const today = new Date()
+                  const todayEvents = events.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === today.toDateString()
+                  })
+
+                  return todayEvents.length > 0 ? (
+                    todayEvents.slice(0, 4).map((event, index) => (
+                      <div key={event.id} className={`p-2 rounded text-xs ${
+                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                        event.type === 'party' ? 'bg-[#ffe522]/30' :
+                        'bg-[#7fdb97]/30'
+                      }`}>
+                        <div className="font-medium">{event.title}</div>
+                        <div className="text-[10px] text-gray-600 truncate">{event.location}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-600">No events for today.</div>
+                  )
+                })()}
               </div>
 
-              <div className="pt-4">
-                <h3 className="font-semibold text-gray-900 mb-2">13, Sep</h3>
-                <p className="text-sm text-gray-500 text-center py-4">No events for this day.</p>
+              <div className="pt-4 border-t">
+                <div className="font-medium text-[#333333] mb-2">{(() => {
+                  const tomorrow = new Date()
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  return tomorrow.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                })()}</div>
+                {(() => {
+                  const tomorrow = new Date()
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  const tomorrowEvents = events.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === tomorrow.toDateString()
+                  })
+
+                  return tomorrowEvents.length > 0 ? (
+                    tomorrowEvents.slice(0, 2).map((event, index) => (
+                      <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                        event.type === 'party' ? 'bg-[#ffe522]/30' :
+                        'bg-[#7fdb97]/30'
+                      }`}>
+                        <div className="font-medium">{event.title}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-600">No events for this day.</div>
+                  )
+                })()}
               </div>
 
-              <div className="pt-4">
-                <h3 className="font-semibold text-gray-900 mb-2">14, Sep</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 bg-pink-400 rounded"></div>
-                  <span className="text-sm font-medium">NAN305-</span>
-                  <span className="text-sm text-gray-600">Yearly Maintenan..</span>
-                </div>
+              <div className="pt-4 border-t">
+                <div className="font-medium text-[#333333] mb-2">{(() => {
+                  const dayAfter = new Date()
+                  dayAfter.setDate(dayAfter.getDate() + 2)
+                  return dayAfter.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                })()}</div>
+                {(() => {
+                  const dayAfter = new Date()
+                  dayAfter.setDate(dayAfter.getDate() + 2)
+                  const dayAfterEvents = events.filter(event => {
+                    const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
+                    return eventDate.toDateString() === dayAfter.toDateString()
+                  })
+
+                  return dayAfterEvents.length > 0 ? (
+                    dayAfterEvents.slice(0, 2).map((event, index) => (
+                      <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                        event.type === 'party' ? 'bg-[#ffe522]/30' :
+                        'bg-[#7fdb97]/30'
+                      }`}>
+                        <div className="font-medium">{event.title}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-600">No events for this day.</div>
+                  )
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -222,7 +299,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Sales</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "100%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -230,7 +307,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Logistics</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "100%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -238,7 +315,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Treasury</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "70%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -246,7 +323,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Business Dev.</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "40%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -254,7 +331,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Admin</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "80%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -262,7 +339,7 @@ export default function ITPage() {
                     <span className="text-sm text-gray-600">Soft Admin (I.T.)</span>
                     <div className="flex-1 mx-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: "60%" }}></div>
+                        <div className="bg-gray-400 h-2 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
                   </div>
@@ -291,15 +368,15 @@ export default function ITPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="space-y-2">
                   <div className="text-sm text-gray-600">Total LED Screens</div>
-                  <div className="text-2xl font-bold">4</div>
+                  <div className="text-2xl font-bold">0</div>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Online</span>
-                      <span className="font-medium">3</span>
+                      <span className="font-medium">0</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Offline</span>
-                      <span className="font-medium">1</span>
+                      <span className="font-medium">0</span>
                     </div>
                   </div>
                 </div>
@@ -321,12 +398,12 @@ export default function ITPage() {
                       stroke="currentColor"
                       strokeWidth="8"
                       fill="transparent"
-                      strokeDasharray={`${75 * 2.51} ${25 * 2.51}`}
-                      className="text-green-500"
+                      strokeDasharray={`${0 * 2.51} ${100 * 2.51}`}
+                      className="text-gray-400"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-gray-900">75%</span>
+                    <span className="text-2xl font-bold text-gray-900">0%</span>
                   </div>
                 </div>
               </div>

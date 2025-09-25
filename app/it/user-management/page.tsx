@@ -211,10 +211,10 @@ export default function ITUserManagementPage() {
     admin: "Administrator",
     sales: "Sales Team",
     logistics: "Logistics Team",
-    cms: "Content Management",
+    treasury: "Treasury",
     it: "IT Team",
     business: "Business Development",
-    treasury: "Treasury",
+    cms: "Content Management",
     accounting: "Accounting",
     finance: "Finance",
   }
@@ -591,12 +591,17 @@ export default function ITUserManagementPage() {
           Object.entries(usersByDepartment).map(([department, departmentUsers]) => {
             const memberCount = departmentUsers.length
             const memberText = memberCount === 1 ? "member" : "members"
+            const isDisabled = ['Accounting', 'Finance', 'Content Management'].includes(department)
 
             return (
               <Card
                 key={department}
-                className="p-6 bg-white shadow-sm border border-gray-200 rounded-xl cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/it/department/${encodeURIComponent(department)}`)}
+                className={`p-6 shadow-sm border border-gray-200 rounded-xl transition-shadow ${
+                  isDisabled
+                    ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                    : 'bg-white cursor-pointer hover:shadow-md'
+                }`}
+                onClick={isDisabled ? undefined : () => router.push(`/it/department/${encodeURIComponent(department)}`)}
               >
                 <div className={`h-1 ${departmentColors[department] || 'bg-gray-300'} rounded-full mb-4 -mt-2`} />
 
@@ -644,7 +649,8 @@ export default function ITUserManagementPage() {
                 <Button
                   variant="outline"
                   className="w-full text-gray-600 border-gray-300 hover:bg-gray-50 bg-transparent"
-                  onClick={(e) => {
+                  disabled={isDisabled}
+                  onClick={isDisabled ? undefined : (e) => {
                     e.stopPropagation()
                     handleAddTeammate(department)
                   }}

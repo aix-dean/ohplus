@@ -384,13 +384,6 @@ export default function BusinessInventoryPage() {
       return
     }
 
-    // Check if user has license key
-    if (!userData?.license_key) {
-      console.log("No license key found")
-      setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
 
     // Check if subscription exists and is active
     if (!currentSubscription) {
@@ -443,15 +436,6 @@ export default function BusinessInventoryPage() {
         console.error("Error fetching subscription after company registration:", error)
       }
 
-      // Check subscription after company registration
-      if (!userData?.license_key) {
-        console.log("No license key after company registration")
-        setSubscriptionLimitMessage(
-          "Company registered successfully! Now choose a subscription plan to start adding sites.",
-        )
-        setShowSubscriptionLimitDialog(true)
-        return
-      }
 
       if (!currentSubscription) {
         console.log("No subscription found after company registration")
@@ -507,13 +491,6 @@ export default function BusinessInventoryPage() {
         return
       }
 
-      // Check if user has license key
-      if (!userData?.license_key) {
-        console.log("No license key found after company update")
-        setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
-        setShowSubscriptionLimitDialog(true)
-        return
-      }
 
       // Check if subscription exists and is active
       if (!currentSubscription) {
