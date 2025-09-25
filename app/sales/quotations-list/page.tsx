@@ -78,6 +78,7 @@ export default function QuotationsListPage() {
   const [projectNameDialogOpen, setProjectNameDialogOpen] = useState(false)
   const [selectedQuotationForProject, setSelectedQuotationForProject] = useState<any>(null)
   const [projectName, setProjectName] = useState("")
+  const [creatingReservation, setCreatingReservation] = useState(false)
 
   const handleProjectNameDialogClose = (open: boolean) => {
     if (!open) {
@@ -894,6 +895,7 @@ export default function QuotationsListPage() {
       return
     }
 
+    setCreatingReservation(true)
     try {
       const quotationRef = doc(db, "quotations", selectedQuotationForProject.id)
       let downloadURL = ""
@@ -962,6 +964,8 @@ export default function QuotationsListPage() {
         description: "Failed to create booking document. Please check console for details.",
         variant: "destructive",
       })
+    } finally {
+      setCreatingReservation(false)
     }
   }
 
@@ -1578,8 +1582,15 @@ export default function QuotationsListPage() {
                 <Button variant="outline" onClick={() => setProjectNameDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleProjectNameSubmit} disabled={!projectName.trim()}>
-                  Create Reservation
+                <Button onClick={handleProjectNameSubmit} disabled={!projectName.trim() || creatingReservation}>
+                  {creatingReservation ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Reservation...
+                    </>
+                  ) : (
+                    "Create Reservation"
+                  )}
                 </Button>
               </div>
             </div>
