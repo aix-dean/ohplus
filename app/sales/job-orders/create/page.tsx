@@ -1969,7 +1969,7 @@ export default function CreateJobOrderPage() {
                 <div className="flex items-center space-x-2">
                   <Label className="w-36 text-sm text-gray-800">Campaign Name</Label>
                   <Input
-                    placeholder="Fantastic 4"
+                    placeholder=""
                     value={jobOrderForms[0]?.campaignName || ""}
                     onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
                     className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
