@@ -159,7 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Fetch roles from user_roles collection
           const userRoles = await getUserRoles(firebaseUser.uid)
+          console.log("=== FETCH USER DATA - ROLES DEBUG ===")
           console.log("User roles from user_roles collection:", userRoles)
+          console.log("User roles length:", userRoles.length)
+          console.log("User roles type:", typeof userRoles)
 
           fetchedUserData = {
             uid: firebaseUser.uid,
@@ -187,7 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Fetch roles from user_roles collection even if user doc doesn't exist
           const userRoles = await getUserRoles(firebaseUser.uid)
+          console.log("=== FETCH USER DATA - ROLES DEBUG (no doc) ===")
           console.log("User roles from user_roles collection:", userRoles)
+          console.log("User roles length:", userRoles.length)
 
           fetchedUserData = {
             uid: firebaseUser.uid,
@@ -198,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRoles.length > 0 ? userRoles[0] : null,
             roles: userRoles,
             permissions: [],
-            onboarding: true, // New users need to complete onboarding
+            onboarding: false, // Skip onboarding for new users
           }
 
           // Create the user document with uid field
@@ -319,27 +324,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const findOHPlusAccount = async (uid: string) => {
     try {
+      console.log("=== FIND OHPLUS ACCOUNT DEBUG ===")
       console.log("Checking OHPLUS account for uid:", uid)
+
       // Query for user document with this uid
       const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid))
       const usersSnapshot = await getDocs(usersQuery)
 
       console.log("Query snapshot empty:", usersSnapshot.empty)
+      console.log("Query snapshot size:", usersSnapshot.size)
+
       if (!usersSnapshot.empty) {
         const userDoc = usersSnapshot.docs[0]
         const data = userDoc.data()
+        console.log("User document data:", data)
         console.log("User data type:", data.type)
+        console.log("User data uid:", data.uid)
+
         // Check if type is OHPLUS
         if (data.type === "OHPLUS") {
-          console.log("OHPLUS account found")
+          console.log("✅ OHPLUS account found")
           return true
+        } else {
+          console.log("❌ User document exists but type is not OHPLUS:", data.type)
         }
+      } else {
+        console.log("❌ No user document found in iboard_users collection")
+        console.log("❌ This means the user registration failed to create the document")
       }
 
-      console.log("No OHPLUS account found")
+      console.log("❌ No OHPLUS account found")
       return false
     } catch (error) {
-      console.error("Error finding OHPLUS account:", error)
+      console.error("❌ Error finding OHPLUS account:", error)
       return false
     }
   }
@@ -521,7 +538,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid,
-        onboarding: true, // New users need to complete onboarding
+        onboarding: false, // Skip onboarding for new users
       }
 
       console.log("=== USER DOCUMENT CREATION DEBUG ===")
@@ -658,6 +675,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log("Setting up auth state listener with tenant ID:", tenantAuth.tenantId)
     const unsubscribe = onAuthStateChanged(tenantAuth, async (firebaseUser) => {
+      console.log("=== AUTH STATE CHANGE ===")
+      console.log("Firebase user:", firebaseUser?.uid)
+      console.log("Is registering:", isRegistering)
+
       if (firebaseUser) {
         console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
@@ -670,10 +691,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
+        console.log("Is OHPLUS account:", isOHPlusAccount)
+
         if (isOHPlusAccount) {
+          console.log("✅ Fetching user data for OHPLUS account")
           await fetchUserData(firebaseUser)
         } else {
-          console.log("No OHPLUS account found, signing out")
+          console.log("❌ No OHPLUS account found, signing out user")
+          console.log("❌ This is likely why the user gets redirected to login")
           await signOut(tenantAuth)
         }
       } else {
@@ -744,6 +769,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getRoleDashboardPath = useCallback((roles: RoleType[]): string | null => {
     console.log("getRoleDashboardPath called with roles:", roles)
 
+    // Skip onboarding check - go directly to role dashboard
     if (!roles || roles.length === 0) {
       console.log("No roles found, returning null")
       return null
@@ -755,8 +781,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return "/admin/dashboard"
     }
     if (roles.includes("it")) {
-      console.log("IT role found, redirecting to IT dashboard")
-      return "/it"
+      console.log("IT role found, redirecting to IT user management dashboard")
+      return "/it/user-management"
     }
     if (roles.includes("sales")) {
       console.log("Sales role found, redirecting to sales dashboard")
