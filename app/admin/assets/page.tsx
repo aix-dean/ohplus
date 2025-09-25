@@ -764,7 +764,7 @@ export default function AdminAssetsPage() {
     const isActive = product.active === true
     const statusText = isActive ? "Active" : "Inactive"
     const statusColor = isActive ? "#00bf63" : "#ff6b35" // Green for active, red for inactive
-  
+
     // Get image from product media or use placeholder
     const image =
       product.media && product.media.length > 0
@@ -772,14 +772,14 @@ export default function AdminAssetsPage() {
         : product.content_type === "dynamic"
           ? "/led-billboard-1.png"
           : "/roadside-billboard.png"
-  
+
     // Generate a health percentage based on status if not available
     const healthPercentage =
       product.health_percentage ||
       (product.status === "ACTIVE"
         ? Math.floor(Math.random() * 20) + 80
         : Math.floor(Math.random() * 40) + 10)
-  
+
     // Extract address information
     const address =
       product.specs_rental?.location ||
@@ -787,10 +787,10 @@ export default function AdminAssetsPage() {
       product.location ||
       product.address ||
       "Address not specified"
-  
+
     const handleCardClick = () => {
       if (product.id) {
-        onCreateReport(product.id)
+        router.push(`/admin/assets/${product.id}`)
       }
     }
   
@@ -869,7 +869,9 @@ export default function AdminAssetsPage() {
                   style={{ backgroundColor: "#0f76ff" }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleCardClick()
+                    if (product.id) {
+                      onCreateReport(product.id)
+                    }
                   }}
                 >
                   Create Report
@@ -920,7 +922,7 @@ export default function AdminAssetsPage() {
 
     const handleCardClick = () => {
       if (product.id) {
-        onCreateReport(product.id)
+        router.push(`/admin/assets/${product.id}`)
       }
     }
 
@@ -1009,7 +1011,9 @@ export default function AdminAssetsPage() {
               }}
               onClick={(e) => {
                 e.stopPropagation()
-                handleCardClick()
+                if (product.id) {
+                  onCreateReport(product.id)
+                }
               }}
             >
               Create Report
