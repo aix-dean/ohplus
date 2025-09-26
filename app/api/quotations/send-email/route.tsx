@@ -338,7 +338,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email data with all attachments
     const emailData: any = {
-      from: `${companyName || "Company"} <noreply@company.com>`,
+      from: `${companyName || "Company"} <noreply@${process.env.RESEND_VERIFIED_DOMAIN || 'company.com'}>`,
       to: [clientEmail],
       subject: finalSubject,
       html: finalBody,
