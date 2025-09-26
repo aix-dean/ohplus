@@ -18,8 +18,6 @@ export default function SalesReportsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
-  const [activeTab, setActiveTab] = useState("From Sales")
-  const [showDrafts, setShowDrafts] = useState(false)
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
@@ -33,7 +31,7 @@ export default function SalesReportsPage() {
       await filterReports()
     }
     loadReports()
-  }, [searchQuery, filterType, activeTab, showDrafts, userData])
+  }, [searchQuery, filterType, userData])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -58,21 +56,9 @@ export default function SalesReportsPage() {
         filters.push(`companyId:${userData.company_id}`)
       }
 
-      // Category filter based on activeTab
-      if (activeTab === "From Sales") {
-        filters.push(`category:sales`)
-      } else if (activeTab === "From Management") {
-        filters.push(`category:management`)
-      } else if (activeTab === "From Admin") {
-        filters.push(`category:admin`)
-      }
 
       // Status filter
-      if (showDrafts) {
-        filters.push(`status:draft`)
-      } else {
-        filters.push(`NOT status:draft`)
-      }
+      filters.push(`NOT status:draft`)
 
       // Report type filter
       if (filterType !== "All") {
@@ -171,24 +157,6 @@ export default function SalesReportsPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex items-center gap-6">
-          {["From Sales", "From Management", "From Admin"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Search and Filters */}
       <div className="bg-white px-6 py-4 border-b border-gray-200">
@@ -216,13 +184,6 @@ export default function SalesReportsPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            variant={showDrafts ? "default" : "outline"}
-            onClick={() => setShowDrafts(!showDrafts)}
-            className="px-4"
-          >
-            Drafts
-          </Button>
         </div>
       </div>
 
@@ -232,6 +193,9 @@ export default function SalesReportsPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Report #
                 </th>
@@ -253,7 +217,7 @@ export default function SalesReportsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2">Loading reports...</span>
@@ -262,13 +226,16 @@ export default function SalesReportsPage() {
                 </tr>
               ) : filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>
               ) : (
                 filteredReports.map((report) => (
                   <tr key={report.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(report.created)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {generateReportNumber(report.id || "")}
                     </td>
