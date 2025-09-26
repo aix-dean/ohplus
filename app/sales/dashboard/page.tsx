@@ -37,7 +37,7 @@ import {
   type Booking,
 } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { collection, query, where, getDocs, getDoc, doc, Timestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, getDoc, doc, Timestamp, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
 import type { SearchResult } from "@/lib/algolia-service"
@@ -143,11 +143,40 @@ function SalesDashboardContent() {
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
-  const handleCreateReport = (product: Product, e: React.MouseEvent) => {
+  const handleCreateReport = async (product: Product, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setSelectedProductForReport(product.id || "")
-    setCreateReportDialogOpen(true)
+
+    try {
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(
+        jobOrdersRef,
+        where("product_id", "==", product.id),
+        orderBy("createdAt", "desc"),
+        limit(1)
+      )
+      const snapshot = await getDocs(q)
+
+      if (!snapshot.empty) {
+        const latestJobOrder = snapshot.docs[0]
+        router.push(`/sales/project-monitoring/details/${latestJobOrder.id}`)
+      } else {
+        toast({
+          title: "No Job Order Found",
+          description: "No job order found for this product.",
+          variant: "destructive",
+          open: true,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching job order:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch job order.",
+        variant: "destructive",
+        open: true,
+      })
+    }
   }
 
   const handleCopySitesFromProposal = (sites: Product[], client?: any) => {
@@ -2076,6 +2105,23 @@ function ProductCard({
             <MapPin size={12} className="mr-1 flex-shrink-0" />
             <span className="truncate">{location}</span>
           </div>
+
+          {/* Create Report Button */}
+          {!selectionMode && (
+            <div className="mt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onCreateReport(e)
+                }}
+                className="w-full text-xs"
+              >
+                Create Report
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </div>

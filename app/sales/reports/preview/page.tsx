@@ -12,7 +12,7 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { doc, getDoc, Timestamp } from "firebase/firestore"
+import { doc, getDoc, Timestamp, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { CongratulationsDialog } from "@/components/congratulations-dialog"
 
@@ -32,6 +32,7 @@ export default function SalesReportPreviewPage() {
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
   const [showCongratulations, setShowCongratulations] = useState(false)
+  const [booking, setBooking] = useState<any>(null)
 
   const handleCongratulationsClose = () => {
     setShowCongratulations(false)
@@ -136,7 +137,7 @@ export default function SalesReportPreviewPage() {
     return obj
   }
 
-  const loadPreviewData = () => {
+  const loadPreviewData = async () => {
     try {
       const reportDataString = sessionStorage.getItem("previewReportData")
       const productDataString = sessionStorage.getItem("previewProductData")
@@ -151,6 +152,27 @@ export default function SalesReportPreviewPage() {
 
         setReport(reportData)
         setProduct(productData)
+
+        // Fetch booking data
+        if (productData?.id) {
+          try {
+            const bookingsRef = collection(db, "booking")
+            const q = query(
+              bookingsRef,
+              where("product_id", "==", productData.id),
+              orderBy("created", "desc"),
+              limit(1)
+            )
+            const snapshot = await getDocs(q)
+
+            if (!snapshot.empty) {
+              const bookingData = snapshot.docs[0].data()
+              setBooking(bookingData)
+            }
+          } catch (error) {
+            console.error("Error fetching booking:", error)
+          }
+        }
       } else {
         console.error("No preview data found in session storage")
         toast({
@@ -527,7 +549,7 @@ export default function SalesReportPreviewPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="bg-[#38b6ff] text-white px-4 py-2 rounded-full text-[27.7px] font-medium">Lilo & Stitch</div>
+          <div className="bg-[#38b6ff] text-white px-4 py-2 rounded-full text-[27.7px] font-medium">{booking?.project_name || "Lilo & Stitch"}</div>
           {report.joNumber && <span className="text-lg font-bold text-[25.1px] text-[#0f76ff] bg-blue-100 px-3 py-1 rounded-md">{report.joNumber}</span>}
         </div>
 

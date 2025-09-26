@@ -225,7 +225,7 @@ export function SideNavigation() {
     if (section === 'logistics') return 'bg-[#98d3fd]'
     if (section === 'admin') return 'bg-[#9498d9]'
     if (section === 'treasury') return 'bg-[#81c999]'
-    if (section === 'it') return 'bg-[#9498d9]'
+    if (section === 'it') return 'bg-[#80bfbf]'
     if (section === 'business') return 'bg-[#a0b4f0]'
     if (section === 'cms') return 'bg-[#fed7aa]'
     return 'bg-[#38b6ff]'
