@@ -4,7 +4,7 @@ import type { Todo } from "./types/todo"
 
 const TODOS_COLLECTION = "todos"
 
-export async function getTodosByUser(userId: string, companyId?: string): Promise<Todo[]> {
+export async function getTodosByUser(userId: string, companyId?: string, department?: string): Promise<Todo[]> {
   try {
     let q = query(
       collection(db, TODOS_COLLECTION),
@@ -14,6 +14,10 @@ export async function getTodosByUser(userId: string, companyId?: string): Promis
 
     if (companyId) {
       q = query(q, where("company_id", "==", companyId))
+    }
+
+    if (department) {
+      q = query(q, where("department", "==", department))
     }
 
     const querySnapshot = await getDocs(q)

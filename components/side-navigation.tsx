@@ -714,6 +714,7 @@ export function SideNavigation() {
                 })}
                 {currentSection === "treasury" && [
                   { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
+                  { title: "Planner", href: "/treasury/planner", icon: Calendar },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/requests", icon: FileText },
                 ].map((item) => {

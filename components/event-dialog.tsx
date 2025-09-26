@@ -30,14 +30,8 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
   const { user, userData } = useAuth()
   const isEditing = !!event?.id
   const [startDate, setStartDate] = useState<Date | undefined>(event?.start instanceof Date ? event.start : new Date())
-  const [endDate, setEndDate] = useState<Date | undefined>(
-    event?.end instanceof Date ? event.end : new Date(Date.now() + 60 * 60 * 1000), // Default to 1 hour later
-  )
   const [startTime, setStartTime] = useState(
     event?.start instanceof Date ? format(event.start, "HH:mm") : format(new Date(), "HH:mm"),
-  )
-  const [endTime, setEndTime] = useState(
-    event?.end instanceof Date ? format(event.end, "HH:mm") : format(new Date(Date.now() + 60 * 60 * 1000), "HH:mm"),
   )
   const [isAllDay, setIsAllDay] = useState(event?.allDay || false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -60,6 +54,7 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
       status: event?.status || "scheduled",
       description: event?.description || "",
       color: event?.color || "#3b82f6", // Default blue
+      department: department || "admin", // Default to current department
     },
   })
 
@@ -73,16 +68,11 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
         status: event?.status || "scheduled",
         description: event?.description || "",
         color: event?.color || "#3b82f6",
+        department: department || "admin",
       })
 
       setStartDate(event?.start instanceof Date ? event.start : new Date())
-      setEndDate(event?.end instanceof Date ? event.end : new Date(Date.now() + 60 * 60 * 1000))
       setStartTime(event?.start instanceof Date ? format(event.start, "HH:mm") : format(new Date(), "HH:mm"))
-      setEndTime(
-        event?.end instanceof Date
-          ? format(event.end, "HH:mm")
-          : format(new Date(Date.now() + 60 * 60 * 1000), "HH:mm"),
-      )
       setIsAllDay(event?.allDay || false)
 
       // Reset recurrence settings - just the type
@@ -93,18 +83,21 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
   const onSubmit = async (data: any) => {
     if (!user?.uid || !userData) return
 
-
     try {
       setIsSubmitting(true)
 
-      // Combine date and time
+      // Combine date and time for start
       const startDateTime = new Date(startDate!)
-      const [startHours, startMinutes] = startTime.split(":").map(Number)
-      startDateTime.setHours(startHours, startMinutes, 0, 0)
+      if (!isAllDay) {
+        const [startHours, startMinutes] = startTime.split(":").map(Number)
+        startDateTime.setHours(startHours, startMinutes, 0, 0)
+      }
 
-      const endDateTime = new Date(endDate!)
-      const [endHours, endMinutes] = endTime.split(":").map(Number)
-      endDateTime.setHours(endHours, endMinutes, 0, 0)
+      // For events without end date/time, set end to same as start (or 1 hour later if not all day)
+      const endDateTime = new Date(startDateTime)
+      if (!isAllDay) {
+        endDateTime.setHours(endDateTime.getHours() + 1) // Default to 1 hour duration
+      }
 
       // Prepare recurrence data - simplified
       let recurrence = undefined
@@ -133,9 +126,9 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
         // Create new event
         eventId = await createEvent(
           user.uid,
-          department, // Fixed department
+          data.department || department, // Use selected department from form
           userData.role === "admin", // isAdmin
-          department, // userDepartment - fixed for planner
+          data.department || department, // userDepartment - use selected department
           eventData as any,
           companyId || ""
         )
@@ -153,177 +146,103 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md relative sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6">
-        <button
-          onClick={() => onClose()}
-          className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </button>
-        <DialogHeader className="pb-2">
-          <DialogTitle className="text-base font-semibold">{isEditing ? "Edit Event" : "Create Event"}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-lg p-0 bg-white rounded-2xl border border-[#c4c4c4]">
+        <div className="p-8">
+          <DialogTitle className="text-2xl font-bold text-black mb-6">{isEditing ? "Edit Event" : "Create Event"}</DialogTitle>
 
-        <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-3 px-1">
-          {/* Event Information Section */}
-          <div className="bg-gray-100 p-3 rounded-lg space-y-1">
-            <div className="text-base">
-              <span className="font-medium">Department:</span>{" "}
-              <span className="capitalize">{department}</span>
-            </div>
-            <div className="text-base">
-              <span className="font-medium">Type:</span>{" "}
-              {watch("type") || "Not selected"}
-            </div>
-            <div className="text-base">
-              <span className="font-medium">Status:</span>{" "}
-              <span className="capitalize">{watch("status") || "scheduled"}</span>
-            </div>
-          </div>
-
-          {/* Department Selection for Admin */}
-          {department === "admin" && (
-            <div className="space-y-2">
-              <Label htmlFor="department" className="text-sm font-semibold text-gray-900">
-                Department <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                defaultValue={department}
-                onValueChange={(value) => {
-                  // For admin, we allow changing the department
-                  // This will be passed to the createEvent function
-                }}
-              >
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="it">IT</SelectItem>
-                  <SelectItem value="treasury">Treasury</SelectItem>
-                  <SelectItem value="business-dev">Business Dev</SelectItem>
-                  <SelectItem value="logistics">Logistics</SelectItem>
-                  <SelectItem value="sales">Sales</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-sm font-semibold text-gray-900">
-                Event Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                placeholder="Enter event title"
-                {...register("title", { required: "Title is required" })}
-                className={`h-9 text-sm ${errors.title ? "border-red-500" : ""}`}
-              />
-              {errors.title && <p className="text-red-500 text-sm">{errors.title.message as string}</p>}
-            </div>
-
-            {/* Date and Time */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900">Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal h-9 text-sm", !startDate && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "MMM d, yyyy") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => {
-                        setStartDate(date)
-                        // If end date is before start date, update it
-                        if (endDate && date && date > endDate) {
-                          setEndDate(date)
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+          <div className="max-h-[60vh] overflow-y-auto space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Title */}
+              <div className="space-y-3">
+                <Label htmlFor="title" className="text-base font-semibold text-black">
+                  Event Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="Enter event title"
+                  {...register("title", { required: "Title is required" })}
+                  className="h-11 text-base border-[#c4c4c4] focus:border-[#333333]"
+                />
+                {errors.title && <p className="text-red-500 text-sm">{errors.title.message as string}</p>}
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="startTime" className="text-sm font-semibold text-gray-900">Start Time</Label>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="allDay" checked={isAllDay} onCheckedChange={setIsAllDay} className="h-4 w-4" />
-                    <Label htmlFor="allDay" className="text-sm">
-                      All day
-                    </Label>
-                  </div>
+  
+              {/* Department Selection */}
+              <div className="space-y-3">
+                <Label htmlFor="department" className="text-base font-semibold text-black">Department</Label>
+                <Select
+                  defaultValue={watch("department")}
+                  onValueChange={(value) => setValue("department", value)}
+                >
+                  <SelectTrigger className="h-11 text-base border-[#c4c4c4]">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="it">IT</SelectItem>
+                    <SelectItem value="treasury">Treasury</SelectItem>
+                    <SelectItem value="business-dev">Business Dev</SelectItem>
+                    <SelectItem value="logistics">Logistics</SelectItem>
+                    <SelectItem value="sales">Sales</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+  
+              {/* Start Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold text-black">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal h-11 text-base border-[#c4c4c4]", !startDate && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "MMM d, yyyy") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  disabled={isAllDay}
-                  className="h-9 text-sm"
-                />
+  
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="startTime" className="text-base font-semibold text-black">Start Time</Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="allDay" checked={isAllDay} onCheckedChange={setIsAllDay} />
+                      <Label htmlFor="allDay" className="text-sm text-gray-600">
+                        All day
+                      </Label>
+                    </div>
+                  </div>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    disabled={isAllDay}
+                    className="h-11 text-base border-[#c4c4c4]"
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900">End Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal h-9 text-sm", !endDate && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "MMM d, yyyy") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      disabled={(date) => (startDate ? date < startDate : false)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endTime" className="text-sm font-semibold text-gray-900">End Time</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  disabled={isAllDay}
-                  className="h-9 text-sm"
-                />
-              </div>
-            </div>
 
             {/* Type and Location */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="type" className="text-sm font-semibold text-gray-900">Event Type</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <Label htmlFor="type" className="text-base font-semibold text-black">Event Type</Label>
                 <Select
                   defaultValue={watch("type")}
                   onValueChange={(value) => setValue("type", value as SalesEvent["type"])}
                 >
-                  <SelectTrigger className="h-9 text-sm">
+                  <SelectTrigger className="h-11 text-base border-[#c4c4c4]">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -334,34 +253,34 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="location" className="text-sm font-semibold text-gray-900">Location</Label>
+              <div className="space-y-3">
+                <Label htmlFor="location" className="text-base font-semibold text-black">Location</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="location" placeholder="Enter location" className="pl-8 h-9 text-sm" {...register("location")} />
+                  <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Input id="location" placeholder="Enter location" className="pl-11 h-11 text-base border-[#c4c4c4]" {...register("location")} />
                 </div>
               </div>
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-semibold text-gray-900">Description (Optional)</Label>
+            <div className="space-y-3">
+              <Label htmlFor="description" className="text-base font-semibold text-black">Description (Optional)</Label>
               <Textarea
                 id="description"
                 placeholder="Enter event description"
-                className="min-h-[80px] text-sm resize-y"
+                className="min-h-[100px] text-base border-[#c4c4c4] resize-y"
                 {...register("description")}
               />
             </div>
 
             {/* Recurrence - Simplified */}
-            <div className="space-y-2 border-t pt-3">
+            <div className="space-y-3">
               <div className="flex items-center space-x-2">
-                <Repeat className="h-4 w-4 text-muted-foreground" />
-                <Label htmlFor="recurrenceType" className="text-sm font-semibold text-gray-900">Repeat</Label>
+                <Repeat className="h-5 w-5 text-gray-400" />
+                <Label htmlFor="recurrenceType" className="text-base font-semibold text-black">Repeat</Label>
               </div>
               <Select value={recurrenceType} onValueChange={(value) => setRecurrenceType(value as RecurrenceType)}>
-                <SelectTrigger className="h-9 text-sm">
+                <SelectTrigger className="h-11 text-base border-[#c4c4c4]">
                   <SelectValue placeholder="Select recurrence" />
                 </SelectTrigger>
                 <SelectContent>
@@ -374,27 +293,27 @@ export function EventDialog({ isOpen, onClose, event, onEventSaved, department, 
               </Select>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+            <div className="flex justify-end gap-3 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="px-6 py-3 text-base font-medium border-[#c4c4c4] text-black hover:bg-[#f0f0f0]"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-3 text-base font-medium bg-[#30c71d] hover:bg-[#30c71d]/90 text-white"
+              >
                 {isSubmitting ? "Saving..." : isEditing ? "Update" : "Create"}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </div>
-
-        <style jsx global>{`
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </DialogContent>
+  </Dialog>
   )
 }
