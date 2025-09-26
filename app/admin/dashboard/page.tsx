@@ -40,7 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Pagination } from "@/components/ui/pagination";
-import { Timestamp } from "firebase/firestore";
+import { Timestamp, onSnapshot, collection, query, where, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams();
@@ -104,29 +105,21 @@ export default function AdminDashboardPage() {
   // Check if petty cash balance is low
   const isPettyCashBalanceLow = pettyCashConfig ? pettyCashBalance <= pettyCashConfig.warning_amount : false;
 
-  const fetchPettyCashData = async () => {
-    if (userData?.company_id) {
-      setLoadingPettyCash(true);
-      try {
-        // Fetch petty cash config and active cycle
-        const [config, cycle] = await Promise.all([
-          getPettyCashConfig(userData.company_id),
-          getActivePettyCashCycle(userData.company_id)
-        ]);
-
-        setPettyCashConfig(config);
-        setPettyCashCycle(cycle);
-
-        // Calculate remaining balance: config amount - cycle expenses
-        const balance = config ? config.amount - (cycle?.total || 0) : 0;
-        setPettyCashBalance(balance);
-      } catch (error) {
-        console.error("Error fetching petty cash data:", error);
-      } finally {
-        setLoadingPettyCash(false);
+  // Fetch petty cash config on component mount
+  useEffect(() => {
+    const fetchPettyCashConfig = async () => {
+      if (userData?.company_id) {
+        try {
+          const config = await getPettyCashConfig(userData.company_id);
+          setPettyCashConfig(config);
+        } catch (error) {
+          console.error("Error fetching petty cash config:", error);
+        }
       }
-    }
-  };
+    };
+
+    fetchPettyCashConfig();
+  }, [userData?.company_id]);
 
   useEffect(() => {
     const registeredParam = searchParams.get("registered");
@@ -187,9 +180,56 @@ export default function AdminDashboardPage() {
     fetchCalendarEvents();
   }, [userData?.company_id]);
 
+  // Set up real-time listener for latest petty cash cycle
   useEffect(() => {
-    fetchPettyCashData();
-  }, [userData?.company_id]);
+    console.log("Setting up real-time listener for latest cycle - userData:", userData)
+    console.log("Company ID:", userData?.company_id)
+
+    if (!userData?.company_id) {
+      console.log("No company_id found, skipping cycle listener")
+      return
+    }
+
+    setLoadingPettyCash(true)
+
+    const cyclesRef = collection(db, "petty_cash_cycles")
+    const q = query(
+      cyclesRef,
+      where("company_id", "==", userData.company_id),
+      orderBy("cycle_no", "desc"),
+      limit(1)
+    )
+
+    console.log("Setting up onSnapshot for latest petty cash cycle")
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log("onSnapshot triggered for latest cycle, docs:", querySnapshot.size)
+      querySnapshot.docChanges().forEach((change) => {
+        console.log("Change type:", change.type, "doc id:", change.doc.id, "data:", change.doc.data())
+      })
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const cycle = { id: doc.id, ...doc.data() } as PettyCashCycle
+        console.log("Latest cycle updated to:", cycle.cycle_no, "id:", cycle.id)
+        setPettyCashCycle(cycle)
+
+        // Calculate remaining balance: config amount - cycle expenses
+        const balance = pettyCashConfig ? pettyCashConfig.amount - (cycle?.total || 0) : 0
+        setPettyCashBalance(balance)
+      } else {
+        console.log("No cycles found, setting currentCycle to null")
+        setPettyCashCycle(null)
+        setPettyCashBalance(pettyCashConfig?.amount || 0)
+      }
+      setLoadingPettyCash(false)
+    }, (error) => {
+      console.error("Error in onSnapshot for latest cycle:", error)
+      setPettyCashCycle(null)
+      setPettyCashBalance(pettyCashConfig?.amount || 0)
+      setLoadingPettyCash(false)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id, pettyCashConfig?.amount])
 
   // Fetch events
   useEffect(() => {
@@ -451,8 +491,6 @@ export default function AdminDashboardPage() {
       await updatePettyCashCycleTotal(latestCycle.id, newTotal)
       console.log("Cycle total updated")
 
-      // Refresh petty cash data
-      await fetchPettyCashData();
 
       toast({
         title: "Success",
