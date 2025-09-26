@@ -42,6 +42,7 @@ export default function RequestsPage() {
   const [invoicesTotalCount, setInvoicesTotalCount] = useState(0)
   const [invoicesHasNextPage, setInvoicesHasNextPage] = useState(false)
   const [invoicesLastDoc, setInvoicesLastDoc] = useState<any>(null)
+  const [generatingInvoiceId, setGeneratingInvoiceId] = useState<string | null>(null)
 
   const handleClientClick = async (clientName: string, invoice?: Invoice) => {
     if (invoice) {
@@ -392,6 +393,7 @@ export default function RequestsPage() {
       return
     }
 
+    setGeneratingInvoiceId(invoice.id!)
     try {
       // Generate next invoice number
       const invoiceNumber = await generateNextInvoiceNumber(userData.company_id)
@@ -403,6 +405,15 @@ export default function RequestsPage() {
         invoice_date: serverTimestamp(),
         updated: serverTimestamp(),
       })
+
+      // Update the corresponding collectible document with the invoice_number
+      if (invoice.collectible_id) {
+        const collectibleRef = doc(db, "collectibles", invoice.collectible_id)
+        await updateDoc(collectibleRef, {
+          invoice_number: invoiceNumber,
+          updated: serverTimestamp(),
+        })
+      }
 
       // Show success toast
       toast({
@@ -419,6 +430,8 @@ export default function RequestsPage() {
         description: "Failed to generate invoice. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setGeneratingInvoiceId(null)
     }
   }
 
@@ -464,24 +477,31 @@ export default function RequestsPage() {
     },
     {
       header: "Actions",
-      cell: (invoice: Invoice) => (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            className="text-sm"
-            onClick={() => handleGenerateInvoice(invoice)}
-          >
-            Generate Invoice
-          </Button>
-          <Button
-            variant="outline"
-            className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent text-sm"
-            onClick={() => handleViewContract(invoice)}
-          >
-            View Contract
-          </Button>
-        </div>
-      ),
+      cell: (invoice: Invoice) => {
+        const isGenerating = generatingInvoiceId === invoice.id
+        const isDisabled = !!invoice.invoice_number || isGenerating
+
+        return (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="text-sm"
+              onClick={() => handleGenerateInvoice(invoice)}
+              disabled={isDisabled}
+            >
+              {isGenerating ? "Generating..." : "Generate Invoice"}
+            </Button>
+            <Button
+              variant="outline"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent text-sm"
+              onClick={() => handleViewContract(invoice)}
+              disabled={isGenerating}
+            >
+              View Contract
+            </Button>
+          </div>
+        )
+      },
       hideOnMobile: true,
     },
   ]
@@ -511,13 +531,19 @@ export default function RequestsPage() {
     {
       header: "Actions",
       cell: (booking: Booking) => (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Link href={`/treasury/requests/create-collectibles/${booking.id}`}>
-            <Button variant="outline" className="text-sm">Create collectibles</Button>
+            <Button
+              variant="outline"
+              className="text-sm w-full sm:w-auto"
+              disabled={booking.isCollectibles}
+            >
+              Create collectibles
+            </Button>
           </Link>
           <Button
             variant="outline"
-            className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm bg-transparent"
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm bg-transparent w-full sm:w-auto"
           >
             Cancel
           </Button>
@@ -528,12 +554,12 @@ export default function RequestsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50  md:p-6">
-      <div className="w-full mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8">
           <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Requests</h1>
-          <Button variant="outline" className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
+          <Button variant="outline" className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto">
             History
           </Button>
         </div>
@@ -601,7 +627,7 @@ export default function RequestsPage() {
 
         {/* Client Details Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-left">
                 <div className="text-sm text-gray-500 mb-1">Reservation ID</div>
@@ -702,7 +728,7 @@ export default function RequestsPage() {
                 <div className="flex justify-center pt-4">
                   <Button
                     onClick={() => setIsDialogOpen(false)}
-                    className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 md:px-12 py-2"
+                    className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 md:px-12 py-2 w-full sm:w-auto"
                     variant="outline"
                   >
                     OK
@@ -715,7 +741,7 @@ export default function RequestsPage() {
 
         {/* Amount Breakdown Dialog */}
         <Dialog open={isAmountDialogOpen} onOpenChange={setIsAmountDialogOpen}>
-          <DialogContent className="max-w-lg bg-white max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] sm:max-w-lg h-[95vh] sm:max-h-[90vh] bg-white overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-left text-xl md:text-2xl font-semibold text-gray-900">Breakdown:</DialogTitle>
             </DialogHeader>
@@ -724,57 +750,57 @@ export default function RequestsPage() {
               <div className="space-y-6 pt-4">
                 {/* Item Breakdown */}
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 font-medium text-gray-900">
+                  <div className="flex justify-between font-medium text-gray-900">
                     <div>Item</div>
-                    <div className="text-right">Amount</div>
+                    <div>Amount</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-gray-700">
+                  <div className="flex justify-between text-gray-700">
                     <div>{formatCoverDates(selectedInvoice)}</div>
-                    <div className="text-right">{selectedInvoice.amount.toLocaleString()}</div>
+                    <div>{selectedInvoice.amount.toLocaleString()}</div>
                   </div>
                 </div>
 
                 {/* Financial Breakdown */}
                 <div className="border-t border-gray-200 pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">VATable Sales:</div>
-                    <div className="text-right text-gray-700">{(selectedInvoice.amount / 1.12).toLocaleString()}</div>
+                    <div className="text-gray-700">{(selectedInvoice.amount / 1.12).toLocaleString()}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">VAT (12%):</div>
-                    <div className="text-right text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
+                    <div className="text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
                   </div>
                 </div>
 
                 <div className="border-t border-gray-200 pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">Total Sales (VAT Inclusive):</div>
-                    <div className="text-right text-gray-700">{selectedInvoice.amount.toLocaleString()}</div>
+                    <div className="text-gray-700">{selectedInvoice.amount.toLocaleString()}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">Less VAT:</div>
-                    <div className="text-right text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
+                    <div className="text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">Amount Net of VAT:</div>
-                    <div className="text-right text-gray-700">{(selectedInvoice.amount / 1.12).toLocaleString()}</div>
+                    <div className="text-gray-700">{(selectedInvoice.amount / 1.12).toLocaleString()}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">Add VAT:</div>
-                    <div className="text-right text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
+                    <div className="text-gray-700">{selectedInvoice.vat_amount.toLocaleString()}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
                     <div className="text-gray-700 font-medium">Less Withholding Tax:</div>
-                    <div className="text-right text-gray-700">{(selectedInvoice.with_holding_tax || 0).toLocaleString()}</div>
+                    <div className="text-gray-700">{(selectedInvoice.with_holding_tax || 0).toLocaleString()}</div>
                   </div>
                 </div>
 
                 {/* Total Amount Due */}
                 <div className="border-t border-gray-200 pt-4">
                   <div className="bg-green-100 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="flex justify-between">
                       <div className="text-gray-900 font-bold text-base md:text-lg">TOTAL AMOUNT DUE:</div>
-                      <div className="text-right text-gray-900 font-bold text-base md:text-lg">
+                      <div className="text-gray-900 font-bold text-base md:text-lg">
                         {(selectedInvoice.amount - (selectedInvoice.with_holding_tax || 0)).toLocaleString()}
                       </div>
                     </div>
@@ -785,7 +811,7 @@ export default function RequestsPage() {
                 <div className="flex justify-center pt-4">
                   <Button
                     onClick={() => setIsAmountDialogOpen(false)}
-                    className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 md:px-12 py-2"
+                    className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 md:px-12 py-2 w-full sm:w-auto"
                     variant="outline"
                   >
                     OK
@@ -798,7 +824,7 @@ export default function RequestsPage() {
 
         {/* Contract PDF Dialog */}
         <Dialog open={isContractDialogOpen} onOpenChange={setIsContractDialogOpen}>
-          <DialogContent className="">
+          <DialogContent className="w-[95vw] sm:max-w-4xl bg-white max-h-[90vh] overflow-y-auto">
 
             <div className="">
               {selectedContractUrl ? (
