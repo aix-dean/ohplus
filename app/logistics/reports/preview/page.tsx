@@ -221,8 +221,17 @@ export default function ReportPreviewPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateValue: string | any) => {
+    let date: Date
+    if (typeof dateValue === 'string') {
+      date = new Date(dateValue)
+    } else if (dateValue && typeof dateValue.toDate === 'function') {
+      // Handle Firestore Timestamp
+      date = dateValue.toDate()
+    } else {
+      date = new Date(dateValue)
+    }
+    return date.toLocaleDateString("en-US", {
       year: "2-digit",
       month: "2-digit",
       day: "2-digit",
@@ -367,11 +376,28 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  const calculateInstallationDuration = (startDate: string, endDate: string) => {
+  const calculateInstallationDuration = (startDate: any, endDate: any) => {
     if (!startDate || !endDate) return 0
 
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    let start: Date
+    let end: Date
+
+    if (typeof startDate === 'string') {
+      start = new Date(startDate)
+    } else if (startDate && typeof startDate.toDate === 'function') {
+      start = startDate.toDate()
+    } else {
+      start = new Date(startDate)
+    }
+
+    if (typeof endDate === 'string') {
+      end = new Date(endDate)
+    } else if (endDate && typeof endDate.toDate === 'function') {
+      end = endDate.toDate()
+    } else {
+      end = new Date(endDate)
+    }
+
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
@@ -406,7 +432,15 @@ export default function ReportPreviewPage() {
 
   const getIllumination = (product: Product | null) => {
     if (!product) return "N/A"
-    return product.specs_rental?.illumination || "LR 2097 (200 Watts x 40)"
+    const illumination = product.specs_rental?.illumination
+    if (typeof illumination === 'string') {
+      return illumination
+    }
+    if (illumination && typeof illumination === 'object') {
+      // If it's an object, return a summary or default
+      return "Custom Illumination Setup"
+    }
+    return "LR 2097 (200 Watts x 40)"
   }
 
   const getGondola = (product: Product | null) => {
@@ -702,13 +736,6 @@ export default function ReportPreviewPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-
-              {process.env.NODE_ENV === "development" && report.attachments && (
-                <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
-                  <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
-                  <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
                 </div>
               )}
             </div>
