@@ -179,6 +179,7 @@ export interface Product {
   light?: {
     illumination_status?: string
     location?: string
+    size?: string
   }
   blueprints?: Array<{
     blueprint: string
