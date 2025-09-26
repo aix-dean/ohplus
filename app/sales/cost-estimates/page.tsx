@@ -311,7 +311,6 @@ function CostEstimatesPageContent() {
                 <TableRow className="bg-gray-50 border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900">Cost Estimate</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900">Items</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
@@ -333,9 +332,6 @@ function CostEstimatesPageContent() {
                           <Skeleton className="h-4 w-20" />
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-12 mx-auto" />
@@ -386,7 +382,6 @@ function CostEstimatesPageContent() {
                 <TableRow className="bg-gray-50 border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900">Cost Estimate</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900">Items</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
@@ -422,12 +417,6 @@ function CostEstimatesPageContent() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3">
                         <div className="text-center">
                           <div className="font-semibold text-gray-900">{costEstimate.lineItems?.length || costEstimate.lineItemsCount || 0}</div>
                           <div className="text-xs text-gray-500">
@@ -441,7 +430,13 @@ function CostEstimatesPageContent() {
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {costEstimate.createdAt ? format(new Date(costEstimate.createdAt), "MMM d, yyyy") : "N/A"}
+                          {(() => {
+                            const date = costEstimate.createdAt instanceof Date ? costEstimate.createdAt : (costEstimate.createdAt && typeof costEstimate.createdAt.toDate === 'function' ? costEstimate.createdAt.toDate() : null);
+                            if (!date || isNaN(date.getTime())) {
+                              return "N/A";
+                            }
+                            return format(date, "MMM d, yyyy");
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>

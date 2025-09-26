@@ -95,6 +95,14 @@ async function removeCostEstimateFromIndex(costEstimateId: string) {
 
 const COST_ESTIMATES_COLLECTION = "cost_estimates"
 
+// Helper function to safely convert to Date
+function safeToDate(dateValue: any): Date | null {
+  if (!dateValue) return null
+  if (dateValue instanceof Date) return dateValue
+  if (dateValue.toDate && typeof dateValue.toDate === "function") return dateValue.toDate()
+  return new Date(dateValue)
+}
+
 interface CreateCostEstimateOptions {
   notes?: string
   customMessage?: string
@@ -412,16 +420,16 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {
@@ -452,16 +460,16 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       status: data.status,
       notes: data.notes || "",
       customMessage: data.customMessage || "",
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
+      createdAt: safeToDate(data.createdAt),
+      updatedAt: safeToDate(data.updatedAt),
       createdBy: data.createdBy,
       company_id: data.company_id || "",
       page_id: data.page_id || "",
       page_number: data.page_number || 1,
-      startDate: data.startDate?.toDate() || null,
-      endDate: data.endDate?.toDate() || null,
+      startDate: safeToDate(data.startDate),
+      endDate: safeToDate(data.endDate),
       durationDays: data.durationDays || null,
-      validUntil: data.validUntil?.toDate() || null,
+      validUntil: safeToDate(data.validUntil),
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -520,15 +528,15 @@ export async function updateCostEstimate(costEstimateId: string, updates: Partia
           status: updatedData.status,
           notes: updatedData.notes || "",
           customMessage: updatedData.customMessage || "",
-          createdAt: updatedData.createdAt?.toDate(),
+          createdAt: safeToDate(updatedData.createdAt),
           updatedAt: new Date(),
           createdBy: updatedData.createdBy,
           company_id: updatedData.company_id || "",
           page_id: updatedData.page_id || "",
-          startDate: updatedData.startDate?.toDate() || null,
-          endDate: updatedData.endDate?.toDate() || null,
+          startDate: safeToDate(updatedData.startDate),
+          endDate: safeToDate(updatedData.endDate),
           durationDays: updatedData.durationDays || null,
-          validUntil: updatedData.validUntil?.toDate() || null,
+          validUntil: safeToDate(updatedData.validUntil),
         } as CostEstimate
 
         // Re-index asynchronously
@@ -561,16 +569,16 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {
@@ -623,16 +631,16 @@ export async function getPaginatedCostEstimates(
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
 
@@ -681,16 +689,16 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {
@@ -734,8 +742,8 @@ export async function getPaginatedCostEstimatesByCreatedBy(
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
@@ -863,16 +871,16 @@ export async function getCostEstimatesByPageId(pageId: string): Promise<CostEsti
         status: data.status,
         notes: data.notes || "",
         customMessage: data.customMessage || "",
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
         createdBy: data.createdBy,
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {
