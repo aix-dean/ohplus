@@ -201,8 +201,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   }
 
   const validatePhoneFormat = (phone: string): boolean => {
-    // Check if phone is exactly +63 followed by 9 digits (Philippines mobile format)
-    const phoneRegex = /^\+63\d{9}$/
+    // Check if phone is exactly +63 followed by 10 digits (Philippines mobile format)
+    const phoneRegex = /^\+63\d{10}$/
     return phoneRegex.test(phone.replace(/\s/g, ''))
   }
 
@@ -219,9 +219,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         value = '+63'
       }
     } else {
-      // If it starts with +63, ensure only digits after and limit to 9
+      // If it starts with +63, ensure only digits after and limit to 10
       const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
-      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+      value = '+63' + digitsAfterPrefix.substring(0, 10) // Limit to 10 digits
     }
 
     // Update form data
@@ -835,14 +835,14 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                     name="contactPhone"
                     value={formData.contactPhone}
                     onChange={handlePhoneInput}
-                    placeholder="Enter 9 digits"
+                    placeholder="Enter 10 digits"
                     className={(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
                   />
                   {validationErrors.contactPhone && (
                     <p className="text-sm text-red-500">Phone number is required</p>
                   )}
                   {validationErrors.phoneFormat && !validationErrors.contactPhone && (
-                    <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                    <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
                   )}
                 </div>
                 <div>
