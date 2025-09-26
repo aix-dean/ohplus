@@ -112,7 +112,7 @@ export default function BusinessInventoryPage() {
   const [selectedAudience, setSelectedAudience] = useState<string[]>([])
   const [dailyTraffic, setDailyTraffic] = useState("")
   const [trafficUnit, setTrafficUnit] = useState<"daily" | "weekly" | "monthly">("monthly")
-  const [price, setPrice] = useState("")
+  const [price, setPrice] = useState("0")
   const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per spot")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -414,6 +414,27 @@ export default function BusinessInventoryPage() {
     }
 
     console.log("All checks passed, opening add site dialog")
+
+    // Reset form to defaults
+    setSiteType("static")
+    setCategory("LED")
+    setSiteName("")
+    setLocation("")
+    setLocationLabel("")
+    setHeight("")
+    setWidth("")
+    setDimensionUnit("ft")
+    setElevation("")
+    setElevationUnit("ft")
+    setDescription("")
+    setSelectedAudience([])
+    setDailyTraffic("")
+    setTrafficUnit("monthly")
+    setPrice("0")
+    setPriceUnit("per spot")
+    setUploadedFiles([])
+    setCurrentImageIndex(0)
+
     setShowAddSiteDialog(true)
   }
 
@@ -561,6 +582,68 @@ export default function BusinessInventoryPage() {
     if (!userData?.company_id || !user?.uid) return
 
     setIsSubmitting(true)
+
+    // Validation
+    if (!siteName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Site name is required.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (!location.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Location is required.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (!price.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Price is required.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (price.trim() && isNaN(Number(price))) {
+      toast({
+        title: "Validation Error",
+        description: "Price must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (height.trim() && isNaN(Number(height))) {
+      toast({
+        title: "Validation Error",
+        description: "Height must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (width.trim() && isNaN(Number(width))) {
+      toast({
+        title: "Validation Error",
+        description: "Width must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
     try {
       // Upload files to Firebase Storage
       const mediaUrls: Array<{ url: string; distance: string; type: string; isVideo: boolean }> = []
@@ -631,7 +714,7 @@ export default function BusinessInventoryPage() {
       setSelectedAudience([])
       setDailyTraffic("")
       setTrafficUnit("monthly")
-      setPrice("")
+      setPrice("0")
       setPriceUnit("per spot")
       setUploadedFiles([])
       setCurrentImageIndex(0)
@@ -970,10 +1053,11 @@ export default function BusinessInventoryPage() {
               {/* Dimension */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Dimension:</Label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-end gap-3">
                   <div className="flex-1">
+                    <Label className="text-[#4e4e4e] text-sm mb-1 block">Height:</Label>
                     <Input
-                      placeholder="Height"
+                      type="number"
                       className="border-[#c4c4c4]"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
@@ -981,8 +1065,9 @@ export default function BusinessInventoryPage() {
                   </div>
                   <span className="text-[#4e4e4e]">x</span>
                   <div className="flex-1">
+                    <Label className="text-[#4e4e4e] text-sm mb-1 block">Width:</Label>
                     <Input
-                      placeholder="Width"
+                      type="number"
                       className="border-[#c4c4c4]"
                       value={width}
                       onChange={(e) => setWidth(e.target.value)}
@@ -1007,6 +1092,7 @@ export default function BusinessInventoryPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
+                    type="number"
                     className="flex-1 border-[#c4c4c4]"
                     value={elevation}
                     onChange={(e) => setElevation(e.target.value)}
@@ -1060,11 +1146,12 @@ export default function BusinessInventoryPage() {
                 </div>
               </div>
 
-              {/* Daily Traffic */}
+              {/* Traffic */}
               <div>
-                <Label className="text-[#4e4e4e] font-medium mb-3 block">Daily Traffic:</Label>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Traffic:</Label>
                 <div className="flex gap-3">
                   <Input
+                    type="number"
                     className="flex-1 border-[#c4c4c4]"
                     value={dailyTraffic}
                     onChange={(e) => setDailyTraffic(e.target.value)}
@@ -1189,6 +1276,7 @@ export default function BusinessInventoryPage() {
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Price:</Label>
                 <div className="flex gap-3">
                   <Input
+                    type="number"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
