@@ -885,30 +885,14 @@ export default function ITPlannerPage() {
         return day
       })
 
-    // Group assignments by day - use alarmDate as primary grouping
+    // Group assignments by day - use coveredDateStart as primary grouping
     const assignmentsByDay: { [key: string]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      console.log("Processing assignment: " + assignment.id)
-      // Primary: use alarmDate
-      if (assignment.alarmDate) {
-        const dayKey = assignment.alarmDate.toDateString()
+      // Use coveredDateStart as the primary date for display
+      if (assignment.coveredDateStart) {
+        const dayKey = assignment.coveredDateStart.toDateString()
         if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
         assignmentsByDay[dayKey].push(assignment)
-      } else if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-        // Fallback: show assignment on all days it spans within the week
-        days.forEach((day) => {
-          const dayStart = new Date(day)
-          dayStart.setHours(0, 0, 0, 0)
-          const dayEnd = new Date(day)
-          dayEnd.setHours(23, 59, 59, 999)
-
-          const overlaps = assignment.coveredDateStart! <= dayEnd && assignment.coveredDateEnd! >= dayStart
-          if (overlaps) {
-            const dayKey = day.toDateString()
-            if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
-            assignmentsByDay[dayKey].push(assignment)
-          }
-        })
       }
     })
 
@@ -948,15 +932,22 @@ export default function ITPlannerPage() {
     const bookingsByDay: { [key: string]: Booking[] } = {}
     bookings.forEach((booking) => {
       if (booking.start_date) {
-        let bookingDate: Date
-        if (booking.start_date instanceof Date) {
-          bookingDate = booking.start_date
-        } else {
-          // Handle Timestamp
-          bookingDate = booking.start_date.toDate()
+        let bookingDate: Date | null = null
+        try {
+          if (booking.start_date instanceof Date) {
+            bookingDate = booking.start_date
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+            bookingDate = (booking.start_date as any).toDate()
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+            bookingDate = new Date((booking.start_date as any).seconds * 1000)
+          } else {
+            bookingDate = new Date(booking.start_date as any)
+          }
+        } catch (dateError) {
+          console.error("Error parsing booking date:", dateError)
         }
 
-        if (bookingDate >= weekStart && bookingDate <= weekEnd) {
+        if (bookingDate && bookingDate >= weekStart && bookingDate <= weekEnd) {
           const dayKey = bookingDate.toDateString()
           if (!bookingsByDay[dayKey]) bookingsByDay[dayKey] = []
           bookingsByDay[dayKey].push(booking)
@@ -1066,14 +1057,78 @@ export default function ITPlannerPage() {
                     </div>
                   </div>
                 ))}
+                {dayTodos.slice(0, 2).map((todo, j) => (
+                  <div
+                    key={`todo-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm`}
+                    style={{ backgroundColor: "#ffe522", borderColor: "#e6d100" }}
+                    title={`${todo.title} - ${todo.description}`}
+                  >
+                    <div className="font-medium flex items-start gap-1">
+                      <span>📝</span>
+                      <span className="break-words">{todo.title}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-700 mt-1 break-words">
+                      {todo.description}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[8px] sm:text-xs px-1 ${todo.status === 'done' ? 'bg-green-100' : todo.status === 'in-progress' ? 'bg-yellow-100' : 'bg-gray-100'}`}
+                      >
+                        {todo.status}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
+                        {todo.start_date ? formatTime(todo.start_date instanceof Date ? todo.start_date : (todo.start_date as any).toDate()) : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {dayBookings.slice(0, 2).map((booking, j) => (
+                  <div
+                    key={`booking-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm`}
+                    style={{ backgroundColor: "#7fdb97", borderColor: "#6bbf87" }}
+                    title={`${booking.reservation_id || booking.id} - ${booking.client?.name || "Unknown Client"}`}
+                  >
+                    <div className="font-medium flex items-start gap-1">
+                      <span>📅</span>
+                      <span className="break-words">{booking.reservation_id || booking.id.slice(-8)}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-700 mt-1 break-words">
+                      {booking.client?.name || "Unknown Client"}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[8px] sm:text-xs px-1 ${getStatusColor(booking.status || "PENDING")}`}
+                      >
+                        {booking.status || "PENDING"}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
+                        ₱{booking.total_cost?.toLocaleString() || "0"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
                 {dayEvents.length > 2 && (
                   <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline mb-1">
                     +{dayEvents.length - 2} more events
                   </div>
                 )}
-                {dayAssignments.length === 0 && dayEvents.length === 0 && (
+                {dayTodos.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-yellow-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayTodos.length - 2} more todos
+                  </div>
+                )}
+                {dayBookings.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayBookings.length - 2} more bookings
+                  </div>
+                )}
+                {dayAssignments.length === 0 && dayEvents.length === 0 && dayTodos.length === 0 && dayBookings.length === 0 && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
-                    No assignments or events
+                    No items
                   </div>
                 )}
               </div>
@@ -1118,6 +1173,57 @@ export default function ITPlannerPage() {
       }
     })
 
+    // Group todos by hour based on start time (for daily view, show all todos for the day)
+    const todosByHour: { [key: number]: Todo[] } = {}
+    todos.forEach((todo) => {
+      if (todo.start_date) {
+        let todoDate: Date
+        if (todo.start_date instanceof Date) {
+          todoDate = todo.start_date
+        } else if (typeof todo.start_date === 'string') {
+          todoDate = new Date(todo.start_date)
+        } else {
+          // Handle Timestamp
+          todoDate = todo.start_date.toDate()
+        }
+
+        if (todoDate.toDateString() === currentDate.toDateString()) {
+          // For daily view, put all todos in hour 0 (top of the day)
+          const hour = 0
+          if (!todosByHour[hour]) todosByHour[hour] = []
+          todosByHour[hour].push(todo)
+        }
+      }
+    })
+
+    // Group bookings by hour based on start time (for daily view, show all bookings for the day)
+    const bookingsByHour: { [key: number]: Booking[] } = {}
+    bookings.forEach((booking) => {
+      if (booking.start_date) {
+        let bookingDate: Date | null = null
+        try {
+          if (booking.start_date instanceof Date) {
+            bookingDate = booking.start_date
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+            bookingDate = (booking.start_date as any).toDate()
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+            bookingDate = new Date((booking.start_date as any).seconds * 1000)
+          } else {
+            bookingDate = new Date(booking.start_date as any)
+          }
+        } catch (dateError) {
+          console.error("Error parsing booking date:", dateError)
+        }
+
+        if (bookingDate && bookingDate.toDateString() === currentDate.toDateString()) {
+          // For daily view, put all bookings in hour 1 (after todos)
+          const hour = 1
+          if (!bookingsByHour[hour]) bookingsByHour[hour] = []
+          bookingsByHour[hour].push(booking)
+        }
+      }
+    })
+
     return (
       <div className="mt-4 border rounded-md overflow-hidden">
         <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[80px_1fr] divide-x">
@@ -1138,13 +1244,15 @@ export default function ITPlannerPage() {
             {hours.map((hour) => {
               const hourAssignments = assignmentsByHour[hour] || []
               const hourEvents = eventsByHour[hour] || []
+              const hourTodos = todosByHour[hour] || []
+              const hourBookings = bookingsByHour[hour] || []
               const currentHour = new Date().getHours()
               const isCurrentHour =
                 hour === currentHour &&
                 currentDate.getDate() === new Date().getDate() &&
                 currentDate.getMonth() === new Date().getMonth() &&
                 currentDate.getFullYear() === new Date().getFullYear()
-  
+
               return (
                 <div
                   key={`content-${hour}`}
@@ -1153,7 +1261,7 @@ export default function ITPlannerPage() {
                   {hourAssignments.map((assignment, i) => {
                     const minutes = assignment.alarmTime ? Number.parseInt(assignment.alarmTime.split(":")[1]) : 0
                     const topPosition = (minutes / 60) * 100
-  
+
                     return (
                       <div
                         key={`assignment-${hour}-${i}`}
@@ -1228,6 +1336,68 @@ export default function ITPlannerPage() {
                       </div>
                     )
                   })}
+                  {hourTodos.map((todo, i) => (
+                    <div
+                      key={`todo-${hour}-${i}`}
+                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50`}
+                      style={{
+                        top: `${(i * 25)}%`,
+                        minHeight: "20%",
+                        maxHeight: "40px",
+                        backgroundColor: "#ffe522",
+                        borderColor: "#e6d100",
+                        zIndex: hourAssignments.length + hourEvents.length + i + 1,
+                      }}
+                      title={`${todo.title} - ${todo.description}`}
+                    >
+                      <div className="font-medium flex items-start gap-1">
+                        <span>📝</span>
+                        <span className="break-words">{todo.title}</span>
+                      </div>
+                      <div className="text-[6px] sm:text-[8px] text-gray-700 break-words">
+                        {todo.description}
+                      </div>
+                      <div className="flex items-center justify-between mt-0 sm:mt-1">
+                        <Badge
+                          variant="outline"
+                          className={`text-[6px] sm:text-[8px] px-1 ${todo.status === 'done' ? 'bg-green-100' : todo.status === 'in-progress' ? 'bg-yellow-100' : 'bg-gray-100'}`}
+                        >
+                          {todo.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {hourBookings.map((booking, i) => (
+                    <div
+                      key={`booking-${hour}-${i}`}
+                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50`}
+                      style={{
+                        top: `${(i * 25) + 50}%`,
+                        minHeight: "20%",
+                        maxHeight: "40px",
+                        backgroundColor: "#7fdb97",
+                        borderColor: "#6bbf87",
+                        zIndex: hourAssignments.length + hourEvents.length + hourTodos.length + i + 1,
+                      }}
+                      title={`${booking.reservation_id || booking.id} - ${booking.client?.name || "Unknown Client"}`}
+                    >
+                      <div className="font-medium flex items-start gap-1">
+                        <span>📅</span>
+                        <span className="break-words">{booking.reservation_id || booking.id.slice(-8)}</span>
+                      </div>
+                      <div className="text-[6px] sm:text-[8px] text-gray-700 break-words">
+                        {booking.client?.name || "Unknown Client"}
+                      </div>
+                      <div className="flex items-center justify-between mt-0 sm:mt-1">
+                        <Badge
+                          variant="outline"
+                          className={`text-[6px] sm:text-[8px] px-1 ${getStatusColor(booking.status || "PENDING")}`}
+                        >
+                          {booking.status || "PENDING"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )
             })}
