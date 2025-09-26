@@ -150,7 +150,10 @@ export default function SalesReportPreviewPage() {
         console.log("Loaded preview report data:", reportData)
         console.log("Preview report attachments:", reportData.attachments)
 
-        setReport(reportData)
+        setReport({
+          ...reportData,
+          attachments: Array.isArray(reportData.attachments) ? reportData.attachments : []
+        })
         setProduct(productData)
 
         // Fetch booking data

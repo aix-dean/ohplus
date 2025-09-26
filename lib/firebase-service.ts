@@ -146,13 +146,19 @@ export interface Product {
     width?: number | null
     site_orientation?: string | null
     caretaker?: string | null
+    size?: string
+    material?: string
+    panels?: string
+    gondola?: boolean
+    technology?: string
+    site_code?: string
     structure:{
       color?: string | null
       condition?: string | null
       contractor?: string | null
       last_maintenance?: Date | null
     }
-    illumination:{
+    illumination: string | {
       bottom_count?: number | null
       bottom_lighting_specs?: string | null
       left_count?: number | null
