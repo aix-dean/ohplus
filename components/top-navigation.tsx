@@ -148,7 +148,7 @@ export function TopNavigation() {
       : isCmsSection
         ? "bg-department-creatives-orange"
         : isItSection
-          ? "bg-[#2a31b4]"
+          ? "bg-[#318080]"
           : isFinanceSection
             ? "bg-department-finance-green"
             : isTreasurySection
@@ -212,7 +212,7 @@ export function TopNavigation() {
             isCmsSection ? '#FFF3E0' :
             isAdminSection ? '#9498d9' :
             isTreasurySection ? '#81c999' :
-            isItSection ? '#9498d9' :
+            isItSection ? '#80bfbf' :
             isFinanceSection ? '#04933480' :
             isBusinessSection ? '#a0b4f0' :
             isAccountingSection ? '#2A31B480' :

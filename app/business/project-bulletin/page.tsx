@@ -519,14 +519,13 @@ export default function ProjectMonitoringPage() {
           </div>
         ) : products.length > 0 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {products
                 .filter((product) => latestJoNumbers[product.id!])
                 .map((product) => (
                   <div
                     key={product.id}
-                    className="bg-[#ffffff] border border-[#c4c4c4] p-4 relative cursor-pointer hover:shadow-lg focus-within:shadow-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                    style={{ width: '461.339px', height: '284px' }}
+                    className="bg-[#ffffff] shadow-md p-4 relative cursor-pointer hover:shadow-lg focus-within:shadow-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded-[20px]"
                     onClick={() => {
                       console.log('Product ID:', product.id)
                       console.log('Latest JO IDs:', latestJoIds)
@@ -559,23 +558,30 @@ export default function ProjectMonitoringPage() {
                       <MoreVertical className="h-4 w-4" aria-hidden="true" />
                     </Button>
 
-                    <div className="flex items-start gap-4">
-                      <Image src={product.media?.[0]?.url || '/placeholder.jpg'} alt={`Site image for ${projectNames[product.id!] || "project"}`} width={108} height={108} className="object-cover rounded-lg mb-4" style={{ width: '108.429px', height: '108.429px' }} onError={(e) => { const target = e.target as HTMLImageElement; target.src = '/placeholder.jpg' }} />
-                      <div className="flex-1">
-                        <div className="mb-1" style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{latestJoNumbers[product.id!] || 'No JO'}</div>
+                    <Image
+                      src={product.media?.[0]?.url || '/placeholder.jpg'}
+                      alt={`Site image for ${projectNames[product.id!] || "project"}`}
+                      width={108}
+                      height={108}
+                      className="w-full h-32 object-cover rounded-lg mb-4"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = '/placeholder.jpg'
+                      }}
+                    />
 
-                        <h3 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '31px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{projectNames[product.id!] || "No Project Name"}</h3>
+                    <div className="mb-1" style={{ color: '#000', fontFamily: 'Inter', fontSize: '14px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{latestJoNumbers[product.id!] || 'No JO'}</div>
 
-                        <div className="mb-2">
-                          <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Site:</span> <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '400', lineHeight: '100%' }}>{product.specs_rental?.location || product.name || "No site code available"}</span>
-                        </div>
-                      </div>
+                    <h3 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '20px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{projectNames[product.id!] || "No Project Name"}</h3>
+
+                    <div className="mb-2">
+                      <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '14px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Site:</span> <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '14px', fontStyle: 'normal', fontWeight: '400', lineHeight: '100%' }}>{product.specs_rental?.location || product.name || "No site code available"}</span>
                     </div>
 
                     <hr className="my-2 border-[#c4c4c4]" />
 
                     <div>
-                      <h4 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Latest Activities:</h4>
+                      <h4 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '10px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Latest Activities:</h4>
                       <div className="space-y-1">
                         {productReports[product.id!] && productReports[product.id!].length > 0 ? (
                           productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {

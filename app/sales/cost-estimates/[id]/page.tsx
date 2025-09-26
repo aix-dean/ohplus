@@ -1162,7 +1162,14 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           <div className="flex justify-between items-start mb-6 mx-4">
             <div>
               <p className="text-sm text-gray-600 mb-2">
-                {costEstimate ? format(costEstimate.createdAt, "MMMM d, yyyy") : ""}
+                {(() => {
+                  if (!costEstimate) return "";
+                  const date = costEstimate.createdAt instanceof Date ? costEstimate.createdAt : (costEstimate.createdAt && typeof costEstimate.createdAt.toDate === 'function' ? costEstimate.createdAt.toDate() : null);
+                  if (!date || isNaN(date.getTime())) {
+                    return "N/A";
+                  }
+                  return format(date, "MMMM d, yyyy");
+                })()}
               </p>
               <div className="space-y-1">
                 <p className="font-semibold text-gray-900">{costEstimate?.client.company}</p>
@@ -1419,9 +1426,14 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 </>
               )}
             </p>
-            {costEstimate?.validUntil && (
-              <p>This cost estimate is valid until {format(costEstimate.validUntil, "PPP")}</p>
-            )}
+            {(() => {
+              if (!costEstimate?.validUntil) return null;
+              const date = costEstimate.validUntil instanceof Date ? costEstimate.validUntil : (costEstimate.validUntil && typeof costEstimate.validUntil.toDate === 'function' ? costEstimate.validUntil.toDate() : null);
+              if (!date || isNaN(date.getTime())) {
+                return <p>This cost estimate is valid until N/A</p>;
+              }
+              return <p>This cost estimate is valid until {format(date, "PPP")}</p>;
+            })()}
             <p className="mt-1">
               © {new Date().getFullYear()} {companyData?.name || ""}. All rights reserved.
             </p>

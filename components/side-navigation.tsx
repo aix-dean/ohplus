@@ -120,7 +120,7 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
       { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
-      { title: "Requests", href: "/treasury/quotations", icon: FileText },
+      { title: "Requests", href: "/treasury/requests", icon: FileText },
       { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
     ],
   },
@@ -225,7 +225,7 @@ export function SideNavigation() {
     if (section === 'logistics') return 'bg-[#98d3fd]'
     if (section === 'admin') return 'bg-[#9498d9]'
     if (section === 'treasury') return 'bg-[#81c999]'
-    if (section === 'it') return 'bg-[#9498d9]'
+    if (section === 'it') return 'bg-[#80bfbf]'
     if (section === 'business') return 'bg-[#a0b4f0]'
     if (section === 'cms') return 'bg-[#fed7aa]'
     return 'bg-[#38b6ff]'
@@ -715,7 +715,7 @@ export function SideNavigation() {
                 {currentSection === "treasury" && [
                   { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
-                  { title: "Requests", href: "/treasury/quotations", icon: FileText },
+                  { title: "Requests", href: "/treasury/requests", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
