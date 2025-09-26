@@ -15,6 +15,8 @@ export function TopNavigation() {
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [isControlBarStep, setIsControlBarStep] = useState(false)
+  const [isUpdatesCenterStep, setIsUpdatesCenterStep] = useState(false)
 
   const { user, userData, logout } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -30,6 +32,21 @@ export function TopNavigation() {
     }, 1000)
 
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const checkStep = () => {
+      const step = document.body.getAttribute('data-tour-step')
+      setIsControlBarStep(step === '0')
+      setIsUpdatesCenterStep(step === '1')
+    }
+
+    checkStep()
+
+    const observer = new MutationObserver(checkStep)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-tour-step'] })
+
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -197,7 +214,7 @@ export function TopNavigation() {
   }
 
   return (
-    <nav className={`top-nav relative ${navBgColor} z-40`}>
+    <nav className={`top-nav relative ${navBgColor} ${isControlBarStep ? 'z-[150]' : 'z-40'}`}>
       {/* Diagonal section - positioned to always be before the date area */}
       <svg
         className="absolute top-0 right-0 h-full w-[280px] z-0 hidden md:block"

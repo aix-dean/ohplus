@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -170,6 +170,7 @@ export function SideNavigation() {
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const [showIntelligence, setShowIntelligence] = useState(false)
+  const [isUpdatesCenterStep, setIsUpdatesCenterStep] = useState(false)
 
   // Determine the current section from the pathname
   let currentSection = pathname?.split("/")[1] || "dashboard"
@@ -204,6 +205,20 @@ export function SideNavigation() {
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
 
+  useEffect(() => {
+    const checkStep = () => {
+      const step = document.body.getAttribute('data-tour-step')
+      setIsUpdatesCenterStep(step === '1')
+    }
+
+    checkStep()
+
+    const observer = new MutationObserver(checkStep)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-tour-step'] })
+
+    return () => observer.disconnect()
+  }, [])
+
   if (
     !currentNavItem &&
     currentSection !== "admin" &&
@@ -232,7 +247,7 @@ export function SideNavigation() {
   }
 
   return (
-    <div className={`w-64 h-[calc(100vh-64px)] ${getDiagonalBgColor(currentSection)} border-r border-gray-200 shadow-sm flex flex-col relative`}>
+    <div className={`w-64 h-[calc(100vh-64px)] ${getDiagonalBgColor(currentSection)} border-r border-gray-200 shadow-sm flex flex-col relative ${isUpdatesCenterStep ? 'z-[150]' : ''}`}>
       <nav className="p-3 space-y-4 flex-1 min-h-0 overflow-y-auto pb-16">
         {currentSection === "cms" ? (
           <>
@@ -409,7 +424,7 @@ export function SideNavigation() {
             {/* Dynamic notification component based on section */}
             {currentSection === "business" && <BusinessDevNotifications />}
             {currentSection === "it" && <ITNotifications />}
-            {currentSection === "finance" && <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] p-3 text-gray-900">
+            {currentSection === "finance" && <div className={`bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] p-3 text-gray-900 ${isUpdatesCenterStep ? 'z-[150]' : ''}`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Updates Center</h3>
               </div>

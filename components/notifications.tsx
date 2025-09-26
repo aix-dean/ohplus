@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useState, useEffect } from "react"
 
 interface NotificationsProps {
   config: NotificationConfig
@@ -15,6 +16,21 @@ interface NotificationsProps {
 export function Notifications({ config }: NotificationsProps) {
   const { notifications, loading, unreadCount } = useNotifications(config)
   const router = useRouter()
+  const [isUpdatesCenterStep, setIsUpdatesCenterStep] = useState(false)
+
+  useEffect(() => {
+    const checkStep = () => {
+      const step = document.body.getAttribute('data-tour-step')
+      setIsUpdatesCenterStep(step === '1')
+    }
+
+    checkStep()
+
+    const observer = new MutationObserver(checkStep)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-tour-step'] })
+
+    return () => observer.disconnect()
+  }, [])
 
   const handleNotificationClick = async (notification: any) => {
     try {
@@ -77,7 +93,7 @@ export function Notifications({ config }: NotificationsProps) {
 
   if (loading) {
     return (
-      <div className={`rounded-[20px] p-3 text-gray-900 ${getGradientClasses()}`}>
+      <div className={`relative rounded-[20px] p-3 text-gray-900 ${getGradientClasses()} transition-all duration-300 ${isUpdatesCenterStep ? 'bg-white z-[150] transform scale-105 border-2 border-blue-500 shadow-xl' : ''}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium">Updates Center</h3>
           {unreadCount > 0 && (
@@ -103,7 +119,7 @@ export function Notifications({ config }: NotificationsProps) {
   }
 
   return (
-    <div className={`rounded-[20px] p-3 text-gray-900 ${getGradientClasses()}`}>
+    <div className={`relative rounded-[20px] p-3 text-gray-900 ${getGradientClasses()} transition-all duration-300 ${isUpdatesCenterStep ? 'bg-white z-[150] transform scale-105 border-2 border-blue-500 shadow-xl' : ''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium">Updates Center</h3>
         {unreadCount > 0 && (

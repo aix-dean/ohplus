@@ -204,7 +204,7 @@ export default function ITUserManagementPage() {
     try {
       const userDocRef = doc(db, "iboard_users", userData.uid)
       await updateDoc(userDocRef, {
-        onboarding: false,
+        onboarding: true,
         updated: new Date(),
       })
       // Refresh user data to update the context
@@ -614,7 +614,7 @@ export default function ITUserManagementPage() {
         />
       )}
 
-      {userData?.onboarding && (
+      {!userData?.onboarding && (
         <OnboardingTooltip onClose={handleCloseOnboarding} />
       )}
     </div>

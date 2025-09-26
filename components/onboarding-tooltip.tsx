@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import Image from "next/image"
 import { X, ArrowRight, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -64,6 +64,13 @@ export function OnboardingTooltip({ onClose }: OnboardingTooltipProps) {
     return () => clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    document.body.setAttribute('data-tour-step', currentStep.toString())
+    return () => {
+      document.body.removeAttribute('data-tour-step')
+    }
+  }, [currentStep])
+
   const handleClose = () => {
     setIsVisible(false)
     // Delay to allow animation to complete
@@ -87,16 +94,87 @@ export function OnboardingTooltip({ onClose }: OnboardingTooltipProps) {
   const step = tourSteps[currentStep]
 
   return (
-    <div
-      className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
-      onClick={handleClose}
-    >
-      {/* Arrow positioned based on current step */}
+    <div>
+      <div
+        className={`fixed inset-0 z-[100] bg-black/50 transition-opacity duration-300 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+        onClick={handleClose}
+      >
+        {/* Dashed border for Workzone step */}
+        {currentStep === 5 && (
+          <div
+            className={`absolute top-20 left-72 right-6 bottom-6 z-[140] border-8 border-dashed border-white rounded-2xl transition-all duration-300 ${
+              isVisible ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+
+        {/* Tooltip Content positioned at bottom center */}
+        <div
+          className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-[140] transition-all duration-300 ${
+            isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-transparent rounded-lg p-10 max-w-4xl mx-4 relative flex items-center gap-10">
+
+            {/* Oscar Image */}
+            <div className="flex-shrink-0">
+              <Image
+                src={step.image}
+                alt="Oscar"
+                width={200}
+                height={200}
+                className="rounded-lg"
+              />
+            </div>
+
+            {/* Text Content */}
+            <div className="flex-1 text-left">
+              <h3 className="text-4xl font-semibold text-white mb-5">
+                {step.title}
+              </h3>
+              <div className="text-xl text-gray-200 leading-relaxed mb-8">
+                {step.text.split('\n\n').map((paragraph, index) => (
+                  <p key={index} className={index > 0 ? 'mt-5' : ''}>
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-white text-lg font-medium">
+                  {Math.min(currentStep + 1, 6)}/6
+                </span>
+                <div className="flex items-center gap-2">
+                  {currentStep === 6 ? (
+                    <Button onClick={handleClose} className="px-8 py-3 text-lg text-white hover:opacity-90" style={{ backgroundColor: '#1d0beb' }}>
+                      Invite Teammates
+                    </Button>
+                  ) : (
+                    <>
+                      {currentStep > 0 && (
+                        <Button onClick={handleBack} className="w-16 h-16 bg-transparent border-4 border-white rounded-full hover:bg-white/10 flex items-center justify-center">
+                          <ArrowLeft className="h-8 w-8 text-white" />
+                        </Button>
+                      )}
+                      <Button onClick={handleNext} className="w-16 h-16 bg-transparent border-4 border-white rounded-full hover:bg-white/10 flex items-center justify-center">
+                        <ArrowRight className="h-8 w-8 text-white" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Arrow positioned based on current step - outside tour overlay */}
       {step.arrowPosition && (
         <div
-          className={`absolute ${step.arrowPosition} transition-all duration-300 ${
+          className={`fixed ${step.arrowPosition} z-[300] transition-all duration-300 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
           }`}
           onClick={(e) => e.stopPropagation()}
@@ -110,75 +188,6 @@ export function OnboardingTooltip({ onClose }: OnboardingTooltipProps) {
           />
         </div>
       )}
-
-      {/* Dashed border for Workzone step */}
-      {currentStep === 5 && (
-        <div
-          className={`absolute top-20 left-72 right-6 bottom-6 border-8 border-dashed border-white rounded-2xl transition-all duration-300 ${
-            isVisible ? "opacity-100" : "opacity-0"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
-
-      {/* Tooltip Content positioned at bottom center */}
-      <div
-        className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 transition-all duration-300 ${
-          isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bg-transparent rounded-lg p-10 max-w-4xl mx-4 relative flex items-center gap-10">
-
-          {/* Oscar Image */}
-          <div className="flex-shrink-0">
-            <Image
-              src={step.image}
-              alt="Oscar"
-              width={200}
-              height={200}
-              className="rounded-lg"
-            />
-          </div>
-
-          {/* Text Content */}
-          <div className="flex-1 text-left">
-            <h3 className="text-4xl font-semibold text-white mb-5">
-              {step.title}
-            </h3>
-            <div className="text-xl text-gray-200 leading-relaxed mb-8">
-              {step.text.split('\n\n').map((paragraph, index) => (
-                <p key={index} className={index > 0 ? 'mt-5' : ''}>
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-white text-lg font-medium">
-                {Math.min(currentStep + 1, 6)}/6
-              </span>
-              <div className="flex items-center gap-2">
-                {currentStep === 6 ? (
-                  <Button onClick={handleClose} className="px-8 py-3 text-lg text-white hover:opacity-90" style={{ backgroundColor: '#1d0beb' }}>
-                    Invite Teammates
-                  </Button>
-                ) : (
-                  <>
-                    {currentStep > 0 && (
-                      <Button onClick={handleBack} className="w-16 h-16 bg-transparent border-4 border-white rounded-full hover:bg-white/10 flex items-center justify-center">
-                        <ArrowLeft className="h-8 w-8 text-white" />
-                      </Button>
-                    )}
-                    <Button onClick={handleNext} className="w-16 h-16 bg-transparent border-4 border-white rounded-full hover:bg-white/10 flex items-center justify-center">
-                      <ArrowRight className="h-8 w-8 text-white" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
