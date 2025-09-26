@@ -1043,7 +1043,6 @@ export default function QuotationsListPage() {
                       <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
                       <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                     </TableRow>
@@ -1069,9 +1068,6 @@ export default function QuotationsListPage() {
                             <Skeleton className="h-4 w-16" />
                           </TableCell>
                           <TableCell className="py-3">
-                            <Skeleton className="h-4 w-20" />
-                          </TableCell>
-                          <TableCell className="py-3">
                             <Skeleton className="h-4 w-24" />
                           </TableCell>
                           <TableCell className="py-3">
@@ -1092,7 +1088,6 @@ export default function QuotationsListPage() {
                           <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
                           <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
                           <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                           <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
                           <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
                         </TableRow>
@@ -1292,19 +1287,6 @@ export default function QuotationsListPage() {
                                     </div>
                                   </div>
                                 </div>
-                              </TableCell>
-                              <TableCell
-                                className="py-3 cursor-pointer"
-                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                              >
-                                <Badge
-                                  variant="outline"
-                                  className={`px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
-                                    quotation.status,
-                                  )}`}
-                                >
-                                  {quotation.status || "Draft"}
-                                </Badge>
                               </TableCell>
                               <TableCell
                                 className="py-3 text-sm text-gray-700 cursor-pointer"

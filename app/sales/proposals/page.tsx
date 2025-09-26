@@ -232,7 +232,6 @@ function ProposalsPageContent() {
                 <TableRow className="bg-gray-50 border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900">Products</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
@@ -254,9 +253,6 @@ function ProposalsPageContent() {
                           <Skeleton className="h-4 w-20" />
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-12 mx-auto" />
@@ -307,7 +303,6 @@ function ProposalsPageContent() {
                 <TableRow className="bg-gray-50 border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
                   <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900">Products</TableHead>
                   <TableHead className="font-semibold text-gray-900">Amount</TableHead>
                   <TableHead className="font-semibold text-gray-900">Created</TableHead>
@@ -343,12 +338,6 @@ function ProposalsPageContent() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3">
                         <div className="text-center">
                           <div className="font-semibold text-gray-900">{proposal.products.length}</div>
                           <div className="text-xs text-gray-500">
@@ -363,7 +352,9 @@ function ProposalsPageContent() {
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {(() => {
-                            console.log("Proposal createdAt:", proposal.createdAt, "Type:", typeof proposal.createdAt, "Is Date:", proposal.createdAt instanceof Date, "Is valid Date:", proposal.createdAt instanceof Date && !isNaN(proposal.createdAt.getTime()))
+                            if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
+                              return "N/A"
+                            }
                             return format(proposal.createdAt, "MMM d, yyyy")
                           })()}
                         </div>
