@@ -2,22 +2,26 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Clock, ZoomIn, ZoomOut, Filter, Search, ArrowLeft, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import { EventDialog } from "@/components/event-dialog"
-import { EventDetailsDialog } from "@/components/event-details-dialog"
 import type { Booking } from "@/lib/booking-service"
-import { getProductById, getServiceAssignmentsByDepartment } from "@/lib/firebase-service"
+import { getProductById } from "@/lib/firebase-service"
 import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
+import { EventDetailsDialog } from "@/components/event-details-dialog"
+import { EventDialog } from "@/components/event-dialog"
+import { getTodosByUser } from "@/lib/todo-service"
+import type { Todo } from "@/lib/types/todo"
+import { bookingService } from "@/lib/booking-service"
 
 // Types for our calendar data
 type ServiceAssignment = {
@@ -40,7 +44,7 @@ type ServiceAssignment = {
   updatedAt?: Date
 }
 
-type CalendarViewType = "month" | "week" | "day"
+type CalendarViewType = "Monthly" | "Weekly" | "Daily"
 
 // Helper functions for date manipulation
 const getDaysInMonth = (year: number, month: number) => {
@@ -64,21 +68,23 @@ export default function BusinessDevPlannerPage() {
   const searchParams = useSearchParams()
   const { userData } = useAuth()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [events, setEvents] = useState<SalesEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<CalendarViewType>("month")
+  const [view, setView] = useState<CalendarViewType>("Monthly")
   const [searchTerm, setSearchTerm] = useState("")
   const [plannerView, setPlannerView] = useState<"assignments" | "bookings">("assignments")
 
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
-  const [eventDialogOpen, setEventDialogOpen] = useState(false)
-  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<SalesEvent | null>(null)
   const [siteProduct, setSiteProduct] = useState<any>(null)
   const [siteProductLoading, setSiteProductLoading] = useState(false)
+  const [events, setEvents] = useState<SalesEvent[]>([])
+  const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [eventDetailsDialogOpen, setEventDetailsDialogOpen] = useState(false)
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<SalesEvent | null>(null)
+  const [isLegendsOpen, setIsLegendsOpen] = useState(false)
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
 
   // Get query parameters
   const siteId = searchParams.get("site")
@@ -92,25 +98,85 @@ export default function BusinessDevPlannerPage() {
       return
     }
 
-    const DEPARTMENT = "BUSINESS DEV"
-
     try {
       setLoading(true)
 
-      const assignments = await getServiceAssignmentsByDepartment(userData.company_id, DEPARTMENT)
+      // Query service assignments from Firestore using company_id
+      const assignmentsRef = collection(db, "service_assignments")
+
+      // Try with orderBy first
+      let q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
+
+      let querySnapshot
+      try {
+        querySnapshot = await getDocs(q)
+      } catch (orderByError) {
+        // If orderBy fails (likely due to missing index), try without orderBy
+        q = query(assignmentsRef, where("company_id", "==", userData.company_id))
+        querySnapshot = await getDocs(q)
+      }
 
       const fetchedAssignments: ServiceAssignment[] = []
-      assignments.forEach((assignment) => {
+      const siteIds: string[] = []
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const siteId = data.projectSiteId || data.siteId || ""
+        if (siteId && !siteIds.includes(siteId)) {
+          siteIds.push(siteId)
+        }
+
         // Convert Firestore timestamps to Date objects with better error handling
+        let alarmDate: Date | null = null
+        let coveredDateStart: Date | null = null
+        let coveredDateEnd: Date | null = null
+
+        try {
+          // Parse alarmDate - this is the primary date for calendar display
+          if (data.alarmDate) {
+            if (data.alarmDate.toDate) {
+              alarmDate = data.alarmDate.toDate()
+            } else if (data.alarmDate.seconds) {
+              alarmDate = new Date(data.alarmDate.seconds * 1000)
+            } else {
+              alarmDate = new Date(data.alarmDate)
+            }
+          }
+
+          // Parse coveredDateStart
+          if (data.coveredDateStart) {
+            if (data.coveredDateStart.toDate) {
+              coveredDateStart = data.coveredDateStart.toDate()
+            } else if (data.coveredDateStart.seconds) {
+              coveredDateStart = new Date(data.coveredDateStart.seconds * 1000)
+            } else {
+              coveredDateStart = new Date(data.coveredDateStart)
+            }
+          }
+
+          // Parse coveredDateEnd
+          if (data.coveredDateEnd) {
+            if (data.coveredDateEnd.toDate) {
+              coveredDateEnd = data.coveredDateEnd.toDate()
+            } else if (data.coveredDateEnd.seconds) {
+              coveredDateEnd = new Date(data.coveredDateEnd.seconds * 1000)
+            } else {
+              coveredDateEnd = new Date(data.coveredDateEnd)
+            }
+          }
+        } catch (dateError) {
+          console.error("Error parsing dates for assignment:", doc.id, dateError)
+        }
+
         let createdAt: Date = new Date()
         try {
-          if (assignment.created) {
-            if (assignment.created.toDate) {
-              createdAt = assignment.created.toDate()
-            } else if (assignment.created.seconds) {
-              createdAt = new Date(assignment.created.seconds * 1000)
+          if (data.created) {
+            if (data.created.toDate) {
+              createdAt = data.created.toDate()
+            } else if (data.created.seconds) {
+              createdAt = new Date(data.created.seconds * 1000)
             } else {
-              createdAt = new Date(assignment.created)
+              createdAt = new Date(data.created)
             }
           }
         } catch (createdError) {
@@ -119,41 +185,74 @@ export default function BusinessDevPlannerPage() {
 
         let updatedAt: Date = new Date()
         try {
-          if (assignment.updated) {
-            if (assignment.updated.toDate) {
-              updatedAt = assignment.updated.toDate()
-            } else if (assignment.updated.seconds) {
-              updatedAt = new Date(assignment.updated.seconds * 1000)
+          if (data.updated) {
+            if (data.updated.toDate) {
+              updatedAt = data.updated.toDate()
+            } else if (data.updated.seconds) {
+              updatedAt = new Date(data.updated.seconds * 1000)
             } else {
-              updatedAt = new Date(assignment.updated)
+              updatedAt = new Date(data.updated)
             }
           }
         } catch (updatedError) {
           console.error("Error parsing updated date:", updatedError)
         }
 
-        const localAssignment: ServiceAssignment = {
-          id: assignment.id,
-          saNumber: assignment.saNumber || "",
-          projectSiteId: assignment.projectSiteId || "",
-          projectSiteName: assignment.projectSiteName || "Unknown Site",
-          serviceType: assignment.serviceType || "General Service",
-          alarmDate: assignment.alarmDate,
-          alarmTime: assignment.alarmTime || "08:00",
-          coveredDateStart: assignment.coveredDateStart,
-          coveredDateEnd: assignment.coveredDateEnd,
-          status: assignment.status || "Pending",
-          location: assignment.projectSiteLocation || "",
-          notes: assignment.message || "",
-          assignedTo: assignment.assignedTo || "",
-          assignedToName: assignment.requestedBy?.name || "Unassigned",
-          jobDescription: assignment.jobDescription || "",
+        const assignment: ServiceAssignment = {
+          id: doc.id,
+          saNumber: data.saNumber || "",
+          projectSiteId: siteId,
+          projectSiteName:
+            data.projectSiteName || data.project_site_name || data.siteName || data.location || "Loading...",
+          serviceType: data.serviceType || data.service_type || data.type || "General Service",
+          alarmDate,
+          alarmTime: data.alarmTime || data.alarm_time || "08:00",
+          coveredDateStart,
+          coveredDateEnd,
+          status: data.status || "Pending",
+          location: data.projectSiteLocation || data.location || data.address || "",
+          notes: data.message || data.notes || data.description || "",
+          assignedTo: data.assignedTo || data.assignedToId || "",
+          assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
+          jobDescription: data.jobDescription || data.description || "",
           createdAt,
           updatedAt,
         }
 
-        fetchedAssignments.push(localAssignment)
+        fetchedAssignments.push(assignment)
       })
+
+      // Fetch site names for assignments that don't have them
+      if (siteIds.length > 0) {
+        try {
+          const productsRef = collection(db, "products")
+          const productsQuery = query(productsRef, where("__name__", "in", siteIds))
+          const productsSnapshot = await getDocs(productsQuery)
+          const siteNameMap: { [key: string]: string } = {}
+
+          productsSnapshot.forEach((doc) => {
+            const data = doc.data()
+            siteNameMap[doc.id] = data.name || data.siteName || data.location || `Site ${doc.id}`
+          })
+
+          // Update assignments with fetched site names
+          fetchedAssignments.forEach((assignment) => {
+            if (assignment.projectSiteId && siteNameMap[assignment.projectSiteId]) {
+              assignment.projectSiteName = siteNameMap[assignment.projectSiteId]
+            } else if (assignment.projectSiteName === "Loading...") {
+              assignment.projectSiteName = assignment.projectSiteId ? `Site ${assignment.projectSiteId}` : "Unknown Site"
+            }
+          })
+        } catch (error) {
+          console.error("Error fetching site names:", error)
+          // Fallback to site IDs
+          fetchedAssignments.forEach((assignment) => {
+            if (assignment.projectSiteName === "Loading...") {
+              assignment.projectSiteName = assignment.projectSiteId ? `Site ${assignment.projectSiteId}` : "Unknown Site"
+            }
+          })
+        }
+      }
 
       setAssignments(fetchedAssignments)
     } catch (error) {
@@ -164,17 +263,10 @@ export default function BusinessDevPlannerPage() {
     }
   }, [userData])
 
-  // Fetch events for sales department
+  // Fetch events
   const fetchEvents = useCallback(async () => {
-    if (!userData?.company_id) {
-      setEvents([])
-      return
-    }
-
     try {
-      const isAdmin = userData.role === "admin"
-      const userDepartment = "business-dev"
-      const fetchedEvents = await getSalesEvents(isAdmin, userDepartment)
+      const fetchedEvents = await getSalesEvents(false, "business-dev", userData?.company_id || undefined)
       setEvents(fetchedEvents)
     } catch (error) {
       console.error("Error fetching events:", error)
@@ -182,10 +274,57 @@ export default function BusinessDevPlannerPage() {
     }
   }, [userData])
 
+  // Fetch todos
+  const fetchTodos = useCallback(async () => {
+    if (!userData?.company_id) {
+      setTodos([])
+      return
+    }
+
+    try {
+      const fetchedTodos = await getTodosByUser("", userData.company_id, "business-dev")
+      // Filter to ensure only non-deleted todos that are not completed are displayed
+      const activeTodos = fetchedTodos.filter(todo => !todo.isDeleted && (todo.status === "todo" || todo.status === "in-progress"))
+      setTodos(activeTodos)
+    } catch (error) {
+      console.error("Error fetching todos:", error)
+      setTodos([])
+    }
+  }, [userData])
+
+  // Fetch bookings
+  const fetchBookings = useCallback(async () => {
+    if (!userData?.company_id) {
+      setBookings([])
+      return
+    }
+
+    try {
+      // Get both completed and collectible (reserved) bookings for the company
+      const [completedBookings, reservedBookings] = await Promise.all([
+        bookingService.getCompletedBookings(userData.company_id),
+        bookingService.getCollectiblesBookings(userData.company_id)
+      ])
+
+      // Combine and deduplicate bookings
+      const allBookings = [...completedBookings, ...reservedBookings]
+      const uniqueBookings = allBookings.filter((booking, index, self) =>
+        index === self.findIndex(b => b.id === booking.id)
+      )
+
+      setBookings(uniqueBookings)
+    } catch (error) {
+      console.error("Error fetching bookings:", error)
+      setBookings([])
+    }
+  }, [userData])
+
   useEffect(() => {
     fetchAssignments()
     fetchEvents()
-  }, [fetchAssignments, fetchEvents])
+    fetchTodos()
+    fetchBookings()
+  }, [fetchAssignments, fetchEvents, fetchTodos, fetchBookings])
 
   // Fetch site product details when siteId is provided
   useEffect(() => {
@@ -256,13 +395,13 @@ export default function BusinessDevPlannerPage() {
   const goToPrevious = () => {
     const newDate = new Date(currentDate)
     switch (view) {
-      case "month":
+      case "Monthly":
         newDate.setMonth(currentDate.getMonth() - 1)
         break
-      case "week":
+      case "Weekly":
         newDate.setDate(currentDate.getDate() - 7)
         break
-      case "day":
+      case "Daily":
         newDate.setDate(currentDate.getDate() - 1)
         break
     }
@@ -272,13 +411,13 @@ export default function BusinessDevPlannerPage() {
   const goToNext = () => {
     const newDate = new Date(currentDate)
     switch (view) {
-      case "month":
+      case "Monthly":
         newDate.setMonth(currentDate.getMonth() + 1)
         break
-      case "week":
+      case "Weekly":
         newDate.setDate(currentDate.getDate() + 7)
         break
-      case "day":
+      case "Daily":
         newDate.setDate(currentDate.getDate() + 1)
         break
     }
@@ -290,7 +429,7 @@ export default function BusinessDevPlannerPage() {
   }
 
   const handleEventClick = (event: SalesEvent) => {
-    setSelectedEvent(event)
+    setSelectedEventForDetails(event)
     setEventDetailsDialogOpen(true)
   }
 
@@ -299,11 +438,11 @@ export default function BusinessDevPlannerPage() {
     const options: Intl.DateTimeFormatOptions = {}
 
     switch (view) {
-      case "month":
+      case "Monthly":
         options.month = "long"
         options.year = "numeric"
         break
-      case "week":
+      case "Weekly":
         const weekStart = new Date(currentDate)
         weekStart.setDate(currentDate.getDate() - currentDate.getDay())
         const weekEnd = new Date(weekStart)
@@ -314,7 +453,7 @@ export default function BusinessDevPlannerPage() {
         } else {
           return `${weekStart.toLocaleDateString([], { month: "short", day: "numeric" })} - ${weekEnd.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
         }
-      case "day":
+      case "Daily":
         options.weekday = "long"
         options.month = "long"
         options.day = "numeric"
@@ -325,7 +464,7 @@ export default function BusinessDevPlannerPage() {
     return currentDate.toLocaleDateString([], options)
   }
 
-  // Filter assignments/bookings/events based on current view and search term
+  // Filter assignments/bookings based on current view and search term
   const getFilteredItems = () => {
     if (plannerView === "bookings") {
       if (!bookings || bookings.length === 0) {
@@ -348,17 +487,17 @@ export default function BusinessDevPlannerPage() {
 
       // Filter based on current view and date range
       switch (view) {
-        case "month":
+        case "Monthly":
           return filtered.filter((booking) => {
             if (booking.start_date) {
               const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
               return bookingDate.getMonth() === currentDate.getMonth() &&
-                    bookingDate.getFullYear() === currentDate.getFullYear()
+                     bookingDate.getFullYear() === currentDate.getFullYear()
             }
             return false
           })
 
-        case "week":
+        case "Weekly":
           const weekStart = new Date(currentDate)
           weekStart.setDate(currentDate.getDate() - currentDate.getDay())
           weekStart.setHours(0, 0, 0, 0)
@@ -375,7 +514,7 @@ export default function BusinessDevPlannerPage() {
             return false
           })
 
-        case "day":
+        case "Daily":
           const dayStart = new Date(currentDate)
           dayStart.setHours(0, 0, 0, 0)
 
@@ -394,80 +533,39 @@ export default function BusinessDevPlannerPage() {
           return filtered
       }
     } else {
-      // Combine assignments and events for sales planner
-      const combinedItems: (ServiceAssignment | SalesEvent)[] = []
-
-      // Add assignments
-      if (assignments) {
-        combinedItems.push(...assignments)
-      }
-
-      // Add events
-      if (events) {
-        combinedItems.push(...events)
-      }
-
-      if (combinedItems.length === 0) {
+      if (!assignments || assignments.length === 0) {
         return []
       }
 
-      let filtered = [...combinedItems]
+      let filtered = [...assignments]
 
       // Apply search filter if any
       if (searchTerm) {
         const term = searchTerm.toLowerCase()
-        filtered = filtered.filter((item) => {
-          if ('saNumber' in item) {
-            // ServiceAssignment
-            return (
-              item.saNumber?.toLowerCase().includes(term) ||
-              item.projectSiteName?.toLowerCase().includes(term) ||
-              item.serviceType?.toLowerCase().includes(term) ||
-              item.location?.toLowerCase().includes(term) ||
-              item.assignedToName?.toLowerCase().includes(term) ||
-              item.notes?.toLowerCase().includes(term) ||
-              item.jobDescription?.toLowerCase().includes(term)
-            )
-          } else {
-            // SalesEvent
-            return (
-              item.title?.toLowerCase().includes(term) ||
-              item.location?.toLowerCase().includes(term) ||
-              item.description?.toLowerCase().includes(term)
-            )
-          }
-        })
+        filtered = filtered.filter(
+          (assignment) =>
+            assignment.saNumber?.toLowerCase().includes(term) ||
+            assignment.projectSiteName?.toLowerCase().includes(term) ||
+            assignment.serviceType?.toLowerCase().includes(term) ||
+            assignment.location?.toLowerCase().includes(term) ||
+            assignment.assignedToName?.toLowerCase().includes(term) ||
+            assignment.notes?.toLowerCase().includes(term) ||
+            assignment.jobDescription?.toLowerCase().includes(term),
+        )
       }
 
-      // Filter based on current view and date range
+      // Filter based on current view and date range - use coveredDateStart as the start_date
       switch (view) {
-        case "month":
-          return filtered.filter((item) => {
-            if ('saNumber' in item) {
-              // ServiceAssignment
-              const assignment = item as ServiceAssignment
-              if (assignment.alarmDate) {
-                return assignment.alarmDate.getMonth() === currentDate.getMonth() &&
-                      assignment.alarmDate.getFullYear() === currentDate.getFullYear()
-              }
-              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-                const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-                const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59)
-                return assignment.coveredDateStart <= monthEnd && assignment.coveredDateEnd >= monthStart
-              }
-              return false
-            } else {
-              // SalesEvent
-              const event = item as SalesEvent
-              if (event.start instanceof Date) {
-                return event.start.getMonth() === currentDate.getMonth() &&
-                      event.start.getFullYear() === currentDate.getFullYear()
-              }
-              return false
+        case "Monthly":
+          return filtered.filter((assignment) => {
+            if (assignment.coveredDateStart) {
+              return assignment.coveredDateStart.getMonth() === currentDate.getMonth() &&
+                     assignment.coveredDateStart.getFullYear() === currentDate.getFullYear()
             }
+            return false
           })
 
-        case "week":
+        case "Weekly":
           const weekStart = new Date(currentDate)
           weekStart.setDate(currentDate.getDate() - currentDate.getDay())
           weekStart.setHours(0, 0, 0, 0)
@@ -476,54 +574,27 @@ export default function BusinessDevPlannerPage() {
           weekEnd.setDate(weekStart.getDate() + 6)
           weekEnd.setHours(23, 59, 59, 999)
 
-          return filtered.filter((item) => {
-            if ('saNumber' in item) {
-              // ServiceAssignment
-              const assignment = item as ServiceAssignment
-              if (assignment.alarmDate) {
-                return assignment.alarmDate >= weekStart && assignment.alarmDate <= weekEnd
-              }
-              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-                return assignment.coveredDateStart <= weekEnd && assignment.coveredDateEnd >= weekStart
-              }
-              return false
-            } else {
-              // SalesEvent
-              const event = item as SalesEvent
-              if (event.start instanceof Date) {
-                return event.start >= weekStart && event.start <= weekEnd
-              }
-              return false
+          return filtered.filter((assignment) => {
+            if (assignment.coveredDateStart) {
+              return assignment.coveredDateStart >= weekStart && assignment.coveredDateStart <= weekEnd
             }
+            return false
           })
 
-        case "day":
+        case "Daily":
           const dayStart = new Date(currentDate)
           dayStart.setHours(0, 0, 0, 0)
 
           const dayEnd = new Date(currentDate)
           dayEnd.setHours(23, 59, 59, 999)
 
-          return filtered.filter((item) => {
-            if ('saNumber' in item) {
-              // ServiceAssignment
-              const assignment = item as ServiceAssignment
-              if (assignment.alarmDate) {
-                return assignment.alarmDate >= dayStart && assignment.alarmDate <= dayEnd
-              }
-              if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-                return assignment.coveredDateStart <= dayEnd && assignment.coveredDateEnd >= dayStart
-              }
-              return false
-            } else {
-              // SalesEvent
-              const event = item as SalesEvent
-              if (event.start instanceof Date) {
-                return event.start >= dayStart && event.start <= dayEnd
-              }
-              return false
+          return filtered.filter((assignment) => {
+            if (assignment.coveredDateStart) {
+              return assignment.coveredDateStart >= dayStart && assignment.coveredDateStart <= dayEnd
             }
+            return false
           })
+
 
         default:
           return filtered
@@ -578,6 +649,7 @@ export default function BusinessDevPlannerPage() {
     }
   }
 
+
   // Get type icon based on service type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -606,8 +678,20 @@ export default function BusinessDevPlannerPage() {
     }
   }
 
-  // Month view renderer with assignments and events data
-  const renderMonthView = (items: (ServiceAssignment | SalesEvent)[]) => {
+  // Get color for events based on type
+  const getEventColor = (type: string) => {
+    // All events use the Alarms color from legends
+    return "#ff9696" // red - Alarms color
+  }
+
+  // Get color for assignments based on legends (Service Assignments = blue)
+  const getAssignmentColor = (type: string) => {
+    // All service assignments use the Service Assignments color from legends
+    return "#73bbff" // blue - Service Assignments color
+  }
+
+  // Month view renderer with actual assignment data
+  const renderMonthView = (assignments: ServiceAssignment[]) => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const daysInMonth = getDaysInMonth(year, month)
@@ -618,166 +702,172 @@ export default function BusinessDevPlannerPage() {
       .fill(null)
       .concat([...Array(daysInMonth)].map((_, i) => i + 1))
 
-    // Group items by day
-    const itemsByDay: { [key: number]: (ServiceAssignment | SalesEvent)[] } = {}
-    items.forEach((item) => {
-      if ('saNumber' in item) {
-        // ServiceAssignment
-        const assignment = item as ServiceAssignment
-        if (assignment.alarmDate) {
-          if (assignment.alarmDate.getMonth() === month && assignment.alarmDate.getFullYear() === year) {
-            const day = assignment.alarmDate.getDate()
-            if (!itemsByDay[day]) itemsByDay[day] = []
-            itemsByDay[day].push(assignment)
-          }
-        } else if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-          // Fallback: show assignment on all days it spans within the current month
-          const monthStart = new Date(year, month, 1)
-          const monthEnd = new Date(year, month + 1, 0, 23, 59, 59)
+    // Fill the grid to make it complete (multiple of 7)
+    const totalCells = Math.ceil(days.length / 7) * 7
+    const filledDays = [...days, ...Array(totalCells - days.length).fill(null)]
 
-          const checkDate = new Date(Math.max(assignment.coveredDateStart.getTime(), monthStart.getTime()))
-          const endCheck = new Date(Math.min(assignment.coveredDateEnd.getTime(), monthEnd.getTime()))
-
-          while (checkDate <= endCheck) {
-            if (checkDate.getMonth() === month && checkDate.getFullYear() === year) {
-              const day = checkDate.getDate()
-              if (!itemsByDay[day]) itemsByDay[day] = []
-              itemsByDay[day].push(assignment)
-            }
-            checkDate.setDate(checkDate.getDate() + 1)
-          }
-        }
-      } else {
-        // SalesEvent
-        const event = item as SalesEvent
-        if (event.start instanceof Date) {
-          if (event.start.getMonth() === month && event.start.getFullYear() === year) {
-            const day = event.start.getDate()
-            if (!itemsByDay[day]) itemsByDay[day] = []
-            itemsByDay[day].push(event)
-          }
+    // Group assignments by day - use coveredDateStart as the start_date
+    const assignmentsByDay: { [key: number]: ServiceAssignment[] } = {}
+    assignments.forEach((assignment) => {
+      // Use coveredDateStart as the primary date for display
+      if (assignment.coveredDateStart) {
+        if (assignment.coveredDateStart.getMonth() === month && assignment.coveredDateStart.getFullYear() === year) {
+          const day = assignment.coveredDateStart.getDate()
+          if (!assignmentsByDay[day]) assignmentsByDay[day] = []
+          assignmentsByDay[day].push(assignment)
         }
       }
     })
 
+    // Group events by day
+    const eventsByDay: { [key: number]: SalesEvent[] } = {}
+    events.forEach((event) => {
+      if (event.start instanceof Date) {
+        if (event.start.getMonth() === month && event.start.getFullYear() === year) {
+          const day = event.start.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          eventsByDay[day].push(event)
+        }
+      }
+    })
+
+    // Group todos by day based on start_date
+    const todosByDay: { [key: number]: Todo[] } = {}
+    todos.forEach((todo) => {
+      if (todo.start_date) {
+        let todoDate: Date
+        if (todo.start_date instanceof Date) {
+          todoDate = todo.start_date
+        } else if (typeof todo.start_date === 'string') {
+          todoDate = new Date(todo.start_date)
+        } else {
+          // Handle Timestamp
+          todoDate = todo.start_date.toDate()
+        }
+
+        if (todoDate.getMonth() === month && todoDate.getFullYear() === year) {
+          const day = todoDate.getDate()
+          if (!todosByDay[day]) todosByDay[day] = []
+          todosByDay[day].push(todo)
+        }
+      }
+    })
+
+    // Group bookings by day based on start_date
+    const bookingsByDay: { [key: number]: Booking[] } = {}
+    bookings.forEach((booking) => {
+      if (booking.start_date) {
+        let bookingDate: Date
+        if (booking.start_date instanceof Date) {
+          bookingDate = booking.start_date
+        } else {
+          // Handle Timestamp
+          bookingDate = booking.start_date.toDate()
+        }
+
+        if (bookingDate.getMonth() === month && bookingDate.getFullYear() === year) {
+          const day = bookingDate.getDate()
+          if (!bookingsByDay[day]) bookingsByDay[day] = []
+          bookingsByDay[day].push(booking)
+        }
+      }
+    })
+
+    const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    const calendarDays = filledDays
+
     return (
-      <div className="grid grid-cols-7 gap-1 mt-4">
-        {/* Day headers */}
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => (
-          <div key={`header-${i}`} className="text-center font-medium p-1 sm:p-2 text-gray-500 text-xs sm:text-sm">
-            {day}
-          </div>
-        ))}
-
-        {/* Calendar days */}
-        {days.map((day, i) => {
-          const isToday =
-            day && new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year
-
-          const dayItems = day ? itemsByDay[day] || [] : []
-
-          return (
+      <>
+        {/* Days of Week Header */}
+        <div className="grid grid-cols-7 border-b border-[#c4c4c4]">
+          {daysOfWeek.map((day) => (
             <div
-              key={`day-${i}`}
-              className={`min-h-[100px] sm:min-h-[140px] border rounded-md p-1 ${
-                day ? "bg-white" : "bg-gray-50"
-              } ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
+              key={day}
+              className="p-4 text-center font-medium text-[#333333] bg-[#f0f0f0] border-r border-[#c4c4c4] last:border-r-0"
             >
-              {day && (
-                <>
-                  <div className={`text-right p-1 text-xs sm:text-sm ${isToday ? "font-bold text-blue-600" : ""}`}>
-                    {day}
-                  </div>
-                  <div className="overflow-y-auto max-h-[70px] sm:max-h-[100px]">
-                    {dayItems.slice(0, 3).map((item, j) => {
-                      const isAssignment = 'saNumber' in item
-                      const isEvent = 'title' in item
-
-                      if (isAssignment) {
-                        // ServiceAssignment
-                        const assignment = item as ServiceAssignment
-                        return (
-                          <div
-                            key={`assignment-${day}-${j}`}
-                            className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              router.push(`/admin/service-assignments/${assignment.id}`)
-                            }}
-                            title={`${assignment.saNumber} - ${assignment.projectSiteName} (${assignment.serviceType}) at ${assignment.alarmTime}`}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>{getTypeIcon(assignment.serviceType)}</span>
-                              <span className="truncate font-medium">{assignment.saNumber}</span>
-                            </div>
-                            <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
-                              {assignment.projectSiteName}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <Badge
-                                variant="outline"
-                                className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1 py-0`}
-                              >
-                                {assignment.status}
-                              </Badge>
-                              <span className="text-[6px] sm:text-[8px] text-gray-500">{assignment.alarmTime}</span>
-                            </div>
-                          </div>
-                        )
-                      } else if (isEvent) {
-                        // SalesEvent
-                        const event = item as SalesEvent
-                        return (
-                          <div
-                            key={`event-${day}-${j}`}
-                            className={`text-[10px] sm:text-xs p-1 mb-1 rounded border cursor-pointer hover:bg-gray-100 bg-blue-50 border-blue-200 min-h-[60px] sm:min-h-[70px]`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEventClick(event)
-                            }}
-                            title={`${event.title} - ${event.location} (${event.type})`}
-                          >
-                            <div className="flex items-start gap-1">
-                              <span>📅</span>
-                              <span className="font-medium break-words">{event.title}</span>
-                            </div>
-                            <div className="text-[8px] sm:text-[10px] text-gray-600 mt-0.5 break-words">
-                              {event.location}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <Badge
-                                variant="outline"
-                                className={`${getStatusColor(event.status)} text-[6px] sm:text-[8px] px-1 py-0`}
-                              >
-                                {event.status}
-                              </Badge>
-                              <span className="text-[6px] sm:text-[8px] text-gray-500">{event.type}</span>
-                            </div>
-                          </div>
-                        )
-                      }
-                      return null
-                    })}
-                    {dayItems.length > 3 && (
-                      <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
-                        +{dayItems.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+              {day}
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+
+        {/* Calendar Days */}
+        <div className="grid grid-cols-7">
+          {calendarDays.map((day, index) => {
+            const isToday =
+              day && new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year
+
+            const dayAssignments = day ? assignmentsByDay[day] || [] : []
+            const dayEvents = day ? eventsByDay[day] || [] : []
+            const dayTodos = day ? todosByDay[day] || [] : []
+            const dayBookings = day ? bookingsByDay[day] || [] : []
+
+            const isLastColumn = (index + 1) % 7 === 0
+
+            return (
+              <div
+                key={index}
+                className={`min-h-[120px] border-r border-b border-[#c4c4c4] p-2 bg-white ${isLastColumn ? 'border-r-0' : ''}`}
+              >
+                {day && (
+                  <>
+                    <div className="text-lg font-medium text-[#333333] mb-2">{day}</div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                        <div
+                          key={eventIndex}
+                          className="text-xs px-2 py-1 rounded text-black font-medium truncate"
+                          style={{ backgroundColor: getEventColor(event.type) }}
+                        >
+                          {event.title}
+                        </div>
+                      ))}
+                      {dayAssignments.slice(0, 3).map((assignment, assignmentIndex) => (
+                        <div
+                          key={assignmentIndex}
+                          className="text-xs px-2 py-1 rounded text-black font-medium truncate"
+                          style={{ backgroundColor: getAssignmentColor(assignment.serviceType) }}
+                        >
+                          {assignment.saNumber}
+                        </div>
+                      ))}
+                      {dayTodos.slice(0, 3).map((todo, todoIndex) => (
+                        <div
+                          key={todoIndex}
+                          className="text-xs px-2 py-1 rounded text-black font-medium truncate"
+                          style={{ backgroundColor: "#ffe522" }}
+                        >
+                          {todo.title}
+                        </div>
+                      ))}
+                      {dayBookings.slice(0, 3).map((booking, bookingIndex) => (
+                        <div
+                          key={bookingIndex}
+                          className="text-xs px-2 py-1 rounded text-black font-medium truncate"
+                          style={{ backgroundColor: "#7fdb97" }}
+                        >
+                          {booking.reservation_id || booking.id.slice(-8)}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </>
     )
   }
 
-  // Week view renderer with assignments and events data
-  const renderWeekView = (items: (ServiceAssignment | SalesEvent)[]) => {
+  // Week view renderer with actual assignment data
+  const renderWeekView = (assignments: ServiceAssignment[]) => {
     const weekStart = new Date(currentDate)
     weekStart.setDate(currentDate.getDate() - currentDate.getDay())
     weekStart.setHours(0, 0, 0, 0)
+
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    weekEnd.setHours(23, 59, 59, 999)
 
     const days = Array(7)
       .fill(null)
@@ -787,40 +877,66 @@ export default function BusinessDevPlannerPage() {
         return day
       })
 
-    // Group assignments by day - use alarmDate as primary grouping
+    // Group assignments by day - use coveredDateStart as primary grouping
     const assignmentsByDay: { [key: string]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      console.log("Processing assignment: " + assignment.id)
-      // Primary: use alarmDate
-      if (assignment.alarmDate) {
-        const dayKey = assignment.alarmDate.toDateString()
+      // Use coveredDateStart as the primary date for display
+      if (assignment.coveredDateStart) {
+        const dayKey = assignment.coveredDateStart.toDateString()
         if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
         assignmentsByDay[dayKey].push(assignment)
-      } else if (assignment.coveredDateStart && assignment.coveredDateEnd) {
-        // Fallback: show assignment on all days it spans within the week
-        days.forEach((day) => {
-          const dayStart = new Date(day)
-          dayStart.setHours(0, 0, 0, 0)
-          const dayEnd = new Date(day)
-          dayEnd.setHours(23, 59, 59, 999)
-
-          const overlaps = assignment.coveredDateStart! <= dayEnd && assignment.coveredDateEnd! >= dayStart
-          if (overlaps) {
-            const dayKey = day.toDateString()
-            if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
-            assignmentsByDay[dayKey].push(assignment)
-          }
-        })
       }
     })
 
-    // Group events by day - use start date
+    // Group events by day
     const eventsByDay: { [key: string]: SalesEvent[] } = {}
     events.forEach((event) => {
       if (event.start instanceof Date) {
         const dayKey = event.start.toDateString()
         if (!eventsByDay[dayKey]) eventsByDay[dayKey] = []
         eventsByDay[dayKey].push(event)
+      }
+    })
+
+    // Group todos by day
+    const todosByDay: { [key: string]: Todo[] } = {}
+    todos.forEach((todo) => {
+      if (todo.start_date) {
+        let todoDate: Date
+        if (todo.start_date instanceof Date) {
+          todoDate = todo.start_date
+        } else if (typeof todo.start_date === 'string') {
+          todoDate = new Date(todo.start_date)
+        } else {
+          // Handle Timestamp
+          todoDate = todo.start_date.toDate()
+        }
+
+        if (todoDate >= weekStart && todoDate <= weekEnd) {
+          const dayKey = todoDate.toDateString()
+          if (!todosByDay[dayKey]) todosByDay[dayKey] = []
+          todosByDay[dayKey].push(todo)
+        }
+      }
+    })
+
+    // Group bookings by day
+    const bookingsByDay: { [key: string]: Booking[] } = {}
+    bookings.forEach((booking) => {
+      if (booking.start_date) {
+        let bookingDate: Date
+        if (booking.start_date instanceof Date) {
+          bookingDate = booking.start_date
+        } else {
+          // Handle Timestamp
+          bookingDate = booking.start_date.toDate()
+        }
+
+        if (bookingDate >= weekStart && bookingDate <= weekEnd) {
+          const dayKey = bookingDate.toDateString()
+          if (!bookingsByDay[dayKey]) bookingsByDay[dayKey] = []
+          bookingsByDay[dayKey].push(booking)
+        }
       }
     })
 
@@ -850,6 +966,8 @@ export default function BusinessDevPlannerPage() {
           const isToday = day.toDateString() === new Date().toDateString()
           const dayAssignments = assignmentsByDay[day.toDateString()] || []
           const dayEvents = eventsByDay[day.toDateString()] || []
+          const dayTodos = todosByDay[day.toDateString()] || []
+          const dayBookings = bookingsByDay[day.toDateString()] || []
 
           return (
             <div
@@ -857,7 +975,6 @@ export default function BusinessDevPlannerPage() {
               className={`border rounded-md overflow-hidden ${isToday ? "border-blue-500 ring-1 ring-blue-200" : "border-gray-200"}`}
             >
               <div className="overflow-y-auto h-[250px] sm:h-[400px] p-1">
-                {/* Render assignments */}
                 {dayAssignments.map((assignment, j) => (
                   <div
                     key={`assignment-${i}-${j}`}
@@ -895,46 +1012,106 @@ export default function BusinessDevPlannerPage() {
                     </div>
                   </div>
                 ))}
-
-                {/* Render events */}
-                {dayEvents.map((event, j) => (
+                {dayEvents.slice(0, 2).map((event, j) => (
                   <div
                     key={`event-${i}-${j}`}
-                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-blue-50 border-blue-200 min-h-[80px] sm:min-h-[100px]`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm bg-green-50 border-green-200 min-h-[80px] sm:min-h-[100px]`}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleEventClick(event)
                     }}
-                    title={`${event.title} - ${event.type}`}
+                    title={`${event.title} - ${event.type} at ${event.location}`}
                   >
                     <div className="font-medium flex items-start gap-1">
-                      <span>📅</span>
+                      <span>🎉</span>
                       <span className="break-words">{event.title}</span>
                     </div>
                     <div className="text-[8px] sm:text-xs text-gray-600 mt-1 break-words">
-                      {event.location || 'No location'}
-                    </div>
-                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1 break-words">
-                      {event.clientName || 'No client'}
+                      {event.location}
                     </div>
                     <div className="flex items-center justify-between mt-1 sm:mt-2">
                       <Badge
                         variant="outline"
-                        className="bg-blue-100 text-blue-800 border-blue-200 text-[8px] sm:text-xs px-1"
+                        className={`text-[8px] sm:text-xs px-1 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
                       >
                         {event.type}
                       </Badge>
                       <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
-                        {event.start instanceof Date ? formatTime(event.start) : ''}
+                        {formatTime(event.start as Date)}
                       </span>
-                    </div>
-                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1 break-words">
-                      {event.description && `📝 ${event.description}`}
                     </div>
                   </div>
                 ))}
-
-                {(dayAssignments.length === 0 && dayEvents.length === 0) && (
+                {dayTodos.slice(0, 2).map((todo, j) => (
+                  <div
+                    key={`todo-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm`}
+                    style={{ backgroundColor: "#ffe522", borderColor: "#e6d100" }}
+                    title={`${todo.title} - ${todo.description}`}
+                  >
+                    <div className="font-medium flex items-start gap-1">
+                      <span>📝</span>
+                      <span className="break-words">{todo.title}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-700 mt-1 break-words">
+                      {todo.description}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[8px] sm:text-xs px-1 ${todo.status === 'done' ? 'bg-green-100' : todo.status === 'in-progress' ? 'bg-yellow-100' : 'bg-gray-100'}`}
+                      >
+                        {todo.status}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
+                        {todo.start_date ? formatTime(todo.start_date instanceof Date ? todo.start_date : (todo.start_date as any).toDate()) : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {dayBookings.slice(0, 2).map((booking, j) => (
+                  <div
+                    key={`booking-${i}-${j}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm`}
+                    style={{ backgroundColor: "#7fdb97", borderColor: "#6bbf87" }}
+                    title={`${booking.reservation_id || booking.id} - ${booking.client?.name || "Unknown Client"}`}
+                  >
+                    <div className="font-medium flex items-start gap-1">
+                      <span>📅</span>
+                      <span className="break-words">{booking.reservation_id || booking.id.slice(-8)}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-700 mt-1 break-words">
+                      {booking.client?.name || "Unknown Client"}
+                    </div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[8px] sm:text-xs px-1 ${getStatusColor(booking.status || "PENDING")}`}
+                      >
+                        {booking.status || "PENDING"}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs max-w-[60px] sm:max-w-none">
+                        ₱{booking.total_cost?.toLocaleString() || "0"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {dayEvents.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayEvents.length - 2} more events
+                  </div>
+                )}
+                {dayTodos.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-yellow-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayTodos.length - 2} more todos
+                  </div>
+                )}
+                {dayBookings.length > 2 && (
+                  <div className="text-[10px] sm:text-xs text-center text-green-600 font-medium cursor-pointer hover:underline mb-1">
+                    +{dayBookings.length - 2} more bookings
+                  </div>
+                )}
+                {dayAssignments.length === 0 && dayEvents.length === 0 && dayTodos.length === 0 && dayBookings.length === 0 && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
                     No items
                   </div>
@@ -947,8 +1124,8 @@ export default function BusinessDevPlannerPage() {
     )
   }
 
-  // Day view renderer with assignments and events data
-  const renderDayView = (items: (ServiceAssignment | SalesEvent)[]) => {
+  // Day view renderer with actual assignment data
+  const renderDayView = (assignments: ServiceAssignment[]) => {
     // Create array of hours
     const hours = Array(24)
       .fill(null)
@@ -981,6 +1158,50 @@ export default function BusinessDevPlannerPage() {
       }
     })
 
+    // Group todos by hour based on start time (for daily view, show all todos for the day)
+    const todosByHour: { [key: number]: Todo[] } = {}
+    todos.forEach((todo) => {
+      if (todo.start_date) {
+        let todoDate: Date
+        if (todo.start_date instanceof Date) {
+          todoDate = todo.start_date
+        } else if (typeof todo.start_date === 'string') {
+          todoDate = new Date(todo.start_date)
+        } else {
+          // Handle Timestamp
+          todoDate = todo.start_date.toDate()
+        }
+
+        if (todoDate.toDateString() === currentDate.toDateString()) {
+          // For daily view, put all todos in hour 0 (top of the day)
+          const hour = 0
+          if (!todosByHour[hour]) todosByHour[hour] = []
+          todosByHour[hour].push(todo)
+        }
+      }
+    })
+
+    // Group bookings by hour based on start time (for daily view, show all bookings for the day)
+    const bookingsByHour: { [key: number]: Booking[] } = {}
+    bookings.forEach((booking) => {
+      if (booking.start_date) {
+        let bookingDate: Date
+        if (booking.start_date instanceof Date) {
+          bookingDate = booking.start_date
+        } else {
+          // Handle Timestamp
+          bookingDate = booking.start_date.toDate()
+        }
+
+        if (bookingDate.toDateString() === currentDate.toDateString()) {
+          // For daily view, put all bookings in hour 1 (after todos)
+          const hour = 1
+          if (!bookingsByHour[hour]) bookingsByHour[hour] = []
+          bookingsByHour[hour].push(booking)
+        }
+      }
+    })
+
     return (
       <div className="mt-4 border rounded-md overflow-hidden">
         <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[80px_1fr] divide-x">
@@ -1000,13 +1221,16 @@ export default function BusinessDevPlannerPage() {
           <div>
             {hours.map((hour) => {
               const hourAssignments = assignmentsByHour[hour] || []
+              const hourEvents = eventsByHour[hour] || []
+              const hourTodos = todosByHour[hour] || []
+              const hourBookings = bookingsByHour[hour] || []
               const currentHour = new Date().getHours()
               const isCurrentHour =
                 hour === currentHour &&
                 currentDate.getDate() === new Date().getDate() &&
                 currentDate.getMonth() === new Date().getMonth() &&
                 currentDate.getFullYear() === new Date().getFullYear()
-
+  
               return (
                 <div
                   key={`content-${hour}`}
@@ -1015,7 +1239,7 @@ export default function BusinessDevPlannerPage() {
                   {hourAssignments.map((assignment, i) => {
                     const minutes = assignment.alarmTime ? Number.parseInt(assignment.alarmTime.split(":")[1]) : 0
                     const topPosition = (minutes / 60) * 100
-   
+  
                     return (
                       <div
                         key={`assignment-${hour}-${i}`}
@@ -1051,14 +1275,14 @@ export default function BusinessDevPlannerPage() {
                       </div>
                     )
                   })}
-                  {eventsByHour[hour]?.map((event, i) => {
-                    // Position events at the beginning of their hour, with flexible spacing for multiple events
-                    const topPosition = i * 30 // 30% spacing between events in the same hour for more room
+                  {hourEvents.map((event, i) => {
+                    const minutes = event.start instanceof Date ? event.start.getMinutes() : 0
+                    const topPosition = (minutes / 60) * 100
 
                     return (
                       <div
                         key={`event-${hour}-${i}`}
-                        className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 bg-blue-50 border-blue-200`}
+                        className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 bg-green-50 border-green-200`}
                         style={{
                           top: `${topPosition}%`,
                           minHeight: "25%", // Minimum height for content
@@ -1081,7 +1305,7 @@ export default function BusinessDevPlannerPage() {
                         <div className="flex items-center justify-between mt-0 sm:mt-1">
                           <Badge
                             variant="outline"
-                            className="bg-blue-100 text-blue-800 border-blue-200 text-[6px] sm:text-[8px] px-1"
+                            className={`text-[6px] sm:text-[8px] px-1 bg-${event.type === 'meeting' ? 'blue' : event.type === 'holiday' ? 'red' : 'purple'}-100`}
                           >
                             {event.type}
                           </Badge>
@@ -1090,6 +1314,68 @@ export default function BusinessDevPlannerPage() {
                       </div>
                     )
                   })}
+                  {hourTodos.map((todo, i) => (
+                    <div
+                      key={`todo-${hour}-${i}`}
+                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50`}
+                      style={{
+                        top: `${(i * 25)}%`,
+                        minHeight: "20%",
+                        maxHeight: "40px",
+                        backgroundColor: "#ffe522",
+                        borderColor: "#e6d100",
+                        zIndex: hourAssignments.length + hourEvents.length + i + 1,
+                      }}
+                      title={`${todo.title} - ${todo.description}`}
+                    >
+                      <div className="font-medium flex items-start gap-1">
+                        <span>📝</span>
+                        <span className="break-words">{todo.title}</span>
+                      </div>
+                      <div className="text-[6px] sm:text-[8px] text-gray-700 break-words">
+                        {todo.description}
+                      </div>
+                      <div className="flex items-center justify-between mt-0 sm:mt-1">
+                        <Badge
+                          variant="outline"
+                          className={`text-[6px] sm:text-[8px] px-1 ${todo.status === 'done' ? 'bg-green-100' : todo.status === 'in-progress' ? 'bg-yellow-100' : 'bg-gray-100'}`}
+                        >
+                          {todo.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {hourBookings.map((booking, i) => (
+                    <div
+                      key={`booking-${hour}-${i}`}
+                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50`}
+                      style={{
+                        top: `${(i * 25) + 50}%`,
+                        minHeight: "20%",
+                        maxHeight: "40px",
+                        backgroundColor: "#7fdb97",
+                        borderColor: "#6bbf87",
+                        zIndex: hourAssignments.length + hourEvents.length + hourTodos.length + i + 1,
+                      }}
+                      title={`${booking.reservation_id || booking.id} - ${booking.client?.name || "Unknown Client"}`}
+                    >
+                      <div className="font-medium flex items-start gap-1">
+                        <span>📅</span>
+                        <span className="break-words">{booking.reservation_id || booking.id.slice(-8)}</span>
+                      </div>
+                      <div className="text-[6px] sm:text-[8px] text-gray-700 break-words">
+                        {booking.client?.name || "Unknown Client"}
+                      </div>
+                      <div className="flex items-center justify-between mt-0 sm:mt-1">
+                        <Badge
+                          variant="outline"
+                          className={`text-[6px] sm:text-[8px] px-1 ${getStatusColor(booking.status || "PENDING")}`}
+                        >
+                          {booking.status || "PENDING"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )
             })}
@@ -1098,6 +1384,8 @@ export default function BusinessDevPlannerPage() {
       </div>
     )
   }
+
+
 
   // Booking render functions
   const renderMonthViewBookings = (bookings: Booking[]) => {
@@ -1207,186 +1495,145 @@ export default function BusinessDevPlannerPage() {
     return renderMonthViewBookings(bookings) // Use same logic for now
   }
 
+  const renderHourViewBookings = (bookings: Booking[]) => {
+    return renderMonthViewBookings(bookings) // Use same logic for now
+  }
+
+  const renderMinuteViewBookings = (bookings: Booking[]) => {
+    return renderMonthViewBookings(bookings) // Use same logic for now
+  }
+
   // Render calendar based on current view
   const renderCalendar = () => {
     const filteredItems = getFilteredItems()
 
     switch (view) {
-      case "month":
-        return plannerView === "bookings" ? renderMonthViewBookings(filteredItems as Booking[]) : renderMonthView(filteredItems as (ServiceAssignment | SalesEvent)[])
-      case "week":
-        return plannerView === "bookings" ? renderWeekViewBookings(filteredItems as Booking[]) : renderWeekView(filteredItems as (ServiceAssignment | SalesEvent)[])
-      case "day":
-        return plannerView === "bookings" ? renderDayViewBookings(filteredItems as Booking[]) : renderDayView(filteredItems as (ServiceAssignment | SalesEvent)[])
+      case "Monthly":
+        return plannerView === "bookings" ? renderMonthView(filteredItems as any) : renderMonthView(filteredItems as ServiceAssignment[])
+      case "Weekly":
+        return plannerView === "bookings" ? renderWeekView(filteredItems as any) : renderWeekView(filteredItems as ServiceAssignment[])
+      case "Daily":
+        return plannerView === "bookings" ? renderDayView(filteredItems as any) : renderDayView(filteredItems as ServiceAssignment[])
     }
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-6">
-        {/* Header with title and actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="min-h-screen bg-[#fafafa] p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-[#fafafa] border-b border-[#c4c4c4] flex items-center justify-between mb-8 py-4 px-2">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">
-              {plannerView === "bookings"
-                ? (siteProduct ? `${siteProduct.name} - Bookings Calendar` : "Site Bookings Calendar")
-                : "Business Dev Calendar"
-              }
-            </h1>
-            {siteId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push(`/admin/inventory/${siteId}`)}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Site
-              </Button>
-            )}
+            <h1 className="text-2xl font-semibold text-[#333333]">Planner</h1>
+            <div className="flex items-center gap-2 text-lg text-[#333333]">
+              <ChevronLeft className="w-5 h-5 cursor-pointer hover:bg-gray-100 rounded p-1" onClick={goToPrevious} />
+              <span className="cursor-pointer hover:bg-gray-100 rounded px-2 py-1" onClick={() => {/* TODO: Month picker */}}>
+                {getViewTitle()}
+              </span>
+              <ChevronRight className="w-5 h-5 cursor-pointer hover:bg-gray-100 rounded p-1" onClick={goToNext} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Toggle Buttons */}
+            <div className="flex bg-[#f0f0f0] rounded-lg p-1">
+              {["Monthly", "Weekly", "Daily"].map((viewOption) => (
+                <Button
+                  key={viewOption}
+                  variant={view === viewOption ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setView(viewOption as CalendarViewType)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    view === viewOption
+                      ? "bg-[#30c71d] text-white hover:bg-[#30c71d]/90"
+                      : "text-[#333333] hover:bg-[#c4c4c4]/20"
+                  }`}
+                >
+                  {viewOption}
+                </Button>
+              ))}
+            </div>
+
+            {/* Create Event Button */}
             <Button
               onClick={() => setEventDialogOpen(true)}
-              className="flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-[#f0f0f0] text-[#333333] hover:bg-[#e0e0e0] border border-[#c4c4c4] transition-colors"
+              variant="outline"
             >
-              <Plus className="h-4 w-4" />
-              Add Event
+              + Add Event
             </Button>
-          </div>
-          <div className="text-sm text-gray-500">
-            {plannerView === "bookings" ? `${bookings.length} bookings loaded` : `${assignments.length} service assignments and ${events.length} events loaded`}
+
+            {/* Colorful Icon */}
+            <Dialog open={isLegendsOpen} onOpenChange={setIsLegendsOpen}>
+              <DialogTrigger asChild>
+                <div className="w-8 h-8 bg-gradient-to-br from-[#ff9696] via-[#ffe522] to-[#7fdb97] rounded-md flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md p-0 bg-white rounded-2xl border border-[#c4c4c4]">
+                <div className="p-8">
+                  <DialogTitle className="text-2xl font-bold text-black mb-8">Legends</DialogTitle>
+
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-6 h-6 rounded-sm" style={{ backgroundColor: "#7fdb97" }}></div>
+                      <span className="text-lg font-medium text-black">Bookings</span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="w-6 h-6 rounded-sm" style={{ backgroundColor: "#73bbff" }}></div>
+                      <span className="text-lg font-medium text-black">Service Assignments</span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="w-6 h-6 rounded-sm" style={{ backgroundColor: "#ff9696" }}></div>
+                      <span className="text-lg font-medium text-black">Alarms</span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="w-6 h-6 rounded-sm" style={{ backgroundColor: "#ffe522" }}></div>
+                      <span className="text-lg font-medium text-black">To-Do Items</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      onClick={() => setIsLegendsOpen(false)}
+                      className="w-full bg-[#f0f0f0] hover:bg-[#e0e0e0] text-black font-medium py-3 rounded-lg border border-[#c4c4c4]"
+                      variant="outline"
+                    >
+                      OK
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
 
-        {/* Calendar controls */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              {/* Navigation controls */}
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={goToPrevious}>
-                  <ChevronLeft size={16} />
-                </Button>
-                <Button variant="outline" onClick={goToToday}>
-                  Today
-                </Button>
-                <Button variant="outline" size="icon" onClick={goToNext}>
-                  <ChevronRight size={16} />
-                </Button>
-                <h2 className="text-lg font-medium ml-2 truncate">{getViewTitle()}</h2>
-              </div>
 
-              {/* Search and filter controls */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <form className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="search"
-                      placeholder="Search assignments..."
-                      className="pl-8 w-full"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </form>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                        <Filter size={16} />
-                        <span className="hidden sm:inline">Filter</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>All Assignments</DropdownMenuItem>
-                      <DropdownMenuItem>Installation</DropdownMenuItem>
-                      <DropdownMenuItem>Maintenance</DropdownMenuItem>
-                      <DropdownMenuItem>Repair</DropdownMenuItem>
-                      <DropdownMenuItem>Inspection</DropdownMenuItem>
-                      <DropdownMenuItem>Dismantling</DropdownMenuItem>
-                      <DropdownMenuItem>Scheduled</DropdownMenuItem>
-                      <DropdownMenuItem>In Progress</DropdownMenuItem>
-                      <DropdownMenuItem>Completed</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* View controls */}
-                <div className="flex items-center justify-between gap-2">
-                  <Tabs
-                    defaultValue="month"
-                    value={view}
-                    onValueChange={(v) => setView(v as CalendarViewType)}
-                    className="flex-1"
-                  >
-                    <TabsList className="grid grid-cols-3 w-full">
-                      <TabsTrigger value="month" className="text-xs">
-                        <CalendarIcon size={14} className="mr-1 hidden sm:inline" />
-                        <span className="sm:hidden">M</span>
-                        <span className="hidden sm:inline">Month</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="week" className="text-xs">
-                        <CalendarIcon size={14} className="mr-1 hidden sm:inline" />
-                        <span className="sm:hidden">W</span>
-                        <span className="hidden sm:inline">Week</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="day" className="text-xs">
-                        <CalendarIcon size={14} className="mr-1 hidden sm:inline" />
-                        <span className="sm:hidden">D</span>
-                        <span className="hidden sm:inline">Day</span>
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() =>
-                        setView(
-                          view === "month"
-                            ? "week"
-                            : view === "week"
-                              ? "day"
-                              : "day",
-                        )
-                      }
-                    >
-                      <ZoomIn size={16} />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() =>
-                        setView(
-                          view === "day"
-                            ? "week"
-                            : view === "week"
-                              ? "month"
-                              : "month",
-                        )
-                      }
-                    >
-                      <ZoomOut size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Calendar view */}
-        <div className="bg-white border rounded-lg p-2 sm:p-4 overflow-x-auto">
+        {/* Calendar Grid */}
+        <div className="bg-white rounded-lg border border-[#c4c4c4] overflow-hidden">
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
               <span className="ml-2 text-base sm:text-lg">Loading calendar...</span>
             </div>
           ) : (
-            <div className="min-w-[640px]">{renderCalendar()}</div>
+            renderCalendar()
           )}
         </div>
+
+        <EventDialog
+          isOpen={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onEventSaved={(eventId) => {
+            // Refresh events after creating a new one
+            fetchEvents()
+          }}
+          department="business-dev"
+          companyId={userData?.company_id || undefined}
+        />
 
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
@@ -1398,20 +1645,10 @@ export default function BusinessDevPlannerPage() {
           department="BUSINESS DEV"
         />
 
-        <EventDialog
-          isOpen={eventDialogOpen}
-          onClose={() => setEventDialogOpen(false)}
-          onEventSaved={(eventId) => {
-            // Refresh events after creating a new one
-            fetchEvents()
-          }}
-          department="business-dev"
-        />
-
         <EventDetailsDialog
           isOpen={eventDetailsDialogOpen}
           onClose={() => setEventDetailsDialogOpen(false)}
-          event={selectedEvent}
+          event={selectedEventForDetails}
         />
       </div>
     </div>

@@ -9,10 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, User } from "lucide-react"
 import { RouteProtection } from "@/components/route-protection"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 import { getSalesEvents, type SalesEvent } from "@/lib/planner-service"
+import { getTodosByUser } from "@/lib/todo-service"
+import type { Todo } from "@/lib/types/todo"
+import { bookingService } from "@/lib/booking-service"
+import type { Booking } from "@/lib/booking-service"
 
 interface User {
   id: string
@@ -29,6 +33,9 @@ export default function ITPage() {
   const [users, setUsers] = useState<User[]>([])
   const [departmentCounts, setDepartmentCounts] = useState<Record<string, number>>({})
   const [events, setEvents] = useState<SalesEvent[]>([])
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [serviceAssignments, setServiceAssignments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [departmentLoading, setDepartmentLoading] = useState(true)
 
@@ -128,8 +135,93 @@ export default function ITPage() {
     }
   }
 
+  const fetchTodos = async () => {
+    if (!userData?.company_id) {
+      setTodos([])
+      return
+    }
+
+    try {
+      const fetchedTodos = await getTodosByUser("", userData.company_id, "it")
+      // Filter to ensure only non-deleted todos that are not completed are displayed
+      const activeTodos = fetchedTodos.filter(todo => !todo.isDeleted && (todo.status === "todo" || todo.status === "in-progress"))
+      setTodos(activeTodos)
+    } catch (error) {
+      console.error("Error fetching todos:", error)
+      setTodos([])
+    }
+  }
+
+  const fetchBookings = async () => {
+    if (!userData?.company_id) {
+      setBookings([])
+      return
+    }
+
+    try {
+      // Get both completed and collectible (reserved) bookings for the company
+      const [completedBookings, reservedBookings] = await Promise.all([
+        bookingService.getCompletedBookings(userData.company_id),
+        bookingService.getCollectiblesBookings(userData.company_id)
+      ])
+
+      // Combine and deduplicate bookings
+      const allBookings = [...completedBookings, ...reservedBookings]
+      const uniqueBookings = allBookings.filter((booking, index, self) =>
+        index === self.findIndex(b => b.id === booking.id)
+      )
+
+      setBookings(uniqueBookings)
+    } catch (error) {
+      console.error("Error fetching bookings:", error)
+      setBookings([])
+    }
+  }
+
+  const fetchServiceAssignments = async () => {
+    if (!userData?.company_id) {
+      setServiceAssignments([])
+      return
+    }
+
+    try {
+      // Query service assignments from Firestore using company_id
+      const assignmentsRef = collection(db, "service_assignments")
+
+      // Try with orderBy first
+      let q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
+
+      let querySnapshot
+      try {
+        querySnapshot = await getDocs(q)
+      } catch (orderByError) {
+        // If orderBy fails (likely due to missing index), try without orderBy
+        q = query(assignmentsRef, where("company_id", "==", userData.company_id))
+        querySnapshot = await getDocs(q)
+      }
+
+      const fetchedAssignments: any[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const assignment = {
+          id: doc.id,
+          ...data,
+        }
+        fetchedAssignments.push(assignment)
+      })
+
+      setServiceAssignments(fetchedAssignments)
+    } catch (error) {
+      console.error("Error fetching service assignments:", error)
+      setServiceAssignments([])
+    }
+  }
+
   useEffect(() => {
     fetchEvents()
+    fetchTodos()
+    fetchBookings()
+    fetchServiceAssignments()
   }, [userData])
 
   return (
@@ -151,25 +243,110 @@ export default function ITPage() {
               <div className="space-y-2">
                 {(() => {
                   const today = new Date()
+
+                  // Filter events
                   const todayEvents = events.filter(event => {
                     const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
                     return eventDate.toDateString() === today.toDateString()
                   })
 
-                  return todayEvents.length > 0 ? (
-                    todayEvents.slice(0, 4).map((event, index) => (
-                      <div key={event.id} className={`p-2 rounded text-xs ${
-                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
-                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
-                        event.type === 'party' ? 'bg-[#ffe522]/30' :
-                        'bg-[#7fdb97]/30'
-                      }`}>
-                        <div className="font-medium">{event.title}</div>
-                        <div className="text-[10px] text-gray-600 truncate">{event.location}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-600">No events for today.</div>
+                  // Filter todos for today
+                  const todayTodos = todos.filter(todo => {
+                    if (todo.start_date) {
+                      let todoDate: Date
+                      if (todo.start_date instanceof Date) {
+                        todoDate = todo.start_date
+                      } else if (typeof todo.start_date === 'string') {
+                        todoDate = new Date(todo.start_date)
+                      } else {
+                        todoDate = todo.start_date.toDate()
+                      }
+                      return todoDate.toDateString() === today.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter bookings for today
+                  const todayBookings = bookings.filter(booking => {
+                    if (booking.start_date) {
+                      const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
+                      return bookingDate.toDateString() === today.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter service assignments for today
+                  const todayAssignments = serviceAssignments.filter(assignment => {
+                    if (assignment.coveredDateStart) {
+                      const assignmentDate = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart : new Date(assignment.coveredDateStart.seconds * 1000)
+                      return assignmentDate.toDateString() === today.toDateString()
+                    }
+                    return false
+                  })
+
+                  return (
+                    <>
+                      {/* Events */}
+                      {todayEvents.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Events:</div>
+                          {todayEvents.slice(0, 2).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                              <div className="text-[10px] text-gray-600 truncate">{event.location}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Todos */}
+                      {todayTodos.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Todos:</div>
+                          {todayTodos.slice(0, 2).map((todo, index) => (
+                            <div key={todo.id} className="p-2 rounded text-xs bg-[#ffe522]/30">
+                              <div className="font-medium">{todo.title}</div>
+                              <div className="text-[10px] text-gray-600 truncate">{todo.description}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Bookings */}
+                      {todayBookings.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Bookings:</div>
+                          {todayBookings.slice(0, 2).map((booking, index) => (
+                            <div key={booking.id} className="p-2 rounded text-xs bg-[#7fdb97]/30">
+                              <div className="font-medium">{booking.reservation_id || booking.id.slice(-8)}</div>
+                              <div className="text-[10px] text-gray-600 truncate">{booking.client?.name || "Unknown Client"}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Service Assignments */}
+                      {todayAssignments.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Service Assignments:</div>
+                          {todayAssignments.slice(0, 2).map((assignment, index) => (
+                            <div key={assignment.id} className="p-2 rounded text-xs bg-[#73bbff]/30">
+                              <div className="font-medium">{assignment.saNumber}</div>
+                              <div className="text-[10px] text-gray-600 truncate">{assignment.projectSiteName}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {todayEvents.length === 0 && todayTodos.length === 0 && todayBookings.length === 0 && todayAssignments.length === 0 && (
+                        <div className="text-sm text-gray-600">No items for today.</div>
+                      )}
+                    </>
                   )
                 })()}
               </div>
@@ -183,24 +360,106 @@ export default function ITPage() {
                 {(() => {
                   const tomorrow = new Date()
                   tomorrow.setDate(tomorrow.getDate() + 1)
+
+                  // Filter events for tomorrow
                   const tomorrowEvents = events.filter(event => {
                     const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
                     return eventDate.toDateString() === tomorrow.toDateString()
                   })
 
-                  return tomorrowEvents.length > 0 ? (
-                    tomorrowEvents.slice(0, 2).map((event, index) => (
-                      <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
-                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
-                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
-                        event.type === 'party' ? 'bg-[#ffe522]/30' :
-                        'bg-[#7fdb97]/30'
-                      }`}>
-                        <div className="font-medium">{event.title}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-600">No events for this day.</div>
+                  // Filter todos for tomorrow
+                  const tomorrowTodos = todos.filter(todo => {
+                    if (todo.start_date) {
+                      let todoDate: Date
+                      if (todo.start_date instanceof Date) {
+                        todoDate = todo.start_date
+                      } else if (typeof todo.start_date === 'string') {
+                        todoDate = new Date(todo.start_date)
+                      } else {
+                        todoDate = todo.start_date.toDate()
+                      }
+                      return todoDate.toDateString() === tomorrow.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter bookings for tomorrow
+                  const tomorrowBookings = bookings.filter(booking => {
+                    if (booking.start_date) {
+                      const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
+                      return bookingDate.toDateString() === tomorrow.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter service assignments for tomorrow
+                  const tomorrowAssignments = serviceAssignments.filter(assignment => {
+                    if (assignment.coveredDateStart) {
+                      const assignmentDate = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart : new Date(assignment.coveredDateStart.seconds * 1000)
+                      return assignmentDate.toDateString() === tomorrow.toDateString()
+                    }
+                    return false
+                  })
+
+                  return (
+                    <div className="space-y-1">
+                      {/* Events */}
+                      {tomorrowEvents.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Events:</div>
+                          {tomorrowEvents.slice(0, 1).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Todos */}
+                      {tomorrowTodos.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Todos:</div>
+                          {tomorrowTodos.slice(0, 1).map((todo, index) => (
+                            <div key={todo.id} className="p-2 rounded text-xs mb-1 bg-[#ffe522]/30">
+                              <div className="font-medium">{todo.title}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Bookings */}
+                      {tomorrowBookings.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Bookings:</div>
+                          {tomorrowBookings.slice(0, 1).map((booking, index) => (
+                            <div key={booking.id} className="p-2 rounded text-xs mb-1 bg-[#7fdb97]/30">
+                              <div className="font-medium">{booking.reservation_id || booking.id.slice(-8)}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Service Assignments */}
+                      {tomorrowAssignments.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Service Assignments:</div>
+                          {tomorrowAssignments.slice(0, 1).map((assignment, index) => (
+                            <div key={assignment.id} className="p-2 rounded text-xs mb-1 bg-[#73bbff]/30">
+                              <div className="font-medium">{assignment.saNumber}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {tomorrowEvents.length === 0 && tomorrowTodos.length === 0 && tomorrowBookings.length === 0 && tomorrowAssignments.length === 0 && (
+                        <div className="text-sm text-gray-600">No items for this day.</div>
+                      )}
+                    </div>
                   )
                 })()}
               </div>
@@ -214,24 +473,106 @@ export default function ITPage() {
                 {(() => {
                   const dayAfter = new Date()
                   dayAfter.setDate(dayAfter.getDate() + 2)
+
+                  // Filter events for day after tomorrow
                   const dayAfterEvents = events.filter(event => {
                     const eventDate = event.start instanceof Date ? event.start : new Date(event.start.seconds * 1000)
                     return eventDate.toDateString() === dayAfter.toDateString()
                   })
 
-                  return dayAfterEvents.length > 0 ? (
-                    dayAfterEvents.slice(0, 2).map((event, index) => (
-                      <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
-                        event.type === 'meeting' ? 'bg-[#73bbff]/30' :
-                        event.type === 'holiday' ? 'bg-[#ff9696]/30' :
-                        event.type === 'party' ? 'bg-[#ffe522]/30' :
-                        'bg-[#7fdb97]/30'
-                      }`}>
-                        <div className="font-medium">{event.title}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-600">No events for this day.</div>
+                  // Filter todos for day after tomorrow
+                  const dayAfterTodos = todos.filter(todo => {
+                    if (todo.start_date) {
+                      let todoDate: Date
+                      if (todo.start_date instanceof Date) {
+                        todoDate = todo.start_date
+                      } else if (typeof todo.start_date === 'string') {
+                        todoDate = new Date(todo.start_date)
+                      } else {
+                        todoDate = todo.start_date.toDate()
+                      }
+                      return todoDate.toDateString() === dayAfter.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter bookings for day after tomorrow
+                  const dayAfterBookings = bookings.filter(booking => {
+                    if (booking.start_date) {
+                      const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
+                      return bookingDate.toDateString() === dayAfter.toDateString()
+                    }
+                    return false
+                  })
+
+                  // Filter service assignments for day after tomorrow
+                  const dayAfterAssignments = serviceAssignments.filter(assignment => {
+                    if (assignment.coveredDateStart) {
+                      const assignmentDate = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart : new Date(assignment.coveredDateStart.seconds * 1000)
+                      return assignmentDate.toDateString() === dayAfter.toDateString()
+                    }
+                    return false
+                  })
+
+                  return (
+                    <div className="space-y-1">
+                      {/* Events */}
+                      {dayAfterEvents.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Events:</div>
+                          {dayAfterEvents.slice(0, 1).map((event, index) => (
+                            <div key={event.id} className={`p-2 rounded text-xs mb-1 ${
+                              event.type === 'meeting' ? 'bg-[#73bbff]/30' :
+                              event.type === 'holiday' ? 'bg-[#ff9696]/30' :
+                              event.type === 'party' ? 'bg-[#ffe522]/30' :
+                              'bg-[#7fdb97]/30'
+                            }`}>
+                              <div className="font-medium">{event.title}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Todos */}
+                      {dayAfterTodos.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Todos:</div>
+                          {dayAfterTodos.slice(0, 1).map((todo, index) => (
+                            <div key={todo.id} className="p-2 rounded text-xs mb-1 bg-[#ffe522]/30">
+                              <div className="font-medium">{todo.title}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Bookings */}
+                      {dayAfterBookings.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Bookings:</div>
+                          {dayAfterBookings.slice(0, 1).map((booking, index) => (
+                            <div key={booking.id} className="p-2 rounded text-xs mb-1 bg-[#7fdb97]/30">
+                              <div className="font-medium">{booking.reservation_id || booking.id.slice(-8)}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Service Assignments */}
+                      {dayAfterAssignments.length > 0 && (
+                        <>
+                          <div className="text-xs font-medium text-gray-700 mb-1">Service Assignments:</div>
+                          {dayAfterAssignments.slice(0, 1).map((assignment, index) => (
+                            <div key={assignment.id} className="p-2 rounded text-xs mb-1 bg-[#73bbff]/30">
+                              <div className="font-medium">{assignment.saNumber}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {dayAfterEvents.length === 0 && dayAfterTodos.length === 0 && dayAfterBookings.length === 0 && dayAfterAssignments.length === 0 && (
+                        <div className="text-sm text-gray-600">No items for this day.</div>
+                      )}
+                    </div>
                   )
                 })()}
               </div>
