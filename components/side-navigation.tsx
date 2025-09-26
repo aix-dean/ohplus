@@ -120,7 +120,7 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
       { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
-      { title: "Requests", href: "/treasury/quotations", icon: FileText },
+      { title: "Requests", href: "/treasury/requests", icon: FileText },
       { title: "Reports", href: "/treasury/reports", icon: BarChart3 },
     ],
   },
@@ -715,7 +715,7 @@ export function SideNavigation() {
                 {currentSection === "treasury" && [
                   { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
-                  { title: "Requests", href: "/treasury/quotations", icon: FileText },
+                  { title: "Requests", href: "/treasury/requests", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
