@@ -159,6 +159,14 @@ export default function ComposeEmailPage() {
 
       const id = params.id as string
       const estimate = await getCostEstimate(id)
+      if (!estimate) {
+        toast({
+          title: "Error",
+          description: "Cost estimate not found",
+          variant: "destructive",
+        })
+        return
+      }
       setCostEstimate(estimate)
 
       let related: CostEstimate[] = []
@@ -188,21 +196,8 @@ export default function ComposeEmailPage() {
       setToEmail(estimate.client?.email || "")
       setCcEmail("")
       setReplyToEmail(user?.email || "")
-      setSubject(`${estimate?.title || "Custom Cost Estimate"}`)
-      setBody(`Hi ${estimate?.client?.contactPerson || estimate?.client?.company || "Valued Client"},
-
-I hope you're doing well!
-
-Please find attached the quotation for your upcoming billboard campaign. The cost estimate includes the site location, duration, and pricing details based on our recent discussion.
-
-If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
-
-Best regards,
-${user?.displayName || "Sales Executive"}
-Sales Executive
-OH Plus
-${currentUserData?.phone_number || ""}
-${user?.email || ""}`)
+      setSubject("")
+      setBody("")
 
       const companyId = currentUserData?.company_id || estimate?.company_id
       console.log("[v0] Final companyId being used:", companyId)
@@ -212,8 +207,9 @@ ${user?.email || ""}`)
           console.log("[v0] Using company_id:", companyId)
           const userTemplates = await emailService.getEmailTemplates(companyId)
           console.log("[v0] Fetched user templates:", userTemplates)
-          setTemplates(userTemplates)
-          
+          const ceTemplates = userTemplates.filter(template => 'template_type' in template && template.template_type === "CE")
+          setTemplates(ceTemplates)
+
         } catch (error) {
           console.error("Error fetching templates:", error)
           setTemplates([])
@@ -295,13 +291,25 @@ ${user?.email || ""}`)
 
     setSavingTemplate(true)
     try {
-      const newTemplate = await emailService.createEmailTemplate({
+      const templateId = await emailService.createEmailTemplate({
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
+        userId: user!.uid,
+        company_id: companyId,
+        template_type: "CE",
+        deleted: false,
+      } as any)
+
+      const newTemplate: EmailTemplate = {
+        id: templateId,
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        userId: user!.uid,
         company_id: companyId,
         deleted: false,
-      })
+      }
 
       setTemplates((prev) => [...prev, newTemplate])
       setShowAddTemplateDialog(false)
@@ -326,6 +334,7 @@ ${user?.email || ""}`)
   }
 
   const handleDeleteTemplate = async (templateId: string) => {
+    if (!templateId) return
     try {
       await emailService.softDeleteEmailTemplate(templateId)
       setTemplates((prev) => prev.filter((template) => template.id !== templateId))
@@ -352,7 +361,7 @@ ${user?.email || ""}`)
   }
 
   const handleSaveEditedTemplate = async () => {
-    if (!editingTemplate || !newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
+    if (!editingTemplate || !editingTemplate.id || !newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
       toast({
         title: "Missing Information",
         description: "Please fill in all template fields",
@@ -642,7 +651,7 @@ ${user?.email || ""}`)
               <div className="flex items-center gap-4">
                 <Label className="w-12 text-sm font-medium">Subject:</Label>
                 <div className="flex-1">
-                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" />
+                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter your cost estimate subject here..." />
                 </div>
               </div>
 
@@ -652,7 +661,7 @@ ${user?.email || ""}`)
                   <Textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
-                    placeholder="Email body..."
+                    placeholder="Enter your cost estimate content here..."
                     className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500"
                   />
                 </div>
@@ -737,37 +746,44 @@ ${user?.email || ""}`)
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="font-medium mb-4">Templates:</h3>
             <div className="max-h-96 overflow-y-auto space-y-3">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                >
-                  <button
-                    className="text-sm text-left flex-1 hover:text-blue-600"
-                    onClick={() => applyTemplate(template)}
-                  >
-                    {template.name}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditTemplate(template)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteTemplate(template.id)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+              {templates.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No cost estimate email templates available.</p>
+                  <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
                 </div>
-              ))}
+              ) : (
+                templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                  >
+                    <button
+                      className="text-sm text-left flex-1 hover:text-blue-600"
+                      onClick={() => applyTemplate(template)}
+                    >
+                      {template.name}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditTemplate(template)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => template.id && handleDeleteTemplate(template.id)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
             <div className="mt-4 pt-4 border-t">
               <Button

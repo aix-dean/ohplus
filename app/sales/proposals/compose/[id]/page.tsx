@@ -144,6 +144,7 @@ Sales Executive
         templatesRef,
         where("company_id", "==", userData.company_id),
         where("template_type", "==", "proposal"),
+        where("deleted", "!=", true),
         orderBy("created", "desc"),
       )
 
@@ -164,25 +165,23 @@ Sales Executive
         })
       })
 
-      if (proposalTemplates.length === 0) {
-        await createDefaultProposalTemplates()
-        const newQuerySnapshot = await getDocs(q)
-        newQuerySnapshot.forEach((doc) => {
-          const data = doc.data()
-          proposalTemplates.push({
-            id: doc.id,
-            name: data.name,
-            subject: data.subject,
-            body: data.body,
-            userId: data.userId,
-            company_id: data.company_id,
-            created: data.created,
-            template_type: data.template_type || "proposal",
-          })
-        })
+      // Remove any existing default templates
+      const defaultTemplateNames = ["Standard Proposal", "Follow-up Proposal"]
+      const templatesToDelete = proposalTemplates.filter(template => defaultTemplateNames.includes(template.name))
+      for (const template of templatesToDelete) {
+        if (template.id) {
+          try {
+            await emailService.deleteEmailTemplate(template.id)
+          } catch (deleteError) {
+            console.error("Error deleting default template:", deleteError)
+          }
+        }
       }
 
-      setTemplates(proposalTemplates)
+      // Filter out the deleted templates from the list
+      const filteredTemplates = proposalTemplates.filter(template => !defaultTemplateNames.includes(template.name))
+
+      setTemplates(filteredTemplates)
     } catch (error) {
       console.error("Error fetching proposal templates:", error)
       toast({
@@ -406,17 +405,8 @@ ${contactDetails}`,
           to: proposalData.client.email,
           cc: "",
           replyTo: userData?.email || user?.email || "",
-          subject: `Proposal: ${proposalData.title} - ${proposalData.client.company} - ${finalCompanyName}`,
-          message: `Hi AAA,
-
-I hope you're doing well!
-
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site details and pricing details based on our recent discussion.
-
-If you have any questions or would like to explore other options, feel free to reach out to us. I'll be happy to assist you further. Looking forward to your feedback!
-
-Best regards,
-${contactDetails}`,
+          subject: "",
+          message: "",
         }))
 
       } catch (error) {
@@ -715,11 +705,12 @@ ${contactDetails}`,
       const templateName = `Proposal Template ${templates.length + 1}`
       const newTemplate = {
         name: templateName,
-        subject: "New Proposal Template",
-        body: "Enter your proposal template content here...",
+        subject: "",
+        body: "",
         userId: user!.uid,
         company_id: userData.company_id,
         template_type: "proposal" as const,
+        deleted: false,
       }
 
       await addDoc(collection(db, "email_templates"), {
@@ -1027,6 +1018,11 @@ ${contactDetails}`,
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="text-sm text-gray-500 mt-2">Loading templates...</p>
                   </div>
+                ) : templates.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">No email templates available.</p>
+                    <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {templates.map((template) => (
@@ -1111,7 +1107,7 @@ ${contactDetails}`,
               <Input
                 value={editTemplateData.subject}
                 onChange={(e) => setEditTemplateData((prev) => ({ ...prev, subject: e.target.value }))}
-                placeholder="Enter email subject"
+                placeholder="Enter your proposal subject here..."
               />
             </div>
             <div>
@@ -1119,7 +1115,7 @@ ${contactDetails}`,
               <Textarea
                 value={editTemplateData.body}
                 onChange={(e) => setEditTemplateData((prev) => ({ ...prev, body: e.target.value }))}
-                placeholder="Enter email body"
+                placeholder="Enter your proposal content here..."
                 className="min-h-[200px] resize-none"
               />
             </div>
