@@ -490,8 +490,21 @@ export default function BusinessDevPlannerPage() {
         case "Monthly":
           return filtered.filter((booking) => {
             if (booking.start_date) {
-              const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
-              return bookingDate.getMonth() === currentDate.getMonth() &&
+              let bookingDate: Date | null = null
+              try {
+                if (booking.start_date instanceof Date) {
+                  bookingDate = booking.start_date
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+                  bookingDate = (booking.start_date as any).toDate()
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+                  bookingDate = new Date((booking.start_date as any).seconds * 1000)
+                } else {
+                  bookingDate = new Date(booking.start_date as any)
+                }
+              } catch (dateError) {
+                console.error("Error parsing booking date:", dateError)
+              }
+              return bookingDate && bookingDate.getMonth() === currentDate.getMonth() &&
                      bookingDate.getFullYear() === currentDate.getFullYear()
             }
             return false
@@ -508,8 +521,21 @@ export default function BusinessDevPlannerPage() {
 
           return filtered.filter((booking) => {
             if (booking.start_date) {
-              const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
-              return bookingDate >= weekStart && bookingDate <= weekEnd
+              let bookingDate: Date | null = null
+              try {
+                if (booking.start_date instanceof Date) {
+                  bookingDate = booking.start_date
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+                  bookingDate = (booking.start_date as any).toDate()
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+                  bookingDate = new Date((booking.start_date as any).seconds * 1000)
+                } else {
+                  bookingDate = new Date(booking.start_date as any)
+                }
+              } catch (dateError) {
+                console.error("Error parsing booking date:", dateError)
+              }
+              return bookingDate && bookingDate >= weekStart && bookingDate <= weekEnd
             }
             return false
           })
@@ -523,8 +549,21 @@ export default function BusinessDevPlannerPage() {
 
           return filtered.filter((booking) => {
             if (booking.start_date) {
-              const bookingDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date.seconds * 1000)
-              return bookingDate >= dayStart && bookingDate <= dayEnd
+              let bookingDate: Date | null = null
+              try {
+                if (booking.start_date instanceof Date) {
+                  bookingDate = booking.start_date
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+                  bookingDate = (booking.start_date as any).toDate()
+                } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+                  bookingDate = new Date((booking.start_date as any).seconds * 1000)
+                } else {
+                  bookingDate = new Date(booking.start_date as any)
+                }
+              } catch (dateError) {
+                console.error("Error parsing booking date:", dateError)
+              }
+              return bookingDate && bookingDate >= dayStart && bookingDate <= dayEnd
             }
             return false
           })
@@ -757,15 +796,22 @@ export default function BusinessDevPlannerPage() {
     const bookingsByDay: { [key: number]: Booking[] } = {}
     bookings.forEach((booking) => {
       if (booking.start_date) {
-        let bookingDate: Date
-        if (booking.start_date instanceof Date) {
-          bookingDate = booking.start_date
-        } else {
-          // Handle Timestamp
-          bookingDate = booking.start_date.toDate()
+        let bookingDate: Date | null = null
+        try {
+          if (booking.start_date instanceof Date) {
+            bookingDate = booking.start_date
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in (booking.start_date as any)) {
+            bookingDate = (booking.start_date as any).toDate()
+          } else if (booking.start_date && typeof booking.start_date === 'object' && 'seconds' in (booking.start_date as any)) {
+            bookingDate = new Date((booking.start_date as any).seconds * 1000)
+          } else {
+            bookingDate = new Date(booking.start_date as any)
+          }
+        } catch (dateError) {
+          console.error("Error parsing booking date:", dateError)
         }
 
-        if (bookingDate.getMonth() === month && bookingDate.getFullYear() === year) {
+        if (bookingDate && bookingDate.getMonth() === month && bookingDate.getFullYear() === year) {
           const day = bookingDate.getDate()
           if (!bookingsByDay[day]) bookingsByDay[day] = []
           bookingsByDay[day].push(booking)
