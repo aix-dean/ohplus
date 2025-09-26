@@ -806,8 +806,8 @@ interface Quotation {
 
   // Phone validation function
   const validatePhoneFormat = (phone: string): boolean => {
-    // Check if phone is exactly +63 followed by 9 digits (Philippines mobile format)
-    const phoneRegex = /^\+63\d{9}$/
+    // Check if phone is exactly +63 followed by 10 digits (Philippines mobile format)
+    const phoneRegex = /^\+63\d{10}$/
     return phoneRegex.test(phone.replace(/\s/g, ''))
   }
 
@@ -828,15 +828,15 @@ interface Quotation {
     if (!value.startsWith('+63')) {
       if (value && /^\d/.test(value)) {
         // If user types digits, add +63 prefix
-        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+        value = '+63' + value.replace(/\D/g, '').substring(0, 10)
       } else {
         // If empty or doesn't start with digits, set to +63
         value = '+63'
       }
     } else {
-      // If it starts with +63, ensure only digits after and limit to 9
+      // If it starts with +63, ensure only digits after and limit to 10
       const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
-      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+      value = '+63' + digitsAfterPrefix.substring(0, 10) // Limit to 10 digits
     }
 
     // Update form data
@@ -860,15 +860,15 @@ interface Quotation {
     if (!value.startsWith('+63')) {
       if (value && /^\d/.test(value)) {
         // If user types digits, add +63 prefix
-        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+        value = '+63' + value.replace(/\D/g, '').substring(0, 10)
       } else {
         // If empty or doesn't start with digits, set to +63
         value = '+63'
       }
     } else {
-      // If it starts with +63, ensure only digits after and limit to 9
+      // If it starts with +63, ensure only digits after and limit to 10
       const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
-      value = '+63' + digitsAfterPrefix.substring(0, 9) // Limit to 9 digits
+      value = '+63' + digitsAfterPrefix.substring(0, 10) // Limit to 10 digits
     }
 
     // Update form data
@@ -1447,14 +1447,14 @@ interface Quotation {
                    id="edit-phone"
                    value={editFormData.phone}
                    onChange={handleEditContactPhoneInput}
-                   placeholder="Enter 9 digits"
+                   placeholder="Enter 10 digits"
                    className={(editContactValidationErrors.phone || editContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
                  />
                  {editContactValidationErrors.phone && (
                    <p className="text-sm text-red-500">Phone number is required</p>
                  )}
                  {editContactValidationErrors.phoneFormat && !editContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                   <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
                  )}
                </div>
 
@@ -1571,14 +1571,14 @@ interface Quotation {
                    id="add-phone"
                    value={addContactFormData.phone}
                    onChange={handleAddContactPhoneInput}
-                   placeholder="Enter 9 digits"
+                   placeholder="Enter 10 digits"
                    className={(addContactValidationErrors.phone || addContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
                  />
                  {addContactValidationErrors.phone && (
                    <p className="text-sm text-red-500">Phone number is required</p>
                  )}
                  {addContactValidationErrors.phoneFormat && !addContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Please enter exactly 9 digits</p>
+                   <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
                  )}
                </div>
 
