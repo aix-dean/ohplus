@@ -111,7 +111,9 @@ export default function AllSitesTab({
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
           const allProducts: Product[] = []
           querySnapshot.forEach((doc) => {
-            allProducts.push(doc.data() as Product)
+            const product = doc.data() as Product
+            product.id = doc.id
+            allProducts.push(product)
           })
     
           // Filter by searchTerm

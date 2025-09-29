@@ -22,34 +22,34 @@ const isValidDate = (dateString: string | number | Date | undefined): boolean =>
 };
 
 export default function JobOrdersPage() {
-  const { user } = useAuth()
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+   const { user, userData } = useAuth()
+   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+   const [searchTerm, setSearchTerm] = useState("")
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState<string | null>(null)
 
-  const router = useRouter()
+   const router = useRouter()
 
-  useEffect(() => {
-    const fetchJOs = async () => {
-      if (!user?.uid) {
-        setError("User not authenticated.")
-        setLoading(false)
-        return
-      }
-      try {
-        setLoading(true)
-        const fetchedJOs = await getJobOrders(user.uid)
-        setJobOrders(fetchedJOs)
-      } catch (err) {
-        console.error("Failed to fetch job orders:", err)
-        setError("Failed to load job orders. Please try again.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchJOs()
-  }, [user?.uid])
+   useEffect(() => {
+     const fetchJOs = async () => {
+       if (!userData?.company_id) {
+         setError("Company ID not found. Please contact support.")
+         setLoading(false)
+         return
+       }
+       try {
+         setLoading(true)
+         const fetchedJOs = await getJobOrders(userData.company_id)
+         setJobOrders(fetchedJOs)
+       } catch (err) {
+         console.error("Failed to fetch job orders:", err)
+         setError("Failed to load job orders. Please try again.")
+       } finally {
+         setLoading(false)
+       }
+     }
+     fetchJOs()
+   }, [userData?.company_id])
 
   const filteredJobOrders = useMemo(() => {
     if (!searchTerm) {
