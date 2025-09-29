@@ -858,13 +858,13 @@ export default function ProposalDetailsPage() {
 
   const getPageTitle = (pageContent: any[]): string => {
     if (!pageContent || pageContent.length === 0) {
-      return "Company Name"
+      return "N/A"
     }
 
     const siteCodes = pageContent.map((product) => product.site_code).filter(Boolean)
 
     if (siteCodes.length === 0) {
-      return "Company Name"
+      return "N/A"
     }
 
     if (siteCodes.length === 1) {
@@ -1504,7 +1504,7 @@ export default function ProposalDetailsPage() {
                                   <img
                                     src={product.media[0].url || "/placeholder.svg"}
                                     alt={product.name || "Product image"}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full"
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
