@@ -60,7 +60,11 @@ export async function POST(request: Request) {
     let apiKey: string | undefined
     let finalIndexName: string | undefined
 
-    if (indexName === 'service_assignments') {
+    if (indexName === 'products') {
+      appId = 'DHRR76C4T7'
+      apiKey = '67f06e32aa15542a1f9f118cb647d33a'
+      finalIndexName = 'products'
+    } else if (indexName === 'service_assignments') {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID
       apiKey = process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
       finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME
@@ -120,7 +124,10 @@ export async function POST(request: Request) {
     let attributesToRetrieve = "name,type,location,price,site_code,image_url,category,seller_id"
     let attributesToHighlight = "name,location"
 
-    if (indexName === 'service_assignments') {
+    if (indexName === 'products') {
+      attributesToRetrieve = "name,type,location,price,site_code,category,seller_id,media,specs_rental,description"
+      attributesToHighlight = "name,location,description"
+    } else if (indexName === 'service_assignments') {
       attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
       attributesToHighlight = "saNumber,projectSiteName,serviceType"
     } else if (indexName === 'cost_estimates') {
