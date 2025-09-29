@@ -419,6 +419,38 @@ export async function getUserProducts(userId: string): Promise<Product[]> {
   }
 }
 
+// Get all products for a user with real-time updates
+export function getUserProductsRealtime(
+  userId: string,
+  callback: (products: Product[]) => void,
+): () => void {
+  const productsRef = collection(db, "products")
+  const q = query(
+    productsRef,
+    where("company_id", "==", userId),
+    where("active", "==", true),
+    orderBy("created", "desc")
+  )
+
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const products: Product[] = []
+      querySnapshot.forEach((doc) => {
+        products.push({ id: doc.id, ...doc.data() } as Product)
+      })
+      callback(products)
+    } catch (error) {
+      console.error("Error processing real-time product updates:", error)
+      callback([])
+    }
+  }, (error) => {
+    console.error("Error in real-time products listener:", error)
+    callback([])
+  })
+
+  return unsubscribe
+}
+
 // Get paginated products for a user
 export async function getPaginatedUserProducts(
   userId: string,

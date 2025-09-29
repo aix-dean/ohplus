@@ -9,10 +9,16 @@ export interface SearchResult {
   image_url?: string
   category?: string
   seller_id?: string
-  media?: any
+  media?: Array<{
+    url: string
+    distance: string
+    type: string
+    isVideo: boolean
+  }>
   specs_rental?: any
+  description?: string
   _highlightResult?: any
- 
+
 }
 
 // Define the search response interface
@@ -32,10 +38,10 @@ export interface SearchResponse {
 export async function searchProducts(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10): Promise<SearchResponse> {
   try {
     // Log the search attempt
-    console.log(`Searching for: "${query}"${companyId ? ` with user filter: ${companyId}` : ""}`)
+    console.log(`Searching products for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
 
     // Create the request body
-    const requestBody: any = { query, indexName: 'booking', page, hitsPerPage }
+    const requestBody: any = { query, indexName: 'products', page, hitsPerPage }
 
     // Only add filters if companyId is provided
     if (companyId) {
