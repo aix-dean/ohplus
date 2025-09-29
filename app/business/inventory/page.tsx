@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight, Search, List, Grid3X3, Upload, Edit, Trash2 } from "lucide-react"
+import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight, Search, List, Grid3X3, Upload, Edit, Trash2, X } from "lucide-react"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, createProduct, uploadFileToFirebaseStorage, getUserProductsRealtime, type Product } from "@/lib/firebase-service"
 import { searchProducts, type SearchResult } from "@/lib/algolia-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
@@ -173,19 +173,21 @@ export default function BusinessInventoryPage() {
 
   // Handle search query - use Algolia for search, fallback to client-side filtering
   useEffect(() => {
-    const performSearch = async () => {
-      if (!searchQuery.trim()) {
-        setFilteredProducts(allProducts)
-        setSearchResults([])
-        setIsSearching(false)
-        return
-      }
+    const trimmedQuery = searchQuery.trim()
 
+    if (!trimmedQuery) {
+      setFilteredProducts(allProducts)
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+
+    const performSearch = async () => {
       setIsSearching(true)
       try {
         // Use Algolia search
         const searchResponse = await searchProducts(
-          searchQuery,
+          trimmedQuery,
           userData?.company_id || undefined,
           0, // page
           1000 // large number to get all results for client-side pagination
@@ -217,7 +219,7 @@ export default function BusinessInventoryPage() {
         } else {
           // Fallback to client-side filtering if Algolia fails
           console.log("Algolia search failed, falling back to client-side filtering")
-          const searchLower = searchQuery.toLowerCase()
+          const searchLower = trimmedQuery.toLowerCase()
           const filtered = allProducts.filter((product) =>
             product.name?.toLowerCase().includes(searchLower) ||
             product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
@@ -229,7 +231,7 @@ export default function BusinessInventoryPage() {
       } catch (error) {
         console.error("Search error:", error)
         // Fallback to client-side filtering
-        const searchLower = searchQuery.toLowerCase()
+        const searchLower = trimmedQuery.toLowerCase()
         const filtered = allProducts.filter((product) =>
           product.name?.toLowerCase().includes(searchLower) ||
           product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
@@ -879,10 +881,18 @@ export default function BusinessInventoryPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4" />
               <Input
                 placeholder="Search products..."
-                className="pl-10 w-80 bg-white border-[#d9d9d9]"
+                className="pl-10 pr-10 w-80 bg-white border-[#d9d9d9]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && !isSearching && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] hover:text-gray-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
               {isSearching && (
                 <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4 animate-spin" />
               )}
