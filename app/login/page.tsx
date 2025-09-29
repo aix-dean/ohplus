@@ -653,6 +653,8 @@ export default function LoginPage() {
       }
     } else {
       console.log('No .lic file found in dropped files')
+      setError("Please upload a valid .lic activation key file.")
+      toast({ title: "Invalid File Type", description: "Please upload a valid .lic activation key file.", variant: "destructive" })
     }
   }, [])
 
@@ -737,7 +739,8 @@ export default function LoginPage() {
         }
       } else {
         console.log('File does not end with .lic')
-        setError('Please select a .lic file')
+        setError("Please upload a valid .lic activation key file.")
+        toast({ title: "Invalid File Type", description: "Please upload a valid .lic activation key file.", variant: "destructive" })
       }
     } else {
       console.log('No files selected')
