@@ -973,12 +973,11 @@ export default function BusinessInventoryPage() {
             <div className="bg-white border border-[#d9d9d9] rounded-lg overflow-hidden">
               {/* List Header */}
               <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-                <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+                <div className="grid grid-cols-10 gap-4 text-sm font-medium text-gray-700">
                   <div className="col-span-4">Site Details</div>
                   <div className="col-span-2">Type</div>
                   <div className="col-span-2">Location</div>
                   <div className="col-span-2">Price</div>
-                  <div className="col-span-2">Actions</div>
                 </div>
               </div>
 
@@ -987,7 +986,7 @@ export default function BusinessInventoryPage() {
                 {loading && allProducts.length === 0
                   ? Array.from({ length: 8 }).map((_, index) => (
                       <div key={`shimmer-list-${index}`} className="px-6 py-4">
-                        <div className="grid grid-cols-12 gap-4 items-center">
+                        <div className="grid grid-cols-10 gap-4 items-center">
                           <div className="col-span-4 flex items-center space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded animate-pulse" />
                             <div className="space-y-2">
@@ -1004,10 +1003,6 @@ export default function BusinessInventoryPage() {
                           <div className="col-span-2">
                             <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
                           </div>
-                          <div className="col-span-2 flex space-x-2">
-                            <div className="w-8 h-8 bg-gray-200 rounded animate-pulse" />
-                            <div className="w-8 h-8 bg-gray-200 rounded animate-pulse" />
-                          </div>
                         </div>
                       </div>
                     ))
@@ -1017,7 +1012,7 @@ export default function BusinessInventoryPage() {
                           className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
                           onClick={() => product.id && handleViewDetails(product.id)}
                         >
-                        <div className="grid grid-cols-12 gap-4 items-center">
+                        <div className="grid grid-cols-10 gap-4 items-center">
                           {/* Site Details */}
                           <div className="col-span-4 flex items-center space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
@@ -1066,32 +1061,6 @@ export default function BusinessInventoryPage() {
                             <span className="text-sm font-medium text-green-700">
                               ₱{Number(product.price).toLocaleString()}
                             </span>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="col-span-2 flex items-center space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEditClick(product, e)
-                              }}
-                              className="h-8 w-8 p-0 hover:bg-blue-50"
-                            >
-                              <Edit size={16} className="text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteClick(product, e)
-                              }}
-                              className="h-8 w-8 p-0 hover:bg-red-50"
-                            >
-                              <Trash2 size={16} className="text-red-600" />
-                            </Button>
                           </div>
                         </div>
                       </div>
