@@ -111,4 +111,5 @@ export interface Quotation {
   signature_position?: string // Position of the person signing the quotation
   signature_name?: string // Name of the person signing the quotation
   size?: string // Size specification
+  costEstimateNumber?: string // Reference to the source cost estimate number
 }
