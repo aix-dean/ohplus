@@ -1201,7 +1201,7 @@ function SalesDashboardContent() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-3xl font-bold text-gray-900">← Create Proposal</h2>
+            <h2 className="text-[30px] font-bold text-gray-900">← Create Proposal</h2>
           </div>
         </div>
       )}
@@ -1336,95 +1336,99 @@ function SalesDashboardContent() {
                 </div>
               )}
 
-              {/* Search Bar - Visible when proposalCreationMode OR ceQuoteMode is active */}
+              {/* Search and Client Selection - Side by side layout */}
               {(proposalCreationMode || ceQuoteMode) && (
                 <div className="flex items-center gap-4 mt-4 mb-4">
-                  <span className="text-xl font-medium text-gray-900">Search:</span>
-                  <div className="relative flex-1 max-w-md">
-                    <Input
-                      placeholder="Search sites..."
-                      value=""
-                      onChange={() => {}}
-                      className="h-9 text-sm border-gray-400"
-                      aria-label="Search sites"
-                    />
+                  {/* Search Bar */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-medium text-gray-900">Search:</span>
+                    <div className="relative w-[311px]">
+                      <Input
+                        placeholder="Search"
+                        value=""
+                        onChange={() => {}}
+                        className="h-[39px] text-sm border-gray-400 rounded-[10px]"
+                        aria-label="Search sites"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
-              {(proposalCreationMode || ceQuoteMode) && (
-                <div className="relative w-full max-w-xs mt-2 mb-2" ref={clientSearchRef}>
-                  <div className="relative">
-                    <Input
-                      placeholder="Search or select client..."
-                      value={
-                        selectedClientForProposal
-                          ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
-                          : dashboardClientSearchTerm
-                      }
-                      onChange={(e) => {
-                        setDashboardClientSearchTerm(e.target.value)
-                        setSelectedClientForProposal(null)
-                      }}
-                      onFocus={() => {
-                        setIsClientDropdownOpen(true)
-                        if (selectedClientForProposal) {
-                          setDashboardClientSearchTerm("")
-                        }
-                      }}
-                      className={cn(
-                        "pr-10 h-9 text-sm",
-                        (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
-                      )}
-                    />
-                    {isSearchingDashboardClients && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
-                    )}
-                  </div>
-                  {/* Results dropdown */}
-                  {isClientDropdownOpen && (
-                    <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
-                      <div className="max-h-[200px] overflow-y-auto">
-                        <div className="p-2">
-                          {/* Always show "Add New Client" option at the top */}
-                          <div
-                            className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                            onClick={() => setIsNewClientDialogOpen(true)}
-                          >
-                            <PlusCircle className="h-4 w-4 text-blue-500" />
-                            <span className="font-medium text-blue-700">Add New Client</span>
-                          </div>
-
-                          {dashboardClientSearchResults.length > 0 ? (
-                            dashboardClientSearchResults.map((result) => (
-                              <div
-                                key={result.id}
-                                className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                                onClick={() => handleClientSelectOnDashboard(result)}
-                              >
-                                <div>
-                                  <p className="font-medium">
-                                    {result.name} ({result.company})
-                                  </p>
-                                  <p className="text-xs text-gray-500">{result.email}</p>
-                                </div>
-                                {selectedClientForProposal?.id === result.id && (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-gray-500 text-center py-2">
-                              {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                                ? `No clients found for "${dashboardClientSearchTerm}".`
-                                : "Start typing to search for clients."}
-                            </p>
+                  {/* Client Selection */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-medium text-gray-900">Client:</span>
+                    <div className="relative w-[311px]" ref={clientSearchRef}>
+                      <div className="relative">
+                        <Input
+                          placeholder="Select client"
+                          value={
+                            selectedClientForProposal
+                              ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
+                              : dashboardClientSearchTerm
+                          }
+                          onChange={(e) => {
+                            setDashboardClientSearchTerm(e.target.value)
+                            setSelectedClientForProposal(null)
+                          }}
+                          onFocus={() => {
+                            setIsClientDropdownOpen(true)
+                            if (selectedClientForProposal) {
+                              setDashboardClientSearchTerm("")
+                            }
+                          }}
+                          className={cn(
+                            "h-[39px] pr-10 text-sm rounded-[10px] border-gray-400",
+                            (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
                           )}
-                        </div>
+                        />
+                        {isSearchingDashboardClients && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                        )}
                       </div>
-                    </Card>
-                  )}
+                      {/* Results dropdown */}
+                      {isClientDropdownOpen && (
+                        <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
+                          <div className="max-h-[200px] overflow-y-auto">
+                            <div className="p-2">
+                              {/* Always show "Add New Client" option at the top */}
+                              <div
+                                className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                                onClick={() => setIsNewClientDialogOpen(true)}
+                              >
+                                <PlusCircle className="h-4 w-4 text-blue-500" />
+                                <span className="font-medium text-blue-700">Add New Client</span>
+                              </div>
+
+                              {dashboardClientSearchResults.length > 0 ? (
+                                dashboardClientSearchResults.map((result) => (
+                                  <div
+                                    key={result.id}
+                                    className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                                    onClick={() => handleClientSelectOnDashboard(result)}
+                                  >
+                                    <div>
+                                      <p className="font-medium">
+                                        {result.name} ({result.company})
+                                      </p>
+                                      <p className="text-xs text-gray-500">{result.email}</p>
+                                    </div>
+                                    {selectedClientForProposal?.id === result.id && (
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-sm text-gray-500 text-center py-2">
+                                  {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                                    ? `No clients found for "${dashboardClientSearchTerm}".`
+                                    : "Start typing to search for clients."}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1645,7 +1649,7 @@ function SalesDashboardContent() {
                       <ResponsiveCardGrid
                         mobileColumns={1}
                         tabletColumns={2}
-                        desktopColumns={3}
+                        desktopColumns={4}
                         gap="lg"
                       >
                         {products.map((product) => (
@@ -1869,13 +1873,13 @@ function SalesDashboardContent() {
         {/* Next Button - Fixed position when in proposal mode */}
         {proposalCreationMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-white rounded-full px-6 py-3 shadow-lg border border-gray-200">
+            <div className="bg-white rounded-[50px] w-[440px] h-[112px] shadow-lg border border-gray-200 flex flex-col items-center justify-center">
               <Button
                 onClick={handleConfirmProposalCreation}
                 disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-                className={`gap-2 text-3xl font-bold transition-all duration-200 ${
+                className={`w-[175px] h-[61px] text-[30px] font-bold transition-all duration-200 ${
                   selectedClientForProposal && selectedProducts.length > 0
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
                     : "bg-gray-400 text-gray-600 cursor-not-allowed"
                 }`}
                 aria-label={`Create proposal with ${selectedProducts.length} selected sites`}
@@ -1891,7 +1895,7 @@ function SalesDashboardContent() {
                   </>
                 )}
               </Button>
-              <div className="text-center mt-2 text-gray-900 font-medium">
+              <div className="text-center text-gray-900 font-medium">
                 ({selectedProducts.length}) selected
               </div>
             </div>
