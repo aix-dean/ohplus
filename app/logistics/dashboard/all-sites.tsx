@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import type { Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 
 // Direct Firebase imports for job order fetching
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Number of items to display per page
@@ -45,13 +45,9 @@ export default function AllSitesTab({
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
   const [pageCache, setPageCache] = useState<
     Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
   >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
 
   // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -64,147 +60,97 @@ export default function AllSitesTab({
     name: string
   }>({ id: "", name: "" })
 
-  // Simplified direct job order fetching function
-  const fetchJobOrderCountsDirectly = useCallback(async () => {
-    if (!userData?.company_id) {
-      console.log("No company_id available")
-      return
-    }
 
-    try {
-      const counts: Record<string, number> = {}
 
-      // Get all product IDs from current products
-      const productIds = products.map((p) => p.id).filter(Boolean)
 
-      if (productIds.length === 0) {
-        console.log("No products available to fetch job orders for")
-        setJobOrderCounts({})
-        return
-      }
 
-      // Query job orders collection directly
-      const jobOrdersRef = collection(db, "job_orders")
-      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
-      const querySnapshot = await getDocs(q)
 
-      // Count job orders for each product, but only for existing products
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        const productId = data.product_id
-        if (productId && productIds.includes(productId)) {
-          counts[productId] = (counts[productId] || 0) + 1
-        }
-      })
-
-      setJobOrderCounts(counts)
-    } catch (error) {
-      console.error("Error fetching job orders directly:", error)
-      setJobOrderCounts({})
-    }
-  }, [userData?.company_id, products])
-
-  // Fetch total count of products
-  const fetchTotalCount = useCallback(async () => {
-    if (!userData?.company_id) return
-
-    setLoadingCount(true)
-    try {
-      const count = await getUserProductsCount(userData?.company_id, {
-        active: true,
-        searchTerm: searchQuery,
-      })
-
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
-    } catch (error) {
-      console.error("Error fetching total count:", error)
-    } finally {
-      setLoadingCount(false)
-    }
-  }, [userData?.company_id, searchQuery])
-
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number, forceRefresh = false) => {
-      if (!userData?.company_id) return
-
-      // Check if we have this page in cache and not forcing refresh
-      if (!forceRefresh && pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
-          active: true,
-          searchTerm: searchQuery,
-        })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        setError("Failed to load sites. Please try again.")
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [userData?.company_id, lastDoc, pageCache, searchQuery],
-  )
 
   // Reset pagination when search or filter changes
-  useEffect(() => {
-    setCurrentPage(1)
-    setPageCache(new Map())
-    fetchTotalCount()
-    fetchProducts(1, true)
-  }, [searchQuery, contentTypeFilter])
-
-  // Load initial data and count
-  useEffect(() => {
-    if (userData?.company_id) {
-      fetchProducts(1)
-      fetchTotalCount()
-      fetchJobOrderCountsDirectly()
-    }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCountsDirectly])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (currentPage > 0 && userData?.company_id) {
-      fetchProducts(currentPage)
-    }
-  }, [currentPage, fetchProducts, userData?.company_id])
-
+    useEffect(() => {
+      setCurrentPage(1)
+      setPageCache(new Map())
+    }, [searchQuery, contentTypeFilter])
+  
   // Debug effect to log JO counts when they change
-  useEffect(() => {
-    Object.entries(jobOrderCounts).forEach(([productId, count]) => {
-      console.log(`Product ${productId}: ${count} JOs`)
-    })
-  }, [jobOrderCounts])
+    useEffect(() => {
+      Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+        console.log(`Product ${productId}: ${count} JOs`)
+      })
+    }, [jobOrderCounts])
+  
+    // Real-time job orders listener
+      useEffect(() => {
+        if (!userData?.company_id) return
+    
+        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id))
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const counts: Record<string, number> = {}
+          const productIds = products.map(p => p.id).filter(Boolean)
+    
+          querySnapshot.forEach((doc) => {
+            const data = doc.data()
+            const productId = data.product_id
+            if (productId && productIds.includes(productId)) {
+              counts[productId] = (counts[productId] || 0) + 1
+            }
+          })
+    
+          setJobOrderCounts(counts)
+        })
+    
+        return unsubscribe
+      }, [userData?.company_id, products])
+    
+      // Real-time products listener
+      useEffect(() => {
+        if (!userData?.company_id) return
+    
+        setLoading(true)
+        const q = query(collection(db, "products"), where("company_id", "==", userData.company_id), where("active", "==", true))
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const allProducts: Product[] = []
+          querySnapshot.forEach((doc) => {
+            const product = doc.data() as Product
+            product.id = doc.id
+            allProducts.push(product)
+          })
+    
+          // Filter by searchTerm
+          let filtered = allProducts
+          if (searchQuery) {
+            filtered = allProducts.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+          }
+    
+          // Filter by contentTypeFilter
+          if (contentTypeFilter !== "All") {
+            filtered = filtered.filter((product) => {
+              if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
+              else if (contentTypeFilter === "Dynamic") return product.content_type === "Dynamic" || product.content_type === "dynamic"
+              return true
+            })
+          }
+    
+          setTotalItems(filtered.length)
+          setTotalPages(Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)))
+    
+          // Slice for current page
+          const start = (currentPage - 1) * ITEMS_PER_PAGE
+          const end = start + ITEMS_PER_PAGE
+          const sliced = filtered.slice(start, end)
+          setProducts(sliced)
+    
+          setPageCache(new Map()) // clear cache
+          setLoading(false)
+          setError(null)
+        }, (error) => {
+          console.error("Error listening to products:", error)
+          setError("Failed to load sites. Please try again.")
+          setLoading(false)
+        })
+    
+        return unsubscribe
+      }, [userData?.company_id, searchQuery, contentTypeFilter, currentPage])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -373,7 +319,7 @@ export default function AllSitesTab({
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </div>
@@ -434,30 +380,14 @@ export default function AllSitesTab({
         </>
       )}
 
-      {/* Loading More Indicator */}
-      {loadingMore && (
-        <div className="flex justify-center my-4">
-          <div className="flex items-center gap-2">
-            <Loader2 size={18} className="animate-spin" />
-            <span>Loading more...</span>
-          </div>
-        </div>
-      )}
 
       {/* Pagination Controls */}
       {!loading && !error && filteredProducts.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
           <div className="text-sm text-gray-500 flex items-center">
-            {loadingCount ? (
-              <div className="flex items-center">
-                <Loader2 size={14} className="animate-spin mr-2" />
-                <span>Calculating pages...</span>
-              </div>
-            ) : (
-              <span>
-                Page {currentPage} of {totalPages} ({totalItems} items)
-              </span>
-            )}
+            <span>
+              Page {currentPage} of {totalPages} ({totalItems} items)
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
