@@ -1255,6 +1255,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Company", href: "/admin/company", icon: Users },
+                  { title: "Clients", href: "/admin/clients", icon: Users },
                   { title: "Assets", href: "/admin/assets", icon: Package },
                   { title: "Petty Cash", href: "/admin/petty-cash", icon: DollarSign },
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
