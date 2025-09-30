@@ -1191,18 +1191,16 @@ function SalesDashboardContent() {
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {proposalCreationMode && (
-        <div className="flex items-center justify-between p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelProposalCreationMode}
-              className="p-1 hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h2 className="text-[30px] font-bold text-gray-900">← Create Proposal</h2>
-          </div>
+        <div className="flex items-center justify-center p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0 relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancelProposalCreationMode}
+            className="absolute left-4 p-1 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-[30px] font-bold text-[#333333]">← Create Proposal</h2>
         </div>
       )}
 
