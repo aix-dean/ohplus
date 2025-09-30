@@ -1201,15 +1201,8 @@ function SalesDashboardContent() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-lg font-semibold text-gray-900">Select Sites</h2>
+            <h2 className="text-3xl font-bold text-gray-900">← Create Proposal</h2>
           </div>
-          <Button
-            size="sm"
-            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md"
-            onClick={() => setIsCollabPartnerDialogOpen(true)}
-          >
-            + Collab
-          </Button>
         </div>
       )}
 
@@ -1343,6 +1336,22 @@ function SalesDashboardContent() {
                 </div>
               )}
 
+              {/* Search Bar - Visible when proposalCreationMode OR ceQuoteMode is active */}
+              {(proposalCreationMode || ceQuoteMode) && (
+                <div className="flex items-center gap-4 mt-4 mb-4">
+                  <span className="text-xl font-medium text-gray-900">Search:</span>
+                  <div className="relative flex-1 max-w-md">
+                    <Input
+                      placeholder="Search sites..."
+                      value=""
+                      onChange={() => {}}
+                      className="h-9 text-sm border-gray-400"
+                      aria-label="Search sites"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
               {(proposalCreationMode || ceQuoteMode) && (
                 <div className="relative w-full max-w-xs mt-2 mb-2" ref={clientSearchRef}>
@@ -1416,6 +1425,28 @@ function SalesDashboardContent() {
                       </div>
                     </Card>
                   )}
+                </div>
+              )}
+
+              {/* Static/Digital Toggle Buttons - Visible when proposalCreationMode OR ceQuoteMode is active */}
+              {(proposalCreationMode || ceQuoteMode) && (
+                <div className="flex items-center gap-4 mt-4 mb-4">
+                  <Button
+                    variant="default"
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold"
+                    aria-label="Select static display type"
+                    aria-pressed={true}
+                  >
+                    Static
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-gray-400 text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md font-medium"
+                    aria-label="Select digital display type"
+                    aria-pressed={false}
+                  >
+                    Digital
+                  </Button>
                 </div>
               )}
 
@@ -1614,7 +1645,7 @@ function SalesDashboardContent() {
                       <ResponsiveCardGrid
                         mobileColumns={1}
                         tabletColumns={2}
-                        desktopColumns={4}
+                        desktopColumns={3}
                         gap="lg"
                       >
                         {products.map((product) => (
@@ -1835,27 +1866,35 @@ function SalesDashboardContent() {
           </div>
         )}
 
-        {/* Create Proposal Button - Fixed position when in proposal mode */}
+        {/* Next Button - Fixed position when in proposal mode */}
         {proposalCreationMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <Button
-              onClick={handleConfirmProposalCreation}
-              disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-              className={`px-8 py-3 text-lg font-semibold transition-all duration-200 ${
-                selectedClientForProposal && selectedProducts.length > 0
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-gray-400 text-gray-600 cursor-not-allowed"
-              }`}
-            >
-              {isCreatingProposal ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Proposal"
-              )}
-            </Button>
+            <div className="bg-white rounded-full px-6 py-3 shadow-lg border border-gray-200">
+              <Button
+                onClick={handleConfirmProposalCreation}
+                disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+                className={`gap-2 text-3xl font-bold transition-all duration-200 ${
+                  selectedClientForProposal && selectedProducts.length > 0
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                }`}
+                aria-label={`Create proposal with ${selectedProducts.length} selected sites`}
+              >
+                {isCreatingProposal ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Next →
+                  </>
+                )}
+              </Button>
+              <div className="text-center mt-2 text-gray-900 font-medium">
+                ({selectedProducts.length}) selected
+              </div>
+            </div>
           </div>
         )}
 
@@ -2060,13 +2099,13 @@ function ProductCard({
   return (
     <div
       className={cn(
-        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
-        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
-        selectionMode ? "hover:border-green-300 mr-2" : "",
+        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
+        isSelected ? "border-green-500" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
-      <div className="h-48 bg-gray-200 relative">
+      <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
         <Image
           src={thumbnailUrl || "/placeholder.svg"}
           alt={product.name || "Product image"}
@@ -2081,7 +2120,7 @@ function ProductCard({
 
         {/* Selection indicator */}
         {selectionMode && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-3 left-3 z-10">
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
@@ -2092,38 +2131,33 @@ function ProductCard({
             </div>
           </div>
         )}
+
+        {/* Site Photo label */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-lg font-semibold text-black bg-white bg-opacity-80 px-3 py-1 rounded-md">
+            Site Photo
+          </span>
+        </div>
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+      <div className="p-4">
+        <div className="space-y-2">
+          <div className="text-sm text-gray-500 font-medium">Site Code</div>
+          <div className="text-sm text-black font-medium">{siteCode || "N/A"}</div>
 
-          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+          <div className="text-sm text-black font-medium">Site Name</div>
+          <div className="text-sm text-black font-medium line-clamp-1">{product.name}</div>
 
-          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-          <div className="mt-1 text-xs text-gray-500 flex items-center">
+          <div className="text-sm text-black font-medium">Location</div>
+          <div className="text-sm text-black font-medium flex items-center">
             <MapPin size={12} className="mr-1 flex-shrink-0" />
             <span className="truncate">{location}</span>
           </div>
 
-          {/* Create Report Button */}
-          {!selectionMode && (
-            <div className="mt-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onCreateReport(e)
-                }}
-                className="w-full text-xs"
-              >
-                Create Report
-              </Button>
-            </div>
-          )}
+          <div className="text-sm text-black font-medium">PRICE</div>
+          <div className="text-sm font-medium text-green-700">{formattedPrice}</div>
         </div>
-      </CardContent>
+      </div>
     </div>
   )
 }
