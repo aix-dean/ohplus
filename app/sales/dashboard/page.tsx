@@ -1873,11 +1873,11 @@ function SalesDashboardContent() {
         {/* Next Button - Fixed position when in proposal mode */}
         {proposalCreationMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-white rounded-[50px] w-[440px] h-[112px] shadow-lg border border-gray-200 flex flex-col items-center justify-center">
+            <div className="bg-white rounded-[50px] w-[440px] h-[112px] shadow-lg border border-gray-200 relative">
               <Button
                 onClick={handleConfirmProposalCreation}
                 disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-                className={`w-[175px] h-[61px] text-[30px] font-bold transition-all duration-200 ${
+                className={`absolute left-[238px] top-[25px] w-[175px] h-[61px] text-[30px] font-bold rounded-[15px] transition-all duration-200 ${
                   selectedClientForProposal && selectedProducts.length > 0
                     ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
                     : "bg-gray-400 text-gray-600 cursor-not-allowed"
@@ -1895,7 +1895,7 @@ function SalesDashboardContent() {
                   </>
                 )}
               </Button>
-              <div className="text-center text-gray-900 font-medium">
+              <div className="absolute left-[123px] top-[86px] text-[20px] font-semibold text-gray-900 text-center w-[160px]">
                 ({selectedProducts.length}) selected
               </div>
             </div>
