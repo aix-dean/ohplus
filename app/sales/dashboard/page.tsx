@@ -1873,15 +1873,15 @@ function SalesDashboardContent() {
         {/* Next Button - Fixed position when in proposal mode */}
         {proposalCreationMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 min-w-[300px] max-w-[400px]">
-              <div className="flex flex-col items-center gap-2">
-                <div className="text-sm font-medium text-gray-600">
+            <div className="bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 min-w-[350px] max-w-[450px]">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm font-medium text-gray-600 flex-shrink-0">
                   {selectedProducts.length} site{selectedProducts.length !== 1 ? 's' : ''} selected
                 </div>
                 <Button
                   onClick={handleConfirmProposalCreation}
                   disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-                  className={`w-full h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
+                  className={`flex-1 h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
                     selectedClientForProposal && selectedProducts.length > 0
                       ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
                       : "bg-gray-400 text-gray-600 cursor-not-allowed"
