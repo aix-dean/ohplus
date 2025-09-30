@@ -1873,30 +1873,32 @@ function SalesDashboardContent() {
         {/* Next Button - Fixed position when in proposal mode */}
         {proposalCreationMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-white rounded-[50px] w-[440px] h-[112px] shadow-lg border border-gray-200 relative">
-              <Button
-                onClick={handleConfirmProposalCreation}
-                disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-                className={`absolute left-[238px] top-[26px] w-[175px] h-[61px] rounded-[15px] transition-all duration-200 ${
-                  selectedClientForProposal && selectedProducts.length > 0
-                    ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
-                    : "bg-gray-400 text-gray-600 cursor-not-allowed"
-                }`}
-                aria-label={`Create proposal with ${selectedProducts.length} selected sites`}
-              >
-                <span className="text-[30px] font-bold">
+            <div className="bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 min-w-[300px] max-w-[400px]">
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-sm font-medium text-gray-600">
+                  {selectedProducts.length} site{selectedProducts.length !== 1 ? 's' : ''} selected
+                </div>
+                <Button
+                  onClick={handleConfirmProposalCreation}
+                  disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+                  className={`w-full h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
+                    selectedClientForProposal && selectedProducts.length > 0
+                      ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
+                      : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                  }`}
+                  aria-label={`Create proposal with ${selectedProducts.length} selected sites`}
+                >
                   {isCreatingProposal ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin inline" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating...
                     </>
                   ) : (
-                    "Next →"
+                    <>
+                      Next →
+                    </>
                   )}
-                </span>
-              </Button>
-              <div className="absolute left-[123px] top-[48px] text-[20px] font-semibold text-gray-900 text-center w-[160px]">
-                ({selectedProducts.length}) selected
+                </Button>
               </div>
             </div>
           </div>
