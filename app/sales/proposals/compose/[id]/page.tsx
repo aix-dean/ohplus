@@ -869,7 +869,7 @@ ${contactDetails}`,
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex items-center space-x-4 mb-6">
           <Button
@@ -881,51 +881,50 @@ ${contactDetails}`,
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Compose Email</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Compose email</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-           <div className="lg:col-span-3">
-             <Card>
-               <CardContent className="p-6">
-                 <div className="space-y-4">
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
+        <div className="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
+           <div className="flex-1">
+             <div className="space-y-4">
+                   <div className="flex items-center space-x-4">
+                     <label className="text-lg font-medium text-gray-900 w-20">To:</label>
                      <Input
                        value={emailData.to}
                        onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
                        placeholder="Enter recipient email"
-                       className="w-full"
+                       className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
                      />
                    </div>
 
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
+                   <div className="flex items-center space-x-4">
+                     <label className="text-lg font-medium text-gray-900 w-20">CC:</label>
                      <Input
                        value={emailData.cc}
                        onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
                        placeholder="Enter CC email"
-                       className="w-full"
+                       className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
                      />
                    </div>
 
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">Reply-To:</label>
+                   <div className="flex items-center space-x-4">
+                     <label className="text-lg font-medium text-gray-900 w-20">Reply-To:</label>
                      <Input
                        value={emailData.replyTo}
                        onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
                        placeholder="Enter reply-to email"
-                       className="w-full"
+                       className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
                      />
                    </div>
 
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+
+                   <div className="flex items-center space-x-4">
+                     <label className="text-lg font-medium text-gray-900 w-20">Subject:</label>
                      <Input
                        value={emailData.subject}
                        onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
                        placeholder="Enter email subject"
-                       className="w-full"
+                       className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
                      />
                    </div>
 
@@ -934,7 +933,7 @@ ${contactDetails}`,
                        value={emailData.message}
                        onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
                        placeholder="Enter your message"
-                       className="w-full min-h-[200px] resize-none"
+                       className="bg-white rounded-[10px] border-2 border-[#c4c4c4] w-full h-[543px] resize-none"
                      />
                    </div>
 
@@ -994,25 +993,15 @@ ${contactDetails}`,
                      </div>
 
                      <div className="mt-4">
-                       <Button
-                         onClick={handleAddAttachment}
-                         variant="outline"
-                         className="w-full bg-white hover:bg-gray-50 border-gray-200 hover:border-blue-300"
-                       >
-                         <Upload className="h-4 w-4 mr-2" />
-                         Add File
-                       </Button>
+                       <button onClick={handleAddAttachment} className="text-[#2d3fff] underline text-lg font-medium">+Add attachment</button>
                      </div>
                    </div>
                  </div>
-               </CardContent>
-             </Card>
            </div>
 
-           <div className="lg:col-span-1">
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-medium text-gray-900 mb-4">Templates:</h3>
+           <div className="w-[346px]">
+            <div className="bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
+              <h3 className="font-semibold text-lg text-black mb-4">Templates</h3>
                 {templatesLoading ? (
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
@@ -1026,56 +1015,51 @@ ${contactDetails}`,
                 ) : (
                   <div className="space-y-2">
                     {templates.map((template) => (
-                      <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div key={template.id} className="bg-[#c4c4c4] bg-opacity-20 h-[56px] rounded-[10px] flex items-center justify-between px-4">
                         <span
-                          className="text-sm text-gray-700 cursor-pointer"
+                          className="text-lg font-medium text-gray-900 cursor-pointer"
                           onClick={() => handleTemplateAction(template.id!, "copy")}
                           title="Apply template"
                         >
                           {template.name}
                         </span>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-2">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleTemplateAction(template.id!, "edit")}
-                            className="h-6 w-6 p-0"
-                            title="Edit template"
+                            className="p-0"
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="h-6 w-6 opacity-50" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleTemplateAction(template.id!, "delete")}
-                            className="h-6 w-6 p-0"
-                            title="Delete template"
+                            className="p-0"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-6 w-6 opacity-50" />
                           </Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-                <Button onClick={handleAddTemplate} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Template
+                <Button onClick={handleAddTemplate} className="w-full mt-4 bg-white border-2 border-[#c4c4c4] rounded-[10px] text-gray-900 font-medium text-lg h-[39px]">
+                  +Add Template
                 </Button>
-              </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end mt-6">
-           <Button
-             onClick={handleSendEmail}
-             disabled={sending}
-             className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-           >
-             {sending ? "Sending..." : "Send Email"}
-           </Button>
-         </div>
+        <div className="flex justify-center mt-6">
+          <div className="bg-white rounded-[50px] border-[1.5px] border-[#c4c4c4] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] w-[440px] h-[61px] flex items-center justify-between px-4">
+            <button onClick={handleBack} className="text-gray-900 underline text-lg">Cancel</button>
+            <Button onClick={handleSendEmail} disabled={sending} className="bg-[#1d0beb] text-white rounded-[15px] px-6 py-2 text-2xl font-bold">
+              {sending ? "Sending..." : "Send email"}
+            </Button>
+          </div>
+        </div>
 
         <input
           ref={fileInputRef}
