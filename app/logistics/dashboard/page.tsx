@@ -98,9 +98,8 @@ export default function LogisticsDashboardPage() {
             </div>
 
             {/* All Sites Display */}
-            <div className="bg-white rounded-lg border border-gray-200">
               <AllSitesTab searchQuery={searchQuery} contentTypeFilter={contentTypeFilter} viewMode={viewMode} />
-            </div>
+            
           </div>
         </main>
 
