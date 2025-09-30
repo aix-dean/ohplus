@@ -48,6 +48,7 @@ export interface EmailTemplate {
   body: string
   userId: string
   company_id?: string
+  template_type?: string
   deleted?: boolean
   created?: Timestamp
 }
@@ -140,14 +141,25 @@ class EmailService {
     }
   }
 
-  async getEmailTemplates(companyId: string): Promise<EmailTemplate[]> {
+  async getEmailTemplates(companyId: string, templateType?: string): Promise<EmailTemplate[]> {
     try {
-      const q = query(
+      let q = query(
         collection(db, this.templatesCollection),
         where("company_id", "==", companyId),
         where("deleted", "==", false),
         orderBy("created", "desc"),
       )
+
+      if (templateType) {
+        q = query(
+          collection(db, this.templatesCollection),
+          where("company_id", "==", companyId),
+          where("template_type", "==", templateType),
+          where("deleted", "==", false),
+          orderBy("created", "desc"),
+        )
+      }
+
       const querySnapshot = await getDocs(q)
       return querySnapshot.docs.map((doc) => ({
         id: doc.id,
@@ -193,12 +205,27 @@ class EmailService {
     }
   }
 
-  async createDefaultTemplates(companyId: string): Promise<void> {
+  async createDefaultTemplates(companyId: string, templateType: string = "quotation"): Promise<void> {
     const defaultTemplates = [
       {
-        name: "Cost Estimate Template 1",
-        subject: "Cost Estimate: {title} - OH Plus",
-        body: `Hi {clientName},
+        name: templateType === "report" ? "Report Template 1" : "Cost Estimate Template 1",
+        subject: templateType === "report" ? "Report: {title} - {companyName}" : "Cost Estimate: {title} - OH Plus",
+        body: templateType === "report" ?
+          `Hi {clientName},
+
+I hope you're doing well!
+
+Please find attached the report for your project. The report includes the site details and project status based on our recent work.
+
+If you have any questions or would like to discuss the findings, feel free to reach out to us. I'll be happy to assist you further.
+
+Best regards,
+{userName}
+Sales Executive
+{companyName}
+{userContact}
+{userEmail}` :
+          `Hi {clientName},
 
 I hope you're doing well!
 
@@ -212,13 +239,34 @@ Sales Executive
 {companyName}
 {userContact}
 {userEmail}`,
+        userId: "", // Will be set when called
         company_id: companyId,
+        template_type: templateType,
         deleted: false,
       },
       {
-        name: "Cost Estimate Template 2",
-        subject: "Your Advertising Campaign Quote - {title}",
-        body: `Dear {clientName},
+        name: templateType === "report" ? "Report Template 2" : "Cost Estimate Template 2",
+        subject: templateType === "report" ? "Follow-up: Report for {title}" : "Your Advertising Campaign Quote - {title}",
+        body: templateType === "report" ?
+          `Dear {clientName},
+
+I wanted to follow up on the report we sent for {title}.
+
+I hope you've had a chance to review the attached report. We're very interested in your feedback and are available to discuss the findings in detail.
+
+If you have any questions about our assessment, recommendations, or next steps, I'd be happy to schedule a call to discuss them in detail.
+
+We're also available to provide additional support or clarification as needed.
+
+Please let me know your thoughts or if you need any additional information.
+
+Best regards,
+{userName}
+Sales Executive
+{companyName}
+{userContact}
+{userEmail}` :
+          `Dear {clientName},
 
 Thank you for your interest in our advertising services. We are pleased to provide you with a detailed cost estimate for your campaign.
 
@@ -229,41 +277,9 @@ We look forward to working with you!
 Best regards,
 {userName}
 {companyName}`,
+        userId: "", // Will be set when called
         company_id: companyId,
-        deleted: false,
-      },
-      {
-        name: "Cost Estimate Template 3",
-        subject: "Billboard Campaign Proposal - {title}",
-        body: `Hello {clientName},
-
-We've prepared a comprehensive cost estimate for your billboard advertising campaign. The attached document includes all the details we discussed.
-
-Please take your time to review it and don't hesitate to contact us with any questions.
-
-Thank you for considering OH Plus for your advertising needs.
-
-Best regards,
-{userName}`,
-        company_id: companyId,
-        deleted: false,
-      },
-      {
-        name: "Cost Estimate Template 4",
-        subject: "Cost Estimate Ready for Review - {title}",
-        body: `Dear {clientName},
-
-Your cost estimate is ready! We've carefully prepared a detailed proposal that aligns with your requirements and budget considerations.
-
-The attached document contains all the information you need to make an informed decision about your advertising campaign.
-
-We're excited about the possibility of working together!
-
-Best regards,
-{userName}
-Sales Executive
-{companyName}`,
-        company_id: companyId,
+        template_type: templateType,
         deleted: false,
       },
     ]

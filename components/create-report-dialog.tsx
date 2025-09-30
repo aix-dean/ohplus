@@ -43,6 +43,7 @@ interface JobOrder {
   joNumber: string
   clientName: string
   clientCompany: string
+  client_email?: string
   status: string
   joType: string
   siteName: string
@@ -123,11 +124,13 @@ export function CreateReportDialog({
       const fetchedJobOrders: JobOrder[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
+
         fetchedJobOrders.push({
           id: doc.id,
           joNumber: data.joNumber || "N/A",
           clientName: data.clientName || "Unknown Client",
           clientCompany: data.clientCompany || "",
+          client_email: data.client_email || "",
           status: data.status || "unknown",
           joType: data.joType || "General",
           siteName: data.siteName || "Unknown Site",
@@ -180,18 +183,19 @@ export function CreateReportDialog({
       const querySnapshot = await getDocs(q)
 
       if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0]
-        const data = doc.data()
+        const docSnap = querySnapshot.docs[0]
+        const data = docSnap.data()
         const siteImageUrl = data.siteImageUrl
 
         if (siteImageUrl) {
           console.log("Found siteImageUrl from associated job order for product:", siteImageUrl)
           // Store this in a way that can be used when creating the report
           const jobOrderDetails = {
-            id: doc.id,
+            id: docSnap.id,
             joNumber: data.joNumber || "N/A",
             clientName: data.clientName || "Unknown Client",
             clientCompany: data.clientCompany || "",
+            client_email: data.client_email || "",
             status: data.status || "unknown",
             joType: data.joType || "General",
             siteName: data.siteName || "Unknown Site",
@@ -227,13 +231,15 @@ export function CreateReportDialog({
       const querySnapshot = await getDocs(q)
 
       if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0]
-        const data = doc.data()
+        const docSnap = querySnapshot.docs[0]
+        const data = docSnap.data()
+
         const detailedJobOrder: JobOrder = {
-          id: doc.id,
+          id: docSnap.id,
           joNumber: data.joNumber || "N/A",
           clientName: data.clientName || "Unknown Client",
           clientCompany: data.clientCompany || "",
+          client_email: data.client_email || "",
           status: data.status || "unknown",
           joType: data.joType || "General",
           siteName: data.siteName || "Unknown Site",
@@ -546,6 +552,7 @@ export function CreateReportDialog({
         sellerId: product.seller_id || user.uid,
         client: effectiveJobOrder?.clientCompany || "No Client",
         clientId: effectiveJobOrder?.clientName || "no-client-id",
+        client_email: effectiveJobOrder?.client_email || "",
         joNumber: selectedJO !== "none" ? selectedJO : undefined,
         joType: effectiveJobOrder?.joType || "General",
         bookingDates: {

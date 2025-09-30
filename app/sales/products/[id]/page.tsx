@@ -34,6 +34,7 @@ import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/fi
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
 import { getAllJobOrders, type JobOrder } from "@/lib/job-order-service"
+import { getReportsByProductId, type ReportData } from "@/lib/report-service"
 import type { Booking } from "@/lib/booking-service"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
@@ -411,6 +412,19 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [quotationsLoading, setQuotationsLoading] = useState(true)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [jobOrdersLoading, setJobOrdersLoading] = useState(true)
+  const [reports, setReports] = useState<ReportData[]>([])
+  const [reportsLoading, setReportsLoading] = useState(true)
+  const [reportsTotal, setReportsTotal] = useState(0)
+  const [reportsPage, setReportsPage] = useState(1)
+  const [bookingsTotal, setBookingsTotal] = useState(0)
+  const [bookingsPage, setBookingsPage] = useState(1)
+  const [costEstimatesTotal, setCostEstimatesTotal] = useState(0)
+  const [costEstimatesPage, setCostEstimatesPage] = useState(1)
+  const [quotationsTotal, setQuotationsTotal] = useState(0)
+  const [quotationsPage, setQuotationsPage] = useState(1)
+  const [jobOrdersTotal, setJobOrdersTotal] = useState(0)
+  const [jobOrdersPage, setJobOrdersPage] = useState(1)
+  const itemsPerPage = 10
   const [marketplaceDialogOpen, setMarketplaceDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("booking-summary")
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false)
@@ -498,7 +512,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   // Fetch bookings for this product
   useEffect(() => {
     const fetchBookings = async () => {
-      if (!params.id) return
+      if (!params.id || activeTab !== "booking-summary") return
 
       setBookingsLoading(true)
       try {
@@ -509,16 +523,19 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           orderBy("created", "desc")
         )
         const bookingsSnapshot = await getDocs(bookingsQuery)
-        const bookingsData: Booking[] = []
+        const allBookings: Booking[] = []
 
         bookingsSnapshot.forEach((doc) => {
-          bookingsData.push({
+          allBookings.push({
             id: doc.id,
             ...doc.data(),
           } as Booking)
         })
 
-        setBookings(bookingsData)
+        setBookingsTotal(allBookings.length)
+        const offset = (bookingsPage - 1) * itemsPerPage
+        const paginatedBookings = allBookings.slice(offset, offset + itemsPerPage)
+        setBookings(paginatedBookings)
       } catch (error) {
         console.error("Error fetching bookings:", error)
       } finally {
@@ -527,11 +544,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchBookings()
-  }, [params.id])
+  }, [params.id, bookingsPage, activeTab])
 
   useEffect(() => {
     const fetchCostEstimates = async () => {
-      if (!params.id || params.id === "new" || !product) {
+      if (!params.id || params.id === "new" || !product || activeTab !== "ce") {
         setCostEstimatesLoading(false)
         return
       }
@@ -555,7 +572,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           ),
         )
 
-        setCostEstimates(relatedEstimates)
+        setCostEstimatesTotal(relatedEstimates.length)
+        const offset = (costEstimatesPage - 1) * itemsPerPage
+        const paginatedEstimates = relatedEstimates.slice(offset, offset + itemsPerPage)
+        setCostEstimates(paginatedEstimates)
       } catch (error) {
         console.error("Error fetching cost estimates:", error)
         showNotification("error", "Failed to load cost estimates")
@@ -565,11 +585,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchCostEstimates()
-  }, [params.id, product])
+  }, [params.id, product, costEstimatesPage, activeTab])
 
   useEffect(() => {
     const fetchQuotations = async () => {
-      if (!params.id || params.id === "new" || !product) {
+      if (!params.id || params.id === "new" || !product || activeTab !== "quote") {
         setQuotationsLoading(false)
         return
       }
@@ -593,7 +613,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
            (productLocation && quotation.items.location && quotation.items.location.toLowerCase().includes(productLocation.toLowerCase())))
         )
 
-        setQuotations(relatedQuotations)
+        setQuotationsTotal(relatedQuotations.length)
+        const offset = (quotationsPage - 1) * itemsPerPage
+        const paginatedQuotations = relatedQuotations.slice(offset, offset + itemsPerPage)
+        setQuotations(paginatedQuotations)
       } catch (error) {
         console.error("Error fetching quotations:", error)
       } finally {
@@ -602,11 +625,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchQuotations()
-  }, [params.id, product])
+  }, [params.id, product, quotationsPage, activeTab])
 
   useEffect(() => {
     const fetchJobOrders = async () => {
-      if (!params.id || params.id === "new" || !product) {
+      if (!params.id || params.id === "new" || !product || activeTab !== "job-order") {
         setJobOrdersLoading(false)
         return
       }
@@ -630,7 +653,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             (productLocation && jobOrder.siteLocation?.toLowerCase().includes(productLocation.toLowerCase())),
         )
 
-        setJobOrders(relatedJobOrders)
+        setJobOrdersTotal(relatedJobOrders.length)
+        const offset = (jobOrdersPage - 1) * itemsPerPage
+        const paginatedJobOrders = relatedJobOrders.slice(offset, offset + itemsPerPage)
+        setJobOrders(paginatedJobOrders)
       } catch (error) {
         console.error("Error fetching job orders:", error)
       } finally {
@@ -639,7 +665,49 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchJobOrders()
-  }, [params.id, product])
+  }, [params.id, product, jobOrdersPage, activeTab])
+
+  // Reset pages when switching tabs
+  useEffect(() => {
+    if (activeTab !== "booking-summary") {
+      setBookingsPage(1)
+    }
+    if (activeTab !== "ce") {
+      setCostEstimatesPage(1)
+    }
+    if (activeTab !== "quote") {
+      setQuotationsPage(1)
+    }
+    if (activeTab !== "job-order") {
+      setJobOrdersPage(1)
+    }
+    if (activeTab !== "reports") {
+      setReportsPage(1)
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!params.id || params.id === "new" || activeTab !== "reports") {
+        setReportsLoading(false)
+        return
+      }
+
+      setReportsLoading(true)
+      try {
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const { reports: reportsData, total } = await getReportsByProductId(productId, reportsPage, itemsPerPage)
+        setReports(reportsData)
+        setReportsTotal(total)
+      } catch (error) {
+        console.error("Error fetching reports:", error)
+      } finally {
+        setReportsLoading(false)
+      }
+    }
+
+    fetchReports()
+  }, [params.id, reportsPage, activeTab])
 
   const handleBack = () => {
     router.back()
@@ -952,13 +1020,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const getTabCount = (tab: string) => {
     switch (tab) {
       case "booking-summary":
-        return bookings.length
+        return bookingsTotal
       case "ce":
-        return costEstimates.length
+        return costEstimatesTotal
       case "quote":
-        return quotations.length
+        return quotationsTotal
       case "job-order":
-        return jobOrders.length
+        return jobOrdersTotal
+      case "reports":
+        return reportsTotal
       default:
         return 0
     }
@@ -1239,9 +1309,24 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               {/* Action Buttons */}
               {!product?.deleted && (
                 <div className="p-4 space-y-2 border-t border-gray-100">
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Propose this Site</Button>
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create CE</Button>
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">Create Quote</Button>
+                  <Button
+                    className="w-full bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => router.push(`/sales/dashboard?tab=proposals&productId=${params.id}`)}
+                  >
+                    Propose this Site
+                  </Button>
+                  <Button
+                    className="w-full bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => router.push(`/sales/dashboard?tab=ce&productId=${params.id}`)}
+                  >
+                    Create CE
+                  </Button>
+                  <Button
+                    className="w-full bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => router.push(`/sales/dashboard?tab=quotations&productId=${params.id}`)}
+                  >
+                    Create Quote
+                  </Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600 text-white"
                     onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
@@ -1257,14 +1342,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         {/* Right Content - Tabbed Interface */}
         <section className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="grid w-fit grid-cols-4">
+            <div className="text-sm text-gray-600 mb-4 text-right">Total: {getTabCount(activeTab)}</div>
+            <div className="mb-4">
+              <TabsList className="grid w-fit grid-cols-5">
                 <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
                 <TabsTrigger value="ce">CE</TabsTrigger>
                 <TabsTrigger value="quote">Quote</TabsTrigger>
                 <TabsTrigger value="job-order">Job Order</TabsTrigger>
+                <TabsTrigger value="reports">Reports</TabsTrigger>
               </TabsList>
-              <div className="text-sm text-gray-600">Total: {getTabCount(activeTab)}</div>
             </div>
 
             <TabsContent value="booking-summary" className="mt-0">
@@ -1340,6 +1426,36 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       </div>
                     </div>
                   )}
+
+                  {/* Pagination */}
+                  {bookingsTotal > itemsPerPage && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                      <div className="text-sm text-gray-700">
+                        Showing {((bookingsPage - 1) * itemsPerPage) + 1} to {Math.min(bookingsPage * itemsPerPage, bookingsTotal)} of {bookingsTotal} bookings
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBookingsPage(prev => Math.max(1, prev - 1))}
+                          disabled={bookingsPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-gray-600">
+                          Page {bookingsPage} of {Math.ceil(bookingsTotal / itemsPerPage)}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBookingsPage(prev => Math.min(Math.ceil(bookingsTotal / itemsPerPage), prev + 1))}
+                          disabled={bookingsPage === Math.ceil(bookingsTotal / itemsPerPage)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1407,6 +1523,36 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                           </div>
                         ))}
                       </div>
+
+                      {/* Pagination */}
+                      {costEstimatesTotal > itemsPerPage && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                          <div className="text-sm text-gray-700">
+                            Showing {((costEstimatesPage - 1) * itemsPerPage) + 1} to {Math.min(costEstimatesPage * itemsPerPage, costEstimatesTotal)} of {costEstimatesTotal} cost estimates
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCostEstimatesPage(prev => Math.max(1, prev - 1))}
+                              disabled={costEstimatesPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm text-gray-600">
+                              Page {costEstimatesPage} of {Math.ceil(costEstimatesTotal / itemsPerPage)}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCostEstimatesPage(prev => Math.min(Math.ceil(costEstimatesTotal / itemsPerPage), prev + 1))}
+                              disabled={costEstimatesPage === Math.ceil(costEstimatesTotal / itemsPerPage)}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -1468,6 +1614,36 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                         )
                       })}
                     </div>
+
+                    {/* Pagination */}
+                    {quotationsTotal > itemsPerPage && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                        <div className="text-sm text-gray-700">
+                          Showing {((quotationsPage - 1) * itemsPerPage) + 1} to {Math.min(quotationsPage * itemsPerPage, quotationsTotal)} of {quotationsTotal} quotations
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuotationsPage(prev => Math.max(1, prev - 1))}
+                            disabled={quotationsPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            Page {quotationsPage} of {Math.ceil(quotationsTotal / itemsPerPage)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuotationsPage(prev => Math.min(Math.ceil(quotationsTotal / itemsPerPage), prev + 1))}
+                            disabled={quotationsPage === Math.ceil(quotationsTotal / itemsPerPage)}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1527,6 +1703,118 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                         )
                       })}
                     </div>
+
+                    {/* Pagination */}
+                    {jobOrdersTotal > itemsPerPage && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                        <div className="text-sm text-gray-700">
+                          Showing {((jobOrdersPage - 1) * itemsPerPage) + 1} to {Math.min(jobOrdersPage * itemsPerPage, jobOrdersTotal)} of {jobOrdersTotal} job orders
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setJobOrdersPage(prev => Math.max(1, prev - 1))}
+                            disabled={jobOrdersPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            Page {jobOrdersPage} of {Math.ceil(jobOrdersTotal / itemsPerPage)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setJobOrdersPage(prev => Math.min(Math.ceil(jobOrdersTotal / itemsPerPage), prev + 1))}
+                            disabled={jobOrdersPage === Math.ceil(jobOrdersTotal / itemsPerPage)}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="space-y-4">
+              <div className="bg-white rounded-lg border border-gray-200">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Reports</h3>
+                </div>
+                {reportsLoading ? (
+                  <div className="p-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-500">Loading reports...</p>
+                  </div>
+                ) : reports.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <p>No reports found for this product.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                      <div>Date</div>
+                      <div>Report ID</div>
+                      <div>Type</div>
+                      <div>Client</div>
+                      <div>Status</div>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {reports.map((report) => (
+                        <div
+                          key={report.id}
+                          className="grid grid-cols-5 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => router.push(`/sales/reports/${report.id}`)}
+                        >
+                          <div className="text-gray-600">{report.created ? formatFirebaseDate(report.created) : "N/A"}</div>
+                          <div className="text-gray-900 font-medium">
+                            {report.report_id || report.id?.slice(-8) || "N/A"}
+                          </div>
+                          <div className="text-gray-600">{report.reportType || "Unknown"}</div>
+                          <div className="text-gray-900">
+                            {report.client || "Unknown Client"}
+                          </div>
+                          <div>
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                              {report.status || "Draft"}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pagination */}
+                    {reportsTotal > itemsPerPage && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                        <div className="text-sm text-gray-700">
+                          Showing {((reportsPage - 1) * itemsPerPage) + 1} to {Math.min(reportsPage * itemsPerPage, reportsTotal)} of {reportsTotal} reports
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setReportsPage(prev => Math.max(1, prev - 1))}
+                            disabled={reportsPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            Page {reportsPage} of {Math.ceil(reportsTotal / itemsPerPage)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setReportsPage(prev => Math.min(Math.ceil(reportsTotal / itemsPerPage), prev + 1))}
+                            disabled={reportsPage === Math.ceil(reportsTotal / itemsPerPage)}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

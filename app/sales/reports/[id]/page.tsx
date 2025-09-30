@@ -25,6 +25,7 @@ import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { generateReportPDF } from "@/lib/report-pdf-service"
 
 export default function SalesReportViewPage() {
   const router = useRouter()
@@ -276,39 +277,30 @@ export default function SalesReportViewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      console.log("Starting Puppeteer PDF generation for report:", report.id)
-
-      // Call the new Puppeteer API
-      const response = await fetch(`/api/sales/reports/${report.id}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      toast({
+        title: "Download",
+        description: "Generating PDF...",
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
-      }
-
-      // Get the PDF blob
-      const pdfBlob = await response.blob()
+      const siteName = getSiteName(report)
+      const pdfFile = await generateReportPDF(report.id || 'unknown', siteName)
 
       // Create download link
-      const url = window.URL.createObjectURL(pdfBlob)
+      const url = URL.createObjectURL(pdfFile)
       const link = document.createElement('a')
       link.href = url
-      link.download = `report-${report.id}.pdf`
+      link.download = pdfFile.name
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      URL.revokeObjectURL(url)
 
       toast({
         title: "Success",
-        description: "PDF downloaded successfully.",
+        description: "PDF downloaded successfully",
       })
     } catch (error) {
-      console.error("Error generating report PDF:", error)
+      console.error("Error generating PDF:", error)
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -334,7 +326,7 @@ export default function SalesReportViewPage() {
   }
 
   const handleBack = () => {
-    router.push("/sales/reports")
+    router.back()
   }
 
   const handleEdit = () => {
@@ -442,7 +434,7 @@ export default function SalesReportViewPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -459,7 +451,7 @@ export default function SalesReportViewPage() {
         <div className="ml-auto"></div>
       </div>
 
-      <div className="relative">
+      <div className="relative flex justify-center">
         <div className="absolute left-4 top-6 z-10">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col items-center">
@@ -498,7 +490,7 @@ export default function SalesReportViewPage() {
           </div>
         </div>
 
-        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto max-h-[calc(100vh-150px)]">
+        <div className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
@@ -510,12 +502,12 @@ export default function SalesReportViewPage() {
                 }}
               ></div>
               <div className="relative z-10 h-full flex items-center px-6">
-                <div className="text-white text-lg font-semibold">Sales</div>
+                <div className="text-white text-lg font-semibold">Logistics</div>
               </div>
             </div>
           </div>
 
-          <div className="max-w-6xl mx-auto p-6 space-y-6">
+          <div className="p-4 space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex flex-col">
                 <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
@@ -685,7 +677,7 @@ export default function SalesReportViewPage() {
                 <h3 className="font-semibold mb-2">Prepared by:</h3>
                 <div className="text-sm text-gray-600">
                   <div>{preparedByName || "Loading..."}</div>
-                  <div>SALES</div>
+                  <div>LOGISTICS</div>
                   <div>{formatDate(report.date)}</div>
                 </div>
               </div>

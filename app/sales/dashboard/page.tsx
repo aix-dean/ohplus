@@ -265,7 +265,71 @@ function SalesDashboardContent() {
   useEffect(() => {
     const mode = searchParams.get('mode')
     const clientId = searchParams.get('clientId')
+    const tab = searchParams.get('tab')
 
+    // Handle tab parameter for direct mode activation (from product page buttons)
+    if (tab && userData?.company_id) {
+      const productId = searchParams.get('productId')
+
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // If productId is provided, fetch and select the product
+      if (productId) {
+        const fetchProduct = async () => {
+          try {
+            const productDoc = await getDoc(doc(db, "products", productId))
+            if (productDoc.exists()) {
+              const product = { id: productDoc.id, ...productDoc.data() } as Product
+
+              // Select the product based on the mode
+              if (tab === 'proposals') {
+                setSelectedProducts([product])
+              } else if (tab === 'ce' || tab === 'quotations') {
+                setSelectedSites([product])
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching product for auto-selection:", error)
+          }
+        }
+        fetchProduct()
+      }
+
+      // Activate the appropriate mode based on tab parameter
+      setTimeout(() => {
+        if (tab === 'proposals') {
+          setProposalCreationMode(true)
+          setCeQuoteMode(false)
+        } else if (tab === 'ce') {
+          setCeMode(true)
+          setQuoteMode(false)
+          setCeQuoteMode(true)
+          setProposalCreationMode(false)
+        } else if (tab === 'quotations') {
+          setQuoteMode(true)
+          setCeMode(false)
+          setCeQuoteMode(true)
+          setProposalCreationMode(false)
+        }
+      }, 100)
+
+      // Clean up URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('tab')
+      newUrl.searchParams.delete('productId')
+      window.history.replaceState({}, '', newUrl.toString())
+      return
+    }
+
+    // Handle mode and clientId parameters (existing logic)
     if (mode && clientId && userData?.company_id) {
       // Reset all modes first
       setProposalCreationMode(false)
