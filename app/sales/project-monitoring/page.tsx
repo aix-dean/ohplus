@@ -579,22 +579,6 @@ export default function ProjectMonitoringPage() {
           </button>
           <h1 id="project-bulletin-title" className="text-2xl font-semibold text-[#333333]">Project Bulletin</h1>
         </div>
-        {!quoteMode ? (
-          <Button
-            onClick={handleQuoteMode}
-            variant="outline"
-            className="bg-[#ffffff] border-[#c4c4c4] text-[#333333] hover:bg-[#c4c4c4]"
-          >
-            Create Quotation
-          </Button>
-        ) : (
-          <Button
-            onClick={handleCancelQuote}
-            variant="outline"
-          >
-            Cancel Quote
-          </Button>
-        )}
       </div>
 
       <div className="flex items-center justify-between mb-6">

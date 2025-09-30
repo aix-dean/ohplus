@@ -781,6 +781,7 @@ export default function CreateJobOrderPage() {
             clientCompany: quotation?.client_company_name || "N/A", // Changed from client?.company to client?.name
             clientCompanyId: quotation.client_company_id || "",
             clientId: client?.id || "",
+            client_email: (client as any)?.email || "",
             contractDuration: totalDays.toString(), // Convert to string as expected by type
             contractPeriodStart: contractPeriodStart || undefined,
             contractPeriodEnd: contractPeriodEnd || undefined,
@@ -936,6 +937,7 @@ export default function CreateJobOrderPage() {
         clientCompany: quotation?.client_company_name || "N/A",
         clientCompanyId: quotation.client_company_id || "",
         clientId: client?.id || "",
+        client_email: (client as any)?.email || "",
         contractDuration: totalDays.toString(),
         contractPeriodStart: quotation.start_date ? safeToDate(quotation.start_date) : undefined,
         contractPeriodEnd: quotation.end_date ? safeToDate(quotation.end_date) : undefined,

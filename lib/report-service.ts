@@ -23,6 +23,7 @@ export interface ReportData {
   sellerId: string
   client: string
   clientId: string
+  client_email?: string
   joNumber?: string
   joType?: string
   bookingDates: {
@@ -129,6 +130,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
       sellerId: reportData.sellerId,
       client: reportData.client,
       clientId: reportData.clientId,
+      client_email: reportData.client_email,
       joNumber: reportData.joNumber,
       joType: reportData.joType,
       bookingDates: {

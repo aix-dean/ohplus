@@ -1,22 +1,32 @@
 "use client"
 
 import type React from "react"
-import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
-import { useAuth } from "@/contexts/auth-context"
-import { useState, useEffect, useRef } from "react"
+
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter, useParams } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Paperclip, X, Copy, Edit, Trash2, Upload, Plus } from "lucide-react"
-import { useRouter } from "next/navigation"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ArrowLeft, Paperclip, Edit, Trash2, Upload, X, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
 import { getReportById } from "@/lib/report-service"
 import { getClientById, type Client } from "@/lib/client-service"
+import { useAuth } from "@/contexts/auth-context"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { db } from "@/lib/firebase"
+import { getDoc, doc, collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, updateDoc } from "firebase/firestore"
 
 interface ComposeEmailPageProps {
   params: {
@@ -46,11 +56,40 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const [sending, setSending] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [emailData, setEmailData] = useState({
-    to: "",
-    cc: "",
-    subject: "",
-    message: `Hi AAA,
+  const [toEmail, setToEmail] = useState("")
+  const [ccEmail, setCcEmail] = useState("")
+  const [replyToEmail, setReplyToEmail] = useState("")
+  const [subject, setSubject] = useState("")
+  const [body, setBody] = useState("")
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [companyName, setCompanyName] = useState<string>("")
+
+  const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
+  const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
+  const [newTemplateName, setNewTemplateName] = useState("")
+  const [newTemplateSubject, setNewTemplateSubject] = useState("")
+  const [newTemplateBody, setNewTemplateBody] = useState("")
+  const [savingTemplate, setSavingTemplate] = useState(false)
+
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
+
+  const fetchReportTemplates = useCallback(async () => {
+    if (!userData?.company_id) return
+
+    try {
+      setTemplatesLoading(true)
+
+      const userTemplates = await emailService.getEmailTemplates(userData.company_id, "report")
+      if (userTemplates.length === 0) {
+        // Create default templates with proper userId
+        const defaultTemplates = [
+          {
+            name: "Standard Report",
+            subject: "Report: {title} - {companyName}",
+            body: `Hi {clientName},
 
 I hope you're doing well!
 
@@ -59,126 +98,22 @@ Please find attached the report for your project. The report includes the site d
 If you have any questions or would like to discuss the findings, feel free to reach out to us. I'll be happy to assist you further.
 
 Best regards,
+{userName}
 Sales Executive
-Sales Executive
-OH PLUS
-+639XXXXXXXXX`,
-  })
+{companyName}
+{userContact}
+{userEmail}`,
+            userId: user?.uid || "",
+            company_id: userData.company_id,
+            template_type: "report",
+            deleted: false,
+          },
+          {
+            name: "Follow-up Report",
+            subject: "Follow-up: Report for {title}",
+            body: `Dear {clientName},
 
-  const [attachments, setAttachments] = useState<Attachment[]>([])
-
-  const [templates, setTemplates] = useState<ReportEmailTemplate[]>([])
-  const [templatesLoading, setTemplatesLoading] = useState(true)
-
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<ReportEmailTemplate | null>(null)
-  const [editTemplateData, setEditTemplateData] = useState({
-    name: "",
-    subject: "",
-    body: "",
-  })
-
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false)
-
-  const fetchReportTemplates = async () => {
-    if (!user?.uid) return
-
-    try {
-      setTemplatesLoading(true)
-
-      const templatesRef = collection(db, "email_templates")
-      const q = query(
-        templatesRef,
-        where("userId", "==", user.uid),
-        where("template_type", "==", "report"),
-        orderBy("created", "desc"),
-      )
-
-      const querySnapshot = await getDocs(q)
-      const reportTemplates: ReportEmailTemplate[] = []
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        reportTemplates.push({
-          id: doc.id,
-          name: data.name,
-          subject: data.subject,
-          body: data.body,
-          userId: data.userId,
-          created: data.created,
-          template_type: data.template_type || "report",
-        })
-      })
-
-      if (reportTemplates.length === 0) {
-        await createDefaultReportTemplates()
-        const newQuerySnapshot = await getDocs(q)
-        newQuerySnapshot.forEach((doc) => {
-          const data = doc.data()
-          reportTemplates.push({
-            id: doc.id,
-            name: data.name,
-            subject: data.subject,
-            body: data.body,
-            userId: data.userId,
-            created: data.created,
-            template_type: data.template_type || "report",
-          })
-        })
-      }
-
-      setTemplates(reportTemplates)
-    } catch (error) {
-      console.error("Error fetching report templates:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load email templates",
-        variant: "destructive",
-      })
-    } finally {
-      setTemplatesLoading(false)
-    }
-  }
-
-  const createDefaultReportTemplates = async () => {
-    if (!user?.uid) return
-
-    const defaultReportTemplates = [
-      {
-        name: "Standard Report",
-        subject: "Report: [Project Name] - [Company Name]",
-        body: `Dear [Client Name],
-
-I hope this email finds you well.
-
-Please find attached our detailed report for your project. We've completed the assessment and compiled all findings in the attached document.
-
-The report includes:
-- Detailed project assessment
-- Current status and progress
-- Key findings and recommendations
-- Next steps and timeline
-
-We're committed to delivering high-quality results and are available to discuss the report findings in detail.
-
-Please review the attached report and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
-
-Looking forward to your feedback!
-
-Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
-        userId: user.uid,
-        template_type: "report" as const,
-      },
-      {
-        name: "Follow-up Report",
-        subject: "Follow-up: Report for [Project Name]",
-        body: `Dear [Client Name],
-
-I wanted to follow up on the report we sent for [Project Name].
+I wanted to follow up on the report we sent for {title}.
 
 I hope you've had a chance to review the attached report. We're very interested in your feedback and are available to discuss the findings in detail.
 
@@ -189,26 +124,39 @@ We're also available to provide additional support or clarification as needed.
 Please let me know your thoughts or if you need any additional information.
 
 Best regards,
-[Your Name]
-[Your Position]
-OH PLUS
-[Contact Information]`,
-        userId: user.uid,
-        template_type: "report" as const,
-      },
-    ]
+{userName}
+Sales Executive
+{companyName}
+{userContact}
+{userEmail}`,
+            userId: user?.uid || "",
+            company_id: userData.company_id,
+            template_type: "report",
+            deleted: false,
+          },
+        ]
 
-    try {
-      for (const template of defaultReportTemplates) {
-        await addDoc(collection(db, "email_templates"), {
-          ...template,
-          created: serverTimestamp(),
-        })
+        for (const template of defaultTemplates) {
+          await emailService.createEmailTemplate(template)
+        }
+
+        const newTemplates = await emailService.getEmailTemplates(userData.company_id, "report")
+        setTemplates(newTemplates)
+      } else {
+        setTemplates(userTemplates)
       }
     } catch (error) {
-      console.error("Error creating default report templates:", error)
+      console.error("Error fetching report templates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load email templates",
+        variant: "destructive",
+      })
+    } finally {
+      setTemplatesLoading(false)
     }
-  }
+  }, [userData?.company_id, toast])
+
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -220,22 +168,38 @@ OH PLUS
         }
 
         setReport(reportData)
+        console.log("Loaded report data:", reportData)
+        console.log("Report client_email:", reportData.client_email)
+        console.log("Report clientId:", reportData.clientId)
 
-        // Fetch client data if clientId exists
-        if (reportData.clientId) {
+        // Check for 'to' query parameter first
+        const urlParams = new URLSearchParams(window.location.search)
+        const toParam = urlParams.get('to')
+        console.log("Query param 'to':", toParam)
+
+        // Use client_email from report if available, otherwise fetch client data
+        if (reportData.client_email) {
+          console.log("Using client_email from report:", reportData.client_email)
+          const finalToEmail = toParam || reportData.client_email
+          const finalReplyToEmail = user?.email || ""
+          console.log("Setting toEmail:", finalToEmail)
+          console.log("Setting replyToEmail:", finalReplyToEmail)
+          setToEmail(finalToEmail)
+          setCcEmail("")
+          setReplyToEmail(finalReplyToEmail)
+          setSubject(`Report: ${reportData.siteName} - ${reportData.client} - OH Plus`)
+        } else if (reportData.clientId) {
+          // Fallback to fetching client data if client_email is not in report
           const clientData = await getClientById(reportData.clientId)
           if (clientData) {
             setClient(clientData)
-            setEmailData((prev) => ({
-              ...prev,
-              to: clientData.email,
-              cc: "",
-              subject: `Report: ${reportData.siteName} - ${clientData.company} - OH Plus`,
-            }))
+            setToEmail(toParam || clientData.email)
+            setCcEmail("")
+            setReplyToEmail(user?.email || "")
+            setSubject(`Report: ${reportData.siteName} - ${clientData.company} - OH Plus`)
           }
         }
 
-        await generateReportPDFs(reportData)
       } catch (error) {
         console.error("Error fetching report:", error)
         toast({
@@ -249,7 +213,13 @@ OH PLUS
     }
 
     fetchReport()
-  }, [params.id, toast])
+  }, [params.id, toast, user?.email])
+
+  // Debug user email
+  useEffect(() => {
+    console.log("User object:", user)
+    console.log("User email:", user?.email)
+  }, [user])
 
   useEffect(() => {
     if (user?.uid) {
@@ -257,58 +227,85 @@ OH PLUS
     }
   }, [user?.uid])
 
-  // Auto-redirect to dashboard after showing success dialog
+  // Set subject and body when report and company name are available
   useEffect(() => {
-    if (successDialogOpen) {
+    if (report && companyName && userData) {
+      setSubject(`Report: ${report.siteName || "Site"} - ${companyName}`)
+      setBody(`Hi ${client?.name || "Valued Client"},
+
+I hope you're doing well!
+
+Please find attached the report for your project. The report includes the site details and project status based on our recent work.
+
+If you have any questions or would like to discuss the findings, feel free to reach out to us. I'll be happy to assist you further.
+
+Best regards,
+${user?.displayName || "Sales Executive"}
+Sales Executive
+${companyName}
+${userData?.phone_number || ""}
+${user?.email || ""}`)
+    }
+  }, [report, companyName, userData, user?.displayName, user?.email, client?.name])
+
+  // Query company name from Firebase
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (!user || !userData) {
+        console.log("[v0] fetchCompanyName: Missing user or userData", { user: !!user, userData: !!userData })
+        return
+      }
+
+      try {
+        console.log("[v0] fetchCompanyName: userData:", userData)
+        console.log("[v0] fetchCompanyName: userData.company_id:", userData.company_id)
+
+        if (!userData.company_id) {
+          console.warn("[v0] No company_id found in userData:", userData)
+          return
+        }
+
+        console.log("[v0] Fetching company name for company_id:", userData.company_id)
+        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+          const companyNameValue = companyData?.name || "Company"
+          setCompanyName(companyNameValue)
+          console.log("[v0] Company name loaded from Firebase:", companyNameValue)
+        } else {
+          console.warn("[v0] No company document found for company_id:", userData.company_id)
+          setCompanyName("Company")
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching company name from Firebase:", error)
+        setCompanyName("Company")
+      }
+    }
+
+    if (user && userData) {
+      fetchCompanyName()
+    }
+  }, [user, userData])
+
+  // Auto-redirect to reports list after showing success dialog
+  useEffect(() => {
+    if (showSuccessDialog) {
       const timer = setTimeout(() => {
-        router.push("/sales/dashboard")
+        handleSuccessDialogClose()
       }, 3000) // 3 seconds delay
 
       return () => clearTimeout(timer)
     }
-  }, [successDialogOpen, router])
+  }, [showSuccessDialog])
 
-  const generateReportPDFs = async (reportData: ReportData) => {
-    try {
-      // For now, create a placeholder attachment since we don't have a report PDF generation API yet
-      const fileName = `OH_PLUS_REPORT_${reportData.siteCode || reportData.siteId}.pdf`
-      const placeholderPDFs: Attachment[] = [
-        {
-          name: fileName,
-          size: "2.3 MB",
-          type: "report",
-          url: `https://ohplus.ph/api/reports/${reportData.id}/pdf`,
-        },
-      ]
-
-      setAttachments(placeholderPDFs)
-    } catch (error) {
-      console.error("Error generating report PDFs:", error)
-      const fallbackFileName = `OH_PLUS_REPORT_${reportData.siteCode || reportData.siteId}.pdf`
-      const fallbackPDFs: Attachment[] = [
-        {
-          name: fallbackFileName,
-          size: "2.3 MB",
-          type: "report",
-          url: `https://ohplus.ph/api/reports/${reportData.id}/pdf`,
-        },
-      ]
-      setAttachments(fallbackPDFs)
-
-      toast({
-        title: "Warning",
-        description: "Could not generate report PDF. Using fallback attachment.",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleBack = () => {
     router.back()
   }
 
   const handleSendEmail = async () => {
-    if (!emailData.to.trim()) {
+    if (!toEmail.trim()) {
       toast({
         title: "Validation Error",
         description: "Please enter a recipient email address.",
@@ -317,7 +314,7 @@ OH PLUS
       return
     }
 
-    if (!emailData.subject.trim()) {
+    if (!subject.trim()) {
       toast({
         title: "Validation Error",
         description: "Please enter an email subject.",
@@ -331,12 +328,12 @@ OH PLUS
     try {
       const formData = new FormData()
 
-      const toEmails = emailData.to
+      const toEmails = toEmail
         .split(",")
         .map((email) => email.trim())
         .filter((email) => email)
-      const ccEmails = emailData.cc
-        ? emailData.cc
+      const ccEmails = ccEmail
+        ? ccEmail
             .split(",")
             .map((email) => email.trim())
             .filter((email) => email)
@@ -346,28 +343,16 @@ OH PLUS
       if (ccEmails.length > 0) {
         formData.append("cc", JSON.stringify(ccEmails))
       }
-      formData.append("subject", emailData.subject)
-      formData.append("body", emailData.message)
+      formData.append("subject", subject)
+      formData.append("body", body)
       if (userData?.phone_number) {
         formData.append("currentUserPhoneNumber", userData.phone_number)
       }
 
-      for (let i = 0; i < attachments.length; i++) {
-        const attachment = attachments[i]
-        try {
-          if (attachment.file) {
-            formData.append(`attachment_${i}`, attachment.file)
-          } else if (attachment.url && attachment.type === "report") {
-            const pdfResponse = await fetch(attachment.url)
-            if (pdfResponse.ok) {
-              const pdfBlob = await pdfResponse.blob()
-              const pdfFile = new File([pdfBlob], attachment.name, { type: "application/pdf" })
-              formData.append(`attachment_${i}`, pdfFile)
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing attachment ${attachment.name}:`, error)
-        }
+      // Add uploaded files
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const file = uploadedFiles[i]
+        formData.append(`attachment_${i}`, file)
       }
 
       const response = await fetch("/api/send-email", {
@@ -383,23 +368,23 @@ OH PLUS
 
       try {
         const emailRecord = {
-          body: emailData.message,
+          body: body,
           created: serverTimestamp(),
           from: user?.email || "noreply@ohplus.ph",
           reportId: params.id,
           sentAt: serverTimestamp(),
           status: "sent",
-          subject: emailData.subject,
+          subject: subject,
           to: toEmails,
           cc: ccEmails.length > 0 ? ccEmails : null,
           updated: serverTimestamp(),
           userId: user?.uid || null,
           email_type: "report",
-          attachments: attachments.map((att) => ({
-            fileName: att.name,
-            fileSize: att.file?.size || 0,
-            fileType: att.file?.type || "application/pdf",
-            fileUrl: att.url || null,
+          attachments: uploadedFiles.map((file) => ({
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            fileUrl: null,
           })),
         }
 
@@ -409,8 +394,8 @@ OH PLUS
         console.error("Error saving email record:", emailRecordError)
       }
 
-      // Show success dialog instead of toast
-      setSuccessDialogOpen(true)
+      // Show success dialog
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error("Email sending error:", error)
       toast({
@@ -423,179 +408,169 @@ OH PLUS
     }
   }
 
-  const handleTemplateAction = (templateId: string, action: "copy" | "edit" | "delete") => {
-    const template = templates.find((t) => t.id === templateId)
-    if (!template) return
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.push("/sales/reports")
+  }
 
-    console.log(`handleTemplateAction called with templateId: ${templateId}, action: ${action}`); // Debug log
+  const applyTemplate = (template: EmailTemplate) => {
+    setSubject(template.subject)
+    setBody(template.body)
+    toast({
+      title: "Template applied",
+      description: `${template.name} has been applied to your email.`,
+    })
+  }
 
-    switch (action) {
-      case "copy":
-        setEmailData((prev) => ({
-          ...prev,
-          subject: template.subject,
-          message: template.body,
-        }))
-        toast({
-          title: "Template applied",
-          description: `${template.name} has been applied to your email.`,
-        })
-        break
-      case "edit":
-        setEditingTemplate(template)
-        setEditTemplateData({
-          name: template.name,
-          subject: template.subject,
-          body: template.body,
-        })
-        setEditDialogOpen(true)
-        break
-      case "delete":
-        handleDeleteTemplate(templateId)
-        break
-    }
+  const handleEditTemplate = (template: EmailTemplate) => {
+    setEditingTemplate(template)
+    setNewTemplateName(template.name)
+    setNewTemplateSubject(template.subject)
+    setNewTemplateBody(template.body)
+    setShowEditTemplateDialog(true)
   }
 
   const handleDeleteTemplate = async (templateId: string) => {
     try {
-      await emailService.deleteEmailTemplate(templateId)
-      await fetchReportTemplates()
+      await emailService.softDeleteEmailTemplate(templateId)
+      setTemplates((prev) => prev.filter((template) => template.id !== templateId))
       toast({
-        title: "Template deleted",
-        description: "The template has been deleted successfully.",
+        title: "Template Deleted",
+        description: "Email template has been deleted successfully",
       })
     } catch (error) {
       console.error("Error deleting template:", error)
       toast({
         title: "Error",
-        description: "Failed to delete template",
+        description: "Failed to delete template. Please try again.",
         variant: "destructive",
       })
     }
   }
 
+
   const handleAddTemplate = async () => {
-    if (!user?.uid) {
+    if (!newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
       toast({
-        title: "Error",
-        description: "You must be logged in to create templates",
+        title: "Missing Information",
+        description: "Please fill in all template fields",
         variant: "destructive",
       })
       return
     }
 
-    try {
-      const templateName = `Report Template ${templates.length + 1}`
-      const newTemplate = {
-        name: templateName,
-        subject: "New Report Template",
-        body: "Enter your report template content here...",
-        userId: user.uid,
-        template_type: "report" as const,
-      }
+    const companyId = userData?.company_id
 
-      await addDoc(collection(db, "email_templates"), {
-        ...newTemplate,
-        created: serverTimestamp(),
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID not found. Cannot create template.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSavingTemplate(true)
+    try {
+      await emailService.createEmailTemplate({
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        userId: user?.uid || "",
+        company_id: companyId,
+        template_type: "report",
+        deleted: false,
       })
 
-      await fetchReportTemplates()
+      // Refetch templates to get the updated list
+      const updatedTemplates = await emailService.getEmailTemplates(companyId)
+      setTemplates(updatedTemplates)
+      setShowAddTemplateDialog(false)
+      setNewTemplateName("")
+      setNewTemplateSubject("")
+      setNewTemplateBody("")
 
       toast({
-        title: "Template created",
-        description: `${templateName} has been created successfully.`,
+        title: "Template Added",
+        description: "Email template has been created successfully",
       })
     } catch (error) {
       console.error("Error creating template:", error)
       toast({
         title: "Error",
-        description: "Failed to create template",
+        description: "Failed to create template. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
-  const handleUpdateTemplate = async () => {
-    if (!editingTemplate?.id || !user?.uid) {
+  const handleSaveEditedTemplate = async () => {
+    if (!editingTemplate || !newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
       toast({
-        title: "Error",
-        description: "Unable to update template",
+        title: "Missing Information",
+        description: "Please fill in all template fields",
         variant: "destructive",
       })
       return
     }
 
+    setSavingTemplate(true)
     try {
-      const templateRef = doc(db, "email_templates", editingTemplate.id)
-      await updateDoc(templateRef, {
-        name: editTemplateData.name,
-        subject: editTemplateData.subject,
-        body: editTemplateData.body,
-        updated: serverTimestamp(),
+      const updatedTemplate = await emailService.updateEmailTemplate(editingTemplate.id!, {
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        template_type: "report",
       })
 
-      await fetchReportTemplates()
-      setEditDialogOpen(false)
+      setTemplates((prev) => prev.map((template) => (template.id === editingTemplate.id ? updatedTemplate : template)))
+
+      setShowEditTemplateDialog(false)
       setEditingTemplate(null)
+      setNewTemplateName("")
+      setNewTemplateSubject("")
+      setNewTemplateBody("")
 
       toast({
-        title: "Template updated",
-        description: "The template has been updated successfully.",
+        title: "Template Updated",
+        description: "Email template has been updated successfully",
       })
     } catch (error) {
       console.error("Error updating template:", error)
       toast({
         title: "Error",
-        description: "Failed to update template",
+        description: "Failed to update template. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
-  const handleRemoveAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-    toast({
-      title: "Attachment removed",
-      description: "The attachment has been removed from the email.",
-    })
+
+  const removeUploadedFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleAddAttachment = () => {
     fileInputRef.current?.click()
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (!files) return
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedFiles((prev) => [...prev, ...newFiles])
 
-    Array.from(files).forEach((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
-          variant: "destructive",
-        })
-        return
-      }
-
-      const newAttachment: Attachment = {
-        name: file.name,
-        size: formatFileSize(file.size),
-        type: "user-upload",
-        file: file,
-      }
-
-      setAttachments((prev) => [...prev, newAttachment])
-    })
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      toast({
+        title: "Files Added",
+        description: `${newFiles.length} file(s) added to attachments`,
+      })
     }
 
-    toast({
-      title: "Files added",
-      description: `${files.length} file(s) have been added to your email.`,
-    })
+    event.target.value = ""
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -638,80 +613,96 @@ OH PLUS
             <Card>
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">To:</label>
-                    <Input
-                      value={emailData.to}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
-                      placeholder="Enter recipient email"
-                      className="w-full"
-                    />
+                  {/* To Field */}
+                  <div className="flex items-center gap-4">
+                    <Label className="w-12 text-sm font-medium">To:</Label>
+                    <div className="flex-1">
+                      <Input
+                        value={toEmail}
+                        onChange={(e) => setToEmail(e.target.value)}
+                        placeholder="recipient@example.com"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
-                    <Input
-                      value={emailData.cc}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
-                      placeholder="Enter CC email"
-                      className="w-full"
-                    />
+                  {/* CC Field */}
+                  <div className="flex items-center gap-4">
+                    <Label className="w-12 text-sm font-medium">Cc:</Label>
+                    <div className="flex-1">
+                      <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
-                    <Input
-                      value={emailData.subject}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
-                      placeholder="Enter email subject"
-                      className="w-full"
-                    />
+                  {/* Reply To Field */}
+                  <div className="flex items-center gap-4">
+                    <Label className="w-12 text-sm font-medium">Reply to:</Label>
+                    <div className="flex-1">
+                      <Input
+                        value={replyToEmail}
+                        onChange={(e) => setReplyToEmail(e.target.value)}
+                        placeholder="reply@example.com"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <Textarea
-                      value={emailData.message}
-                      onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
-                      placeholder="Enter your message"
-                      className="w-full min-h-[200px] resize-none"
-                    />
+                  {/* Subject Field */}
+                  <div className="flex items-center gap-4">
+                    <Label className="w-12 text-sm font-medium">Subject:</Label>
+                    <div className="flex-1">
+                      <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+                  {/* Body Field */}
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Textarea
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        placeholder="Email body..."
+                        className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Attachments */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Attachments:</Label>
                     <div className="space-y-2">
-                      {attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <Paperclip className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-700">{attachment.name}</span>
-                            <span className="text-xs text-gray-500">({attachment.size})</span>
-                            {attachment.type === "user-upload" && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
-                            )}
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                            <X className="h-4 w-4" />
+                      {uploadedFiles.map((file, index) => (
+                        <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                          <Paperclip className="h-4 w-4 text-gray-500" />
+                          <span className="flex-1 text-sm text-gray-700">{file.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeUploadedFile(index)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
                       ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-blue-600 bg-transparent"
-                        onClick={handleAddAttachment}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Add Attachment
-                      </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={handleFileSelect}
-                        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-                      />
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          id="file-upload"
+                          multiple
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById("file-upload")?.click()}
+                          className="text-blue-500 border-blue-200 hover:bg-blue-50"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Add Attachment
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -731,30 +722,30 @@ OH PLUS
                 ) : (
                   <div className="space-y-2">
                     {templates.map((template) => (
-                      <div key={template.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <span
-                          className="text-sm text-gray-700 cursor-pointer"
-                          onClick={() => handleTemplateAction(template.id!, "copy")}
-                          title="Apply template"
+                      <div
+                        key={template.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <button
+                          className="text-sm text-left flex-1 hover:text-blue-600"
+                          onClick={() => applyTemplate(template)}
                         >
                           {template.name}
-                        </span>
-                        <div className="flex items-center space-x-1">
+                        </button>
+                        <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleTemplateAction(template.id!, "edit")}
+                            onClick={() => handleEditTemplate(template)}
                             className="h-6 w-6 p-0"
-                            title="Edit template"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleTemplateAction(template.id!, "delete")}
+                            onClick={() => handleDeleteTemplate(template.id!)}
                             className="h-6 w-6 p-0"
-                            title="Delete template"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -783,61 +774,64 @@ OH PLUS
         </div>
       </div>
 
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Edit Template Dialog */}
+      <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Template</DialogTitle>
+            <DialogTitle>Edit Email Template</DialogTitle>
+            <DialogDescription>Update the email template details.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Template Name:</label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-name">Template Name</Label>
               <Input
-                value={editTemplateData.name}
-                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter template name"
+                id="edit-template-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="e.g., Standard Quotation"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-subject">Subject</Label>
               <Input
-                value={editTemplateData.subject}
-                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, subject: e.target.value }))}
-                placeholder="Enter email subject"
+                id="edit-template-subject"
+                value={newTemplateSubject}
+                onChange={(e) => setNewTemplateSubject(e.target.value)}
+                placeholder="e.g., Quotation: {title} - {companyName}"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Body:</label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-body">Body</Label>
               <Textarea
-                value={editTemplateData.body}
-                onChange={(e) => setEditTemplateData((prev) => ({ ...prev, body: e.target.value }))}
-                placeholder="Enter email body"
-                className="min-h-[200px] resize-none"
+                id="edit-template-body"
+                value={newTemplateBody}
+                onChange={(e) => setNewTemplateBody(e.target.value)}
+                placeholder="Hi {clientName},&#10;&#10;Please find attached..."
+                className="min-h-[200px]"
               />
+            </div>
+            <div className="text-sm text-gray-500">
+              <p className="font-medium mb-1">Available placeholders:</p>
+              <p>{"{clientName}, {title}, {userName}, {companyName}, {userContact}, {userEmail}"}</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setShowEditTemplateDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateTemplate} className="bg-blue-600 hover:bg-blue-700 text-white">
-              Update Template
+            <Button onClick={handleSaveEditedTemplate} disabled={savingTemplate}>
+              {savingTemplate ? "Updating..." : "Update Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Success Dialog */}
-      <Dialog open={successDialogOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-transparent border-transparent" >
-          <div className="text-center">
-            <div className="flex justify-center bg-transparent">
-              <img
-                src="/images/success_report.png"
-                alt="Success"
-                className="w-22 object-contain"
-              />
-            </div>
-          </div>
+      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessDialogClose}>
+        <DialogContent className="sm:max-w-[425px] flex flex-col items-center justify-center text-center p-8">
+          <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
+          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-6" />
+          <p className="text-lg text-gray-700">You have successfully sent a report!</p>
         </DialogContent>
       </Dialog>
     </div>

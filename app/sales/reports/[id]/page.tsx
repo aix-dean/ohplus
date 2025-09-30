@@ -334,7 +334,7 @@ export default function SalesReportViewPage() {
   }
 
   const handleBack = () => {
-    router.push("/sales/reports")
+    router.back()
   }
 
   const handleEdit = () => {

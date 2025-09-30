@@ -38,7 +38,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
          const product = await getProductById(report.product.id)
          if (product?.media && product.media.length > 0) {
            // Use the first media item that has a URL
-           const firstMedia = product.media.find(media => media.url)
+           const firstMedia = product.media.find((media: any) => media.url)
            setProductImageUrl(firstMedia?.url || "")
          } else {
            setProductImageUrl("")
@@ -53,6 +53,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
 
      fetchProductImage()
    }, [isOpen, report?.product?.id])
+
 
    const handleCopyLink = async () => {
     try {
@@ -73,7 +74,8 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
   const handleEmailShare = () => {
     onClose()
     const department = pathname.includes('/admin') ? 'admin' : 'sales'
-    router.push(`/${department}/reports/compose/${report.id}`)
+    const queryParams = report.client_email ? `?to=${encodeURIComponent(report.client_email)}` : ''
+    router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
   }
 
   const handleWhatsAppShare = () => {
