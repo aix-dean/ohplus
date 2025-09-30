@@ -1324,9 +1324,6 @@ export default function QuotationsListPage() {
                                       <Share2 className="w-3 h-3 mr-2" />
                                       Share
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => console.log("Cancel", quotation.id)}>
-                                      Cancel
-                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handleCopyQuotation(quotation.id)}
                                       disabled={copyingQuotations.has(quotation.id)}

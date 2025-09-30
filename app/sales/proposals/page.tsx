@@ -26,6 +26,7 @@ import {
   XCircle,
   Send,
   Calculator,
+  Printer,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
@@ -175,6 +176,12 @@ function ProposalsPageContent() {
     // Navigate to detail page and trigger download there
     // This ensures the proposal is rendered and can be captured by html2canvas
     router.push(`/sales/proposals/${proposal.id}?action=download`)
+  }
+
+  const handlePrintProposal = (proposal: Proposal) => {
+    // Navigate to detail page and trigger print there
+    // This ensures the proposal is rendered and can be printed
+    router.push(`/sales/proposals/${proposal.id}?action=print`)
   }
 
   return (
@@ -378,6 +385,10 @@ function ProposalsPageContent() {
                             <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

@@ -200,7 +200,7 @@ export async function generateSeparateCostEstimatePDFs(
       }
 
       // Generate PDF for this single site
-      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false, userData) // Pass userData to PDF generation
+      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false, false, userData) // Pass userData to PDF generation
 
       // Add a small delay between downloads to ensure proper file naming
       if (i < sitesToProcess.length - 1) {
@@ -220,16 +220,17 @@ export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
+  returnPDF = false,
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
-): Promise<string | void> {
+): Promise<string | jsPDF | void> {
   try {
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 second timeout
     })
 
-    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, returnBase64, userData)
+    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, returnBase64, returnPDF, userData)
 
-    return await Promise.race([pdfGenerationPromise, timeoutPromise])
+    return await Promise.race([pdfGenerationPromise, timeoutPromise]) as string | jsPDF | void
   } catch (error) {
     console.error("Error generating PDF:", error)
     throw error
@@ -240,8 +241,9 @@ async function generatePDFInternal(
   costEstimate: CostEstimate,
   selectedPages?: string[],
   returnBase64 = false,
+  returnPDF = false,
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
-): Promise<string | void> {
+): Promise<string | jsPDF | void> {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -340,7 +342,9 @@ async function generatePDFInternal(
   let companyData = null
   if (userData?.company_id || costEstimate.company_id) {
     const companyId = userData?.company_id || costEstimate.company_id
-    companyData = await fetchCompanyData(companyId)
+    if (companyId) {
+      companyData = await fetchCompanyData(companyId)
+    }
   }
 
   for (let siteIndex = 0; siteIndex < sitesToProcess.length; siteIndex++) {
@@ -546,9 +550,11 @@ async function generatePDFInternal(
     pdf.text(footerText, footerX, pageHeight - 15)
   }
 
-  // Return base64 or download PDF
+  // Return base64, PDF object, or download PDF
   if (returnBase64) {
     return pdf.output("datauristring").split(",")[1]
+  } else if (returnPDF) {
+    return pdf
   } else {
     const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
     const sitesSuffix =
@@ -592,7 +598,9 @@ export async function generateDetailedCostEstimatePDF(
     let companyData = null
     if (userData?.company_id || costEstimate.company_id) {
       const companyId = userData?.company_id || costEstimate.company_id
-      companyData = await fetchCompanyData(companyId)
+      if (companyId) {
+        companyData = await fetchCompanyData(companyId)
+      }
     }
 
     // Header with company name
@@ -796,7 +804,7 @@ export async function generateCostEstimateEmailPDF(
     console.log("[v0] Starting email PDF generation for cost estimate:", costEstimate.id)
 
     // Use the main generateCostEstimatePDF function with returnBase64 = true to ensure same formatting
-    const pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true, userData)
+    const pdfBase64 = await generateCostEstimatePDF(costEstimate, undefined, true, false, userData)
 
     if (pdfBase64) {
       console.log("[v0] Email PDF generated successfully")
@@ -808,5 +816,47 @@ export async function generateCostEstimateEmailPDF(
   } catch (error) {
     console.error("[v0] Error generating email PDF:", error)
     return null
+  }
+}
+
+/**
+ * Generate and print a cost estimate PDF
+ * Creates the PDF blob, opens it in a new window, and triggers the print dialog
+ */
+export async function printCostEstimatePDF(
+  costEstimate: CostEstimate,
+  selectedPages?: string[],
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+): Promise<void> {
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 second timeout
+    })
+
+    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, false, true, userData)
+
+    const pdf = await Promise.race([pdfGenerationPromise, timeoutPromise]) as jsPDF
+
+    // Generate blob and create URL for printing
+    const pdfBlob = pdf.output('blob')
+    const pdfUrl = URL.createObjectURL(pdfBlob)
+
+    // Open PDF in new window and trigger print
+    const printWindow = window.open(pdfUrl, '_blank')
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print()
+        // Clean up the URL after printing
+        printWindow.onafterprint = () => {
+          URL.revokeObjectURL(pdfUrl)
+        }
+      }
+    } else {
+      console.error("Failed to open print window")
+      URL.revokeObjectURL(pdfUrl)
+    }
+  } catch (error) {
+    console.error("Error printing PDF:", error)
+    throw error
   }
 }
