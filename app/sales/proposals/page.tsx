@@ -322,7 +322,7 @@ function ProposalsPageContent() {
                                 <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                                   <CheckCircle className="w-2 h-2 text-white" />
                                 </div>
-                                <span className="text-gray-700">{product.location || product.name || `Site ${i + 1}`}</span>
+                                <span className="text-gray-700">{product.name || "No Product Name" || `Site ${i + 1}`}</span>
                               </div>
                             ))}
                           </div>
