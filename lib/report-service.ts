@@ -16,6 +16,7 @@ import { db } from "./firebase"
 
 export interface ReportData {
   id?: string
+  report_id?: string
   siteId: string
   siteName: string
   siteCode?: string
@@ -122,8 +123,12 @@ export async function createReport(reportData: ReportData): Promise<string> {
 
     console.log("Processed attachments:", processedAttachments)
 
+    // Generate report_id in format "RP-[currentmillis]"
+    const reportId = `RP-${Date.now()}`
+
     // Create the final report data with proper structure
     const finalReportData: any = {
+      report_id: reportId,
       siteId: reportData.siteId,
       siteName: reportData.siteName,
       companyId: reportData.companyId,
@@ -397,6 +402,29 @@ export async function getReportsByType(reportType: string): Promise<ReportData[]
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by type:", error)
+    throw error
+  }
+}
+
+export async function getReportsByProductId(productId: string, page: number = 1, limit: number = 10): Promise<{ reports: ReportData[], total: number }> {
+  try {
+    // Get all reports for this product (since Firestore doesn't support offset with where clauses)
+    const q = query(collection(db, "reports"), where("product.id", "==", productId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const allReports = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
+    })) as ReportData[]
+
+    const total = allReports.length
+    const offset = (page - 1) * limit
+    const reports = allReports.slice(offset, offset + limit)
+
+    return { reports, total }
+  } catch (error) {
+    console.error("Error fetching reports by product:", error)
     throw error
   }
 }

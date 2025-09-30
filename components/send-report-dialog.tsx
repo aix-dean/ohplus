@@ -9,6 +9,7 @@ import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
 import { getProductById } from "@/lib/firebase-service"
+import { generateReportPDF } from "@/lib/report-pdf-service"
 
 interface SendReportDialogProps {
   isOpen: boolean
@@ -18,12 +19,13 @@ interface SendReportDialogProps {
 }
 
 export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
-   const { toast } = useToast()
-   const router = useRouter()
-   const pathname = usePathname()
-   const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
-   const [productImageUrl, setProductImageUrl] = useState<string>("")
-   const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false)
+    const { toast } = useToast()
+    const router = useRouter()
+    const pathname = usePathname()
+    const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
+    const [productImageUrl, setProductImageUrl] = useState<string>("")
+    const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false)
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false)
 
    useEffect(() => {
      const fetchProductImage = async () => {
@@ -71,11 +73,43 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
     }
   }
 
-  const handleEmailShare = () => {
-    onClose()
-    const department = pathname.includes('/admin') ? 'admin' : 'sales'
-    const queryParams = report.client_email ? `?to=${encodeURIComponent(report.client_email)}` : ''
-    router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
+  const handleEmailShare = async () => {
+    setIsGeneratingPDF(true)
+    try {
+      // Generate PDF first
+      const siteName = report.siteName || report.client || 'Unknown'
+      const pdfFile = await generateReportPDF(report.id || 'unknown', siteName)
+
+      // Store PDF in sessionStorage
+      const arrayBuffer = await pdfFile.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binaryString = ''
+      for (let i = 0; i < uint8Array.length; i++) {
+        binaryString += String.fromCharCode(uint8Array[i])
+      }
+      const base64Data = btoa(binaryString)
+      const pdfData = {
+        name: pdfFile.name,
+        data: base64Data,
+        type: pdfFile.type
+      }
+      sessionStorage.setItem('report-pdf', JSON.stringify(pdfData))
+
+      // Close dialog and navigate to compose page
+      onClose()
+      const department = pathname.includes('/admin') ? 'admin' : 'sales'
+      const queryParams = report.client_email ? `?to=${encodeURIComponent(report.client_email)}` : ''
+      router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
+    } catch (error) {
+      console.error("Error generating PDF for email:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGeneratingPDF(false)
+    }
   }
 
   const handleWhatsAppShare = () => {
@@ -162,12 +196,19 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
           <div className="grid grid-cols-4 gap-4">
             <button
               onClick={handleEmailShare}
-              className="flex flex-col items-center space-y-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isGeneratingPDF}
+              className="flex flex-col items-center space-y-2 p-3 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                <Image src="/icons/email.png" alt="Email" width={74} height={74} />
+                {isGeneratingPDF ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                ) : (
+                  <Image src="/icons/email.png" alt="Email" width={74} height={74} />
+                )}
               </div>
-              <span className="text-xs font-medium text-gray-700">Email</span>
+              <span className="text-xs font-medium text-gray-700">
+                {isGeneratingPDF ? "Generating..." : "Email"}
+              </span>
             </button>
 
             <button

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import jsPDF from "jspdf"
 import { getReportById, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { doc, getDoc } from "firebase/firestore"
@@ -176,23 +176,8 @@ export async function GET(
     }
   }
 
-  // Helper function to get image dimensions
-  function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => {
-        resolve({ width: img.width, height: img.height })
-      }
-      img.onerror = () => {
-        resolve({ width: 100, height: 100 }) // Default dimensions
-      }
-      img.src = base64
-    })
-  }
-
-  let browser
   try {
-    console.log("Starting Puppeteer PDF generation for report:", reportId)
+    console.log("Starting jsPDF generation for report:", reportId)
 
     // Fetch the report data
     const report = await getReportById(reportId)
@@ -233,238 +218,218 @@ export async function GET(
       }
     }
 
-    // Launch Puppeteer browser
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    })
+    // Create PDF using jsPDF
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+    let yPosition = margin
 
-    const page = await browser.newPage()
+    // Set font
+    pdf.setFont('helvetica')
 
-    // Generate HTML content that replicates the report page
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Report - ${reportId}</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-          body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-          }
-          .clip-path-custom { clip-path: polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%); }
-          @page {
-            size: A4;
-            margin: 0;
-          }
-          .page-break {
-            page-break-before: always;
-          }
-        </style>
-      </head>
-      <body class="bg-white m-0 p-0" style="margin: 0; padding: 0; min-height: 297mm; display: flex; flex-direction: column;">
-        <!-- Header Section -->
-        <div style="width: 100%; position: relative; margin-bottom: 16px;">
-          <div style="position: relative; height: 64px; overflow: hidden;">
-            <div style="position: absolute; inset: 0; background-color: #1e3a8a;"></div>
-            <div style="position: absolute; top: 0; right: 0; height: 100%; background-color: #06b6d4; clip-path: polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%); width: 40%;"></div>
-            <div style="position: relative; z-index: 10; height: 100%; display: flex; align-items: center; padding-left: 24px; padding-right: 24px;">
-              <div style="color: white; font-size: 18px; font-weight: 600;">Sales</div>
-            </div>
-          </div>
-        </div>
+    // Header
+    pdf.setFillColor(30, 58, 138) // Blue background
+    pdf.rect(0, 0, pageWidth, 25, 'F')
 
-        <div style="flex: 1; width: 100%; background: white; display: flex; flex-direction: column;">
-          <div class="max-w-6xl mx-auto p-3 space-y-3" style="padding: 12px;">
-            <!-- Report Header -->
-            <div class="flex justify-between items-center">
-              <div class="flex flex-col">
-                <div class="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-                  ${getReportTypeDisplay(report.reportType)}
-                </div>
-                <p class="text-gray-600 text-sm mt-2">as of ${formatDate(report.date)}</p>
-              </div>
-              <div class="flex-shrink-0">
-                <div class="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm" style="width: 160px; height: 160px;">
-                  ${companyData?.photo_url ? `<img src="${companyData.photo_url}" alt="Company Logo" class="max-h-full max-w-full object-contain" />` : '<img src="/ohplus-new-logo.png" alt="Company Logo" class="max-h-full max-w-full object-contain" />'}
-                </div>
-              </div>
-            </div>
+    // Cyan accent on the right
+    pdf.setFillColor(6, 182, 212) // Cyan
+    pdf.rect(pageWidth * 0.6, 0, pageWidth * 0.4, 25, 'F')
 
-            <!-- Project Information Card -->
-            <div style="border: 1px solid #e5e7eb; border-radius: 6px;">
-              <div style="padding: 12px;">
-                <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #111827;">Project Information</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; font-size: 12px; line-height: 1.2;">
-                  <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Site ID:</span>
-                      <span style="color: #111827;">${getSiteLocation(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Job Order:</span>
-                      <span style="color: #111827;">${report.joNumber || report.id?.slice(-4).toUpperCase() || "N/A"}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Job Order Date:</span>
-                      <span style="color: #111827;">${formatDate(report.date)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Site:</span>
-                      <span style="color: #111827;">${getSiteName(report)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Size:</span>
-                      <span style="color: #111827;">${getSiteSize(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Start Date:</span>
-                      <span style="color: #111827;">${report.bookingDates?.start ? formatDate(report.bookingDates.start) : "N/A"}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">End Date:</span>
-                      <span style="color: #111827;">${report.bookingDates?.end ? formatDate(report.bookingDates.end) : "N/A"}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Installation Duration:</span>
-                      <span style="color: #111827;">${report.bookingDates?.start && report.bookingDates?.end ? `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days` : "N/A"}</span>
-                    </div>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Content:</span>
-                      <span style="color: #111827;">${product?.content_type || "Static"}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Material Specs:</span>
-                      <span style="color: #111827;">${getMaterialSpecs(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Crew:</span>
-                      <span style="color: #111827;">Team ${report.assignedTo || "Sales"}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Illumination:</span>
-                      <span style="color: #111827;">${getIllumination(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Gondola:</span>
-                      <span style="color: #111827;">${getGondola(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Technology:</span>
-                      <span style="color: #111827;">${getTechnology(product)}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start;">
-                      <span style="font-weight: bold; color: #374151; white-space: nowrap;">Sales:</span>
-                      <span style="color: #111827;">${report.sales || "N/A"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+    // Header text
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(18)
+    pdf.text('Sales', margin, 17)
 
-            <!-- Project Status -->
-            <div style="margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 16px;">
-                <h2 style="font-size: 16px; font-weight: bold; color: #111827; margin: 0;">Project Status</h2>
-                <div style="color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 500; ${(() => {
-                  const percentage = getCompletionPercentage(report)
-                  if (percentage >= 90) return "background-color: #10b981;"
-                  if (percentage >= 70) return "background-color: #f59e0b;"
-                  if (percentage >= 50) return "background-color: #f97316;"
-                  return "background-color: #ef4444;"
-                })()}">
-                  ${getCompletionPercentage(report)}%
-                </div>
-              </div>
+    yPosition = 40
 
-              <!-- Attachments -->
-              ${report.attachments && report.attachments.length > 0 ? `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px;">
-                  ${report.attachments.slice(0, 2).map((attachment, index) => `
-                    <div style="background: #f3f4f6; border-radius: 8px; height: 256px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; position: relative; cursor: pointer;">
-                      ${attachment.fileUrl && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(attachment.fileName?.toLowerCase().split('.').pop() || '') ?
-                        `<img src="${attachment.fileUrl}" alt="${attachment.fileName}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;" />` :
-                        `<div style="text-align: center; font-size: 14px; color: #374151; word-break: break-all;">${attachment.fileName}</div>`
-                      }
-                    </div>
-                  `).join('')}
-                </div>
-              ` : ''}
-            </div>
-          </div>
-        </div>
+    // Report type badge
+    pdf.setFillColor(6, 182, 212) // Cyan
+    pdf.roundedRect(margin, yPosition, 60, 12, 2, 2, 'F')
 
-        <!-- Prepared by section - positioned right above footer -->
-        <div style="width: 100%; background: white; padding: 12px; border-top: 1px solid #e5e7eb;">
-          <div class="max-w-6xl mx-auto">
-            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-              <div>
-                <h3 style="font-weight: 600; margin-bottom: 2px; font-size: 12px;">Prepared by:</h3>
-                <div style="font-size: 12px; color: #6b7280;">
-                  <div>${companyData?.company_name || "OH Plus"}</div>
-                  <div>SALES</div>
-                  <div>${formatDate(report.date)}</div>
-                </div>
-              </div>
-              <div style="text-align: right; font-size: 10px; color: #9ca3af; font-style: italic; max-width: 180px;">
-                "All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."
-              </div>
-            </div>
-          </div>
-        </div>
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(10)
+    pdf.text(getReportTypeDisplay(report.reportType), margin + 5, yPosition + 8)
 
-        <!-- Bottom Footer - fixed at bottom of page -->
-        <div style="height: 64px; width: 100%; position: relative;">
-          <div style="position: relative; height: 100%; overflow: hidden;">
-            <div style="position: absolute; inset: 0; background-color: #06b6d4;"></div>
-            <div style="position: absolute; top: 0; right: 0; height: 100%; background-color: #1e3a8a; clip-path: polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%); width: 75%;"></div>
-            <div style="position: relative; z-index: 10; height: 100%; display: flex; align-items: center; justify-between; padding-left: 32px; padding-right: 32px;">
-              <div style="display: flex; align-items: center; gap: 24px;">
-                <div style="color: white; font-size: 18px; font-weight: 600;"></div>
-              </div>
-              <div style="color: white; text-align: right; display: flex; align-items: center; gap: 8px; margin-left: auto;">
-                <div style="font-size: 14px; font-weight: 500;">Smart. Seamless. Scalable</div>
-                <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center;">
-                  OH!
-                  <div style="margin-left: 4px; color: #06b6d4;">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    // Date
+    pdf.setTextColor(100, 116, 139)
+    pdf.setFontSize(9)
+    pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition + 20)
 
-    // Set the HTML content
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
+    // Company logo placeholder (right side)
+    if (companyData?.photo_url) {
+      try {
+        const logoBase64 = await loadImageAsBase64(companyData.photo_url)
+        if (logoBase64) {
+          // Add logo image (simplified - would need proper sizing)
+          pdf.addImage(logoBase64, 'JPEG', pageWidth - 60, yPosition - 10, 40, 40)
+        }
+      } catch (error) {
+        console.error('Error loading company logo:', error)
+      }
+    }
 
-    // Generate PDF with full page coverage
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '0px',
-        right: '0px',
-        bottom: '0px',
-        left: '0px'
-      },
-      preferCSSPageSize: true,
-      displayHeaderFooter: false,
-      width: '210mm',
-      height: '297mm'
-    })
+    yPosition += 35
+
+    // Project Information section
+    pdf.setTextColor(17, 24, 39)
+    pdf.setFontSize(14)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Project Information', margin, yPosition)
+    yPosition += 10
+
+    // Draw border
+    pdf.setDrawColor(229, 231, 235)
+    pdf.setLineWidth(0.5)
+    pdf.rect(margin, yPosition - 5, pageWidth - 2 * margin, 80)
+
+    yPosition += 5
+
+    // Left column
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Site ID:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getSiteLocation(product), margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Job Order:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(report.joNumber || report.id?.slice(-4).toUpperCase() || "N/A", margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Job Order Date:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(formatDate(report.date), margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Site:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getSiteName(report), margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Size:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getSiteSize(product), margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Start Date:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    const startDate = report.bookingDates?.start ?
+      (typeof report.bookingDates.start === 'string' ? report.bookingDates.start : report.bookingDates.start.toDate().toISOString()) : null
+    pdf.text(startDate ? formatDate(startDate) : "N/A", margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('End Date:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    const endDate = report.bookingDates?.end ?
+      (typeof report.bookingDates.end === 'string' ? report.bookingDates.end : report.bookingDates.end.toDate().toISOString()) : null
+    pdf.text(endDate ? formatDate(endDate) : "N/A", margin + 25, yPosition)
+
+    yPosition += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Installation Duration:', margin + 5, yPosition)
+    pdf.setFont('helvetica', 'normal')
+    const duration = startDate && endDate ? `${calculateInstallationDuration(startDate, endDate)} days` : "N/A"
+    pdf.text(duration, margin + 25, yPosition)
+
+    // Right column
+    let rightY = yPosition - 32 // Reset to same starting position
+    const rightX = pageWidth / 2 + 10
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Content:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(product?.content_type || "Static", rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Material Specs:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getMaterialSpecs(product), rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Crew:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(`Team ${report.assignedTo || "Sales"}`, rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Illumination:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getIllumination(product), rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Gondola:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getGondola(product), rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Technology:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(getTechnology(product), rightX + 20, rightY)
+
+    rightY += 8
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Sales:', rightX, rightY)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(report.sales || "N/A", rightX + 20, rightY)
+
+    // Project Status section
+    yPosition += 25
+    pdf.setFontSize(14)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Project Status', margin, yPosition)
+
+    // Status badge
+    const percentage = getCompletionPercentage(report)
+    let statusColor = [239, 68, 68] // Red
+    if (percentage >= 90) statusColor = [16, 185, 129] // Green
+    else if (percentage >= 70) statusColor = [245, 158, 11] // Yellow
+    else if (percentage >= 50) statusColor = [249, 115, 22] // Orange
+
+    pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+    pdf.roundedRect(margin + 50, yPosition - 5, 25, 8, 2, 2, 'F')
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(8)
+    pdf.text(`${percentage}%`, margin + 55, yPosition)
+
+    // Footer
+    const footerY = pageHeight - 30
+    pdf.setFillColor(6, 182, 212) // Cyan background
+    pdf.rect(0, footerY, pageWidth, 30, 'F')
+
+    pdf.setFillColor(30, 58, 138) // Blue accent
+    pdf.rect(pageWidth * 0.75, footerY, pageWidth * 0.25, 30, 'F')
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(12)
+    pdf.text('Smart. Seamless. Scalable', pageWidth - margin - 80, footerY + 12)
+    pdf.setFontSize(16)
+    pdf.text('OH!', pageWidth - margin - 20, footerY + 20)
+
+    // Prepared by section
+    pdf.setTextColor(17, 24, 39)
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Prepared by:', margin, footerY - 15)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.text(companyData?.company_name || "OH Plus", margin, footerY - 5)
+    pdf.text('SALES', margin, footerY + 2)
+    pdf.text(formatDate(report.date), margin, footerY + 9)
+
+    const pdfBuffer = pdf.output('arraybuffer')
 
     console.log("PDF generated successfully for report:", reportId)
 
@@ -480,9 +445,5 @@ export async function GET(
       { error: "Failed to generate PDF", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     )
-  } finally {
-    if (browser) {
-      await browser.close()
-    }
   }
 }

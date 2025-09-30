@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Paperclip, Edit, Trash2, Upload, X, Plus } from "lucide-react"
+import { ArrowLeft, Paperclip, Edit, Trash2, Upload, X, Plus, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
 import { getReportById } from "@/lib/report-service"
@@ -26,7 +26,8 @@ import { getClientById, type Client } from "@/lib/client-service"
 import { useAuth } from "@/contexts/auth-context"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
 import { db } from "@/lib/firebase"
-import { getDoc, doc, collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, updateDoc } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, updateDoc } from "firebase/firestore"
+import { generateReportPDF } from "@/lib/report-pdf-service"
 
 interface ComposeEmailPageProps {
   params: {
@@ -62,8 +63,9 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [reportPdfFile, setReportPdfFile] = useState<File | null>(null)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [companyName, setCompanyName] = useState<string>("")
+  const [companyName, setCompanyName] = useState<string>("Company")
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
   const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false)
@@ -215,11 +217,12 @@ Sales Executive
     fetchReport()
   }, [params.id, toast, user?.email])
 
-  // Debug user email
+  // Set reply-to email to current user's email
   useEffect(() => {
-    console.log("User object:", user)
-    console.log("User email:", user?.email)
-  }, [user])
+    if (user?.email) {
+      setReplyToEmail(user.email)
+    }
+  }, [user?.email])
 
   useEffect(() => {
     if (user?.uid) {
@@ -248,45 +251,63 @@ ${user?.email || ""}`)
     }
   }, [report, companyName, userData, user?.displayName, user?.email, client?.name])
 
-  // Query company name from Firebase
+  // Set company name from report data
   useEffect(() => {
-    const fetchCompanyName = async () => {
-      if (!user || !userData) {
-        console.log("[v0] fetchCompanyName: Missing user or userData", { user: !!user, userData: !!userData })
-        return
-      }
+    if (report) {
+      // Use company_name from report if available, otherwise fallback to Company
+      const companyNameFromReport = (report as any).company_name || (report as any).companyName || "Company"
+      setCompanyName(companyNameFromReport)
+      console.log("[v0] Company name set from report:", companyNameFromReport)
+    }
+  }, [report])
 
+  // Check for pre-generated PDF from sessionStorage
+  useEffect(() => {
+    const checkForPdf = () => {
       try {
-        console.log("[v0] fetchCompanyName: userData:", userData)
-        console.log("[v0] fetchCompanyName: userData.company_id:", userData.company_id)
+        const pdfDataString = sessionStorage.getItem('report-pdf')
+        if (pdfDataString) {
+          const pdfData = JSON.parse(pdfDataString)
+          const binaryString = atob(pdfData.data)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          const pdfBlob = new Blob([bytes], { type: pdfData.type })
+          const pdfFile = new File([pdfBlob], pdfData.name, { type: pdfData.type })
 
-        if (!userData.company_id) {
-          console.warn("[v0] No company_id found in userData:", userData)
-          return
-        }
-
-        console.log("[v0] Fetching company name for company_id:", userData.company_id)
-        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
-
-        if (companyDoc.exists()) {
-          const companyData = companyDoc.data()
-          const companyNameValue = companyData?.name || "Company"
-          setCompanyName(companyNameValue)
-          console.log("[v0] Company name loaded from Firebase:", companyNameValue)
+          setReportPdfFile(pdfFile)
+          // Clear the sessionStorage after using it
+          sessionStorage.removeItem('report-pdf')
+          console.log("PDF loaded from sessionStorage for compose page")
         } else {
-          console.warn("[v0] No company document found for company_id:", userData.company_id)
-          setCompanyName("Company")
+          // No PDF found, show error and redirect
+          toast({
+            title: "Error",
+            description: "PDF not found. Please try sending the report again.",
+            variant: "destructive",
+          })
+          setTimeout(() => {
+            router.push(`/sales/reports/${params.id}`)
+          }, 2000)
         }
       } catch (error) {
-        console.error("[v0] Error fetching company name from Firebase:", error)
-        setCompanyName("Company")
+        console.error("Error loading PDF from sessionStorage:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load PDF. Please try sending the report again.",
+          variant: "destructive",
+        })
+        setTimeout(() => {
+          router.push(`/sales/reports/${params.id}`)
+        }, 2000)
       }
     }
 
-    if (user && userData) {
-      fetchCompanyName()
+    if (!loading) {
+      checkForPdf()
     }
-  }, [user, userData])
+  }, [loading, params.id, toast, router])
 
   // Auto-redirect to reports list after showing success dialog
   useEffect(() => {
@@ -323,6 +344,15 @@ ${user?.email || ""}`)
       return
     }
 
+    if (!body.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter an email body.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSending(true)
 
     try {
@@ -349,10 +379,29 @@ ${user?.email || ""}`)
         formData.append("currentUserPhoneNumber", userData.phone_number)
       }
 
-      // Add uploaded files
+      // Add company and user data for proper email formatting
+      if (userData?.company_id) {
+        formData.append("companyId", userData.company_id)
+      }
+      if (companyName) {
+        formData.append("companyName", companyName)
+      }
+      if (user?.displayName) {
+        formData.append("userDisplayName", user?.displayName)
+      }
+      if (replyToEmail.trim()) {
+        formData.append("replyTo", replyToEmail.trim())
+      }
+
+      // Add the pre-generated PDF as the first attachment
+      if (reportPdfFile) {
+        formData.append("attachment_0", reportPdfFile)
+      }
+
+      // Add any additional uploaded files
       for (let i = 0; i < uploadedFiles.length; i++) {
         const file = uploadedFiles[i]
-        formData.append(`attachment_${i}`, file)
+        formData.append(`attachment_${i + 1}`, file)
       }
 
       const response = await fetch("/api/send-email", {
@@ -380,12 +429,20 @@ ${user?.email || ""}`)
           updated: serverTimestamp(),
           userId: user?.uid || null,
           email_type: "report",
-          attachments: uploadedFiles.map((file) => ({
-            fileName: file.name,
-            fileSize: file.size,
-            fileType: file.type,
-            fileUrl: null,
-          })),
+          attachments: [
+            ...(reportPdfFile ? [{
+              fileName: reportPdfFile.name,
+              fileSize: reportPdfFile.size,
+              fileType: reportPdfFile.type,
+              fileUrl: null,
+            }] : []),
+            ...uploadedFiles.map((file) => ({
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type,
+              fileUrl: null,
+            })),
+          ],
         }
 
         await addDoc(collection(db, "emails"), emailRecord)
@@ -669,6 +726,32 @@ ${user?.email || ""}`)
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Attachments:</Label>
                     <div className="space-y-2">
+                      {/* Report PDF */}
+                      {reportPdfFile && (
+                        <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200">
+                          <Paperclip className="h-4 w-4 text-blue-500" />
+                          <span className="flex-1 text-sm text-gray-700 font-medium">{reportPdfFile.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const url = URL.createObjectURL(reportPdfFile)
+                              const link = document.createElement('a')
+                              link.href = url
+                              link.download = reportPdfFile.name
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                              URL.revokeObjectURL(url)
+                            }}
+                            className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* User uploaded files */}
                       {uploadedFiles.map((file, index) => (
                         <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
                           <Paperclip className="h-4 w-4 text-gray-500" />
