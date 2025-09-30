@@ -1877,25 +1877,25 @@ function SalesDashboardContent() {
               <Button
                 onClick={handleConfirmProposalCreation}
                 disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
-                className={`absolute left-[238px] top-[25px] w-[175px] h-[61px] text-[30px] font-bold rounded-[15px] transition-all duration-200 ${
+                className={`absolute left-[238px] top-[26px] w-[175px] h-[61px] rounded-[15px] transition-all duration-200 ${
                   selectedClientForProposal && selectedProducts.length > 0
                     ? "bg-[#1d0beb] hover:bg-blue-700 text-white"
                     : "bg-gray-400 text-gray-600 cursor-not-allowed"
                 }`}
                 aria-label={`Create proposal with ${selectedProducts.length} selected sites`}
               >
-                {isCreatingProposal ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    Next →
-                  </>
-                )}
+                <span className="text-[30px] font-bold">
+                  {isCreatingProposal ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin inline" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Next →"
+                  )}
+                </span>
               </Button>
-              <div className="absolute left-[123px] top-[86px] text-[20px] font-semibold text-gray-900 text-center w-[160px]">
+              <div className="absolute left-[123px] top-[48px] text-[20px] font-semibold text-gray-900 text-center w-[160px]">
                 ({selectedProducts.length}) selected
               </div>
             </div>
