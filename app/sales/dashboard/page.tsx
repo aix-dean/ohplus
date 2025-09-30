@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CalendarIcon,
   CheckCircle2,
   ArrowLeft,
@@ -141,6 +142,12 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
+  // Display type selection for proposal creation
+  const [selectedDisplayType, setSelectedDisplayType] = useState<"static" | "digital" | null>("static")
+
+  // Search sites state
+  const [siteSearchTerm, setSiteSearchTerm] = useState("")
+
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
   const handleCreateReport = async (product: Product, e: React.MouseEvent) => {
@@ -223,6 +230,17 @@ function SalesDashboardContent() {
       setViewMode("grid")
     }
   }, [isMobile])
+
+  // Store current mode in sessionStorage for side navigation active state
+  useEffect(() => {
+    if (proposalCreationMode) {
+      sessionStorage.setItem('sales-dashboard-mode', 'proposal')
+    } else if (ceQuoteMode) {
+      sessionStorage.setItem('sales-dashboard-mode', ceMode ? 'cost-estimate' : 'quotation')
+    } else {
+      sessionStorage.setItem('sales-dashboard-mode', 'normal')
+    }
+  }, [proposalCreationMode, ceQuoteMode, ceMode])
   console.log(`user comoany id ${userData?.company_id}`)
   // Fetch clients for dashboard client selection (for proposals and CE/Quote)
   useEffect(() => {
@@ -675,6 +693,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
     setSelectedSites([]) // Clear any previously selected sites
+    setSelectedDisplayType("static") // Reset display type to default
   }
 
   const handleClientSelectOnDashboard = (client: Client) => {
@@ -706,6 +725,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
     setDashboardClientSearchResults([])
     setSelectedProducts([])
+    setSelectedDisplayType(null)
   }
 
   const handleProductSelect = (product: Product) => {
@@ -1186,41 +1206,51 @@ function SalesDashboardContent() {
     setSelectedSites([])
     setSelectedClientForProposal(null)
     setDashboardClientSearchTerm("")
+    setSelectedDisplayType(null)
   }
 
+  // Display type selection handlers
+  const handleSelectStatic = () => {
+    setSelectedDisplayType("static")
+  }
+
+  const handleSelectDigital = () => {
+    setSelectedDisplayType("digital")
+  }
+
+  // Filter products based on selected display type and search term
+  const filteredProducts = products.filter(product => {
+    // Display type filter
+    if (selectedDisplayType) {
+      // Assume digital products have content_type containing "digital" or "led"
+      // Static products are everything else
+      const contentType = product.content_type?.toLowerCase() || ""
+      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen")
+
+      if (selectedDisplayType === "digital") {
+        if (!isDigital) return false
+      } else {
+        if (isDigital) return false
+      }
+    }
+
+    // Search filter
+    if (siteSearchTerm.trim()) {
+      const searchLower = siteSearchTerm.toLowerCase()
+      const name = product.name?.toLowerCase() || ""
+      const location = (product.specs_rental?.location || product.light?.location || "")?.toLowerCase() || ""
+      const siteCode = getSiteCode(product)?.toLowerCase() || ""
+
+      return name.includes(searchLower) ||
+             location.includes(searchLower) ||
+             siteCode.includes(searchLower)
+    }
+
+    return true
+  })
+
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
-      {proposalCreationMode && (
-        <div className="flex items-center justify-center p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0 relative">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancelProposalCreationMode}
-            className="absolute left-4 p-1 hover:bg-gray-100"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h2 className="text-[30px] font-bold text-[#333333]">← Create Proposal</h2>
-        </div>
-      )}
-
-      {ceQuoteMode && !proposalCreationMode && (
-        <div className="flex items-center justify-between p-4 pb-2 bg-white border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelCeQuote}
-              className="p-1 hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h2 className="text-lg font-semibold text-gray-900">Select Sites</h2>
-          </div>
-          {/* No collab button for CE/Quote mode */}
-        </div>
-      )}
-
+    <div className="h-screen flex flex-col">
       {/* Main content area */}
       <div className="flex-1 overflow-hidden">
         {loading ? (
@@ -1272,13 +1302,51 @@ function SalesDashboardContent() {
           // Actual Dashboard Content
           <div
             className={cn(
-              "grid grid-cols-1 gap-6 h-full",
+              "grid grid-cols-1 gap-6 h-full transition-all duration-300",
               // Only apply two-column layout when proposalCreationMode is true
               proposalCreationMode && "lg:grid-cols-[1fr_300px]",
             )}
           >
             {/* Left Column: Main Dashboard Content */}
             <div className="flex flex-col gap-1 md:gap-2 h-full overflow-hidden">
+              {/* Proposal Creation Header */}
+              {proposalCreationMode && (
+                <div className="flex items-center mb-6 px-2 sm:px-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelProposalCreationMode}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:bg-accent hover:scale-105 focus:ring-2 focus:ring-ring focus:ring-offset-2 mr-4"
+                    aria-label="Cancel proposal creation and return to dashboard"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline text-sm font-medium">Back</span>
+                  </Button>
+                  <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">
+                    Create Proposal
+                  </h2>
+                </div>
+              )}
+
+              {/* CE/Quote Header */}
+              {ceQuoteMode && !proposalCreationMode && (
+                <div className="flex items-center mb-6 px-2 sm:px-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelCeQuote}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:bg-accent hover:scale-105 focus:ring-2 focus:ring-ring focus:ring-offset-2 mr-4"
+                    aria-label="Cancel site selection and return to dashboard"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline text-sm font-medium">Back</span>
+                  </Button>
+                  <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
+                    Select Sites
+                  </h2>
+                </div>
+              )}
+
               {/* Dashboard Header */}
               {!(proposalCreationMode || ceQuoteMode) && (
                 <div className="mb-6">
@@ -1334,30 +1402,31 @@ function SalesDashboardContent() {
                 </div>
               )}
 
-              {/* Search and Client Selection - Side by side layout */}
+              {/* Search and Client Selection - Responsive layout */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="flex items-center gap-4 mt-4 mb-4">
-                  {/* Search Bar */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-medium text-gray-900">Search:</span>
-                    <div className="relative w-[311px]">
-                      <Input
-                        placeholder="Search"
-                        value=""
-                        onChange={() => {}}
-                        className="h-[39px] text-sm border-gray-400 rounded-[10px]"
-                        aria-label="Search sites"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Client Selection */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-medium text-gray-900">Client:</span>
-                    <div className="relative w-[311px]" ref={clientSearchRef}>
+                <div className="mt-0.5 mb-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Search Bar */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">Search Sites</label>
                       <div className="relative">
                         <Input
-                          placeholder="Select client"
+                          placeholder="Search for sites..."
+                          value={siteSearchTerm}
+                          onChange={(e) => setSiteSearchTerm(e.target.value)}
+                          className="h-11 pl-4 pr-4 text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          aria-label="Search sites"
+                        />
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+
+                    {/* Client Selection */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">Select Client</label>
+                      <div className="relative" ref={clientSearchRef}>
+                        <Input
+                          placeholder="Choose a client..."
                           value={
                             selectedClientForProposal
                               ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
@@ -1374,81 +1443,142 @@ function SalesDashboardContent() {
                             }
                           }}
                           className={cn(
-                            "h-[39px] pr-10 text-sm rounded-[10px] border-gray-400",
-                            (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
+                            "h-11 pl-4 pr-10 text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all",
+                            (proposalCreationMode || ceQuoteMode) && selectedClientForProposal && "border-green-500 bg-green-50",
                           )}
                         />
-                        {isSearchingDashboardClients && (
+                        {isSearchingDashboardClients ? (
                           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                        ) : (
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        )}
+                        {/* Results dropdown */}
+                        {isClientDropdownOpen && (
+                          <Card className="absolute top-full z-50 mt-2 w-full shadow-xl border border-gray-200 rounded-lg animate-in slide-in-from-top-2 duration-200">
+                            <div className="max-h-60 overflow-y-auto">
+                              <div className="p-2">
+                                {/* Always show "Add New Client" option at the top */}
+                                <div
+                                  className="flex items-center gap-3 py-3 px-3 hover:bg-blue-50 cursor-pointer rounded-md text-sm mb-2 border-b border-gray-100 transition-colors"
+                                  onClick={() => setIsNewClientDialogOpen(true)}
+                                >
+                                  <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                                    <PlusCircle className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <span className="font-medium text-blue-700">Add New Client</span>
+                                </div>
+
+                                {dashboardClientSearchResults.length > 0 ? (
+                                  dashboardClientSearchResults.map((result) => (
+                                    <div
+                                      key={result.id}
+                                      className="flex items-center justify-between py-3 px-3 hover:bg-gray-50 cursor-pointer rounded-md text-sm transition-colors"
+                                      onClick={() => handleClientSelectOnDashboard(result)}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full">
+                                          <span className="text-xs font-medium text-gray-600">
+                                            {(result.company || result.name).charAt(0).toUpperCase()}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <p className="font-medium text-gray-900">
+                                            {result.name} {result.company && `(${result.company})`}
+                                          </p>
+                                          <p className="text-xs text-gray-500">{result.email}</p>
+                                        </div>
+                                      </div>
+                                      {selectedClientForProposal?.id === result.id && (
+                                        <CheckCircle className="h-5 w-5 text-green-500" />
+                                      )}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-center py-6">
+                                    <Search className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                    <p className="text-sm text-gray-500">
+                                      {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                                        ? `No clients found for "${dashboardClientSearchTerm}".`
+                                        : "Start typing to search for clients."}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
                         )}
                       </div>
-                      {/* Results dropdown */}
-                      {isClientDropdownOpen && (
-                        <Card className="absolute top-full z-50 mt-1 w-full shadow-lg">
-                          <div className="max-h-[200px] overflow-y-auto">
-                            <div className="p-2">
-                              {/* Always show "Add New Client" option at the top */}
-                              <div
-                                className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
-                                onClick={() => setIsNewClientDialogOpen(true)}
-                              >
-                                <PlusCircle className="h-4 w-4 text-blue-500" />
-                                <span className="font-medium text-blue-700">Add New Client</span>
-                              </div>
-
-                              {dashboardClientSearchResults.length > 0 ? (
-                                dashboardClientSearchResults.map((result) => (
-                                  <div
-                                    key={result.id}
-                                    className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                                    onClick={() => handleClientSelectOnDashboard(result)}
-                                  >
-                                    <div>
-                                      <p className="font-medium">
-                                        {result.name} ({result.company})
-                                      </p>
-                                      <p className="text-xs text-gray-500">{result.email}</p>
-                                    </div>
-                                    {selectedClientForProposal?.id === result.id && (
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    )}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-sm text-gray-500 text-center py-2">
-                                  {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                                    ? `No clients found for "${dashboardClientSearchTerm}".`
-                                    : "Start typing to search for clients."}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Static/Digital Toggle Buttons - Visible when proposalCreationMode OR ceQuoteMode is active */}
+              {/* Display Type Selection - Enhanced UX */}
               {(proposalCreationMode || ceQuoteMode) && (
-                <div className="flex items-center gap-4 mt-4 mb-4">
-                  <Button
-                    variant="default"
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold"
-                    aria-label="Select static display type"
-                    aria-pressed={true}
-                  >
-                    Static
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-gray-400 text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md font-medium"
-                    aria-label="Select digital display type"
-                    aria-pressed={false}
-                  >
-                    Digital
-                  </Button>
+                <div className="mb-2">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-700">Display Type</span>
+                      <div className="h-px bg-gray-200 flex-1"></div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant={selectedDisplayType === "static" ? "default" : "outline"}
+                          className={selectedDisplayType === "static"
+                            ? "bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
+                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                          }
+                          onClick={handleSelectStatic}
+                          aria-label="Select static display type"
+                          aria-pressed={selectedDisplayType === "static"}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "static" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
+                            Static
+                          </div>
+                        </Button>
+                        <Button
+                          variant={selectedDisplayType === "digital" ? "default" : "outline"}
+                          className={selectedDisplayType === "digital"
+                            ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
+                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                          }
+                          onClick={handleSelectDigital}
+                          aria-label="Select digital display type"
+                          aria-pressed={selectedDisplayType === "digital"}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "digital" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
+                            Digital
+                          </div>
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "grid" ? "bg-gray-100" : ""}`}
+                          onClick={() => setViewMode("grid")}
+                          aria-label="Switch to grid view"
+                        >
+                          <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                          onClick={() => setViewMode("list")}
+                          aria-label="Switch to list view"
+                        >
+                          <List className="w-4 h-4 text-[#b7b7b7]" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Choose the type of display for your campaign sites
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1631,7 +1761,7 @@ function SalesDashboardContent() {
               {!isSearching && (
                 <>
                   {/* Empty state */}
-                  {!loading && products.length === 0 && (
+                  {!loading && filteredProducts.length === 0 && (
                     <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
                       <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                         <MapPin size={24} className="text-gray-400" />
@@ -1642,15 +1772,15 @@ function SalesDashboardContent() {
                   )}
 
                   {/* Grid View */}
-                  {!loading && products.length > 0 && viewMode === "grid" && (
+                  {!loading && filteredProducts.length > 0 && viewMode === "grid" && (
                     <div className="flex-1 overflow-y-auto">
                       <ResponsiveCardGrid
                         mobileColumns={1}
                         tabletColumns={2}
                         desktopColumns={4}
-                        gap="lg"
+                        gap="xl"
                       >
-                        {products.map((product) => (
+                        {filteredProducts.map((product) => (
                           <ProductCard
                             key={product.id}
                             product={product}
@@ -1675,28 +1805,26 @@ function SalesDashboardContent() {
                   )}
 
                   {/* List View - Only show on tablet and desktop */}
-                  {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
+                  {!loading && filteredProducts.length > 0 && viewMode === "list" && !isMobile && (
                     <div className="flex-1 overflow-y-auto">
                       <div className="border rounded-lg overflow-hidden">
                         <div className="overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[80px]">Image</TableHead>
+                                <TableHead className="w-[80px]">Site</TableHead>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead className="hidden md:table-cell">Location</TableHead>
                                 <TableHead>Price</TableHead>
                                 <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {products.map((product) => (
+                              {filteredProducts.map((product) => (
                                 <TableRow
                                   key={product.id}
-                                  className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                                  className="cursor-pointer hover:bg-gray-50"
                                   onClick={() => {
                                     if (proposalCreationMode) {
                                       handleProductSelect(product)
@@ -1751,27 +1879,6 @@ function SalesDashboardContent() {
                                     {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
                                   </TableCell>
                                   <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
-                                  <TableCell>
-                                    {product.type?.toLowerCase() === "rental" &&
-                                      (productsWithBookings[product.id || ""] ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="bg-amber-50 text-amber-700 border-amber-200"
-                                        >
-                                          <CalendarIcon className="mr-1 h-3 w-3" /> Booked
-                                        </Badge>
-                                      ) : (
-                                        <Badge
-                                          variant="outline"
-                                          className="bg-green-50 text-green-700 border-green-200"
-                                        >
-                                          <CheckCircle2 className="mr-1 h-3 w-3" /> Available
-                                        </Badge>
-                                      ))}
-                                  </TableCell>
-                                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    {/* Edit and delete buttons removed */}
-                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -1792,7 +1899,7 @@ function SalesDashboardContent() {
                   )}
 
                   {/* Pagination Controls */}
-                  {!loading && products.length > 0 && (
+                  {!loading && filteredProducts.length > 0 && (
                     <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
                       <div className="text-sm text-gray-500 flex items-center">
                         {loadingCount ? (
@@ -1802,7 +1909,7 @@ function SalesDashboardContent() {
                           </div>
                         ) : (
                           <span>
-                            Page {currentPage} of {totalPages} ({products.length} items)
+                            Page {currentPage} of {totalPages} ({filteredProducts.length} items)
                           </span>
                         )}
                       </div>
@@ -1857,7 +1964,7 @@ function SalesDashboardContent() {
 
 {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
 {proposalCreationMode && (
-  <div className="flex flex-col gap-4 pt-4 md:pt-6 h-[calc(100vh-120px)]">
+  <div className="flex flex-col gap-4 mt-24 h-[calc(100vh-120px)]">
     <ProposalHistory
       selectedClient={selectedClientForProposal}
       onCopySites={handleCopySitesFromProposal}
@@ -1902,93 +2009,42 @@ function SalesDashboardContent() {
           </div>
         )}
 
-        {/* CE/Quote Button - Fixed position when in CE mode */}
-        {ceQuoteMode && selectedSites.length > 0 && (
+        {/* CE/Quote Button - Fixed position when in CE/Quote mode */}
+        {ceQuoteMode && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            {ceMode && (
-              <Button
-                onClick={openCreateCostEstimateDateDialog}
-                className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
-                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-              >
-                {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="h-4 w-4" />
-                    Create Cost Estimate
-                  </>
-                )}
-              </Button>
-            )}
-            {quoteMode && (
-              <Button
-                onClick={openCreateQuotationDateDialog}
-                className="gap-2 bg-green-600 text-white hover:bg-green-700"
-                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-              >
-                {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Create Quotation
-                  </>
-                )}
-              </Button>
-            )}
+            <div className="bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 min-w-[350px] max-w-[450px]">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm font-medium text-gray-600 flex-shrink-0">
+                  {selectedSites.length} site{selectedSites.length !== 1 ? 's' : ''} selected
+                </div>
+                <Button
+                  onClick={ceMode ? openCreateCostEstimateDateDialog : openCreateQuotationDateDialog}
+                  disabled={!selectedClientForProposal || selectedSites.length === 0 || isCreatingDocument}
+                  className={`flex-1 h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
+                    selectedClientForProposal && selectedSites.length > 0
+                      ? ceMode
+                        ? "bg-gray-600 hover:bg-gray-700 text-white"
+                        : "bg-green-600 hover:bg-green-700 text-white"
+                      : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                  }`}
+                  aria-label={`${ceMode ? 'Create cost estimate' : 'Create quotation'} with ${selectedSites.length} selected sites`}
+                >
+                  {isCreatingDocument ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Next →
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
-        {ceMode && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
-            <Button
-              onClick={openCreateCostEstimateDateDialog}
-              className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
-              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-            >
-              {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Calculator className="h-4 w-4" />
-                  Create Cost Estimate
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {quoteMode && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 p-4 bg-white border rounded-lg shadow-lg z-50">
-            <Button
-              onClick={openCreateQuotationDateDialog}
-              className="gap-2 bg-green-600 text-white hover:bg-green-700"
-              disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
-            >
-              {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4" />
-                  Create Quotation
-                </>
-              )}
-            </Button>
-          </div>
-        )}
 
         {/* Date Range Selection Dialog */}
         <DateRangeCalendarDialog
@@ -2136,32 +2192,18 @@ function ProductCard({
           </div>
         )}
 
-        {/* Site Photo label */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-semibold text-black bg-white bg-opacity-80 px-3 py-1 rounded-md">
-            Site Photo
-          </span>
-        </div>
       </div>
 
       <div className="p-4">
         <div className="space-y-2">
-          <div className="text-sm text-gray-500 font-medium">Site Code</div>
-          <div className="text-sm text-black font-medium">{siteCode || "N/A"}</div>
-
-          <div className="text-sm text-black font-medium">Site Name</div>
-          <div className="text-sm text-black font-medium line-clamp-1">{product.name}</div>
-
-          <div className="text-sm text-black font-medium">Location</div>
-          <div className="text-sm text-black font-medium flex items-center">
-            <MapPin size={12} className="mr-1 flex-shrink-0" />
-            <span className="truncate">{location}</span>
-          </div>
-
-          <div className="text-sm text-black font-medium">PRICE</div>
-          <div className="text-sm font-medium text-green-700">{formattedPrice}</div>
+          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
+          <div className="text-sm text-black font-medium">{product.name}</div>
+          <div className="text-sm text-black font-medium truncate">{location}</div>
+          <div className="text-sm text-black font-medium">{formattedPrice}</div>
         </div>
       </div>
     </div>
   )
 }
+
+

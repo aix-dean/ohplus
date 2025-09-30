@@ -61,7 +61,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     companyPhone: "", // Separate field for company phone
     address: client?.address || "",
     companyLogoUrl: client?.companyLogoUrl || "",
-    name: client?.name || "", // Contact Person Name
+    prefix: "Mr.", // Contact Person Prefix
+    firstName: "", // Contact Person First Name
+    lastName: "", // Contact Person Last Name
     designation: client?.designation || "", // New field
     contactPhone: client?.phone || "+63", // Separate field for contact phone with +63 prefix
     email: client?.email || "", // Contact Details Email
@@ -72,10 +74,15 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const [validationErrors, setValidationErrors] = useState({
     clientType: false,
     partnerType: false,
-    name: false,
+    firstName: false,
+    lastName: false,
+    designation: false,
     contactPhone: false,
     email: false,
     phoneFormat: false,
+    companyPhoneFormat: false,
+    websiteFormat: false,
+    prefix: false,
   })
 
   const fetchCompanies = async () => {
@@ -121,10 +128,12 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company: client?.company || "",
         industry: client?.industry || "",
         website: (client as any)?.website || "",
-        companyPhone: "",
+        companyPhone: "+02",
         address: client?.address || "",
         companyLogoUrl: client?.companyLogoUrl || "",
-        name: client?.name || "",
+        prefix: "Mr.",
+        firstName: client?.name || "",
+        lastName: "",
         designation: client?.designation || "",
         contactPhone: client?.phone || "+63",
         email: client?.email || "",
@@ -132,16 +141,21 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       })
       setLogoFile(null) // Clear selected file
       setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
-      setShowNewCompanyInput(false)
+      setShowNewCompanyInput(!client) // Default to new company input for new clients
       setNewCompanyName("")
       // Reset validation errors
       setValidationErrors({
         clientType: false,
         partnerType: false,
-        name: false,
+        firstName: false,
+        lastName: false,
+        designation: false,
         contactPhone: false,
         email: false,
         phoneFormat: false,
+        companyPhoneFormat: false,
+        websiteFormat: false,
+        prefix: false,
       })
       fetchCompanies()
 
@@ -155,6 +169,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
               componentRestrictions: { country: "ph" }, // Restrict to Philippines
               fields: ["place_id", "geometry", "name", "formatted_address"],
             })
+
+            // Set initial value after autocomplete is attached
+            addressInputRef.current.value = formData.address
 
             addressAutocompleteRef.current.addListener("place_changed", () => {
               const place = addressAutocompleteRef.current.getPlace()
@@ -172,6 +189,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       setTimeout(initializeAutocomplete, 100)
     }
   }, [open, client, userData?.company_id]) // Added userData?.company_id to dependency array
+
+  // Sync input value when formData.address changes (e.g., from company selection)
+  useEffect(() => {
+    if (addressInputRef.current && addressAutocompleteRef.current) {
+      addressInputRef.current.value = formData.address
+    }
+  }, [formData.address])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -206,6 +230,12 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     return phoneRegex.test(phone.replace(/\s/g, ''))
   }
 
+  const validateCompanyPhoneFormat = (phone: string): boolean => {
+    // Check if phone is exactly +02 followed by 7 digits (Philippines landline format)
+    const phoneRegex = /^\+02\d{7}$/
+    return phoneRegex.test(phone.replace(/\s/g, ''))
+  }
+
   const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\s/g, '') // Remove spaces
 
@@ -237,12 +267,40 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
   }
 
+  const handleCompanyPhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+
+    // Always ensure +02 prefix is present
+    if (!value.startsWith('+02')) {
+      if (value && /^\d/.test(value)) {
+        // If user types digits, add +02 prefix
+        value = '+02' + value.replace(/\D/g, '').substring(0, 7)
+      } else {
+        // If empty or doesn't start with digits, set to +02
+        value = '+02'
+      }
+    } else {
+      // If it starts with +02, ensure only digits after and limit to 7
+      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
+      value = '+02' + digitsAfterPrefix.substring(0, 7) // Limit to 7 digits
+    }
+
+    // Update form data
+    setFormData((prev) => ({ ...prev, companyPhone: value }))
+
+    // Clear validation error when user types
+    if (validationErrors.companyPhoneFormat) {
+      setValidationErrors((prev) => ({ ...prev, companyPhoneFormat: false }))
+    }
+  }
+
   const scrollToFirstError = () => {
     // Define the order of fields to check for errors
     const fieldOrder = [
       'clientType',
       'partnerType',
-      'name',
+      'prefix',
+      'firstName',
       'contactPhone',
       'phoneFormat',
       'email'
@@ -257,8 +315,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           element = document.getElementById('clientType')
         } else if (fieldName === 'partnerType') {
           element = document.getElementById('partnerType')
-        } else if (fieldName === 'name') {
-          element = document.getElementById('name')
+        } else if (fieldName === 'prefix') {
+          element = document.getElementById('prefix')
+        } else if (fieldName === 'firstName') {
+          element = document.getElementById('firstName')
         } else if (fieldName === 'contactPhone') {
           element = document.getElementById('contactPhone')
         } else if (fieldName === 'email') {
@@ -298,7 +358,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         clientType: "",
         partnerType: "",
         website: "",
-        phone: "",
+        companyPhone: "+02",
         companyLogoUrl: "",
       }))
       setLogoPreviewUrl(null)
@@ -315,7 +375,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           partnerType: selectedCompany.partnerType || "",
           website: (selectedCompany as any).website || "",
           companyLogoUrl: selectedCompany.companyLogoUrl || "",
-          name: "",
+          prefix: "Mr.",
+          firstName: "",
+          lastName: "",
           designation: "",
           email: "",
         }))
@@ -456,11 +518,32 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
 
     // Validate required contact fields
-    if (!formData.name.trim()) {
-      newValidationErrors.name = true
+    if (!formData.prefix.trim()) {
+      newValidationErrors.prefix = true
       hasErrors = true
     } else {
-      newValidationErrors.name = false
+      newValidationErrors.prefix = false
+    }
+
+    if (!formData.firstName.trim()) {
+      newValidationErrors.firstName = true
+      hasErrors = true
+    } else {
+      newValidationErrors.firstName = false
+    }
+
+    if (!formData.lastName.trim()) {
+      newValidationErrors.lastName = true
+      hasErrors = true
+    } else {
+      newValidationErrors.lastName = false
+    }
+
+    if (!formData.designation.trim()) {
+      newValidationErrors.designation = true
+      hasErrors = true
+    } else {
+      newValidationErrors.designation = false
     }
 
     if (!formData.contactPhone.trim()) {
@@ -492,6 +575,36 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       }
     } else {
       newValidationErrors.phoneFormat = false
+    }
+
+    // Validate company phone format (only if provided)
+    if (formData.companyPhone.trim()) {
+      if (formData.companyPhone === '+02') {
+        // If only +02 is entered, it's incomplete
+        newValidationErrors.companyPhoneFormat = true
+        hasErrors = true
+      } else if (!validateCompanyPhoneFormat(formData.companyPhone)) {
+        // If format is invalid
+        newValidationErrors.companyPhoneFormat = true
+        hasErrors = true
+      } else {
+        newValidationErrors.companyPhoneFormat = false
+      }
+ 
+      // Validate website URL format (only if provided)
+      if (formData.website.trim()) {
+        const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
+        if (!urlRegex.test(formData.website)) {
+          newValidationErrors.websiteFormat = true
+          hasErrors = true
+        } else {
+          newValidationErrors.websiteFormat = false
+        }
+      } else {
+        newValidationErrors.websiteFormat = false
+      }
+    } else {
+      newValidationErrors.companyPhoneFormat = false
     }
 
     setValidationErrors(newValidationErrors)
@@ -537,7 +650,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company_id: finalCompanyId,
         company: finalCompanyName,
         companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
-        name: formData.name || "",
+        name: `${formData.firstName} ${formData.lastName}`.trim() || "",
         email: formData.email || "",
         phone: formData.contactPhone || "",
         industry: formData.industry || "",
@@ -580,272 +693,277 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Client</DialogTitle>
+          <DialogTitle>Add new client</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="company">Company Name:</Label>
-              {!showNewCompanyInput ? (
-                <Select value={formData.company_id} onValueChange={handleCompanySelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Select or add company"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="add_new">+ Add New Company</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="flex gap-2">
-                  <Input
-                    value={newCompanyName}
-                    onChange={(e) => setNewCompanyName(e.target.value)}
-                    placeholder="Enter new company name"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowNewCompanyInput(false)
-                      setNewCompanyName("")
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {showNewCompanyInput && (
-              <>
-                {/* Industry and Client Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="industry">Industry:</Label>
-                  <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="-Select an Industry-" />
+          <div className="flex gap-8">
+            {/* Left Section: Company Fields */}
+            <div className="flex-1 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="company" className="text-[#333333] text-sm font-medium">
+                  Company Name <span className="text-[#f95151]">*</span>
+                </Label>
+                {!showNewCompanyInput ? (
+                  <Select value={formData.company_id} onValueChange={handleCompanySelect}>
+                    <SelectTrigger className="h-10 border-[#c4c4c4]">
+                      <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Select or add company"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="automotive">Automotive</SelectItem>
-                      <SelectItem value="banking">Banking & Financial Services</SelectItem>
-                      <SelectItem value="beverages">Beverages</SelectItem>
-                      <SelectItem value="fast_food">Fast Food & QSR</SelectItem>
-                      <SelectItem value="retail">Retail & Shopping</SelectItem>
-                      <SelectItem value="telecom">Telecommunications</SelectItem>
-                      <SelectItem value="pharmaceuticals">Pharmaceuticals</SelectItem>
-                      <SelectItem value="real_estate">Real Estate</SelectItem>
-                      <SelectItem value="government">Government & Public Services</SelectItem>
-                      <SelectItem value="fmcg">FMCG</SelectItem>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="entertainment">Entertainment & Media</SelectItem>
-                      <SelectItem value="travel">Travel & Tourism</SelectItem>
-                      <SelectItem value="education">Education</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="add_new">+ Add New Company</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="clientType">Client Type <span className="text-red-500">*</span></Label>
-                  <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
-                    <SelectTrigger id="clientType" className={`h-10 ${validationErrors.clientType ? 'border-red-500 focus:border-red-500' : ''}`}>
-                      <SelectValue placeholder="Select client type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="partner">Partner</SelectItem>
-                      <SelectItem value="brand">Brand</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {validationErrors.clientType && (
-                    <p className="text-sm text-red-500">Client type is required</p>
-                  )}
-                </div>
-
-                {formData.clientType === "partner" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="partnerType">Partner Type <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={formData.partnerType}
-                      onValueChange={(value) => handleSelectChange("partnerType", value)}
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      placeholder="Enter new company name"
+                      required
+                      className="h-10 border-[#c4c4c4]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowNewCompanyInput(false)
+                        setNewCompanyName("")
+                      }}
+                      className="border-[#c4c4c4]"
                     >
-                      <SelectTrigger id="partnerType" className={`h-10 ${validationErrors.partnerType ? 'border-red-500 focus:border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select partner type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="operator">Operator</SelectItem>
-                        <SelectItem value="agency">Agency</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.partnerType && (
-                      <p className="text-sm text-red-500">Partner type is required</p>
-                    )}
+                      Cancel
+                    </Button>
                   </div>
                 )}
+              </div>
 
-                {/* Address and Website */}
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Company Address:</Label>
-                  <Input
-                    ref={addressInputRef}
-                    id="address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    placeholder="Start typing to search for addresses..."
-                    className="h-10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="website">Company Website:</Label>
-                  <Input
-                    id="website"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleChange}
-                    placeholder="Company Website"
-                    className="h-10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Company Phone #:</Label>
-                  <Input
-                    id="companyPhone"
-                    name="companyPhone"
-                    value={formData.companyPhone}
-                    onChange={handleChange}
-                    placeholder="Company Phone #"
-                    className="h-10"
-                  />
-                </div>
-
-                {/* Company Logo */}
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="companyLogo">Company Logo: <span className="text-green-600">(Optional)</span></Label>
-                  <div
-                    className="w-24 h-24 border border-gray-300 rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
-                    onClick={handleLogoClick}
-                  >
-                    {logoPreviewUrl ? (
-                      <img
-                        src={logoPreviewUrl || "/placeholder.svg"}
-                        alt="Company Logo Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Plus className="h-8 w-8 text-gray-400" />
+              {showNewCompanyInput && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientType" className="text-[#333333] text-sm font-medium">
+                      Client Type <span className="text-[#f95151]">*</span>
+                    </Label>
+                    <Select value={formData.clientType} onValueChange={(value) => handleSelectChange("clientType", value)}>
+                      <SelectTrigger id="clientType" className={`h-10 border-[#c4c4c4] ${validationErrors.clientType ? 'border-[#f95151]' : ''}`}>
+                        <SelectValue placeholder="Select client type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="partner">Partner</SelectItem>
+                        <SelectItem value="brand">Brand</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.clientType && (
+                      <p className="text-sm text-[#f95151]">Client type is required</p>
                     )}
                   </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept="image/*"
-                  />
-                </div>
 
-                {/* Compliance Section */}
-                <div className="md:col-span-2">
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Compliance</h3>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-700">DTI/BIR 2303</span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs bg-transparent"
-                          onClick={() => handleComplianceUpload("dti")}
-                        >
-                          {complianceFiles.dti ? complianceFiles.dti.name : "Upload Document"}
-                        </Button>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-700">G.I.S.</span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs bg-transparent"
-                          onClick={() => handleComplianceUpload("gis")}
-                        >
-                          {complianceFiles.gis ? complianceFiles.gis.name : "Upload Document"}
-                        </Button>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-700">ID with signature</span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs bg-transparent"
-                          onClick={() => handleComplianceUpload("id")}
-                        >
-                          {complianceFiles.id ? complianceFiles.id.name : "Upload Document"}
-                        </Button>
-                      </div>
+                  {formData.clientType === "partner" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="partnerType" className="text-[#333333] text-sm font-medium">
+                        Type <span className="text-[#f95151]">*</span>
+                      </Label>
+                      <Select
+                        value={formData.partnerType}
+                        onValueChange={(value) => handleSelectChange("partnerType", value)}
+                      >
+                        <SelectTrigger id="partnerType" className={`h-10 border-[#c4c4c4] ${validationErrors.partnerType ? 'border-[#f95151]' : ''}`}>
+                          <SelectValue placeholder="Select partner type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="operator">Operator</SelectItem>
+                          <SelectItem value="agency">Agency</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {validationErrors.partnerType && (
+                        <p className="text-sm text-[#f95151]">Partner type is required</p>
+                      )}
                     </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address" className="text-[#333333] text-sm font-medium">
+                      Company Address
+                    </Label>
+                    <Input
+                      ref={addressInputRef}
+                      id="address"
+                      name="address"
+                      placeholder="Start typing to search for addresses..."
+                      className="h-10 border-[#c4c4c4]"
+                      onBlur={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+                    />
                   </div>
-                </div>
-              </>
-            )}
 
-            {/* Hide client type, industry, address, and logo when selecting existing company */}
-            {/* These fields are only shown when creating a new company (showNewCompanyInput = true) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPhone" className="text-[#333333] text-sm font-medium">
+                      Company Landline
+                    </Label>
+                    <Input
+                      id="companyPhone"
+                      name="companyPhone"
+                      value={formData.companyPhone}
+                      onChange={handleCompanyPhoneInput}
+                      placeholder="+02 1234567"
+                      className={`h-10 border-[#c4c4c4] ${validationErrors.companyPhoneFormat ? 'border-[#f95151]' : ''}`}
+                    />
+                    {validationErrors.companyPhoneFormat && (
+                      <p className="text-sm text-[#f95151]">Please enter exactly 7 digits after +02</p>
+                    )}
+                  </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="name">Contact Person <span className="text-red-500">*</span></Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Name"
-                className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
-              />
-              {validationErrors.name && (
-                <p className="text-sm text-red-500">Contact person name is required</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="companyLogo" className="text-[#333333] text-sm font-medium">
+                      Company Logo
+                    </Label>
+                    <div
+                      className="w-24 h-24 border border-[#c4c4c4] rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
+                      onClick={handleLogoClick}
+                    >
+                      {logoPreviewUrl ? (
+                        <img
+                          src={logoPreviewUrl || "/placeholder.svg"}
+                          alt="Company Logo Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Plus className="h-8 w-8 text-gray-400" />
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="website" className="text-[#333333] text-sm font-medium">
+                      Company Website
+                    </Label>
+                    <Input
+                      id="website"
+                      name="website"
+                      value={formData.website}
+                      onChange={handleChange}
+                      placeholder="https://example.com"
+                      className={`h-10 border-[#c4c4c4] ${validationErrors.websiteFormat ? 'border-[#f95151]' : ''}`}
+                    />
+                    {validationErrors.websiteFormat && (
+                      <p className="text-sm text-[#f95151]">Please enter a valid URL (e.g., https://example.com)</p>
+                    )}
+                  </div>
+                </>
               )}
-              <Input
-                id="designation"
-                name="designation"
-                value={formData.designation}
-                onChange={handleChange}
-                placeholder="Designation"
-              />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>Contact Details:</Label>
+            {/* Vertical Line */}
+            <div className="w-px bg-[#c4c4c4] opacity-50"></div>
+
+            {/* Right Section: Contact Person Fields */}
+            <div className="flex-1 space-y-4">
               <div className="space-y-2">
+                <Label className="text-[#333333] text-sm font-medium">
+                  Contact Person
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label htmlFor="prefix" className="text-[#a1a1a1] text-sm">
+                      Prefix <span className="text-[#f95151]">*</span>
+                    </Label>
+                    <Select value={formData.prefix} onValueChange={(value) => handleSelectChange("prefix", value)}>
+                      <SelectTrigger id="prefix" className={`h-10 border-[#c4c4c4] ${validationErrors.prefix ? 'border-[#f95151]' : ''}`}>
+                        <SelectValue placeholder="Select prefix" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Mrs.">Mrs.</SelectItem>
+                        <SelectItem value="Ms.">Ms.</SelectItem>
+                        <SelectItem value="Dr.">Dr.</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.prefix && (
+                      <p className="text-sm text-[#f95151]">Prefix is required</p>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="firstName" className="text-[#a1a1a1] text-sm">
+                      First Name <span className="text-[#f95151]">*</span>
+                    </Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      placeholder="First Name"
+                      className={`h-10 border-[#c4c4c4] ${validationErrors.firstName ? 'border-[#f95151]' : ''}`}
+                    />
+                    {validationErrors.firstName && (
+                      <p className="text-sm text-[#f95151]">First name is required</p>
+                    )}
+                  </div>
+                </div>
                 <div>
+                  <Label htmlFor="lastName" className="text-[#a1a1a1] text-sm">
+                    Last Name <span className="text-[#f95151]">*</span>
+                  </Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="Last Name"
+                    className={`h-10 border-[#c4c4c4] ${validationErrors.lastName ? 'border-[#f95151]' : ''}`}
+                  />
+                  {validationErrors.lastName && (
+                    <p className="text-sm text-[#f95151]">Last name is required</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="designation" className="text-[#a1a1a1] text-sm">
+                    Designation <span className="text-[#f95151]">*</span>
+                  </Label>
+                  <Input
+                    id="designation"
+                    name="designation"
+                    value={formData.designation}
+                    onChange={handleChange}
+                    placeholder="Designation"
+                    className={`h-10 border-[#c4c4c4] ${validationErrors.designation ? 'border-[#f95151]' : ''}`}
+                  />
+                  {validationErrors.designation && (
+                    <p className="text-sm text-[#f95151]">Designation is required</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="contactPhone" className="text-[#a1a1a1] text-sm">
+                    Contact No. <span className="text-[#f95151]">*</span>
+                  </Label>
                   <Input
                     id="contactPhone"
                     name="contactPhone"
                     value={formData.contactPhone}
                     onChange={handlePhoneInput}
                     placeholder="Enter 10 digits"
-                    className={(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
+                    className={`h-10 border-[#c4c4c4] ${(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-[#f95151]' : ''}`}
                   />
                   {validationErrors.contactPhone && (
-                    <p className="text-sm text-red-500">Phone number is required</p>
+                    <p className="text-sm text-[#f95151]">Phone number is required</p>
                   )}
                   {validationErrors.phoneFormat && !validationErrors.contactPhone && (
-                    <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
+                    <p className="text-sm text-[#f95151]">Please enter exactly 10 digits</p>
                   )}
                 </div>
                 <div>
+                  <Label htmlFor="email" className="text-[#a1a1a1] text-sm">
+                    Email Address <span className="text-[#f95151]">*</span>
+                  </Label>
                   <Input
                     id="email"
                     name="email"
@@ -853,23 +971,28 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Email Address"
-                    className={validationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+                    className={`h-10 border-[#c4c4c4] ${validationErrors.email ? 'border-[#f95151]' : ''}`}
                   />
                   {validationErrors.email && (
-                    <p className="text-sm text-red-500">Email address is required</p>
+                    <p className="text-sm text-[#f95151]">Email address is required</p>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save Client Information"}
-            </Button>
+          <div className="flex justify-between items-center mt-8">
+            <p className="text-[#333333] text-sm">
+              Fields marked <span className="text-[#f95151]">*</span> are required
+            </p>
+            <div className="flex space-x-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="px-6 py-3 border-[#c4c4c4] text-[#333333]">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading} className="px-6 py-3 bg-[#1d0beb] hover:bg-blue-700 text-white">
+                {loading ? "Saving..." : "Save"}
+              </Button>
+            </div>
           </div>
         </form>
 

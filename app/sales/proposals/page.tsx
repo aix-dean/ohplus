@@ -26,6 +26,8 @@ import {
   XCircle,
   Send,
   Calculator,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
@@ -41,7 +43,6 @@ function ProposalsPageContent() {
   const [filteredProposals, setFilteredProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [lastDoc, setLastDoc] = useState<any>(null)
@@ -54,6 +55,7 @@ function ProposalsPageContent() {
   const { isMobile } = useResponsive()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("proposals")
+  const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (user?.uid) {
@@ -63,9 +65,9 @@ function ProposalsPageContent() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadProposals(1, true) // Reset to first page when search/filter changes
+      loadProposals(1, true) // Reset to first page when search changes
     }
-  }, [searchTerm, statusFilter])
+  }, [searchTerm])
 
   useEffect(() => {
     const success = searchParams.get("success")
@@ -88,7 +90,7 @@ function ProposalsPageContent() {
         itemsPerPage,
         lastDocToUse,
         searchTerm,
-        statusFilter === "all" ? null : statusFilter
+        null
       )
 
       setProposals(result.items)
@@ -101,7 +103,7 @@ function ProposalsPageContent() {
       const count = await getProposalsCountByUserId(
         user.uid,
         searchTerm,
-        statusFilter === "all" ? null : statusFilter
+        null
       )
       setTotalCount(count)
     } catch (error) {
@@ -178,11 +180,10 @@ function ProposalsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        <div className="mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Proposals</h1>
+    <>
+      <div className="bg-white rounded-tl-[10px] rounded-tr-[10px] p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">Proposals</h1>
             <Button
               onClick={() => router.push("/sales/dashboard?action=create-proposal")}
               className="bg-blue-600 hover:bg-blue-700"
@@ -192,100 +193,53 @@ function ProposalsPageContent() {
             </Button>
           </div>
 
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search proposals or clients..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-400" />
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40 border-gray-200 rounded-lg">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="sent">Sent</SelectItem>
-                      <SelectItem value="viewed">Viewed</SelectItem>
-                      <SelectItem value="accepted">Accepted</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="mb-6">
+            <div className="relative w-96">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search proposals or clients..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
+              />
+            </div>
+          </div>
 
-        {loading ? (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Created</TableHead>
-                  <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i} className="border-b border-gray-100">
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-48 mb-1" />
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-8 w-8 rounded-full" />
-                        <div>
-                          <Skeleton className="h-5 w-28 mb-1" />
-                          <Skeleton className="h-4 w-20" />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-12 mx-auto" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell className="text-right py-3">
-                      <Skeleton className="h-8 w-8 ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        ) : filteredProposals.length === 0 ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="text-center py-12">
+          {loading ? (
+            <div>
+              <div className="grid grid-cols-6 gap-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900 mb-4">
+                <div>Date</div>
+                <div>Proposal ID</div>
+                <div>Company</div>
+                <div>Contact Person</div>
+                <div>Sites</div>
+                <div className="text-right">Actions</div>
+              </div>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-6 gap-4 py-4 border-b border-gray-100">
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-8 w-8 ml-auto" />
+                </div>
+              ))}
+            </div>
+          ) : filteredProposals.length === 0 ? (
+            <div className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || statusFilter !== "all" ? "No proposals found" : "No proposals yet"}
+                {searchTerm ? "No proposals found" : "No proposals yet"}
               </h3>
               <p className="text-gray-600 mb-6">
-                {searchTerm || statusFilter !== "all"
-                  ? "Try adjusting your search or filter criteria"
+                {searchTerm
+                  ? "Try adjusting your search criteria"
                   : "Create your first proposal to get started"}
               </p>
-              {!searchTerm && statusFilter === "all" && (
+              {!searchTerm && (
                 <Button
                   onClick={() => router.push("/sales/proposals/create")}
                   className="bg-blue-600 hover:bg-blue-700"
@@ -294,72 +248,80 @@ function ProposalsPageContent() {
                   Create Proposal
                 </Button>
               )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Created</TableHead>
-                  <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProposals.map((proposal) => {
-                  const statusConfig = getStatusConfig(proposal.status)
-                  const StatusIcon = statusConfig.icon
-
-                  return (
-                    <TableRow
+            </div>
+          ) : (
+            <div>
+              <div className="grid grid-cols-6 gap-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900 mb-4">
+                <div>Date</div>
+                <div>Proposal ID</div>
+                <div>Company</div>
+                <div>Contact Person</div>
+                <div>Sites</div>
+                <div className="text-right">Actions</div>
+              </div>
+              {filteredProposals.map((proposal) => {
+                return (
+                  <>
+                    <div
                       key={proposal.id}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                      className="grid grid-cols-6 gap-4 py-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                       onClick={() => handleViewProposal(proposal.id)}
                     >
-                      <TableCell className="py-3">
-                        <div>
-                          <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
-                          <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-gray-600" />
+                      <div className="text-sm text-gray-600">
+                        {(() => {
+                          if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
+                            return "N/A"
+                          }
+                          return format(proposal.createdAt, "MMM d, yyyy")
+                        })()}
+                      </div>
+                      <div className="text-sm text-gray-900">{proposal.id.slice(0, 8)}...</div>
+                      <div className="text-sm text-gray-900">{proposal.client.company}</div>
+                      <div className="text-sm text-gray-900">{proposal.client.contactPerson}</div>
+                      <div className="flex flex-col">
+                        <button
+                          className="flex items-center gap-1 text-sm text-gray-900 hover:text-blue-600"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedProposals(prev => {
+                              const newSet = new Set(prev)
+                              if (newSet.has(proposal.id)) {
+                                newSet.delete(proposal.id)
+                              } else {
+                                newSet.add(proposal.id)
+                              }
+                              return newSet
+                            })
+                          }}
+                        >
+                          {proposal.products.length}
+                          {expandedProposals.has(proposal.id) ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                        {expandedProposals.has(proposal.id) && (
+                          <div className="mt-2 space-y-1">
+                            {proposal.products.map((product, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                style={{
+                                  animationDelay: `${i * 50}ms`,
+                                  animationDuration: "200ms",
+                                }}
+                              >
+                                <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                  <CheckCircle className="w-2 h-2 text-white" />
+                                </div>
+                                <span className="text-gray-700">{product.location || product.name || `Site ${i + 1}`}</span>
+                              </div>
+                            ))}
                           </div>
-                          <div>
-                            <div className="font-medium text-gray-900">{proposal.client.company}</div>
-                            <div className="text-sm text-gray-500">{proposal.client.contactPerson}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-center">
-                          <div className="font-semibold text-gray-900">{proposal.products.length}</div>
-                          <div className="text-xs text-gray-500">
-                            product{proposal.products.length !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-sm text-gray-600 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {(() => {
-                            if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
-                              return "N/A"
-                            }
-                            return format(proposal.createdAt, "MMM d, yyyy")
-                          })()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
+                        )}
+                      </div>
+                      <div className="text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -381,27 +343,28 @@ function ProposalsPageContent() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+                      </div>
+                    </div>
+                  </>
+                )
+              })}
+            </div>
+          )}
 
-        {/* Pagination */}
-        {!loading && filteredProposals.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            itemsPerPage={itemsPerPage}
-            totalItems={filteredProposals.length}
-            onNextPage={handleNextPage}
-            onPreviousPage={handlePreviousPage}
-            hasMore={hasMore}
-          />
-        )}
-      </div>
+          {/* Pagination */}
+          {!loading && filteredProposals.length > 0 && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredProposals.length}
+                onNextPage={handleNextPage}
+                onPreviousPage={handlePreviousPage}
+                hasMore={hasMore}
+              />
+            </div>
+          )}
+        </div>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
@@ -417,7 +380,7 @@ function ProposalsPageContent() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
 
