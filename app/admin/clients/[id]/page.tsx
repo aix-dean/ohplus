@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Edit, Search, Printer, Plus, FileText, Upload, X, Check, Trash2 } from "lucide-react"
 import {
   Dialog,
@@ -35,6 +36,8 @@ interface Company {
   clientType: string
   partnerType?: string
   companyLogoUrl?: string
+  website?: string
+  phone?: string
   contactPersons?: Array<{
     name: string
     email: string
@@ -143,7 +146,7 @@ interface Quotation {
   user_id: string;
 }
  
- export default function ClientInformationPage() {
+ export default function AdminClientInformationPage() {
    const router = useRouter()
    const params = useParams()
    const { userData } = useAuth()
@@ -215,6 +218,22 @@ interface Quotation {
    const [reservationsTotalPages, setReservationsTotalPages] = useState(1)
    const [reservationsTotalItems, setReservationsTotalItems] = useState(0)
    const [loadingReservations, setLoadingReservations] = useState(false)
+
+   // Edit company dialog state
+   const [showEditDialog, setShowEditDialog] = useState(false)
+   const [editCompanyFormData, setEditCompanyFormData] = useState({
+     name: "",
+     address: "",
+     industry: "",
+     clientType: "",
+     partnerType: "",
+     website: "",
+     phone: "",
+     companyLogoUrl: "",
+   })
+   const [logoFile, setLogoFile] = useState<File | null>(null)
+   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+   const fileInputRef = useRef<HTMLInputElement>(null)
 
    const ITEMS_PER_PAGE = 10
 
@@ -329,6 +348,8 @@ interface Quotation {
           clientType: data.clientType || "",
           partnerType: data.partnerType || "",
           companyLogoUrl: data.companyLogoUrl || "",
+          website: data.website || "",
+          phone: data.phone || "",
           contactPersons: data.contactPersons || [],
           compliance: {
             dti: data.compliance?.dti || "",
@@ -340,7 +361,7 @@ interface Quotation {
         })
       } else {
         toast.error("Client not found")
-        router.push("/sales/clients")
+        router.push("/admin/clients")
       }
     } catch (error) {
       console.error("Error loading client data:", error)
@@ -974,6 +995,53 @@ interface Quotation {
     }
   }
  
+   const handleSaveEdit = async () => {
+     if (!company) return
+
+     try {
+       let finalCompanyLogoUrl = editCompanyFormData.companyLogoUrl
+
+       if (logoFile) {
+         const uploadPath = `company_logos/${company.id}/`
+         finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
+       }
+
+       await updateDoc(doc(db, "client_company", company.id), {
+         name: editCompanyFormData.name,
+         address: editCompanyFormData.address,
+         industry: editCompanyFormData.industry,
+         clientType: editCompanyFormData.clientType,
+         partnerType: editCompanyFormData.partnerType,
+         website: editCompanyFormData.website,
+         phone: editCompanyFormData.phone,
+         companyLogoUrl: finalCompanyLogoUrl,
+         updated: new Date()
+       })
+
+       setCompany(prev => prev ? { ...prev, ...editCompanyFormData, companyLogoUrl: finalCompanyLogoUrl } : null)
+       setShowEditDialog(false)
+       toast.success("Company updated successfully")
+     } catch (error) {
+       console.error("Error updating company:", error)
+       toast.error("Failed to update company")
+     }
+   }
+
+   const handleLogoClick = () => {
+     fileInputRef.current?.click()
+   }
+
+   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const file = e.target.files?.[0]
+     if (file) {
+       setLogoFile(file)
+       setLogoPreviewUrl(URL.createObjectURL(file))
+     } else {
+       setLogoFile(null)
+       setLogoPreviewUrl(editCompanyFormData.companyLogoUrl || null)
+     }
+   }
+
    const getStatusBadge = (status: string) => {
      const statusColors = {
        "Open Inquiry": "bg-gray-100 text-gray-800",
@@ -986,7 +1054,7 @@ interface Quotation {
        Ongoing: "bg-gray-500 text-white", // Added for bookings
        Done: "bg-green-500 text-white", // Added for bookings
      }
- 
+
      return (
        <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
          {status}
@@ -1085,7 +1153,7 @@ interface Quotation {
        <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
          <div className="text-center py-12">
            <p className="text-gray-500">Client not found</p>
-           <Button onClick={() => router.push("/sales/clients")} className="mt-4">
+           <Button onClick={() => router.push("/admin/clients")} className="mt-4">
              Back to Clients
            </Button>
          </div>
@@ -1102,12 +1170,33 @@ interface Quotation {
        {/* Header */}
        <div className="flex items-center justify-between mb-6">
          <div className="flex items-center space-x-4">
-           <Button variant="ghost" size="icon" onClick={() => router.push("/sales/clients")} className="h-8 w-8">
+           <Button variant="ghost" size="icon" onClick={() => router.push("/admin/clients")} className="h-8 w-8">
              <ArrowLeft className="h-4 w-4" />
            </Button>
            <h1 className="text-2xl font-bold text-gray-900">Client Information</h1>
          </div>
-         <Button variant="ghost" size="icon" className="h-8 w-8 hidden">
+         <Button
+           variant="ghost"
+           size="icon"
+           className="h-8 w-8"
+           onClick={() => {
+             if (company) {
+               setEditCompanyFormData({
+                 name: company.name || "",
+                 address: company.address || "",
+                 industry: company.industry || "",
+                 clientType: company.clientType || "",
+                 partnerType: company.partnerType || "",
+                 website: (company as any).website || "",
+                 phone: (company as any).phone || "",
+                 companyLogoUrl: company.companyLogoUrl || "",
+               })
+               setLogoFile(null)
+               setLogoPreviewUrl(company.companyLogoUrl || null)
+               setShowEditDialog(true)
+             }
+           }}
+         >
            <Edit className="h-4 w-4" />
          </Button>
        </div>
@@ -1620,6 +1709,314 @@ interface Quotation {
          </DialogContent>
        </Dialog>
 
+       {/* Edit Company Dialog */}
+       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+         <DialogContent className="sm:max-w-[500px]">
+           <DialogHeader>
+             <DialogTitle className="text-xl font-bold text-gray-900">Edit Company Information</DialogTitle>
+             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+               <X className="h-4 w-4" />
+               <span className="sr-only">Close</span>
+             </DialogClose>
+           </DialogHeader>
+
+           <div className="py-4 max-h-[70vh] overflow-y-auto">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="space-y-2 md:col-span-2">
+                 <Label htmlFor="edit-company-name">Company Name *</Label>
+                 <Input
+                   id="edit-company-name"
+                   value={editCompanyFormData.name}
+                   onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, name: e.target.value })}
+                   placeholder="Company name"
+                 />
+               </div>
+
+               <div className="space-y-2 md:col-span-2">
+                 <Label htmlFor="edit-company-address">Address</Label>
+                 <Input
+                   id="edit-company-address"
+                   value={editCompanyFormData.address}
+                   onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, address: e.target.value })}
+                   placeholder="Company address"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-company-industry">Industry</Label>
+                 <Select
+                   value={editCompanyFormData.industry}
+                   onValueChange={(value) => setEditCompanyFormData({ ...editCompanyFormData, industry: value })}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="-Select an Industry-" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="automotive">Automotive</SelectItem>
+                     <SelectItem value="banking">Banking & Financial Services</SelectItem>
+                     <SelectItem value="beverages">Beverages</SelectItem>
+                     <SelectItem value="fast_food">Fast Food & QSR</SelectItem>
+                     <SelectItem value="retail">Retail & Shopping</SelectItem>
+                     <SelectItem value="telecom">Telecommunications</SelectItem>
+                     <SelectItem value="pharmaceuticals">Pharmaceuticals</SelectItem>
+                     <SelectItem value="real_estate">Real Estate</SelectItem>
+                     <SelectItem value="government">Government & Public Services</SelectItem>
+                     <SelectItem value="fmcg">FMCG</SelectItem>
+                     <SelectItem value="technology">Technology</SelectItem>
+                     <SelectItem value="entertainment">Entertainment & Media</SelectItem>
+                     <SelectItem value="travel">Travel & Tourism</SelectItem>
+                     <SelectItem value="education">Education</SelectItem>
+                     <SelectItem value="other">Other</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-client-type">Client Type</Label>
+                 <Select
+                   value={editCompanyFormData.clientType}
+                   onValueChange={(value) => setEditCompanyFormData({ ...editCompanyFormData, clientType: value })}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="Select client type" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="partner">Partner</SelectItem>
+                     <SelectItem value="brand">Brand</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               {editCompanyFormData.clientType === "partner" && (
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-partner-type">Partner Type</Label>
+                   <Select
+                     value={editCompanyFormData.partnerType}
+                     onValueChange={(value) => setEditCompanyFormData({ ...editCompanyFormData, partnerType: value })}
+                   >
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select partner type" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="operator">Operator</SelectItem>
+                       <SelectItem value="agency">Agency</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-company-website">Company Website</Label>
+                 <Input
+                   id="edit-company-website"
+                   value={editCompanyFormData.website}
+                   onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, website: e.target.value })}
+                   placeholder="Company Website"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="edit-company-phone">Company Phone #</Label>
+                 <Input
+                   id="edit-company-phone"
+                   value={editCompanyFormData.phone}
+                   onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, phone: e.target.value })}
+                   placeholder="Company Phone #"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="companyLogo">Company Logo</Label>
+                 <div
+                   className="w-24 h-24 border border-gray-300 rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
+                   onClick={handleLogoClick}
+                 >
+                   {logoPreviewUrl ? (
+                     <img
+                       src={logoPreviewUrl || "/placeholder.svg"}
+                       alt="Company Logo Preview"
+                       className="w-full h-full object-cover"
+                     />
+                   ) : (
+                     <Plus className="h-8 w-8 text-gray-400" />
+                   )}
+                 </div>
+                 <input
+                   type="file"
+                   ref={fileInputRef}
+                   onChange={handleFileChange}
+                   className="hidden"
+                   accept="image/*"
+                 />
+               </div>
+
+               <div className="space-y-2 md:col-span-2">
+                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                   <h3 className="text-lg font-medium text-gray-900 mb-4">Compliance</h3>
+
+                   <div className="grid grid-cols-1 gap-3">
+                     <div className="flex items-center justify-between space-x-2">
+                       <div className="flex items-center space-x-2">
+                         {company?.compliance?.dti ? (
+                           <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                             <Check className="h-4 w-4 text-white" />
+                           </div>
+                         ) : (
+                           <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                         )}
+                         <label className="text-sm font-medium">DTI/ BIR 2303</label>
+                       </div>
+                       {company?.compliance?.dti ? (
+                         <div className="flex items-center space-x-2">
+                           <a href={company.compliance.dti} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                             {truncateFileName(decodeURIComponent(company.compliance.dti).split('/').pop()?.split('?')[0] || 'DTI/BIR 2303.pdf')}
+                           </a>
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             className="h-7 text-xs"
+                             onClick={() => triggerFileInput(dtiBirFileInputRef)}
+                             disabled={uploadingDocument === "dti"}
+                           >
+                             {uploadingDocument === "dti" ? "Uploading..." : "Replace"}
+                           </Button>
+                         </div>
+                       ) : (
+                         <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="h-7 text-xs"
+                           onClick={() => triggerFileInput(dtiBirFileInputRef)}
+                           disabled={uploadingDocument === "dti"}
+                         >
+                           {uploadingDocument === "dti" ? "Uploading..." : "Upload"}
+                         </Button>
+                       )}
+                     </div>
+
+                     <div className="flex items-center justify-between space-x-2">
+                       <div className="flex items-center space-x-2">
+                         {company?.compliance?.gis ? (
+                           <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                             <Check className="h-4 w-4 text-white" />
+                           </div>
+                         ) : (
+                           <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                         )}
+                         <label className="text-sm font-medium">G.I.S.</label>
+                       </div>
+                       {company?.compliance?.gis ? (
+                         <div className="flex items-center space-x-2">
+                           <a href={company.compliance.gis} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                             {truncateFileName(decodeURIComponent(company.compliance.gis).split('/').pop()?.split('?')[0] || 'GIS.pdf')}
+                           </a>
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             className="h-7 text-xs"
+                             onClick={() => triggerFileInput(gisFileInputRef)}
+                             disabled={uploadingDocument === "gis"}
+                           >
+                             {uploadingDocument === "gis" ? "Uploading..." : "Replace"}
+                           </Button>
+                         </div>
+                       ) : (
+                         <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="h-7 text-xs"
+                           onClick={() => triggerFileInput(gisFileInputRef)}
+                           disabled={uploadingDocument === "gis"}
+                         >
+                           {uploadingDocument === "gis" ? "Uploading..." : "Upload"}
+                         </Button>
+                       )}
+                     </div>
+
+                     <div className="flex items-center justify-between space-x-2">
+                       <div className="flex items-center space-x-2">
+                         {company?.compliance?.id ? (
+                           <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                             <Check className="h-4 w-4 text-white" />
+                           </div>
+                         ) : (
+                           <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                         )}
+                         <label className="text-sm font-medium">ID with signature</label>
+                       </div>
+                       {company?.compliance?.id ? (
+                         <div className="flex items-center space-x-2">
+                           <a href={company.compliance.id} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                             {truncateFileName(decodeURIComponent(company.compliance.id).split('/').pop()?.split('?')[0] || 'ID_with_signature.pdf')}
+                           </a>
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             className="h-7 text-xs"
+                             onClick={() => triggerFileInput(idSignatureFileInputRef)}
+                             disabled={uploadingDocument === "id"}
+                           >
+                             {uploadingDocument === "id" ? "Uploading..." : "Replace"}
+                           </Button>
+                         </div>
+                       ) : (
+                         <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="h-7 text-xs"
+                           onClick={() => triggerFileInput(idSignatureFileInputRef)}
+                           disabled={uploadingDocument === "id"}
+                         >
+                           {uploadingDocument === "id" ? "Uploading..." : "Upload"}
+                         </Button>
+                       )}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+               Cancel
+             </Button>
+             <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">
+               Save Changes
+             </Button>
+           </DialogFooter>
+
+           {/* Hidden file inputs for compliance documents */}
+           <input
+             type="file"
+             ref={dtiBirFileInputRef}
+             onChange={(e) => handleFileUpload(e, "dti")}
+             className="hidden"
+             accept="application/pdf,image/*"
+           />
+           <input
+             type="file"
+             ref={gisFileInputRef}
+             onChange={(e) => handleFileUpload(e, "gis")}
+             className="hidden"
+             accept="application/pdf,image/*"
+           />
+           <input
+             type="file"
+             ref={idSignatureFileInputRef}
+             onChange={(e) => handleFileUpload(e, "id")}
+             className="hidden"
+             accept="application/pdf,image/*"
+           />
+         </DialogContent>
+       </Dialog>
+
        {/* Tabs */}
        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
          <TabsList className="grid w-full grid-cols-4">
@@ -1646,7 +2043,7 @@ interface Quotation {
                      />
                    </div>
                    <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=proposal&clientId=${clientId}`)}
+                     onClick={() => router.push(`/admin/dashboard?mode=proposal&clientId=${clientId}`)}
                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                    >
                      <Plus className="h-4 w-4" />
@@ -1727,7 +2124,7 @@ interface Quotation {
                      />
                    </div>
                    <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=cost_estimate&clientId=${clientId}`)}
+                     onClick={() => router.push(`/admin/dashboard?mode=cost_estimate&clientId=${clientId}`)}
                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                    >
                      <Plus className="h-4 w-4" />
@@ -1814,7 +2211,7 @@ interface Quotation {
                      />
                    </div>
                    <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=quotation&clientId=${clientId}`)}
+                     onClick={() => router.push(`/admin/dashboard?mode=quotation&clientId=${clientId}`)}
                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                    >
                      <Plus className="h-4 w-4" />
