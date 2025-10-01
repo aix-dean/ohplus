@@ -286,7 +286,7 @@ const calculateTextHeight = (text: string, maxWidth: number, fontSize = 10): num
 }
 
 // Generate PDF for quotation
-export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
+export async function generateQuotationPDF(quotation: Quotation, returnBlob: boolean = false): Promise<void | Blob> {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -736,8 +736,12 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     { align: "center" },
   )
 
-  // Download the PDF
-  pdf.save(`Quotation-${quotation.quotation_number}.pdf`)
+  // Download the PDF or return blob
+  if (returnBlob) {
+    return pdf.output('blob')
+  } else {
+    pdf.save(`Quotation-${quotation.quotation_number}.pdf`)
+  }
 }
 
 // Send quotation email to client

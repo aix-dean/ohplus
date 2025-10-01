@@ -873,17 +873,26 @@ export async function generateProposalPDFBlob(
   return { blob: pdfBlob, filename }
 }
 
-// Get sent emails for a proposal or cost estimate
-export async function getSentEmailsForProposal(proposalId: string, emailType: "proposal" | "cost_estimate" = "proposal"): Promise<any[]> {
+// Get sent emails for a proposal, cost estimate, or quotation
+export async function getSentEmailsForProposal(proposalId: string, emailType: "proposal" | "cost_estimate" | "quotation" = "proposal"): Promise<any[]> {
   try {
     if (!db) {
       throw new Error("Firestore not initialized")
     }
 
     const emailsRef = collection(db, "emails")
+    let idField: string
+    if (emailType === "quotation") {
+      idField = "quotationId"
+    } else if (emailType === "cost_estimate") {
+      idField = "costEstimateId"
+    } else {
+      idField = "proposalId"
+    }
+
     const q = query(
       emailsRef,
-      where(emailType === "proposal" ? "proposalId" : "costEstimateId", "==", proposalId),
+      where(idField, "==", proposalId),
       where("email_type", "==", emailType),
       where("status", "==", "sent"),
       orderBy("sentAt", "desc")

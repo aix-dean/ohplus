@@ -7,11 +7,11 @@ import { format } from "date-fns"
 import { X } from "lucide-react"
 
 interface SentHistoryDialogProps {
-   open: boolean
-   onOpenChange: (open: boolean) => void
-   proposalId: string
-   emailType?: "proposal" | "cost_estimate"
- }
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    proposalId: string
+    emailType?: "proposal" | "cost_estimate" | "quotation"
+  }
 
 interface EmailRecord {
   id: string

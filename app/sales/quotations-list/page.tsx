@@ -34,8 +34,6 @@ import {
   Search,
   X,
   MoreVertical,
-  ChevronDown,
-  ChevronRight,
   Upload,
   FileText,
   Loader2,
@@ -48,10 +46,16 @@ import {
   Linkedin,
   Check,
   Plus,
+  Eye,
+  Download,
+  History,
+  Printer,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
+import { ComplianceDialog } from "@/components/compliance-dialog"
 import { bookingService } from "@/lib/booking-service"
 import { searchQuotations } from "@/lib/algolia-service"
 
@@ -69,7 +73,6 @@ export default function QuotationsListPage() {
   const [hasMorePages, setHasMorePages] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
-  const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
   const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
@@ -81,6 +84,10 @@ export default function QuotationsListPage() {
   const [selectedQuotationForProject, setSelectedQuotationForProject] = useState<any>(null)
   const [projectName, setProjectName] = useState("")
   const [creatingReservation, setCreatingReservation] = useState(false)
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedQuotationForHistory, setSelectedQuotationForHistory] = useState<any>(null)
+  const [showComplianceDialog, setShowComplianceDialog] = useState(false)
+  const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
 
   const handleProjectNameDialogClose = (open: boolean) => {
     if (!open) {
@@ -574,7 +581,7 @@ export default function QuotationsListPage() {
       },
     ]
 
-    const allItems = [...toReserveItems, ...otherRequirementsItems]
+    const allItems = toReserveItems
     const completed = allItems.filter((item) => item.status === "completed").length
     return {
       completed,
@@ -584,17 +591,6 @@ export default function QuotationsListPage() {
     }
   }
 
-  const toggleComplianceExpansion = (quotationId: string) => {
-    setExpandedCompliance((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(quotationId)) {
-        newSet.delete(quotationId)
-      } else {
-        newSet.add(quotationId)
-      }
-      return newSet
-    })
-  }
 
   const triggerFileUpload = (quotationId: string, complianceType: string) => {
     const input = document.createElement("input")
@@ -674,6 +670,52 @@ export default function QuotationsListPage() {
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
+
+  const handlePrintQuotationWindow = async (quotationId: string) => {
+    setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
+
+    try {
+      // Get the full quotation data
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+
+      // Generate the PDF blob
+      const pdfBlob = await generateQuotationPDF(quotation, true) as Blob // Pass true to get blob instead of downloading
+
+      // Create a blob URL and open in new window for printing
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const printWindow = window.open(pdfUrl, '_blank')
+
+      if (printWindow) {
+        // Wait a bit for the PDF to load, then trigger print
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+          }, 1000)
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Quotation PDF opened in print window",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF for printing:", error)
       toast({
         title: "Print Failed",
         description: error.message || "Failed to generate PDF. Please try again.",
@@ -971,6 +1013,16 @@ export default function QuotationsListPage() {
     }
   }
 
+  const handleViewSentHistory = (quotation: any) => {
+    setSelectedQuotationForHistory(quotation)
+    setShowSentHistoryDialog(true)
+  }
+
+  const handleViewCompliance = (quotation: any) => {
+    setSelectedQuotationForCompliance(quotation)
+    setShowComplianceDialog(true)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -1003,10 +1055,12 @@ export default function QuotationsListPage() {
               <TableHeader>
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Compliance</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1026,7 +1080,13 @@ export default function QuotationsListPage() {
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
                       <Skeleton className="h-5 w-16" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-12" />
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -1042,17 +1102,18 @@ export default function QuotationsListPage() {
               <TableHeader>
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Compliance</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {quotations.map((quotation: any) => {
                   const compliance = getProjectCompliance(quotation)
-                  const isExpanded = expandedCompliance.has(quotation.id)
 
                   return (
                     <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200">
@@ -1071,180 +1132,32 @@ export default function QuotationsListPage() {
                         <div className="font-medium text-gray-900">{quotation.quotation_number || quotation.id || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
+                        <div className="text-sm text-gray-600">{quotation.client_company_name || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
                         <div className="font-medium text-gray-900">{quotation.client_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
                       </TableCell>
-                      <TableCell className="py-3 text-sm text-gray-700">
-                        <div className="space-y-2">
-                          <div
-                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => toggleComplianceExpansion(quotation.id)}
-                          >
-                            <span className="font-medium">
-                              {compliance.completed}/{compliance.total}
-                            </span>
-                            <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                            <div className="transition-transform duration-200 ease-in-out">
-                              {isExpanded ? (
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
-                              ) : (
-                                <ChevronRight className="w-3 h-3 text-gray-400" />
-                              )}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                            }`}
-                          >
-                            <div className="space-y-1 pt-1">
-                                <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
-                                {compliance.toReserve.map((item: any, index: number) => {
-                                  const uploadKey = `${quotation.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
-                                          </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <div className="flex flex-col">
-                                          <span className="text-gray-700">{item.name}</span>
-                                          {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(quotation.id, item.key)
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-
-                                <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
-                                {compliance.otherRequirements.map((item: any, index: number) => {
-                                  const uploadKey = `${quotation.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
-                                          </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <span className="text-gray-700">{item.name}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(quotation.id, item.key)
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-
-                            </div>
-                          </div>
-                        </div>
+                      <TableCell className="py-3">
+                        {quotation.status?.toLowerCase() === "reserved" ? (
+                          <span className="text-[#30C71D] font-bold font-medium leading-[50%]">
+                            Reserved
+                          </span>
+                        ) : (
+                          <span className="text-[#C4C4C4] font-bold leading-[50%]">
+                            Pending
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span
+                          className="font-bold text-[#2d3fff] font-medium underline leading-[0.5] cursor-pointer"
+                          onClick={() => handleViewCompliance(quotation)}
+                        >
+                          ({compliance.completed}/{compliance.total})
+                        </span>
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -1258,9 +1171,11 @@ export default function QuotationsListPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleCreateJO(quotation.id)}>
-                              Create JO
+                            <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handlePrintQuotation(quotation.id)}
                               disabled={generatingPDFs.has(quotation.id)}
@@ -1271,24 +1186,37 @@ export default function QuotationsListPage() {
                                   Generating PDF...
                                 </>
                               ) : (
-                                "Print"
+                                <>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </>
                               )}
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
-                              <Share2 className="w-3 h-3 mr-2" />
+                              <Share2 className="mr-2 h-4 w-4" />
                               Share
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewSentHistory(quotation)}>
+                              <History className="mr-2 h-4 w-4" />
+                              View Sent History
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleCopyQuotation(quotation.id)}
-                              disabled={copyingQuotations.has(quotation.id)}
+                              onClick={() => handlePrintQuotationWindow(quotation.id)}
+                              disabled={generatingPDFs.has(quotation.id)}
                             >
-                              {copyingQuotations.has(quotation.id) ? (
+                              {generatingPDFs.has(quotation.id) ? (
                                 <>
                                   <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Copying...
+                                  Generating PDF...
                                 </>
                               ) : (
-                                "Make a Copy"
+                                <>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print
+                                </>
                               )}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1529,6 +1457,21 @@ export default function QuotationsListPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        proposalId={selectedQuotationForHistory?.id || ""}
+        emailType="quotation"
+      />
+
+      <ComplianceDialog
+        open={showComplianceDialog}
+        onOpenChange={setShowComplianceDialog}
+        quotation={selectedQuotationForCompliance}
+        onFileUpload={handleFileUpload}
+        uploadingFiles={uploadingFiles}
+      />
     </div>
   )
 }
