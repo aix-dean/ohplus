@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MoreVertical, Plus } from "lucide-react"
+import { Search, MoreVertical, Plus, Printer, Eye, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -159,6 +159,12 @@ export default function SalesReportsPage() {
     })
   }
 
+  const handlePrintReport = (report: ReportData) => {
+    // Navigate to detail page and trigger print there
+    // This ensures the report is rendered and can be printed
+    router.push(`/sales/reports/${report.id}?action=print`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -269,9 +275,20 @@ export default function SalesReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>View Report</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>Edit Report</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePrintReport(report)}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print Report
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Delete Report
                           </DropdownMenuItem>
                         </DropdownMenuContent>

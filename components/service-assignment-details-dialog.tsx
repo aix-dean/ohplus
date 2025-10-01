@@ -84,6 +84,7 @@ interface ServiceAssignment {
       }
     | string
   message?: string
+  campaignName?: string
   coveredDateStart?: any
   covered_date_start?: any
   start_date?: any

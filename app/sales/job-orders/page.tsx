@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { Search, Plus, MoreHorizontal, X } from "lucide-react" // Added X for clear search
+import { Search, Plus, MoreHorizontal, X, Loader2 } from "lucide-react" // Added X for clear search
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,8 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton" // Added Skeleton
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useRouter } from "next/navigation" // Added useRouter
+import { useRouter, useSearchParams } from "next/navigation" // Added useRouter and useSearchParams
 import { Timestamp } from "firebase/firestore" // Import Timestamp type
+import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
+import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 
 // Helper function to safely parse date values
 const safeParseDate = (dateValue: string | Date | Timestamp | undefined): Date | null => {
@@ -36,8 +38,25 @@ export default function JobOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   const router = useRouter() // Initialize useRouter
+  const searchParams = useSearchParams() // Initialize useSearchParams
+
+  // Success dialog states
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [successJoIds, setSuccessJoIds] = useState<string[]>([])
+
+  // Print function for job orders
+  const handlePrint = async (jobOrder: JobOrder, event: React.MouseEvent) => {
+    event.stopPropagation() // Prevent row click navigation
+
+    try {
+      await generateJobOrderPDF(jobOrder, "print", false)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchJOs = async () => {
@@ -59,6 +78,23 @@ export default function JobOrdersPage() {
     }
     fetchJOs()
   }, [user?.uid])
+
+  // Check for success query parameters on mount
+  useEffect(() => {
+    const success = searchParams.get("success")
+    const joIds = searchParams.get("joIds")
+
+    if (success === "true" && joIds) {
+      setSuccessJoIds(joIds.split(","))
+      setShowSuccessDialog(true)
+
+      // Clear the query parameters from the URL
+      const url = new URL(window.location.href)
+      url.searchParams.delete("success")
+      url.searchParams.delete("joIds")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [searchParams])
 
 
   const filteredJobOrders = useMemo(() => {
@@ -200,12 +236,16 @@ export default function JobOrdersPage() {
             )}
           </div>
           <Button
-            onClick={() => router.push("/sales/job-orders/select-quotation")}
+            onClick={() => {
+              setIsCreating(true);
+              router.push("/sales/job-orders/select-quotation");
+            }}
             size="sm"
             className="flex items-center gap-2"
+            disabled={isCreating}
           >
-            <Plus className="h-4 w-4" />
-            Create JO
+            {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {isCreating ? "Navigating..." : "Create JO"}
           </Button>
         </div>
 
@@ -300,6 +340,13 @@ export default function JobOrdersPage() {
         )}
       </div>
 
+      {/* Success Dialog */}
+      <JobOrderCreatedSuccessDialog
+        isOpen={showSuccessDialog}
+        onClose={() => setShowSuccessDialog(false)}
+        joIds={successJoIds}
+        isMultiple={successJoIds.length > 1}
+      />
     </div>
   )
 }

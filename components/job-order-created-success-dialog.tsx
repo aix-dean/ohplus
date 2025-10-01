@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { createNotifications } from "@/lib/client-service"
 import { getJobOrderById } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 
 interface JobOrderCreatedSuccessDialogProps {
@@ -28,6 +28,7 @@ export function JobOrderCreatedSuccessDialog({
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [isLoadingPrint, setIsLoadingPrint] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
+  const notificationsSentRef = useRef<Set<string>>(new Set())
 
   // Fetch job order data when dialog opens
   useEffect(() => {
@@ -98,13 +99,46 @@ export function JobOrderCreatedSuccessDialog({
 
     try {
       await createNotifications(notifications)
-      onClose() // Close dialog after successful notification
     } catch (error) {
       console.error("Error creating notifications:", error)
-      // Still close dialog on error
-      onClose()
     }
   }
+
+  // Fetch job order data when dialog opens
+  useEffect(() => {
+    if (isOpen && joIds.length > 0) {
+      const fetchJobOrders = async () => {
+        setIsLoadingData(true)
+        try {
+          const fetchedJobOrders: JobOrder[] = []
+          for (const joId of joIds) {
+            const jobOrder = await getJobOrderById(joId)
+            if (jobOrder) {
+              fetchedJobOrders.push(jobOrder)
+            }
+          }
+          setJobOrders(fetchedJobOrders)
+
+          // Automatically create notifications for all departments (only once per job order)
+          if (userData?.company_id && fetchedJobOrders.length > 0) {
+            const notificationKey = joIds.sort().join(',')
+            if (!notificationsSentRef.current.has(notificationKey)) {
+              await handleNotifyTeams()
+              notificationsSentRef.current.add(notificationKey)
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching job orders:", error)
+        } finally {
+          setIsLoadingData(false)
+        }
+      }
+      fetchJobOrders()
+    }
+  }, [isOpen, joIds, userData])
+
+
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -137,7 +171,7 @@ export function JobOrderCreatedSuccessDialog({
               variant="outline"
               onClick={generateAndPrintPDF}
               disabled={isLoadingData || isLoadingPrint || jobOrders.length === 0}
-              className="flex-1"
+              className="w-full"
             >
               {isLoadingPrint ? (
                 <>
@@ -147,9 +181,6 @@ export function JobOrderCreatedSuccessDialog({
               ) : (
                 "Print"
               )}
-            </Button>
-            <Button onClick={handleNotifyTeams} className="flex-1">
-              Notify Teams
             </Button>
           </div>
         </div>

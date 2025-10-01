@@ -145,10 +145,6 @@ export default function CreateJobOrderPage() {
   // Form data for each product
   const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
 
-  // Success dialog states
-  const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
-  const [createdJoIds, setCreatedJoIds] = useState<string[]>([])
-
 
   // Coming soon dialog state
   const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
@@ -858,8 +854,7 @@ export default function CreateJobOrderPage() {
           user.uid,
           status,
         )
-        setCreatedJoIds(joIds)
-        setShowJobOrderSuccessDialog(true)
+        router.push(`/sales/job-orders?success=true&joIds=${joIds.join(',')}`)
       } catch (error: any) {
         console.error("Error creating job orders:", error)
         toast({
@@ -1041,10 +1036,6 @@ export default function CreateJobOrderPage() {
     toast,
   ])
 
-  const handleDismissAndNavigate = useCallback(() => {
-    setShowJobOrderSuccessDialog(false)
-    router.push("/sales/job-orders")
-  }, [router])
 
   const handleCreateJobOrders = useCallback(
     async (status: JobOrderStatus) => {
@@ -2258,13 +2249,6 @@ export default function CreateJobOrderPage() {
       </div>
 
 
-      {/* Success Dialog */}
-      <JobOrderCreatedSuccessDialog
-        isOpen={showJobOrderSuccessDialog}
-        onClose={handleDismissAndNavigate}
-        joIds={createdJoIds}
-        isMultiple={false}
-      />
 
       {/* Coming Soon Dialog */}
       <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />

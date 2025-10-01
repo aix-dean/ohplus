@@ -892,9 +892,9 @@ export function CreateReportDialog({
 
       let finalReportData = reportData
 
-      // For sales module, save the report to database immediately with posted status
-      if (module === "sales") {
-        console.log("Saving report to database for sales module")
+      // For sales and logistics modules, save the report to database immediately with posted status
+      if (module === "sales" || module === "logistics") {
+        console.log(`Saving report to database for ${module} module`)
         const reportId = await postReport(reportData)
 
         // Fetch the actual saved report data from database
@@ -904,6 +904,11 @@ export function CreateReportDialog({
         if (savedReport) {
           finalReportData = savedReport
           console.log("Retrieved saved report data:", savedReport)
+
+          // Set sessionStorage to trigger success dialog on service-reports page (for logistics module)
+          if (module === "logistics") {
+            sessionStorage.setItem("lastPostedReportId", reportId)
+          }
         } else {
           throw new Error("Failed to retrieve saved report")
         }
@@ -923,15 +928,19 @@ export function CreateReportDialog({
         console.log("Saved admin report with draft status, ID:", reportId)
       }
 
-      // Store the report data in sessionStorage for the preview page
-      sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
-      sessionStorage.setItem("previewProductData", JSON.stringify(product))
+      // Store the report data in sessionStorage for the preview page (only for admin module since logistics and sales auto-post)
+      if (module === "admin") {
+        sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
+        sessionStorage.setItem("previewProductData", JSON.stringify(product))
+      }
 
       toast({
         title: "Success",
         description: module === "sales"
           ? "Service Report Created and Posted Successfully!"
-          : "Service Report Generated Successfully!",
+          : module === "logistics"
+            ? "Congratulations You have successfully posted a report!"
+            : "Service Report Generated Successfully!",
       })
 
       onOpenChange(false)
@@ -949,8 +958,8 @@ export function CreateReportDialog({
       setDescriptionOfWork("")
 
 
-      const previewPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/reports/preview"
-      router.push(previewPath)
+      const redirectPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/service-reports"
+      router.push(redirectPath)
     } catch (error) {
       console.error("Error generating report:", error)
       toast({

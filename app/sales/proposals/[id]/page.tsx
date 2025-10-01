@@ -22,7 +22,7 @@ import {
   Minus,
   Send,
 } from "lucide-react"
-import { getProposalById, updateProposal, downloadProposalPDF } from "@/lib/proposal-service"
+import { getProposalById, updateProposal, downloadProposalPDF, generateProposalPDFBlob } from "@/lib/proposal-service"
 import {
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
@@ -37,6 +37,7 @@ import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 import { ProposalHistory } from "@/components/proposal-history"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -323,6 +324,7 @@ export default function ProposalDetailsPage() {
   const [isApplying, setIsApplying] = useState(false)
   const [zoomLevel, setZoomLevel] = useState<number>(1)
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
+  const [printLoading, setPrintLoading] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -369,7 +371,7 @@ export default function ProposalDetailsPage() {
     fetchProposal()
   }, [params.id])
 
-  // Handle automatic download when page loads with action=download
+  // Handle automatic download/print when page loads with action parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const action = searchParams.get("action")
@@ -383,6 +385,56 @@ export default function ProposalDetailsPage() {
         url.searchParams.delete("action")
         window.history.replaceState({}, "", url.toString())
       }, 1000)
+    } else if (action === "print" && proposal && !loading) {
+      setPrintLoading(true)
+
+      // Scroll to load all maps and generate PDF
+      setTimeout(async () => {
+        // Scroll to load all maps before generating PDF
+        const loadAllMaps = async () => {
+          const pageContainers = document.querySelectorAll('[class*="mx-auto bg-white shadow-lg"]')
+          for (let i = 0; i < pageContainers.length; i++) {
+            const container = pageContainers[i] as HTMLElement
+            container.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            await new Promise(resolve => setTimeout(resolve, 1500)) // Wait for maps to load
+          }
+          // Scroll back to top
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+
+        await loadAllMaps()
+
+        try {
+          // Generate PDF blob same as download
+          const { blob, filename } = await generateProposalPDFBlob(proposal, selectedSize, selectedOrientation)
+          // Create URL for the blob
+          const pdfUrl = URL.createObjectURL(blob)
+          // Open in new window for printing
+          const printWindow = window.open(pdfUrl, '_blank')
+          if (printWindow) {
+            // Wait for PDF to load then print and navigate back
+            printWindow.onload = () => {
+              printWindow.print()
+              // Navigate back immediately after triggering print
+              router.push('/sales/proposals')
+            }
+          }
+        } catch (error) {
+          console.error("Error generating PDF for print:", error)
+          toast({
+            title: "Error",
+            description: "Failed to generate PDF for printing",
+            variant: "destructive",
+          })
+        } finally {
+          setPrintLoading(false)
+        }
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000) // Initial delay before starting
     }
   }, [proposal, loading])
 
@@ -983,8 +1035,8 @@ export default function ProposalDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex flex-col">
-      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm">
+    <div className="min-h-screen bg-gray-50/50 print:bg-white flex flex-col">
+      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm print:hidden">
         <Button
           variant="ghost"
           size="sm"
@@ -1030,7 +1082,7 @@ export default function ProposalDetailsPage() {
 
       {/* Main content area */}
       <div className="flex-1 flex">
-        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto print:p-0 print:justify-start print:items-start">
           {showTemplatesPanel && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
               <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -1363,7 +1415,7 @@ export default function ProposalDetailsPage() {
             </div>
           )}
 
-          <div className="fixed left-2 sm:left-4 md:left-20 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 sm:gap-4 z-50">
+          <div className="fixed left-2 sm:left-4 md:left-20 lg:left-80 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 sm:gap-4 z-50 print:hidden">
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleTemplates}
@@ -1403,7 +1455,7 @@ export default function ProposalDetailsPage() {
           </div>
 
           <div
-            className="flex flex-col gap-8 transition-transform duration-200 ease-in-out"
+            className="flex flex-col gap-8 print:gap-0 transition-transform duration-200 ease-in-out"
             style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center top" }}
           >
             {Array.from({ length: getTotalPages(selectedLayout) }, (_, index) => {
@@ -1612,7 +1664,7 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
 
-        <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto">
+        <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto print:hidden">
           <ProposalHistory
             selectedClient={
               proposal
@@ -1631,7 +1683,7 @@ export default function ProposalDetailsPage() {
 
       {/* Bottom Action Buttons */}
       {!loading && proposal && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50">
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50 print:hidden">
           {isEditingPrice ? (
             <>
               <Button
@@ -1684,6 +1736,20 @@ export default function ProposalDetailsPage() {
           background: selectedTemplateBackground
         }}
       />
+
+      {/* Print Loading Dialog */}
+      <Dialog open={printLoading} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
+          <DialogTitle className="sr-only">Generating PDF for Print</DialogTitle>
+          <div className="py-6">
+            <div className="mb-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Preparing for Print</h2>
+              <p className="text-gray-600">Generating PDF and waiting for all content to load...</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

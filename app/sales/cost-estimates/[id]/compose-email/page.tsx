@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, Paperclip, Edit, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
 import { generateCostEstimateEmailPDF } from "@/lib/cost-estimate-pdf-service"
@@ -576,6 +576,14 @@ export default function ComposeEmailPage() {
     router.push('/sales/cost-estimates')
   }
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
   if (loading || userData === undefined) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -588,15 +596,19 @@ export default function ComposeEmailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="flex items-center gap-2">
+    <div className="min-h-screen bg-neutral-50">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+          >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            <span>Back</span>
           </Button>
-          <h1 className="text-xl font-semibold">Compose Email</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Compose email</h1>
           {pdfGenerating && (
             <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
               Preparing {relatedCostEstimates.length} PDF(s)...
@@ -608,188 +620,173 @@ export default function ComposeEmailPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
           {/* Email Form */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex-1">
             <div className="space-y-4">
               {/* To Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">To:</Label>
-                <div className="flex-1">
-                  <Input
-                    value={toEmail}
-                    onChange={(e) => setToEmail(e.target.value)}
-                    placeholder="recipient@example.com"
-                  />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">To:</label>
+                <Input
+                  value={toEmail}
+                  onChange={(e) => setToEmail(e.target.value)}
+                  placeholder="recipient@example.com"
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
+                />
               </div>
 
               {/* CC Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Cc:</Label>
-                <div className="flex-1">
-                  <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">CC:</label>
+                <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1" />
               </div>
 
               {/* Reply-To Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Reply-To:</Label>
-                <div className="flex-1">
-                  <Input
-                    value={replyToEmail}
-                    onChange={(e) => setReplyToEmail(e.target.value)}
-                    placeholder="reply-to@example.com"
-                  />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">Reply-To:</label>
+                <Input
+                  value={replyToEmail}
+                  onChange={(e) => setReplyToEmail(e.target.value)}
+                  placeholder="reply-to@example.com"
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
+                />
               </div>
 
               {/* Subject Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Subject:</Label>
-                <div className="flex-1">
-                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter your cost estimate subject here..." />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">Subject:</label>
+                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter your cost estimate subject here..." className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1" />
               </div>
 
               {/* Body Field */}
-              <div className="space-y-2">
-                <div className="relative">
-                  <Textarea
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="Enter your cost estimate content here..."
-                    className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500"
-                  />
-                </div>
+              <div>
+                <Textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Enter your cost estimate content here..."
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] w-full h-[543px] resize-none"
+                />
               </div>
 
               {/* Attachments */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Attachments:</Label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+
                 <div className="space-y-2">
                   {preGeneratedPDFs.map((pdf, index) => (
-                    <div
-                      key={`pdf-${index}`}
-                      className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200"
-                    >
-                      <Paperclip className="h-4 w-4 text-green-600" />
-                      <button
-                        className="flex-1 text-sm text-left text-green-800 hover:text-green-900 hover:underline"
-                        onClick={() => handleDownloadAttachment(pdf.filename, index)}
-                        disabled={downloadingPDF === index}
-                      >
-                        {downloadingPDF === index ? "Opening..." : pdf.filename}
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
-                          setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
-                        }}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={`pdf-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{pdf.filename}</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">PDF</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadAttachment(pdf.filename, index)}
+                          title="View attachment"
+                          disabled={downloadingPDF === index}
+                        >
+                          {downloadingPDF === index ? "Opening..." : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
+                            setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
 
                   {uploadedFiles.map((file, index) => (
-                    <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                      <button
-                        className="flex-1 text-sm text-left text-gray-700 hover:text-blue-600 hover:underline"
-                        onClick={() => handleViewUploadedFile(file)}
-                      >
-                        {file.name}
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeUploadedFile(index)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={`upload-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{file.name}</span>
+                        <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewUploadedFile(file)}
+                          title="View attachment"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => removeUploadedFile(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => document.getElementById("file-upload")?.click()}
-                      className="text-blue-500 border-blue-200 hover:bg-blue-50"
-                    >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Add Attachment
-                    </Button>
-                  </div>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                  />
+                  <button onClick={() => document.getElementById("file-upload")?.click()} className="text-[#2d3fff] underline text-lg font-medium">+Add attachment</button>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Templates Sidebar */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-medium mb-4">Templates:</h3>
-            <div className="max-h-96 overflow-y-auto space-y-3">
+          <div className="w-[346px]">
+            <div className="bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
+              <h3 className="font-semibold text-lg text-black mb-4">Templates</h3>
               {templates.length === 0 ? (
                 <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">No cost estimate email templates available.</p>
+                  <p className="text-sm text-gray-500">No email templates available.</p>
                   <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
                 </div>
               ) : (
-                templates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                  >
-                    <button
-                      className="text-sm text-left flex-1 hover:text-blue-600"
-                      onClick={() => applyTemplate(template)}
-                    >
-                      {template.name}
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditTemplate(template)}
-                        className="h-6 w-6 p-0"
+                <div className="space-y-2">
+                  {templates.map((template) => (
+                    <div key={template.id} className="bg-[#c4c4c4] bg-opacity-20 h-[56px] rounded-[10px] flex items-center justify-between px-4">
+                      <span
+                        className="text-lg font-medium text-gray-900 cursor-pointer"
+                        onClick={() => applyTemplate(template)}
+                        title="Apply template"
                       >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => template.id && handleDeleteTemplate(template.id)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                        {template.name}
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditTemplate(template)}
+                          className="p-0"
+                        >
+                          <Edit className="h-6 w-6 opacity-50" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => template.id && handleDeleteTemplate(template.id)}
+                          className="p-0"
+                        >
+                          <Trash2 className="h-6 w-6 opacity-50" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
-            </div>
-            <div className="mt-4 pt-4 border-t">
-              <Button
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => setShowAddTemplateDialog(true)}
-              >
+              <Button onClick={() => setShowAddTemplateDialog(true)} className="w-full mt-4 bg-white border-2 border-[#c4c4c4] rounded-[10px] text-gray-900 font-medium text-lg h-[39px]">
                 +Add Template
               </Button>
             </div>
@@ -797,23 +794,13 @@ export default function ComposeEmailPage() {
         </div>
 
         {/* Send Button */}
-        <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleSendEmail}
-            disabled={sending || !toEmail || !subject || pdfGenerating}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {sending ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Sending Email...
-              </div>
-            ) : pdfGenerating ? (
-              `Preparing ${relatedCostEstimates.length} PDF(s)...`
-            ) : (
-              "Send Email"
-            )}
-          </Button>
+        <div className="flex justify-center mt-6">
+          <div className="bg-white rounded-[50px] border-[1.5px] border-[#c4c4c4] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] w-[440px] h-[61px] flex items-center justify-between px-4">
+            <button onClick={() => router.back()} className="text-gray-900 underline text-lg">Cancel</button>
+            <Button onClick={handleSendEmail} disabled={sending || !toEmail || !subject || pdfGenerating} className="bg-[#1d0beb] text-white rounded-[15px] px-6 py-2 text-2xl font-bold">
+              {sending ? "Sending..." : pdfGenerating ? `Preparing ${relatedCostEstimates.length} PDF(s)...` : "Send email"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -873,51 +860,43 @@ export default function ComposeEmailPage() {
 
       {/* Edit Template Dialog */}
       <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Email Template</DialogTitle>
-            <DialogDescription>Update the email template details.</DialogDescription>
+            <DialogTitle>Edit Template</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-template-name">Template Name</Label>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Template Name:</label>
               <Input
-                id="edit-template-name"
                 value={newTemplateName}
                 onChange={(e) => setNewTemplateName(e.target.value)}
-                placeholder="e.g., Standard Quotation"
+                placeholder="Enter template name"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-template-subject">Subject</Label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
               <Input
-                id="edit-template-subject"
                 value={newTemplateSubject}
                 onChange={(e) => setNewTemplateSubject(e.target.value)}
-                placeholder="e.g., Cost Estimate: {title} - {companyName}"
+                placeholder="Enter your cost estimate subject here..."
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-template-body">Body</Label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Body:</label>
               <Textarea
-                id="edit-template-body"
                 value={newTemplateBody}
                 onChange={(e) => setNewTemplateBody(e.target.value)}
-                placeholder="Hi {clientName},&#10;&#10;Please find attached..."
-                className="min-h-[200px]"
+                placeholder="Enter your cost estimate content here..."
+                className="min-h-[200px] resize-none"
               />
-            </div>
-            <div className="text-sm text-gray-500">
-              <p className="font-medium mb-1">Available placeholders:</p>
-              <p>{"{clientName}, {title}, {userName}, {companyName}, {userContact}, {userEmail}"}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditTemplateDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEditedTemplate} disabled={savingTemplate}>
-              {savingTemplate ? "Updating..." : "Update Template"}
+            <Button onClick={handleSaveEditedTemplate} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Update Template
             </Button>
           </DialogFooter>
         </DialogContent>
