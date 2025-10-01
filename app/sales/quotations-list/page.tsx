@@ -47,6 +47,7 @@ import {
   Twitter,
   Linkedin,
   Check,
+  Plus,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -72,6 +73,7 @@ export default function QuotationsListPage() {
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
   const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
+  const [searchLoading, setSearchLoading] = useState(false)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
@@ -155,7 +157,7 @@ export default function QuotationsListPage() {
       const quotationsRef = collection(db, "quotations")
       let q = query(
         quotationsRef,
-        where("company_id", "==", userData.company_id),
+        where("company_id", "==", userData?.company_id),
         orderBy("created", "desc"),
         limit(pageSize + 1) // Fetch one extra to check if there are more pages
       )
@@ -972,429 +974,380 @@ export default function QuotationsListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        {user?.uid ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-gray-900">Quotation</h1>
-              <p className="text-sm text-gray-600">See the status of the quotations you've generated</p>
+        <div className="mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Quotations</h1>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 opacity-30" />
+                <Input
+                  placeholder="Search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-96 border-gray-300 rounded-full"
+                />
+              </div>
             </div>
-
-            <Card className="border-gray-200 shadow-sm rounded-xl">
-              <CardHeader className="px-6 py-4 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Search by client, phone, or quotation number..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-10 w-full sm:w-80"
-                      />
-                      {searchTerm && (
-                        <button
-                          onClick={() => setSearchTerm("")}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-40">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="booked">Booked</SelectItem>
-                        <SelectItem value="reserved">Reserved</SelectItem>
-                        <SelectItem value="viewed">Viewed</SelectItem>
-                        <SelectItem value="accepted">Accepted</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    {(searchTerm || statusFilter !== "all") && (
-                      <Button variant="outline" onClick={clearFilters} size="sm">
-                        Clear Filters
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {!loading && (
-                  <div className="text-sm text-gray-600 mt-2">
-                    Showing {quotations.length} quotations
-                    {hasMorePages && " (more available)"}
-                  </div>
-                )}
-              </CardHeader>
-
-              {loading ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 border-b border-gray-200">
-                      <TableHead className="font-semibold text-gray-900 py-3 w-8"></TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">NO.</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array(pageSize)
-                      .fill(0)
-                      .map((_, i) => (
-                        <TableRow key={i} className="border-b border-gray-100">
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-4" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-32" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-40" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-32" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-16" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Skeleton className="h-4 w-8" />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              ) : quotations.length > 0 ? (
-                <>
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="font-semibold text-gray-900 py-3 w-8"></TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">NO.</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Project Compliance</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Remarks</TableHead>
-                          <TableHead className="font-semibold text-gray-900 py-3">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {quotations.map((quotation: any) => {
-                          const compliance = getProjectCompliance(quotation)
-                          const isExpanded = expandedCompliance.has(quotation.id)
-
-                          return (
-                            <TableRow key={quotation.id} className="border-b border-gray-100 hover:bg-gray-50">
-                              <TableCell className="py-3"></TableCell>
-                              <TableCell
-                                className="py-3 text-sm text-gray-700 cursor-pointer font-medium"
-                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                              >
-                                {quotation.quotation_number || "N/A"}
-                              </TableCell>
-                              <TableCell
-                                className="py-3 text-sm text-blue-600 cursor-pointer hover:underline"
-                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                              >
-                                {quotation.items?.name || quotation.product_name || "N/A"}
-                              </TableCell>
-                              <TableCell
-                                className="py-3 text-sm text-gray-700 cursor-pointer"
-                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                              >
-                                {quotation.client_name || "N/A"}
-                              </TableCell>
-                              <TableCell className="py-3 text-sm text-gray-700">
-                                <div className="space-y-2">
-                                  <div
-                                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                                    onClick={() => toggleComplianceExpansion(quotation.id)}
-                                  >
-                                    <span className="font-medium">
-                                      {compliance.completed}/{compliance.total}
-                                    </span>
-                                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                                    <div className="transition-transform duration-200 ease-in-out">
-                                      {isExpanded ? (
-                                        <ChevronDown className="w-3 h-3 text-gray-400" />
-                                      ) : (
-                                        <ChevronRight className="w-3 h-3 text-gray-400" />
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                                      isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                                    }`}
-                                  >
-                                    <div className="space-y-1 pt-1">
-                                        <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
-                                        {compliance.toReserve.map((item: any, index: number) => {
-                                          const uploadKey = `${quotation.id}-${item.key}`
-                                          const isUploading = uploadingFiles.has(uploadKey)
-
-                                          return (
-                                            <div
-                                              key={index}
-                                              className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                              style={{
-                                                animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                                animationDuration: "200ms",
-                                              }}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                {item.status === "completed" ? (
-                                                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                                    <CheckCircle className="w-3 h-3 text-white" />
-                                                  </div>
-                                                ) : (
-                                                  <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                                )}
-                                                <div className="flex flex-col">
-                                                  <span className="text-gray-700">{item.name}</span>
-                                                  {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                {item.file && item.fileUrl ? (
-                                                  <a
-                                                    href={item.fileUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    <FileText className="w-3 h-3" />
-                                                    {item.file}
-                                                  </a>
-                                                ) : item.status === "upload" ? (
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-6 px-2 text-xs bg-transparent"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation()
-                                                      triggerFileUpload(quotation.id, item.key)
-                                                    }}
-                                                    disabled={isUploading}
-                                                  >
-                                                    {isUploading ? (
-                                                      <>
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                        Uploading...
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        <Upload className="w-3 h-3 mr-1" />
-                                                        Upload
-                                                      </>
-                                                    )}
-                                                  </Button>
-                                                ) : item.status === "confirmation" ? (
-                                                  <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                                    Pending
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                            </div>
-                                          )
-                                        })}
-
-                                        <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
-                                        {compliance.otherRequirements.map((item: any, index: number) => {
-                                          const uploadKey = `${quotation.id}-${item.key}`
-                                          const isUploading = uploadingFiles.has(uploadKey)
-
-                                          return (
-                                            <div
-                                              key={index}
-                                              className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                              style={{
-                                                animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                                animationDuration: "200ms",
-                                              }}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                {item.status === "completed" ? (
-                                                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                                    <CheckCircle className="w-3 h-3 text-white" />
-                                                  </div>
-                                                ) : (
-                                                  <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                                )}
-                                                <span className="text-gray-700">{item.name}</span>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                {item.file && item.fileUrl ? (
-                                                  <a
-                                                    href={item.fileUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    <FileText className="w-3 h-3" />
-                                                    {item.file}
-                                                  </a>
-                                                ) : item.status === "upload" ? (
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-6 px-2 text-xs bg-transparent"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation()
-                                                      triggerFileUpload(quotation.id, item.key)
-                                                    }}
-                                                    disabled={isUploading}
-                                                  >
-                                                    {isUploading ? (
-                                                      <>
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                        Uploading...
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        <Upload className="w-3 h-3 mr-1" />
-                                                        Upload
-                                                      </>
-                                                    )}
-                                                  </Button>
-                                                ) : item.status === "confirmation" ? (
-                                                  <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                                    Pending
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                            </div>
-                                          )
-                                        })}
-
-                                    </div>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell
-                                className="py-3 text-sm text-gray-700 cursor-pointer"
-                                onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                              >
-                                {quotation.status === "sent"
-                                  ? `Follow up on ${format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "MMM d, yyyy")}.`
-                                  : "-NA"}
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="p-0 h-auto">
-                                      <MoreVertical className="h-4 w-4 text-gray-400" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleCreateJO(quotation.id)}>
-                                      Create JO
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => handlePrintQuotation(quotation.id)}
-                                      disabled={generatingPDFs.has(quotation.id)}
-                                    >
-                                      {generatingPDFs.has(quotation.id) ? (
-                                        <>
-                                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                          Generating PDF...
-                                        </>
-                                      ) : (
-                                        "Print"
-                                      )}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
-                                      <Share2 className="w-3 h-3 mr-2" />
-                                      Share
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => handleCopyQuotation(quotation.id)}
-                                      disabled={copyingQuotations.has(quotation.id)}
-                                    >
-                                      {copyingQuotations.has(quotation.id) ? (
-                                        <>
-                                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                          Copying...
-                                        </>
-                                      ) : (
-                                        "Make a Copy"
-                                      )}
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-
-                  {/* Pagination Controls */}
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                    <div className="text-sm text-gray-600">
-                      Page {currentPage}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1 || loading}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={!hasMorePages || loading}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-
-                </>
-              ) : (
-                <CardContent className="p-6 text-center text-gray-600">
-                  {searchTerm || statusFilter !== "all" ? (
-                    <div>
-                      <p className="mb-2">No quotations found matching your filters.</p>
-                      <Button variant="outline" onClick={clearFilters} size="sm">
-                        Clear Filters
-                      </Button>
-                    </div>
-                  ) : (
-                    <p>No quotations found for your account.</p>
-                  )}
-                </CardContent>
-              )}
-            </Card>
+            <Button
+              onClick={() => router.push("/sales/quotations/compose/new")}
+              className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
+            >
+              Create Quotation
+            </Button>
           </div>
+        </div>
+
+        {(loading || searchLoading) ? (
+          <Card className="bg-white overflow-hidden rounded-t-lg">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200">
+                  <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="border-b border-gray-200">
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-20" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-16" />
+                    </TableCell>
+                    <TableCell className="text-right py-3">
+                      <Skeleton className="h-8 w-8 ml-auto" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : quotations.length > 0 ? (
+          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200">
+                  <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {quotations.map((quotation: any) => {
+                  const compliance = getProjectCompliance(quotation)
+                  const isExpanded = expandedCompliance.has(quotation.id)
+
+                  return (
+                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200">
+                      <TableCell className="py-3">
+                        <div className="text-sm text-gray-600">
+                          {(() => {
+                            const date = quotation.created instanceof Date ? quotation.created : (quotation.created && typeof quotation.created.toDate === 'function' ? quotation.created.toDate() : null);
+                            if (!date || isNaN(date.getTime())) {
+                              return "N/A";
+                            }
+                            return format(date, "MMM d, yyyy");
+                          })()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="font-medium text-gray-900">{quotation.quotation_number || quotation.id || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="font-medium text-gray-900">{quotation.client_name || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-gray-700">
+                        <div className="space-y-2">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                            onClick={() => toggleComplianceExpansion(quotation.id)}
+                          >
+                            <span className="font-medium">
+                              {compliance.completed}/{compliance.total}
+                            </span>
+                            <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                            <div className="transition-transform duration-200 ease-in-out">
+                              {isExpanded ? (
+                                <ChevronDown className="w-3 h-3 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-3 h-3 text-gray-400" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                            }`}
+                          >
+                            <div className="space-y-1 pt-1">
+                                <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
+                                {compliance.toReserve.map((item: any, index: number) => {
+                                  const uploadKey = `${quotation.id}-${item.key}`
+                                  const isUploading = uploadingFiles.has(uploadKey)
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                      style={{
+                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                        animationDuration: "200ms",
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {item.status === "completed" ? (
+                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                            <CheckCircle className="w-3 h-3 text-white" />
+                                          </div>
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                        )}
+                                        <div className="flex flex-col">
+                                          <span className="text-gray-700">{item.name}</span>
+                                          {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {item.file && item.fileUrl ? (
+                                          <a
+                                            href={item.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <FileText className="w-3 h-3" />
+                                            {item.file}
+                                          </a>
+                                        ) : item.status === "upload" ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs bg-transparent"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              triggerFileUpload(quotation.id, item.key)
+                                            }}
+                                            disabled={isUploading}
+                                          >
+                                            {isUploading ? (
+                                              <>
+                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                Uploading...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Upload className="w-3 h-3 mr-1" />
+                                                Upload
+                                              </>
+                                            )}
+                                          </Button>
+                                        ) : item.status === "confirmation" ? (
+                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                            Pending
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+
+                                <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
+                                {compliance.otherRequirements.map((item: any, index: number) => {
+                                  const uploadKey = `${quotation.id}-${item.key}`
+                                  const isUploading = uploadingFiles.has(uploadKey)
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
+                                      style={{
+                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
+                                        animationDuration: "200ms",
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {item.status === "completed" ? (
+                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                            <CheckCircle className="w-3 h-3 text-white" />
+                                          </div>
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
+                                        )}
+                                        <span className="text-gray-700">{item.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {item.file && item.fileUrl ? (
+                                          <a
+                                            href={item.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <FileText className="w-3 h-3" />
+                                            {item.file}
+                                          </a>
+                                        ) : item.status === "upload" ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs bg-transparent"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              triggerFileUpload(quotation.id, item.key)
+                                            }}
+                                            disabled={isUploading}
+                                          >
+                                            {isUploading ? (
+                                              <>
+                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                Uploading...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Upload className="w-3 h-3 mr-1" />
+                                                Upload
+                                              </>
+                                            )}
+                                          </Button>
+                                        ) : item.status === "confirmation" ? (
+                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
+                                            Pending
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => handleCreateJO(quotation.id)}>
+                              Create JO
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePrintQuotation(quotation.id)}
+                              disabled={generatingPDFs.has(quotation.id)}
+                            >
+                              {generatingPDFs.has(quotation.id) ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                  Generating PDF...
+                                </>
+                              ) : (
+                                "Print"
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
+                              <Share2 className="w-3 h-3 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleCopyQuotation(quotation.id)}
+                              disabled={copyingQuotations.has(quotation.id)}
+                            >
+                              {copyingQuotations.has(quotation.id) ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                  Copying...
+                                </>
+                              ) : (
+                                "Make a Copy"
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </Card>
         ) : (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="p-6 text-center text-gray-600">
-              <p>Please log in to view your quotations.</p>
+          <Card className="bg-white rounded-xl">
+            <CardContent className="text-center py-12">
+              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <FileText className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No quotations yet
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Create your first quotation to get started
+              </p>
+              <Button
+                onClick={() => router.push("/sales/quotations/compose/new")}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Quotation
+              </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && quotations.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-xl">
+            <div className="text-sm text-gray-600">
+              Page {currentPage}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1 || loading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!hasMorePages || loading}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

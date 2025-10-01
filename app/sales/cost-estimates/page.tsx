@@ -304,6 +304,7 @@ function CostEstimatesPageContent() {
         client_designation: costEstimate.client.designation || "",
         client_company_id: costEstimate.client.company_id || "",
         status: "draft" as const,
+        created: Timestamp.now(),
         created_by: user?.uid || "",
         seller_id: user?.uid || "",
         company_id: userData?.company_id || "",
@@ -414,100 +415,58 @@ function CostEstimatesPageContent() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <div className="mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Cost Estimates</h1>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Cost Estimates</h1>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 opacity-30" />
+                <Input
+                  placeholder="Search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-96 border-gray-300 rounded-full"
+                />
+              </div>
+            </div>
             <Button
               onClick={() => router.push("/sales/dashboard?action=create-cost-estimate")}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
             >
-              <Plus className="mr-2 h-4 w-4" />
               Create Cost Estimate
             </Button>
           </div>
-
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search cost estimates or clients..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-10 w-full sm:w-80"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="sent">Sent</SelectItem>
-                      <SelectItem value="viewed">Viewed</SelectItem>
-                      <SelectItem value="accepted">Accepted</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {(searchTerm || statusFilter !== "all") && (
-                    <Button variant="outline" onClick={() => {
-                      setSearchTerm("")
-                      setStatusFilter("all")
-                    }} size="sm">
-                      Clear Filters
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {(loading || searchLoading) ? (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+          <Card className="bg-white overflow-hidden rounded-t-lg">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Proposals ID</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Sites</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Actions</TableHead>
+                <TableRow className="border-b border-gray-200">
+                  <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Cost Estimate ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i} className="border-b border-gray-100">
+                  <TableRow key={i} className="border-b border-gray-200">
                     <TableCell className="py-3">
-                      <Skeleton className="h-5 w-48 mb-1" />
-                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-8 w-8 rounded-full" />
-                        <div>
-                          <Skeleton className="h-5 w-28 mb-1" />
-                          <Skeleton className="h-4 w-20" />
-                        </div>
-                      </div>
+                      <Skeleton className="h-5 w-20" />
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="py-3">
-                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -518,7 +477,7 @@ function CostEstimatesPageContent() {
             </Table>
           </Card>
         ) : (isSearching ? searchResults.length === 0 : costEstimates.length === 0) ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
+          <Card className="bg-white rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="h-8 w-8 text-gray-400" />
@@ -546,12 +505,13 @@ function CostEstimatesPageContent() {
           <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Proposals ID</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Sites</TableHead>
-                  <TableHead className="font-semibold text-gray-900">Actions</TableHead>
+                <TableRow className="border-b border-gray-200">
+                  <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Cost Estimate ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -564,12 +524,11 @@ function CostEstimatesPageContent() {
                   return (
                     <TableRow
                       key={costEstimate.id || costEstimate.objectID || `cost-estimate-${index}`}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
+                      className="cursor-pointer border-b border-gray-200"
                       onClick={() => handleViewCostEstimate(costEstimate.id || costEstimate.objectID)}
                     >
                       <TableCell className="py-3">
-                        <div className="text-sm text-gray-600 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                        <div className="text-sm text-gray-600">
                           {(() => {
                             const date = costEstimate.createdAt instanceof Date ? costEstimate.createdAt : (costEstimate.createdAt && typeof costEstimate.createdAt.toDate === 'function' ? costEstimate.createdAt.toDate() : null);
                             if (!date || isNaN(date.getTime())) {
@@ -580,20 +539,16 @@ function CostEstimatesPageContent() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="font-medium text-gray-900">{costEstimate.proposalId || "—"}</div>
+                        <div className="font-medium text-gray-900">{costEstimate.costEstimateNumber || costEstimate.id || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">{costEstimate.client?.company || costEstimate.client?.company || "—"}</div>
-                          </div>
-                        </div>
+                        <div className="font-medium text-gray-900">{costEstimate.client?.company || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="text-sm text-gray-600">{costEstimate.lineItems?.map((item: CostEstimateLineItem) => item.description).join(', ') || "—"}</div>
+                        <div className="text-sm text-gray-600">{costEstimate.client?.name || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="text-sm text-gray-600">{costEstimate.lineItems?.[0]?.description || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
