@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc, Timestamp, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { CongratulationsDialog } from "@/components/congratulations-dialog"
+import html2canvas from "html2canvas"
+import jsPDF from "jspdf"
 
 export default function SalesReportPreviewPage() {
   const router = useRouter()
@@ -33,6 +35,7 @@ export default function SalesReportPreviewPage() {
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
   const [showCongratulations, setShowCongratulations] = useState(false)
   const [booking, setBooking] = useState<any>(null)
+  const reportContentRef = useRef<HTMLDivElement>(null)
 
   const handleCongratulationsClose = () => {
     setShowCongratulations(false)
@@ -389,39 +392,80 @@ export default function SalesReportPreviewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      console.log("Starting Puppeteer PDF generation for report:", report.id)
+      // Dynamic imports for client-side libraries
+      const html2canvas = (await import('html2canvas')).default
+      const jsPDF = (await import('jspdf')).default
 
-      // Call the new Puppeteer API
-      const response = await fetch(`/api/sales/reports/${report.id}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      toast({
+        title: "Download",
+        description: "Generating PDF...",
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
+      // Find all page containers (similar to proposals)
+      const pageContainers = document.querySelectorAll('[class*="mx-32 mb-8 bg-white shadow-lg"]')
+
+      if (pageContainers.length === 0) {
+        throw new Error("No report pages found")
       }
 
-      // Get the PDF blob
-      const pdfBlob = await response.blob()
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      })
 
-      // Create download link
-      const url = window.URL.createObjectURL(pdfBlob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `report-${report.id}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      for (let i = 0; i < pageContainers.length; i++) {
+        const container = pageContainers[i] as HTMLElement
+
+        // Temporarily remove height restrictions to capture full content
+        const originalMaxHeight = container.style.maxHeight
+        const originalOverflow = container.style.overflow
+        container.style.maxHeight = 'none'
+        container.style.overflow = 'visible'
+
+        // Capture the page with html2canvas
+        const canvas = await html2canvas(container, {
+          scale: 3, // Higher quality like proposals
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          width: container.offsetWidth,
+          height: container.offsetHeight,
+          imageTimeout: 0,
+          logging: false,
+        })
+
+        // Restore original styles
+        container.style.maxHeight = originalMaxHeight
+        container.style.overflow = originalOverflow
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.7)
+
+        // Calculate dimensions to fit the page (same as proposals)
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        const imgWidth = canvas.width
+        const imgHeight = canvas.height
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+        const imgX = (pdfWidth - imgWidth * ratio) / 2
+        const imgY = (pdfHeight - imgHeight * ratio) / 2
+
+        if (i > 0) {
+          pdf.addPage()
+        }
+
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      }
+
+      // Save the PDF
+      pdf.save(`report-${report.id || 'preview'}.pdf`)
 
       toast({
         title: "Success",
-        description: "PDF downloaded successfully.",
+        description: "PDF downloaded successfully",
       })
     } catch (error) {
-      console.error("Error generating report PDF:", error)
+      console.error("Error generating PDF:", error)
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -576,7 +620,7 @@ export default function SalesReportPreviewPage() {
           </div>
         </div>
 
-        <div className="mx-32 mb-8 bg-white shadow-lg rounded-lg overflow-y-auto overflow-x-hidden h-[calc(100vh-12rem)]">
+        <div ref={reportContentRef} className="mx-32 mb-8 bg-white shadow-lg rounded-lg overflow-y-auto overflow-x-hidden h-[calc(100vh-12rem)]">
           <div className="w-full relative">
             <div className="relative h-16">
               <div className="absolute inset-0 bg-blue-900"></div>

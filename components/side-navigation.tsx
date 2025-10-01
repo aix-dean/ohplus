@@ -162,6 +162,20 @@ const navigationItems = [
 ]
 
 function isActive(pathname: string, href: string) {
+  // Special case for sales dashboard modes
+  if (pathname === "/sales/dashboard") {
+    const currentMode = sessionStorage.getItem('sales-dashboard-mode')
+    if (href === "/sales/proposals" && currentMode === 'proposal') {
+      return true
+    }
+    if (href === "/sales/cost-estimates" && currentMode === 'cost-estimate') {
+      return true
+    }
+    if (href === "/sales/quotations-list" && currentMode === 'quotation') {
+      return true
+    }
+  }
+
   return pathname === href
 }
 

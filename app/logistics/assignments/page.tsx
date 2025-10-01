@@ -3,23 +3,30 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function ServiceAssignmentsPage() {
-  const router = useRouter()
-  const { userData } = useAuth()
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
+   const router = useRouter()
+   const { userData } = useAuth()
+   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+   const [searchQuery, setSearchQuery] = useState("")
+   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false)
 
   const handleSelectAssignment = async (id: string) => {
     router.push(`/logistics/service-assignments/${id}`)
   }
 
   const handleCreateAssignment = () => {
+    setIsCreatingAssignment(true)
     router.push("/logistics/assignments/create")
+
+    // Reset loading state after a short delay to ensure smooth transition
+    setTimeout(() => {
+      setIsCreatingAssignment(false)
+    }, 1000)
   }
 
   return (
@@ -29,8 +36,17 @@ export default function ServiceAssignmentsPage() {
           <h1 className="text-2xl font-bold">Service Assignments</h1>
           <p className="text-sm text-gray-500">Manage service assignments</p>
         </div>
-        <Button onClick={handleCreateAssignment} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" /> Create Assignment
+        <Button
+          onClick={handleCreateAssignment}
+          disabled={isCreatingAssignment}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isCreatingAssignment ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
+          {isCreatingAssignment ? "Creating..." : "Create Assignment"}
         </Button>
       </header>
 
