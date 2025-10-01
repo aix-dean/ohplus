@@ -57,11 +57,8 @@ export function JobOrderCreatedSuccessDialog({
 
     try {
       await createNotifications(notifications)
-      onClose() // Close dialog after successful notification
     } catch (error) {
       console.error("Error creating notifications:", error)
-      // Still close dialog on error
-      onClose()
     }
   }, [userData?.company_id, userData?.role, joIds, onClose])
 
@@ -103,7 +100,6 @@ export function JobOrderCreatedSuccessDialog({
       for (const jobOrder of jobOrders) {
         await generateJobOrderPDF(jobOrder, "print",false)
       }
-      onClose()
     } catch (error) {
       console.error("Error generating PDF:", error)
     } finally {
@@ -144,7 +140,7 @@ export function JobOrderCreatedSuccessDialog({
               variant="outline"
               onClick={generateAndPrintPDF}
               disabled={isLoadingData || isLoadingPrint || jobOrders.length === 0}
-              className="flex-1"
+              className="w-full"
             >
               {isLoadingPrint ? (
                 <>
@@ -154,9 +150,6 @@ export function JobOrderCreatedSuccessDialog({
               ) : (
                 "Print"
               )}
-            </Button>
-            <Button onClick={handleNotifyTeams} className="flex-1">
-              Notify Teams
             </Button>
           </div>
         </div>
