@@ -1,4 +1,4 @@
-timport { ServiceAssignmentCard } from './ServiceAssignmentCard';
+import { ServiceAssignmentCard } from './ServiceAssignmentCard';
 import { ServiceExpenseCard } from './ServiceExpenseCard';
 import { ActionButtons } from './ActionButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
