@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
 import { Plus, Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 
 export default function ServiceAssignmentsPage() {
    const router = useRouter()
@@ -14,6 +15,21 @@ export default function ServiceAssignmentsPage() {
    const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
    const [searchQuery, setSearchQuery] = useState("")
    const [isCreatingAssignment, setIsCreatingAssignment] = useState(false)
+
+   const [showServiceAssignmentSuccessDialog, setShowServiceAssignmentSuccessDialog] = useState(false)
+   const [createdServiceAssignmentSaNumber, setCreatedServiceAssignmentSaNumber] = useState<string>("")
+
+   useEffect(() => {
+     // Check if we just created a service assignment
+     const lastCreatedServiceAssignmentSaNumber = sessionStorage.getItem("lastCreatedServiceAssignmentSaNumber")
+     if (lastCreatedServiceAssignmentSaNumber) {
+       setCreatedServiceAssignmentSaNumber(lastCreatedServiceAssignmentSaNumber)
+       setShowServiceAssignmentSuccessDialog(true)
+       // Clear the session storage
+       sessionStorage.removeItem("lastCreatedServiceAssignmentId")
+       sessionStorage.removeItem("lastCreatedServiceAssignmentSaNumber")
+     }
+   }, [])
 
   const handleSelectAssignment = async (id: string) => {
     router.push(`/logistics/service-assignments/${id}`)
@@ -69,6 +85,14 @@ export default function ServiceAssignmentsPage() {
           searchQuery={searchQuery}
         />
       </main>
+
+      {/* Service Assignment Success Dialog */}
+      <ServiceAssignmentSuccessDialog
+        open={showServiceAssignmentSuccessDialog}
+        onOpenChange={setShowServiceAssignmentSuccessDialog}
+        saNumber={createdServiceAssignmentSaNumber}
+        onViewAssignments={() => router.push('/logistics/assignments')}
+      />
     </div>
   )
 }

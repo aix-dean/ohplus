@@ -24,6 +24,7 @@ interface ServiceAssignment {
   assignedTo: string
   crew?: string
   message: string
+  campaignName?: string
   coveredDateStart: any
   coveredDateEnd: any
   alarmDate?: any
