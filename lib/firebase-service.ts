@@ -66,6 +66,7 @@ async function indexServiceAssignment(serviceAssignment: ServiceAssignment) {
       jobDescription: serviceAssignment.jobDescription,
       requestedBy: serviceAssignment.requestedBy,
       message: serviceAssignment.message,
+      campaignName: serviceAssignment.campaignName || '',
       status: serviceAssignment.status,
       coveredDateStart: serviceAssignment.coveredDateStart?.toISOString() || '',
       coveredDateEnd: serviceAssignment.coveredDateEnd?.toISOString() || '',
@@ -226,6 +227,7 @@ export interface ServiceAssignment {
     department: string
   }
   message: string
+  campaignName?: string
   coveredDateStart: Date | null
   coveredDateEnd: Date | null
   alarmDate: Date | null
@@ -1231,6 +1233,7 @@ export async function updateServiceAssignment(
           jobDescription: updatedData.jobDescription,
           requestedBy: updatedData.requestedBy,
           message: updatedData.message,
+          campaignName: updatedData.campaignName || '',
           status: updatedData.status,
           coveredDateStart: updatedData.coveredDateStart?.toDate() || null,
           coveredDateEnd: updatedData.coveredDateEnd?.toDate() || null,

@@ -4,7 +4,7 @@ import { ActionButtons } from './ActionButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Search, X } from 'lucide-react';
+import { Search, X, ArrowRight } from 'lucide-react';
 import { format } from "date-fns";
 import type { Timestamp } from "firebase/firestore";
 import type { Product } from "@/lib/firebase-service";
@@ -14,10 +14,12 @@ import type { JobOrder } from "@/lib/types/job-order";
 // Job Order Details Card Component
 function JobOrderDetailsCard({
   jobOrder,
-  onChange
+  onChange,
+  serviceType
 }: {
   jobOrder: JobOrder;
   onChange: () => void;
+  serviceType: string;
 }) {
   // Helper function to format date
   const formatDate = (date: string | Date | Timestamp | undefined) => {
@@ -29,6 +31,8 @@ function JobOrderDetailsCard({
       return "N/A";
     }
   };
+
+  const primaryImageUrl = jobOrder.projectCompliance?.finalArtwork?.fileUrl || jobOrder.siteImageUrl;
 
   return (
     <Card className="w-full">
@@ -59,9 +63,77 @@ function JobOrderDetailsCard({
         </div>
         <div className="space-y-2">
           <Label>Attachments:</Label>
-          {jobOrder.siteImageUrl ? (
+          {serviceType === "Change Material" ? (
+            <div className="flex items-center gap-2">
+              <div className="space-y-2">
+                <div className="relative">
+                  {primaryImageUrl ? (
+                    <img
+                      src={primaryImageUrl}
+                      alt="Old Material"
+                      className="rounded-md h-32 w-32 object-cover"
+                    />
+                  ) : (
+                    <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
+                  )}
+                  <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-center px-10">
+                <ArrowRight className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <div className="relative">
+                  {(jobOrder.attachments as any)?.url ? (
+                    <img
+                      src={(jobOrder.attachments as any).url}
+                      alt="New Material"
+                      className="rounded-md h-32 w-32 object-cover"
+                    />
+                  ) : (
+                    <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
+                  )}
+                  <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                </div>
+              </div>
+            </div>
+          ) : serviceType === "Change Material" ? (
+            <div className="grid grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <div className="relative">
+                  {primaryImageUrl ? (
+                    <img
+                      src={primaryImageUrl}
+                      alt="Old Material"
+                      className="rounded-md h-32 w-32 object-cover"
+                    />
+                  ) : (
+                    <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
+                  )}
+                  <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-center">
+                <ArrowRight className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <div className="relative">
+                  {(jobOrder.attachments as any)?.url ? (
+                    <img
+                      src={(jobOrder.attachments as any).url}
+                      alt="New Material"
+                      className="rounded-md h-32 w-32 object-cover"
+                    />
+                  ) : (
+                    <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
+                  )}
+                  <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                </div>
+              </div>
+            </div>
+          ) : primaryImageUrl ? (
             <img
-              src={jobOrder.siteImageUrl}
+              src={primaryImageUrl}
               alt="Site Image"
               className="rounded-md h-32 w-32 object-cover"
             />
@@ -111,6 +183,7 @@ interface FormData {
   sales: string;
   remarks: string;
   message: string;
+  campaignName?: string;
   startDate: Date | null;
   endDate: Date | null;
   alarmDate: Date | null;
@@ -187,6 +260,7 @@ export function CreateServiceAssignmentForm({
           <JobOrderDetailsCard
             jobOrder={jobOrderData}
             onChange={onChangeJobOrder || (() => {})}
+            serviceType={formData.serviceType}
           />
         ) : (
           onIdentifyJO && (

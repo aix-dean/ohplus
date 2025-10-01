@@ -29,6 +29,7 @@ interface ServiceAssignment {
   assignedTo: string
   jobDescription: string
   message: string
+  campaignName?: string
   joNumber?: string
   requestedBy: {
     id: string
@@ -329,6 +330,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
           assignedTo: saHit.assignedTo || '',
           jobDescription: saHit.jobDescription || '',
           message: saHit.message || '',
+          campaignName: saHit.campaignName || '',
           joNumber: saHit.joNumber || '',
           requestedBy: saHit.requestedBy || { id: '', name: '', department: '' },
           status: saHit.status || '',
@@ -512,7 +514,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
                     "Not specified"
                   )}
                 </TableCell>
-                <TableCell>{assignment.message || assignment.jobDescription || "N/A"}</TableCell>
+                <TableCell>{assignment.campaignName || assignment.message || assignment.jobDescription || "N/A"}</TableCell>
                 <TableCell>{assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "N/A"}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
