@@ -90,7 +90,7 @@ export default function AllSitesTab({
       useEffect(() => {
         if (!userData?.company_id) return
     
-        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id))
+        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
           const counts: Record<string, number> = {}
           const productIds = products.map(p => p.id).filter(Boolean)
@@ -500,9 +500,14 @@ function UnifiedSiteCard({
           className="p-[2px] rounded-[12px] gradient-border"
         >
           <Card
-            className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[10px] w-full"
+            className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[10px] w-full relative"
             onClick={handleCardClick}
           >
+            {site.joCount > 0 && (
+              <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold z-10">
+                {site.joCount}
+              </div>
+            )}
             <CardContent className="p-3">
               <div className="relative w-full aspect-square bg-gray-200">
                 <Image
@@ -596,9 +601,14 @@ function UnifiedSiteCard({
         </div>
       ) : (
         <Card
-          className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[12px] border-2 border-gray-300 w-full"
+          className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[12px] border-2 border-gray-300 w-full relative"
           onClick={handleCardClick}
         >
+          {site.joCount > 0 && (
+            <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold z-10">
+              {site.joCount}
+            </div>
+          )}
           <CardContent className="p-3">
             <div className="relative w-full aspect-square bg-gray-200">
               <Image
