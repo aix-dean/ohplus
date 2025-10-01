@@ -872,3 +872,40 @@ export async function generateProposalPDFBlob(
 
   return { blob: pdfBlob, filename }
 }
+
+// Get sent emails for a proposal or cost estimate
+export async function getSentEmailsForProposal(proposalId: string, emailType: "proposal" | "cost_estimate" = "proposal"): Promise<any[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const emailsRef = collection(db, "emails")
+    const q = query(
+      emailsRef,
+      where(emailType === "proposal" ? "proposalId" : "costEstimateId", "==", proposalId),
+      where("email_type", "==", emailType),
+      where("status", "==", "sent"),
+      orderBy("sentAt", "desc")
+    )
+
+    const querySnapshot = await getDocs(q)
+    const emails: any[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      emails.push({
+        id: doc.id,
+        ...data,
+        sentAt: data.sentAt instanceof Timestamp ? data.sentAt.toDate() : new Date(data.sentAt),
+        created: data.created instanceof Timestamp ? data.created.toDate() : new Date(data.created),
+        updated: data.updated instanceof Timestamp ? data.updated.toDate() : new Date(data.updated),
+      })
+    })
+
+    return emails
+  } catch (error) {
+    console.error("Error fetching sent emails for proposal:", error)
+    return []
+  }
+}

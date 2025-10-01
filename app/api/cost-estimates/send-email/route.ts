@@ -462,17 +462,21 @@ export async function POST(request: NextRequest) {
       const emailDocument = {
         from: from,
         to: to,
-        cc: cc.length > 0 ? cc : undefined,
-        reply_to: emailData.reply_to,
+        cc: cc.length > 0 ? cc : null,
+        replyTo: emailData.reply_to,
         subject: subject.trim(),
         body: body.trim(),
         attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
+        email_type: "cost_estimate",
+        costEstimateId: costEstimate.id,
         templateId: undefined, // No template used for cost estimates
         reportId: undefined,
         status: "sent" as const,
         userId: userData?.email || currentUserEmail || "unknown",
         company_id: userData?.company_id || costEstimate.company_id,
-        sent: Timestamp.fromDate(new Date()),
+        created: Timestamp.fromDate(new Date()),
+        sentAt: Timestamp.fromDate(new Date()),
+        updated: Timestamp.fromDate(new Date()),
       }
 
       const emailId = await emailService.createEmail(emailDocument)
