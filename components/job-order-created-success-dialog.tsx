@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button"
 import { PartyPopper, FileText, Package, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { createNotifications } from "@/lib/client-service"
 import { getJobOrderById } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 
 interface JobOrderCreatedSuccessDialogProps {
@@ -28,39 +27,49 @@ export function JobOrderCreatedSuccessDialog({
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [isLoadingPrint, setIsLoadingPrint] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
+  const notificationsSentRef = useRef<Set<string>>(new Set())
 
-  const handleNotifyTeams = useCallback(async () => {
-    if (!userData?.company_id || !userData?.role) return
-
-    // Map role to department
-    const roleToDepartment: { [key: string]: string } = {
-      sales: "SALES",
-      logistics: "LOGISTICS",
-      admin: "ADMIN",
-      cms: "CMS",
+  // Fetch job order data when dialog opens
+  useEffect(() => {
+    if (isOpen && joIds.length > 0) {
+      const fetchJobOrders = async () => {
+        setIsLoadingData(true)
+        try {
+          const fetchedJobOrders: JobOrder[] = []
+          for (const joId of joIds) {
+            const jobOrder = await getJobOrderById(joId)
+            if (jobOrder) {
+              fetchedJobOrders.push(jobOrder)
+            }
+          }
+          setJobOrders(fetchedJobOrders)
+        } catch (error) {
+          console.error("Error fetching job orders:", error)
+        } finally {
+          setIsLoadingData(false)
+        }
+      }
+      fetchJobOrders()
     }
-     const departmentFrom = "Sales"
+  }, [isOpen, joIds])
 
-    const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
-    const navigateTo = `/logistics/job-orders/${joIds[0]}`
+  const generateAndPrintPDF = async () => {
+    if (jobOrders.length === 0) return
 
-    const notifications = departments.map((dept) => ({
-      company_id: userData.company_id!,
-      department_from: departmentFrom,
-      department_to: dept,
-      description: "A new job order has been created and requires your attention.",
-      navigate_to: navigateTo,
-      title: "New Job Order Created",
-      type: "job_order_created",
-      uid_to: null,
-    }))
-
+    setIsLoadingPrint(true)
     try {
-      await createNotifications(notifications)
+      // Generate PDF for each job order
+      for (const jobOrder of jobOrders) {
+        await generateJobOrderPDF(jobOrder, "print",false)
+      }
+      onClose()
     } catch (error) {
-      console.error("Error creating notifications:", error)
+      console.error("Error generating PDF:", error)
+    } finally {
+      setIsLoadingPrint(false)
     }
-  }, [userData?.company_id, userData?.role, joIds, onClose])
+  }
+
 
   // Fetch job order data when dialog opens
   useEffect(() => {
@@ -77,10 +86,6 @@ export function JobOrderCreatedSuccessDialog({
           }
           setJobOrders(fetchedJobOrders)
 
-          // Automatically create notifications for all departments
-          if (userData?.company_id && fetchedJobOrders.length > 0) {
-            await handleNotifyTeams()
-          }
         } catch (error) {
           console.error("Error fetching job orders:", error)
         } finally {
@@ -89,23 +94,8 @@ export function JobOrderCreatedSuccessDialog({
       }
       fetchJobOrders()
     }
-  }, [isOpen, joIds, userData?.company_id, handleNotifyTeams])
+  }, [isOpen, joIds, userData])
 
-  const generateAndPrintPDF = async () => {
-    if (jobOrders.length === 0) return
-
-    setIsLoadingPrint(true)
-    try {
-      // Generate PDF for each job order
-      for (const jobOrder of jobOrders) {
-        await generateJobOrderPDF(jobOrder, "print",false)
-      }
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-    } finally {
-      setIsLoadingPrint(false)
-    }
-  }
 
 
 

@@ -119,7 +119,6 @@ interface FormData {
   equipmentRequired: string;
   materialSpecs: string;
   crew: string;
-  illuminationNits: string;
   gondola: string;
   technology: string;
   sales: string;
@@ -282,9 +281,6 @@ export function ServiceAssignmentCard({
 
     // Set materialSpecs from job order data
     handleInputChange("materialSpecs", jobOrder.materialSpec || "");
-
-    // Set illuminationNits from job order data
-    handleInputChange("illuminationNits", jobOrder.illumination || "");
 
     // Set dates if available and valid
     const requestedDate = parseDateSafely(jobOrder.dateRequested);
@@ -591,17 +587,6 @@ export function ServiceAssignmentCard({
               </Select>
             </div>
 
-            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label className="w-32 flex-shrink-0">Illumination/Nits:</Label>
-                <Input
-                  placeholder="Enter illumination details"
-                  value={formData.illuminationNits}
-                  onChange={(e) => handleInputChange("illuminationNits", e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            )}
 
             {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
