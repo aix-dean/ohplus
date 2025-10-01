@@ -16,6 +16,7 @@ import { db } from "./firebase"
 
 export interface ReportData {
   id?: string
+  report_id?: string
   siteId: string
   siteName: string
   siteCode?: string
@@ -23,6 +24,7 @@ export interface ReportData {
   sellerId: string
   client: string
   clientId: string
+  client_email?: string
   joNumber?: string
   joType?: string
   bookingDates: {
@@ -38,6 +40,7 @@ export interface ReportData {
     fileName: string
     fileType: string
     fileUrl: string
+    label?: string
   }>
   status: string
   createdBy: string
@@ -113,6 +116,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
           fileName: attachment.fileName || "Unknown file",
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
+          label: attachment.label,
         }
 
         console.log("Processed attachment:", processedAttachment)
@@ -121,14 +125,19 @@ export async function createReport(reportData: ReportData): Promise<string> {
 
     console.log("Processed attachments:", processedAttachments)
 
+    // Generate report_id in format "RP-[currentmillis]"
+    const reportId = `RP-${Date.now()}`
+
     // Create the final report data with proper structure
     const finalReportData: any = {
+      report_id: reportId,
       siteId: reportData.siteId,
       siteName: reportData.siteName,
       companyId: reportData.companyId,
       sellerId: reportData.sellerId,
       client: reportData.client,
       clientId: reportData.clientId,
+      client_email: reportData.client_email,
       joNumber: reportData.joNumber,
       joType: reportData.joType,
       bookingDates: {
@@ -197,6 +206,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
     // Clean the data to remove undefined values before saving
     const cleanedReportData = cleanReportData(finalReportData)
     console.log("Cleaned report data:", cleanedReportData)
+    console.log("Final attachments to be saved:", cleanedReportData.attachments)
 
     const docRef = await addDoc(collection(db, "reports"), cleanedReportData)
     console.log("Report created with ID:", docRef.id)
@@ -312,6 +322,7 @@ export async function updateReport(reportId: string, updateData: Partial<ReportD
           fileName: attachment.fileName || "Unknown file",
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
+          label: attachment.label,
         }))
     }
 
@@ -395,6 +406,29 @@ export async function getReportsByType(reportType: string): Promise<ReportData[]
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by type:", error)
+    throw error
+  }
+}
+
+export async function getReportsByProductId(productId: string, page: number = 1, limit: number = 10): Promise<{ reports: ReportData[], total: number }> {
+  try {
+    // Get all reports for this product (since Firestore doesn't support offset with where clauses)
+    const q = query(collection(db, "reports"), where("product.id", "==", productId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const allReports = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
+    })) as ReportData[]
+
+    const total = allReports.length
+    const offset = (page - 1) * limit
+    const reports = allReports.slice(offset, offset + limit)
+
+    return { reports, total }
+  } catch (error) {
+    console.error("Error fetching reports by product:", error)
     throw error
   }
 }

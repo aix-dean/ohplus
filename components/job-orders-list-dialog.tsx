@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Calendar, User, FileText, ExternalLink } from "lucide-react"
+import { Loader2, Calendar, User, FileText, ExternalLink, Plus } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
+import { useRouter } from "next/navigation"
 
 interface JobOrder {
   id: string
@@ -34,25 +35,41 @@ interface JobOrdersListDialogProps {
 }
 
 export function JobOrdersListDialog({ open, onOpenChange, siteId, siteName, companyId }: JobOrdersListDialogProps) {
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+   const router = useRouter()
+   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+   const [loading, setLoading] = useState(false)
+   const [error, setError] = useState<string | null>(null)
 
   const fetchJobOrders = async () => {
-    if (!siteId || !companyId) return
+    if (!companyId) {
+      console.log("[JobOrdersListDialog] Missing required params - companyId:", companyId)
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
+      console.log("[JobOrdersListDialog] Fetching job orders for companyId:", companyId)
+      console.log("[JobOrdersListDialog] Current query will filter by: company_id==", companyId, "- this shows all job orders for the company")
       const jobOrdersRef = collection(db, "job_orders")
-      const q = query(jobOrdersRef, where("product_id", "==", siteId), where("company_id", "==", companyId))
+      const q = query(jobOrdersRef, where("company_id", "==", companyId))
+      console.log("[JobOrdersListDialog] Query created with collection 'job_orders', filters: company_id==", companyId)
 
       const querySnapshot = await getDocs(q)
+      console.log("[JobOrdersListDialog] Query returned", querySnapshot.size, "documents")
+
       const orders: JobOrder[] = []
 
       querySnapshot.forEach((doc) => {
         const data = doc.data()
+        console.log("[JobOrdersListDialog] Processing doc", doc.id, "with data keys:", Object.keys(data))
+        console.log("[JobOrdersListDialog] Doc data sample:", {
+          joNumber: data.joNumber,
+          product_id: data.product_id,
+          company_id: data.company_id,
+          status: data.status
+        })
         orders.push({
           id: doc.id,
           joNumber: data.joNumber || "N/A",
@@ -79,8 +96,14 @@ export function JobOrdersListDialog({ open, onOpenChange, siteId, siteName, comp
       })
 
       setJobOrders(orders)
+      console.log("[JobOrdersListDialog] Successfully processed", orders.length, "job orders")
     } catch (err) {
-      console.error("Error fetching job orders:", err)
+      console.error("[JobOrdersListDialog] Error fetching job orders:", err)
+      const error = err as Error
+      console.error("[JobOrdersListDialog] Error details:", {
+        message: error.message,
+        stack: error.stack
+      })
       setError("Failed to load job orders")
     } finally {
       setLoading(false)
@@ -215,17 +238,27 @@ export function JobOrdersListDialog({ open, onOpenChange, siteId, siteName, comp
                     </div>
                   )}
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        router.push(`/logistics/assignments/create?jobOrderId=${jo.id}`)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create SA
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         // Navigate to job order details page
-                        window.open(`/logistics/job-orders/${jo.id}`, "_blank")
+                        router.push(`/logistics/job-orders/${jo.id}`)
                       }}
                       className="flex items-center gap-2"
                     >
-                      <ExternalLink className="h-4 w-4" />
                       View Details
                     </Button>
                   </div>

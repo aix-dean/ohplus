@@ -16,8 +16,7 @@ import {
   Package,
   CircleCheck,
   Upload,
-  ArrowRight,
-  Printer
+  ArrowRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +44,7 @@ import { bookingService } from "@/lib/booking-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
 import type { Product } from "@/lib/firebase-service"
-import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
+import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById, createNotifications } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
@@ -144,10 +143,6 @@ export default function CreateJobOrderPage() {
 
   // Form data for each product
   const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
-
-  // Success dialog states
-  const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
-  const [createdJoIds, setCreatedJoIds] = useState<string[]>([])
 
 
   // Coming soon dialog state
@@ -781,6 +776,7 @@ export default function CreateJobOrderPage() {
             clientCompany: quotation?.client_company_name || "N/A", // Changed from client?.company to client?.name
             clientCompanyId: quotation.client_company_id || "",
             clientId: client?.id || "",
+            client_email: (client as any)?.email || "",
             contractDuration: totalDays.toString(), // Convert to string as expected by type
             contractPeriodStart: contractPeriodStart || undefined,
             contractPeriodEnd: contractPeriodEnd || undefined,
@@ -857,8 +853,32 @@ export default function CreateJobOrderPage() {
           user.uid,
           status,
         )
-        setCreatedJoIds(joIds)
-        setShowJobOrderSuccessDialog(true)
+
+        // Create notifications for all departments
+        if (userData?.company_id) {
+          const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
+          const navigateTo = `/logistics/job-orders/${joIds[0]}`
+
+          const notifications = departments.map((dept) => ({
+            company_id: userData.company_id!,
+            department_from: "Sales",
+            department_to: dept,
+            description: "A new job order has been created and requires your attention.",
+            navigate_to: navigateTo,
+            title: "New Job Order Created",
+            type: "job_order_created",
+            uid_to: null,
+          }))
+
+          try {
+            await createNotifications(notifications)
+          } catch (notificationError: any) {
+            console.error("Error creating notifications:", notificationError)
+            // Don't throw here - we don't want notification failure to break job order creation
+          }
+        }
+
+        router.push(`/sales/job-orders?success=true&joIds=${joIds.join(',')}`)
       } catch (error: any) {
         console.error("Error creating job orders:", error)
         toast({
@@ -936,6 +956,7 @@ export default function CreateJobOrderPage() {
         clientCompany: quotation?.client_company_name || "N/A",
         clientCompanyId: quotation.client_company_id || "",
         clientId: client?.id || "",
+        client_email: (client as any)?.email || "",
         contractDuration: totalDays.toString(),
         contractPeriodStart: quotation.start_date ? safeToDate(quotation.start_date) : undefined,
         contractPeriodEnd: quotation.end_date ? safeToDate(quotation.end_date) : undefined,
@@ -1039,10 +1060,6 @@ export default function CreateJobOrderPage() {
     toast,
   ])
 
-  const handleDismissAndNavigate = useCallback(() => {
-    setShowJobOrderSuccessDialog(false)
-    router.push("/sales/job-orders")
-  }, [router])
 
   const handleCreateJobOrders = useCallback(
     async (status: JobOrderStatus) => {
@@ -2226,15 +2243,6 @@ export default function CreateJobOrderPage() {
             <div className="flex gap-2 pt-4 justify-end">
               <Button
                 variant="outline"
-                onClick={handlePrint}
-                disabled={isSubmitting}
-                className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                Print
-              </Button>
-              <Button
-                variant="outline"
                 onClick={() => handleCreateJobOrders("draft")}
                 disabled={isSubmitting}
                 className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
@@ -2256,13 +2264,6 @@ export default function CreateJobOrderPage() {
       </div>
 
 
-      {/* Success Dialog */}
-      <JobOrderCreatedSuccessDialog
-        isOpen={showJobOrderSuccessDialog}
-        onClose={handleDismissAndNavigate}
-        joIds={createdJoIds}
-        isMultiple={false}
-      />
 
       {/* Coming Soon Dialog */}
       <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />

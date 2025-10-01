@@ -72,6 +72,7 @@ export interface Booking {
   updated: any // Firestore timestamp
   user_id: string
   quotation_id: string // Added based on context
+  isCollectibles?: boolean // Indicates if collectibles have been created for this booking
 }
 
 export interface SalesRecord {

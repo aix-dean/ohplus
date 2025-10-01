@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import {
   Send,
   ExternalLink,
   Edit,
+  Loader2,
 } from "lucide-react"
 import { getReportById, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
@@ -25,6 +26,7 @@ import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { generateReportPDF } from "@/lib/report-pdf-service"
 
 export default function SalesReportViewPage() {
   const router = useRouter()
@@ -39,9 +41,11 @@ export default function SalesReportViewPage() {
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
   const [preparedByName, setPreparedByName] = useState<string>("")
+  const [printLoading, setPrintLoading] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
+  const reportContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (params.id) {
@@ -54,6 +58,105 @@ export default function SalesReportViewPage() {
       fetchPreparedByName()
     }
   }, [user?.uid])
+
+  // Handle automatic print when page loads with action parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const action = searchParams.get("action")
+
+    if (action === "print" && report && !loading) {
+      setPrintLoading(true)
+
+      // Scroll to load all maps before generating PDF
+      setTimeout(async () => {
+        try {
+          // Find all page containers (similar to proposals)
+          const pageContainers = document.querySelectorAll('[class*="mx-24 mb-8 bg-white shadow-lg"]')
+
+          if (pageContainers.length === 0) {
+            throw new Error("No report pages found")
+          }
+
+          const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+          })
+
+          for (let i = 0; i < pageContainers.length; i++) {
+            const container = pageContainers[i] as HTMLElement
+
+            // Temporarily remove height restrictions to capture full content
+            const originalMaxHeight = container.style.maxHeight
+            const originalOverflow = container.style.overflow
+            container.style.maxHeight = 'none'
+            container.style.overflow = 'visible'
+
+            // Capture the page with html2canvas
+            const canvas = await html2canvas(container, {
+              scale: 3, // Higher quality like proposals
+              useCORS: true,
+              allowTaint: false,
+              backgroundColor: '#ffffff',
+              width: container.offsetWidth,
+              height: container.offsetHeight,
+              imageTimeout: 0,
+              logging: false,
+            })
+
+            // Restore original styles
+            container.style.maxHeight = originalMaxHeight
+            container.style.overflow = originalOverflow
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.7)
+
+            // Calculate dimensions to fit the page (same as proposals)
+            const pdfWidth = pdf.internal.pageSize.getWidth()
+            const pdfHeight = pdf.internal.pageSize.getHeight()
+            const imgWidth = canvas.width
+            const imgHeight = canvas.height
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+            const imgX = (pdfWidth - imgWidth * ratio) / 2
+            const imgY = (pdfHeight - imgHeight * ratio) / 2
+
+            if (i > 0) {
+              pdf.addPage()
+            }
+
+            pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+          }
+
+          // Generate PDF blob for printing
+          const blob = pdf.output('blob')
+          // Create URL for the blob
+          const pdfUrl = URL.createObjectURL(blob)
+          // Open in new window for printing
+          const printWindow = window.open(pdfUrl, '_blank')
+          if (printWindow) {
+            // Wait for PDF to load then print and navigate back
+            printWindow.onload = () => {
+              printWindow.print()
+              // Navigate back immediately after triggering print
+              router.push('/sales/reports')
+            }
+          }
+        } catch (error) {
+          console.error("Error generating PDF for print:", error)
+          toast({
+            title: "Error",
+            description: "Failed to generate PDF for printing",
+            variant: "destructive",
+          })
+        } finally {
+          setPrintLoading(false)
+        }
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000) // Initial delay before starting
+    }
+  }, [report, loading])
 
   const fetchPreparedByName = async () => {
     if (!user?.uid) return
@@ -276,39 +379,30 @@ export default function SalesReportViewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      console.log("Starting Puppeteer PDF generation for report:", report.id)
-
-      // Call the new Puppeteer API
-      const response = await fetch(`/api/sales/reports/${report.id}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      toast({
+        title: "Download",
+        description: "Generating PDF...",
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
-      }
-
-      // Get the PDF blob
-      const pdfBlob = await response.blob()
+      const siteName = getSiteName(report)
+      const pdfFile = await generateReportPDF(report.id || 'unknown', siteName)
 
       // Create download link
-      const url = window.URL.createObjectURL(pdfBlob)
+      const url = URL.createObjectURL(pdfFile)
       const link = document.createElement('a')
       link.href = url
-      link.download = `report-${report.id}.pdf`
+      link.download = pdfFile.name
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      URL.revokeObjectURL(url)
 
       toast({
         title: "Success",
-        description: "PDF downloaded successfully.",
+        description: "PDF downloaded successfully",
       })
     } catch (error) {
-      console.error("Error generating report PDF:", error)
+      console.error("Error generating PDF:", error)
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -334,7 +428,7 @@ export default function SalesReportViewPage() {
   }
 
   const handleBack = () => {
-    router.push("/sales/reports")
+    router.back()
   }
 
   const handleEdit = () => {
@@ -442,7 +536,7 @@ export default function SalesReportViewPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -459,7 +553,7 @@ export default function SalesReportViewPage() {
         <div className="ml-auto"></div>
       </div>
 
-      <div className="relative">
+      <div className="relative flex justify-center">
         <div className="absolute left-4 top-6 z-10">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col items-center">
@@ -498,7 +592,7 @@ export default function SalesReportViewPage() {
           </div>
         </div>
 
-        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto max-h-[calc(100vh-150px)]">
+        <div className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
@@ -510,12 +604,12 @@ export default function SalesReportViewPage() {
                 }}
               ></div>
               <div className="relative z-10 h-full flex items-center px-6">
-                <div className="text-white text-lg font-semibold">Sales</div>
+                <div className="text-white text-lg font-semibold">Logistics</div>
               </div>
             </div>
           </div>
 
-          <div className="max-w-6xl mx-auto p-6 space-y-6">
+          <div className="p-4 space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex flex-col">
                 <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
@@ -685,7 +779,7 @@ export default function SalesReportViewPage() {
                 <h3 className="font-semibold mb-2">Prepared by:</h3>
                 <div className="text-sm text-gray-600">
                   <div>{preparedByName || "Loading..."}</div>
-                  <div>SALES</div>
+                  <div>LOGISTICS</div>
                   <div>{formatDate(report.date)}</div>
                 </div>
               </div>
@@ -811,6 +905,20 @@ export default function SalesReportViewPage() {
                 <p className="text-white text-sm italic text-center">{fullScreenAttachment.note}</p>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Loading Dialog */}
+      <Dialog open={printLoading} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
+          <DialogTitle className="sr-only">Generating PDF for Print</DialogTitle>
+          <div className="py-6">
+            <div className="mb-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Preparing for Print</h2>
+              <p className="text-gray-600">Generating PDF and waiting for all content to load...</p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

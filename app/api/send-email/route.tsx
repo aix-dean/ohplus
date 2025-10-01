@@ -155,7 +155,6 @@ function createEmailTemplate(
     <div class="email-container">
         <div class="header">
             <h1 class="logo">${companyName || "Company"}</h1>
-            <p class="tagline">Premium Outdoor Advertising Solutions</p>
         </div>
         
         <div class="content">
@@ -187,7 +186,6 @@ function createEmailTemplate(
                 <strong>${companyName || "Company"}</strong><br>
                 📞 ${phoneNumber}<br>
                 📧 ${replyTo || (userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply') + '@ohplus.ph'}<br>
-                ${companyWebsite && companyWebsite !== 'www.ohplus.ph' ? `🌐 ${companyWebsite}` : ''}
             </div>
             
             <div class="divider"></div>

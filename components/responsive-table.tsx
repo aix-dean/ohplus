@@ -44,9 +44,7 @@ export function ResponsiveTable<T>({
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const { isMobile, isTablet } = useResponsive()
 
-  const isSmallScreen = isMobile || isTablet
-
-  const visibleColumns = isSmallScreen ? columns.filter((column) => !column.hideOnMobile) : columns
+  const visibleColumns = isMobile ? columns.filter((column) => !column.hideOnMobile) : columns
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => ({
@@ -89,6 +87,50 @@ export function ResponsiveTable<T>({
 
   if (data.length === 0 && emptyState) {
     return emptyState
+  }
+
+  if (isMobile) {
+    return (
+      <div className="w-full space-y-4">
+        {data.map((row, rowIndex) => {
+          const rowId = row[keyField] ? String(row[keyField]) : String(rowIndex)
+          const isExpanded = expandedRows[rowId]
+
+          return (
+            <div key={rowId} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+              {expandableContent && (
+                <div className="flex justify-between items-center mb-2">
+                  <button
+                    onClick={() => toggleRow(rowId)}
+                    className="p-1 rounded-full hover:bg-gray-200"
+                  >
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
+                </div>
+              )}
+              <div className="space-y-2">
+                {columns.map((column, columnIndex) => {
+                  const header = getColumnHeader(column)
+                  return (
+                    <div key={column.key || column.header || columnIndex} className="flex justify-between items-start">
+                      {header !== "Actions" && (
+                        <span className="font-medium text-gray-700 text-sm">{header}:</span>
+                      )}
+                      <div className={header === "Actions" ? "w-full" : "flex-1 ml-2 text-right"}>{getValue(row, column)}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              {expandableContent && isExpanded && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  {expandableContent(row)}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (

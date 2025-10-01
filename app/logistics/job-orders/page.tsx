@@ -14,42 +14,99 @@ import { useAuth } from "@/contexts/auth-context"
 import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useRouter } from "next/navigation"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
-const isValidDate = (dateString: string | number | Date | undefined): boolean => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+const isValidDate = (dateValue: any): boolean => {
+  if (!dateValue) return false;
+
+  try {
+    let date: Date;
+
+    if (dateValue instanceof Date) {
+      date = dateValue;
+    } else if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        if (!isNaN(Number(dateValue))) {
+          date = new Date(Number(dateValue) * 1000);
+        } else {
+          return false;
+        }
+      }
+    } else if (typeof dateValue === 'number') {
+      date = new Date(dateValue * 1000);
+    } else if (dateValue && typeof dateValue === 'object' && (dateValue as any).seconds) {
+      // Handle Firestore Timestamp
+      date = new Date((dateValue as any).seconds * 1000);
+    } else {
+      return false;
+    }
+
+    return !isNaN(date.getTime());
+  } catch (error) {
+    return false;
+  }
+};
+
+const parseDateSafely = (dateValue: any): Date | null => {
+  if (!dateValue) return null;
+
+  try {
+    if (dateValue instanceof Date) {
+      return dateValue;
+    } else if (typeof dateValue === 'string') {
+      const date = new Date(dateValue);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+      if (!isNaN(Number(dateValue))) {
+        return new Date(Number(dateValue) * 1000);
+      }
+    } else if (typeof dateValue === 'number') {
+      return new Date(dateValue * 1000);
+    } else if (dateValue && typeof dateValue === 'object' && (dateValue as any).seconds) {
+      return new Date((dateValue as any).seconds * 1000);
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
 };
 
 export default function JobOrdersPage() {
-  const { user } = useAuth()
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+   const { user, userData } = useAuth()
+   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+   const [searchTerm, setSearchTerm] = useState("")
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState<string | null>(null)
 
-  const router = useRouter()
+   // Report dialog state
+   const [reportDialogOpen, setReportDialogOpen] = useState(false)
+   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
+   const [preSelectedJobOrder, setPreSelectedJobOrder] = useState<string>("")
 
-  useEffect(() => {
-    const fetchJOs = async () => {
-      if (!user?.uid) {
-        setError("User not authenticated.")
-        setLoading(false)
-        return
-      }
-      try {
-        setLoading(true)
-        const fetchedJOs = await getJobOrders(user.uid)
-        setJobOrders(fetchedJOs)
-      } catch (err) {
-        console.error("Failed to fetch job orders:", err)
-        setError("Failed to load job orders. Please try again.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchJOs()
-  }, [user?.uid])
+   const router = useRouter()
+
+   useEffect(() => {
+     const fetchJOs = async () => {
+       if (!userData?.company_id) {
+         setError("Company ID not found. Please contact support.")
+         setLoading(false)
+         return
+       }
+       try {
+         setLoading(true)
+         const fetchedJOs = await getJobOrders(userData.company_id)
+         setJobOrders(fetchedJOs)
+       } catch (err) {
+         console.error("Failed to fetch job orders:", err)
+         setError("Failed to load job orders. Please try again.")
+       } finally {
+         setLoading(false)
+       }
+     }
+     fetchJOs()
+   }, [userData?.company_id])
 
   const filteredJobOrders = useMemo(() => {
     if (!searchTerm) {
@@ -82,6 +139,7 @@ export default function JobOrdersPage() {
     }
   }
 
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
@@ -107,7 +165,6 @@ export default function JobOrdersPage() {
                   <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -133,9 +190,6 @@ export default function JobOrdersPage() {
                       </TableCell>
                       <TableCell className="py-3">
                         <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
                       </TableCell>
                       <TableCell className="py-3">
                         <Skeleton className="h-4 w-8 ml-auto" />
@@ -223,7 +277,6 @@ export default function JobOrdersPage() {
                   <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
                   <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -239,7 +292,10 @@ export default function JobOrdersPage() {
                     <TableCell className="py-3">{jo.siteName}</TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {isValidDate(jo.dateRequested) ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
+                        {(() => {
+                          const date = parseDateSafely(jo.dateRequested);
+                          return date ? format(date, "MMM d, yyyy") : "N/A";
+                        })()}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">
@@ -249,11 +305,13 @@ export default function JobOrdersPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {isValidDate(jo.deadline) ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
+                        {(() => {
+                          const date = parseDateSafely(jo.deadline);
+                          return date ? format(date, "MMM d, yyyy") : "N/A";
+                        })()}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                    <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
                     <TableCell className="text-right py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -263,11 +321,34 @@ export default function JobOrdersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/logistics/job-orders/${jo.id}`)
+                          }}>
                             View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Delete JO ${jo.joNumber}`)}>Delete</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (jo.product_id) {
+                                setSelectedSiteId(jo.product_id)
+                                setPreSelectedJobOrder(jo.joNumber)
+                                setReportDialogOpen(true)
+                              } else {
+                                alert("No site associated with this job order")
+                              }
+                            }}
+                          >
+                            Create Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            alert(`Edit JO ${jo.joNumber}`)
+                          }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            alert(`Delete JO ${jo.joNumber}`)
+                          }}>Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -278,6 +359,14 @@ export default function JobOrdersPage() {
             </Table>
           </Card>
         )}
+
+        {/* Report Dialog */}
+        <CreateReportDialog
+          open={reportDialogOpen}
+          onOpenChange={setReportDialogOpen}
+          siteId={selectedSiteId}
+          preSelectedJobOrder={preSelectedJobOrder}
+        />
       </div>
     </div>
   )

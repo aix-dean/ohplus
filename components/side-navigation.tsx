@@ -162,6 +162,20 @@ const navigationItems = [
 ]
 
 function isActive(pathname: string, href: string) {
+  // Special case for sales dashboard modes
+  if (pathname === "/sales/dashboard") {
+    const currentMode = sessionStorage.getItem('sales-dashboard-mode')
+    if (href === "/sales/proposals" && currentMode === 'proposal') {
+      return true
+    }
+    if (href === "/sales/cost-estimates" && currentMode === 'cost-estimate') {
+      return true
+    }
+    if (href === "/sales/quotations-list" && currentMode === 'quotation') {
+      return true
+    }
+  }
+
   return pathname === href
 }
 
@@ -714,6 +728,7 @@ export function SideNavigation() {
                 })}
                 {currentSection === "treasury" && [
                   { title: "Dashboard", href: "/treasury/dashboard", icon: LayoutDashboard },
+                  { title: "Planner", href: "/treasury/planner", icon: Calendar },
                   { title: "Collectibles", href: "/treasury/collectibles", icon: Package },
                   { title: "Requests", href: "/treasury/requests", icon: FileText },
                 ].map((item) => {
@@ -1254,6 +1269,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Company", href: "/admin/company", icon: Users },
+                  { title: "Clients", href: "/admin/clients", icon: Users },
                   { title: "Assets", href: "/admin/assets", icon: Package },
                   { title: "Petty Cash", href: "/admin/petty-cash", icon: DollarSign },
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },

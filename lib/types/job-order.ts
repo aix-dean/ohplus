@@ -42,4 +42,6 @@ export interface JobOrder {
   siteImageUrl?: string | null // Added site image URL
   materialSpec?: string // Material specification for the job order
   illumination?: string // Illumination specification for the job order
+  client_email?: string // Client email for the job order
+  campaignName?: string // Campaign name for the job order
 }

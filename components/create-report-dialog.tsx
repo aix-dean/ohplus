@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload, ImageIcon, Eye, X } from "lucide-react"
+import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -36,6 +36,7 @@ interface AttachmentData {
   fileUrl?: string
   uploading?: boolean
   fileType?: string
+  label?: string
 }
 
 interface JobOrder {
@@ -43,6 +44,7 @@ interface JobOrder {
   joNumber: string
   clientName: string
   clientCompany: string
+  client_email?: string
   status: string
   joType: string
   siteName: string
@@ -63,6 +65,8 @@ export function CreateReportDialog({
   const [reportType, setReportType] = useState("completion-report")
   const [date, setDate] = useState("")
   const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
+  const [beforeImages, setBeforeImages] = useState<AttachmentData[]>([{ note: "" }])
+  const [afterImages, setAfterImages] = useState<AttachmentData[]>([{ note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
   const [description, setDescription] = useState("")
 
@@ -123,11 +127,13 @@ export function CreateReportDialog({
       const fetchedJobOrders: JobOrder[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
+
         fetchedJobOrders.push({
           id: doc.id,
           joNumber: data.joNumber || "N/A",
           clientName: data.clientName || "Unknown Client",
           clientCompany: data.clientCompany || "",
+          client_email: data.client_email || "",
           status: data.status || "unknown",
           joType: data.joType || "General",
           siteName: data.siteName || "Unknown Site",
@@ -180,18 +186,19 @@ export function CreateReportDialog({
       const querySnapshot = await getDocs(q)
 
       if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0]
-        const data = doc.data()
+        const docSnap = querySnapshot.docs[0]
+        const data = docSnap.data()
         const siteImageUrl = data.siteImageUrl
 
         if (siteImageUrl) {
           console.log("Found siteImageUrl from associated job order for product:", siteImageUrl)
           // Store this in a way that can be used when creating the report
           const jobOrderDetails = {
-            id: doc.id,
+            id: docSnap.id,
             joNumber: data.joNumber || "N/A",
             clientName: data.clientName || "Unknown Client",
             clientCompany: data.clientCompany || "",
+            client_email: data.client_email || "",
             status: data.status || "unknown",
             joType: data.joType || "General",
             siteName: data.siteName || "Unknown Site",
@@ -227,13 +234,15 @@ export function CreateReportDialog({
       const querySnapshot = await getDocs(q)
 
       if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0]
-        const data = doc.data()
+        const docSnap = querySnapshot.docs[0]
+        const data = docSnap.data()
+
         const detailedJobOrder: JobOrder = {
-          id: doc.id,
+          id: docSnap.id,
           joNumber: data.joNumber || "N/A",
           clientName: data.clientName || "Unknown Client",
           clientCompany: data.clientCompany || "",
+          client_email: data.client_email || "",
           status: data.status || "unknown",
           joType: data.joType || "General",
           siteName: data.siteName || "Unknown Site",
@@ -255,6 +264,38 @@ export function CreateReportDialog({
     const newAttachments = [...attachments]
     newAttachments[index].note = note
     setAttachments(newAttachments)
+  }
+
+  const handleBeforeImageNoteChange = (index: number, note: string) => {
+    const newImages = [...beforeImages]
+    newImages[index].note = note
+    setBeforeImages(newImages)
+  }
+
+  const handleAfterImageNoteChange = (index: number, note: string) => {
+    const newImages = [...afterImages]
+    newImages[index].note = note
+    setAfterImages(newImages)
+  }
+
+  const addBeforeImage = () => {
+    setBeforeImages([...beforeImages, { note: "" }])
+  }
+
+  const addAfterImage = () => {
+    setAfterImages([...afterImages, { note: "" }])
+  }
+
+  const removeBeforeImage = (index: number) => {
+    if (beforeImages.length > 1) {
+      setBeforeImages(beforeImages.filter((_, i) => i !== index))
+    }
+  }
+
+  const removeAfterImage = (index: number) => {
+    if (afterImages.length > 1) {
+      setAfterImages(afterImages.filter((_, i) => i !== index))
+    }
   }
 
   const getFileIcon = (fileName: string) => {
@@ -373,6 +414,116 @@ export function CreateReportDialog({
     }
   }
 
+  const handleBeforeImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      await uploadImage(file, index, beforeImages, setBeforeImages, "before")
+    }
+  }
+
+  const handleAfterImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      await uploadImage(file, index, afterImages, setAfterImages, "after")
+    }
+  }
+
+  const uploadImage = async (
+    file: File,
+    index: number,
+    images: AttachmentData[],
+    setImages: React.Dispatch<React.SetStateAction<AttachmentData[]>>,
+    type: string
+  ) => {
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload only image files (JPEG, PNG, GIF, WebP)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 10MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Set uploading state immediately
+    const newImages = [...images]
+    newImages[index] = {
+      ...newImages[index],
+      file,
+      fileName: file.name,
+      fileType: file.type,
+      uploading: true,
+    }
+
+    // Create preview for images immediately
+    if (file.type.startsWith("image/")) {
+      try {
+        const preview = await createFilePreview(file)
+        newImages[index].preview = preview
+      } catch (error) {
+        console.error("Error creating preview:", error)
+      }
+    }
+
+    setImages(newImages)
+
+    try {
+      // Upload to Firebase Storage with a proper path structure
+      const timestamp = Date.now()
+      const uploadPath = `reports/${siteId}/${type}/${timestamp}_${file.name}`
+
+      console.log("Uploading file to Firebase Storage:", uploadPath)
+      const downloadURL = await uploadFileToFirebaseStorage(file, uploadPath)
+      console.log("File uploaded successfully, download URL:", downloadURL)
+
+      // Update image with Firebase URL
+      const updatedImages = [...images]
+      updatedImages[index] = {
+        ...updatedImages[index],
+        file,
+        fileName: file.name,
+        fileType: file.type,
+        preview: newImages[index].preview,
+        fileUrl: downloadURL,
+        uploading: false,
+      }
+      setImages(updatedImages)
+
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully",
+      })
+    } catch (error) {
+      console.error("Error uploading file:", error)
+
+      // Reset the image on error
+      const errorImages = [...images]
+      errorImages[index] = {
+        note: newImages[index].note,
+        uploading: false,
+      }
+      setImages(errorImages)
+
+      toast({
+        title: "Error",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handlePreviewFile = (attachment: AttachmentData, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -474,6 +625,72 @@ export function CreateReportDialog({
     )
   }
 
+  const renderImagePreview = (image: AttachmentData, inputId: string, type: string) => {
+    if (image.uploading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full space-y-1">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="text-xs text-blue-600">Uploading...</span>
+        </div>
+      )
+    }
+
+    if (!image.file || !image.fileName) {
+      return (
+        <label
+          htmlFor={inputId}
+          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1"
+        >
+          <Upload className="h-6 w-6 text-gray-400" />
+          <span className="text-xs text-gray-500">Upload</span>
+        </label>
+      )
+    }
+
+    const isImage = image.file.type.startsWith("image/")
+
+    return (
+      <div className="relative w-full h-full group">
+        <label
+          htmlFor={inputId}
+          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1 p-1"
+        >
+          {isImage && image.preview ? (
+            <img
+              src={image.preview || "/placeholder.svg"}
+              alt={image.fileName}
+              className="w-full h-full object-cover rounded"
+            />
+          ) : (
+            <div className="flex items-center justify-center">{getFileIcon(image.fileName)}</div>
+          )}
+        </label>
+
+        {/* Preview Button */}
+        <button
+          onClick={(e) => handlePreviewFile(image, e)}
+          className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Preview image"
+        >
+          <Eye className="h-3 w-3" />
+        </button>
+
+        {/* Success indicator when uploaded */}
+        {image.fileUrl && !image.uploading && (
+          <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const handleGenerateReport = async () => {
     if (!product) {
       toast({
@@ -495,22 +712,34 @@ export function CreateReportDialog({
 
 
     // Check if at least one attachment has a file with fileUrl
-    const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
+    let hasValidAttachments = false
+    if (reportType === "completion-report" || reportType === "installation-report") {
+      hasValidAttachments = [...beforeImages, ...afterImages, ...attachments].some((att) => att.file && att.fileUrl)
+    } else {
+      hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
+    }
+
     if (!hasValidAttachments) {
       toast({
         title: "Error",
-        description: "Please upload at least one attachment and wait for it to finish uploading",
+        description: "Please upload at least one image and wait for it to finish uploading",
         variant: "destructive",
       })
       return
     }
 
     // Check if any files are still uploading
-    const isUploading = attachments.some((att) => att.uploading)
+    let isUploading = false
+    if (reportType === "completion-report" || reportType === "installation-report") {
+      isUploading = [...beforeImages, ...afterImages, ...attachments].some((att) => att.uploading)
+    } else {
+      isUploading = attachments.some((att) => att.uploading)
+    }
+
     if (isUploading) {
       toast({
         title: "Error",
-        description: "Please wait for all files to finish uploading",
+        description: "Please wait for all images to finish uploading",
         variant: "destructive",
       })
       return
@@ -546,6 +775,7 @@ export function CreateReportDialog({
         sellerId: product.seller_id || user.uid,
         client: effectiveJobOrder?.clientCompany || "No Client",
         clientId: effectiveJobOrder?.clientName || "no-client-id",
+        client_email: effectiveJobOrder?.client_email || "",
         joNumber: selectedJO !== "none" ? selectedJO : undefined,
         joType: effectiveJobOrder?.joType || "General",
         bookingDates: {
@@ -556,14 +786,43 @@ export function CreateReportDialog({
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
-        attachments: attachments
-          .filter((att) => (att.note.trim() !== "" || att.file) && att.fileUrl) // Only include attachments with fileUrl
-          .map((att) => ({
-            note: att.note,
-            fileName: att.fileName || "",
-            fileType: att.fileType || att.file?.type || "",
-            fileUrl: att.fileUrl!, // This is guaranteed to exist due to filter
-          })),
+        attachments: (reportType === "completion-report" || reportType === "installation-report")
+          ? [
+              ...beforeImages
+                .filter((img) => img.fileUrl)
+                .map((img) => ({
+                  note: img.note,
+                  fileName: img.fileName || "",
+                  fileType: img.fileType || img.file?.type || "",
+                  fileUrl: img.fileUrl!,
+                  label: "before",
+                })),
+              ...afterImages
+                .filter((img) => img.fileUrl)
+                .map((img) => ({
+                  note: img.note,
+                  fileName: img.fileName || "",
+                  fileType: img.fileType || img.file?.type || "",
+                  fileUrl: img.fileUrl!,
+                  label: "after",
+                })),
+              ...attachments
+                .filter((att) => att.fileUrl)
+                .map((att) => ({
+                  note: att.note,
+                  fileName: att.fileName || "",
+                  fileType: att.fileType || att.file?.type || "",
+                  fileUrl: att.fileUrl!,
+                }))
+            ]
+          : attachments
+            .filter((att) => (att.note.trim() !== "" || att.file) && att.fileUrl)
+            .map((att) => ({
+              note: att.note,
+              fileName: att.fileName || "",
+              fileType: att.fileType || att.file?.type || "",
+              fileUrl: att.fileUrl!,
+            })),
         status: module === "sales" ? "posted" : "draft", // Save as posted for sales, draft for others (logistics and admin)
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
@@ -626,23 +885,22 @@ export function CreateReportDialog({
       }
 
       console.log("Generated report data with attachments:", reportData.attachments)
+      console.log("Sample attachment with label:", reportData.attachments.find(att => att.label))
+      console.log("Before images array:", beforeImages)
+      console.log("After images array:", afterImages)
+      console.log("General attachments array:", attachments)
 
-      let finalReportData = reportData
+      let reportId: string | undefined
 
-      // For sales module, save the report to database immediately with posted status
-      if (module === "sales") {
-        console.log("Saving report to database for sales module")
-        const reportId = await postReport(reportData)
+      // For sales and logistics modules, save the report to database immediately with posted status
+      if (module === "sales" || module === "logistics") {
+        console.log(`Saving report to database for ${module} module`)
+        reportId = await postReport(reportData)
+        console.log("Report saved with ID:", reportId)
 
-        // Fetch the actual saved report data from database
-        const { getReportById } = await import("@/lib/report-service")
-        const savedReport = await getReportById(reportId)
-
-        if (savedReport) {
-          finalReportData = savedReport
-          console.log("Retrieved saved report data:", savedReport)
-        } else {
-          throw new Error("Failed to retrieve saved report")
+        // Set sessionStorage to trigger success dialog on service-reports page (for logistics module)
+        if (module === "logistics") {
+          sessionStorage.setItem("lastPostedReportId", reportId)
         }
       }
 
@@ -650,25 +908,25 @@ export function CreateReportDialog({
       if (module === "admin") {
         console.log("Saving report to database for admin module with draft status")
         const { createReport } = await import("@/lib/report-service")
-        const reportId = await createReport(reportData)
+        reportId = await createReport(reportData)
+        console.log("Saved admin report with draft status, ID:", reportId)
 
-        // Set the ID on the report data for the preview page
-        finalReportData = {
+        // Store the report data in sessionStorage for the preview page
+        const finalReportData = {
           ...reportData,
           id: reportId
         }
-        console.log("Saved admin report with draft status, ID:", reportId)
+        sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
+        sessionStorage.setItem("previewProductData", JSON.stringify(product))
       }
-
-      // Store the report data in sessionStorage for the preview page
-      sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
-      sessionStorage.setItem("previewProductData", JSON.stringify(product))
 
       toast({
         title: "Success",
         description: module === "sales"
           ? "Service Report Created and Posted Successfully!"
-          : "Service Report Generated Successfully!",
+          : module === "logistics"
+            ? "Congratulations You have successfully posted a report!"
+            : "Service Report Generated Successfully!",
       })
 
       onOpenChange(false)
@@ -677,6 +935,8 @@ export function CreateReportDialog({
       setDate("")
       setSelectedJO("")
       setAttachments([{ note: "" }, { note: "" }])
+      setBeforeImages([{ note: "" }])
+      setAfterImages([{ note: "" }])
       setStatus("")
       setTimeline("on-time")
       setDelayReason("")
@@ -684,8 +944,16 @@ export function CreateReportDialog({
       setDescriptionOfWork("")
 
 
-      const previewPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/reports/preview"
-      router.push(previewPath)
+      const redirectPath = module === "sales"
+        ? "/sales/reports/preview"
+        : module === "admin"
+          ? "/admin/reports/preview"
+          : module === "logistics" && reportId
+            ? `/logistics/reports/${reportId}`
+            : "/logistics/service-reports"
+
+      console.log("Redirecting to:", redirectPath, "Module:", module, "Report ID:", reportId, "Report ID type:", typeof reportId, "Report ID truthy:", !!reportId)
+      router.push(redirectPath)
     } catch (error) {
       console.error("Error generating report:", error)
       toast({
@@ -860,34 +1128,146 @@ export function CreateReportDialog({
             )}
 
             {/* Attachments */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-900">
-                Attachments: <span className="text-red-500">*</span>
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                {attachments.map((attachment, index) => (
-                  <div key={index} className="space-y-1">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center">
-                      <input
-                        type="file"
-                        className="hidden"
-                        id={`file-${index}`}
-                        accept=".jpg,.jpeg,.png,.gif,.webp"
-                        onChange={(e) => handleFileUpload(index, e)}
-                        disabled={attachment.uploading}
-                      />
-                      {renderFilePreview(attachment, index)}
-                    </div>
-                    <Input
-                      placeholder="Add Note..."
-                      value={attachment.note}
-                      onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
-                      className="text-xs h-8"
-                    />
+            {(reportType === "completion-report" || reportType === "installation-report") ? (
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold text-gray-900">
+                  Images: <span className="text-red-500">*</span>
+                </Label>
+
+                {/* Before Images */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-gray-700">Before</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addBeforeImage}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
                   </div>
-                ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {beforeImages.map((image, index) => (
+                      <div key={`before-${index}`} className="space-y-1">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center relative">
+                          <input
+                            type="file"
+                            className="hidden"
+                            id={`before-file-${index}`}
+                            accept=".jpg,.jpeg,.png,.gif,.webp"
+                            onChange={(e) => handleBeforeImageUpload(index, e)}
+                            disabled={image.uploading}
+                          />
+                          {renderImagePreview(image, `before-file-${index}`, "before")}
+                          {beforeImages.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                removeBeforeImage(index)
+                              }}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                        <Input
+                          placeholder="Add Note..."
+                          value={image.note}
+                          onChange={(e) => handleBeforeImageNoteChange(index, e.target.value)}
+                          className="text-xs h-8"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* After Images */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-gray-700">After</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addAfterImage}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {afterImages.map((image, index) => (
+                      <div key={`after-${index}`} className="space-y-1">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center relative">
+                          <input
+                            type="file"
+                            className="hidden"
+                            id={`after-file-${index}`}
+                            accept=".jpg,.jpeg,.png,.gif,.webp"
+                            onChange={(e) => handleAfterImageUpload(index, e)}
+                            disabled={image.uploading}
+                          />
+                          {renderImagePreview(image, `after-file-${index}`, "after")}
+                          {afterImages.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                removeAfterImage(index)
+                              }}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                        <Input
+                          placeholder="Add Note..."
+                          value={image.note}
+                          onChange={(e) => handleAfterImageNoteChange(index, e.target.value)}
+                          className="text-xs h-8"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-900">
+                  Attachments: <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {attachments.map((attachment, index) => (
+                    <div key={index} className="space-y-1">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                        <input
+                          type="file"
+                          className="hidden"
+                          id={`file-${index}`}
+                          accept=".jpg,.jpeg,.png,.gif,.webp"
+                          onChange={(e) => handleFileUpload(index, e)}
+                          disabled={attachment.uploading}
+                        />
+                        {renderFilePreview(attachment, index)}
+                      </div>
+                      <Input
+                        placeholder="Add Note..."
+                        value={attachment.note}
+                        onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Description of Work - Only show for completion reports */}
             {reportType === "completion-report" && (
@@ -909,13 +1289,13 @@ export function CreateReportDialog({
             {/* Generate Report Button */}
             <Button
               onClick={handleGenerateReport}
-              disabled={loading || attachments.some((att) => att.uploading)}
+              disabled={loading || [...beforeImages, ...afterImages, ...attachments].some((att) => att.uploading)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium mt-4"
             >
               {loading
                 ? "Generating..."
-                : attachments.some((att) => att.uploading)
-                  ? "Uploading files..."
+                : [...beforeImages, ...afterImages, ...attachments].some((att) => att.uploading)
+                  ? "Uploading images..."
                   : "Generate Report"}
             </Button>
           </div>

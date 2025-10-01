@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import type { Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,8 +14,15 @@ import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 
+// CSS for static gradient border
+const gradientBorderStyles = `
+.gradient-border {
+  background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+}
+`
+
 // Direct Firebase imports for job order fetching
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Number of items to display per page
@@ -45,13 +52,9 @@ export default function AllSitesTab({
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
   const [pageCache, setPageCache] = useState<
     Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
   >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
 
   // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -64,147 +67,97 @@ export default function AllSitesTab({
     name: string
   }>({ id: "", name: "" })
 
-  // Simplified direct job order fetching function
-  const fetchJobOrderCountsDirectly = useCallback(async () => {
-    if (!userData?.company_id) {
-      console.log("No company_id available")
-      return
-    }
 
-    try {
-      const counts: Record<string, number> = {}
 
-      // Get all product IDs from current products
-      const productIds = products.map((p) => p.id).filter(Boolean)
 
-      if (productIds.length === 0) {
-        console.log("No products available to fetch job orders for")
-        setJobOrderCounts({})
-        return
-      }
 
-      // Query job orders collection directly
-      const jobOrdersRef = collection(db, "job_orders")
-      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
-      const querySnapshot = await getDocs(q)
 
-      // Count job orders for each product, but only for existing products
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        const productId = data.product_id
-        if (productId && productIds.includes(productId)) {
-          counts[productId] = (counts[productId] || 0) + 1
-        }
-      })
-
-      setJobOrderCounts(counts)
-    } catch (error) {
-      console.error("Error fetching job orders directly:", error)
-      setJobOrderCounts({})
-    }
-  }, [userData?.company_id, products])
-
-  // Fetch total count of products
-  const fetchTotalCount = useCallback(async () => {
-    if (!userData?.company_id) return
-
-    setLoadingCount(true)
-    try {
-      const count = await getUserProductsCount(userData?.company_id, {
-        active: true,
-        searchTerm: searchQuery,
-      })
-
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
-    } catch (error) {
-      console.error("Error fetching total count:", error)
-    } finally {
-      setLoadingCount(false)
-    }
-  }, [userData?.company_id, searchQuery])
-
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number, forceRefresh = false) => {
-      if (!userData?.company_id) return
-
-      // Check if we have this page in cache and not forcing refresh
-      if (!forceRefresh && pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
-          active: true,
-          searchTerm: searchQuery,
-        })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        setError("Failed to load sites. Please try again.")
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [userData?.company_id, lastDoc, pageCache, searchQuery],
-  )
 
   // Reset pagination when search or filter changes
-  useEffect(() => {
-    setCurrentPage(1)
-    setPageCache(new Map())
-    fetchTotalCount()
-    fetchProducts(1, true)
-  }, [searchQuery, contentTypeFilter])
-
-  // Load initial data and count
-  useEffect(() => {
-    if (userData?.company_id) {
-      fetchProducts(1)
-      fetchTotalCount()
-      fetchJobOrderCountsDirectly()
-    }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCountsDirectly])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (currentPage > 0 && userData?.company_id) {
-      fetchProducts(currentPage)
-    }
-  }, [currentPage, fetchProducts, userData?.company_id])
-
+    useEffect(() => {
+      setCurrentPage(1)
+      setPageCache(new Map())
+    }, [searchQuery, contentTypeFilter])
+  
   // Debug effect to log JO counts when they change
-  useEffect(() => {
-    Object.entries(jobOrderCounts).forEach(([productId, count]) => {
-      console.log(`Product ${productId}: ${count} JOs`)
-    })
-  }, [jobOrderCounts])
+    useEffect(() => {
+      Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+        console.log(`Product ${productId}: ${count} JOs`)
+      })
+    }, [jobOrderCounts])
+  
+    // Real-time job orders listener
+      useEffect(() => {
+        if (!userData?.company_id) return
+    
+        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id))
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const counts: Record<string, number> = {}
+          const productIds = products.map(p => p.id).filter(Boolean)
+    
+          querySnapshot.forEach((doc) => {
+            const data = doc.data()
+            const productId = data.product_id
+            if (productId && productIds.includes(productId)) {
+              counts[productId] = (counts[productId] || 0) + 1
+            }
+          })
+    
+          setJobOrderCounts(counts)
+        })
+    
+        return unsubscribe
+      }, [userData?.company_id, products])
+    
+      // Real-time products listener
+      useEffect(() => {
+        if (!userData?.company_id) return
+    
+        setLoading(true)
+        const q = query(collection(db, "products"), where("company_id", "==", userData.company_id), where("active", "==", true))
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const allProducts: Product[] = []
+          querySnapshot.forEach((doc) => {
+            const product = doc.data() as Product
+            product.id = doc.id
+            allProducts.push(product)
+          })
+    
+          // Filter by searchTerm
+          let filtered = allProducts
+          if (searchQuery) {
+            filtered = allProducts.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+          }
+    
+          // Filter by contentTypeFilter
+          if (contentTypeFilter !== "All") {
+            filtered = filtered.filter((product) => {
+              if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
+              else if (contentTypeFilter === "Dynamic") return product.content_type === "Dynamic" || product.content_type === "dynamic"
+              return true
+            })
+          }
+    
+          setTotalItems(filtered.length)
+          setTotalPages(Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)))
+    
+          // Slice for current page
+          const start = (currentPage - 1) * ITEMS_PER_PAGE
+          const end = start + ITEMS_PER_PAGE
+          const sliced = filtered.slice(start, end)
+          setProducts(sliced)
+    
+          setPageCache(new Map()) // clear cache
+          setLoading(false)
+          setError(null)
+        }, (error) => {
+          console.error("Error listening to products:", error)
+          setError("Failed to load sites. Please try again.")
+          setLoading(false)
+        })
+    
+        return unsubscribe
+      }, [userData?.company_id, searchQuery, contentTypeFilter, currentPage])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -325,6 +278,7 @@ export default function AllSitesTab({
       statusColor,
       image,
       address,
+      location: product.specs_rental?.location || null,
       contentType: (product.content_type || "static").toLowerCase(),
       healthPercentage,
       siteCode: product.site_code || product.id?.substring(0, 8),
@@ -357,7 +311,9 @@ export default function AllSitesTab({
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6 bg-transparent min-h-screen">
+    <div className="flex flex-col gap-5 bg-transparent min-h-screen">
+      {/* Inject CSS for gradient border */}
+      <style dangerouslySetInnerHTML={{ __html: gradientBorderStyles }} />
       {/* Debug Panel - Remove this in production */}
 
       {/* Loading State */}
@@ -373,7 +329,7 @@ export default function AllSitesTab({
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </div>
@@ -407,6 +363,7 @@ export default function AllSitesTab({
                 <UnifiedSiteCard
                   key={product.id}
                   site={productToSite(product)}
+                  product={product}
                   onCreateReport={(siteId) => {
                     setSelectedSiteId(siteId)
                     setReportDialogOpen(true)
@@ -434,30 +391,14 @@ export default function AllSitesTab({
         </>
       )}
 
-      {/* Loading More Indicator */}
-      {loadingMore && (
-        <div className="flex justify-center my-4">
-          <div className="flex items-center gap-2">
-            <Loader2 size={18} className="animate-spin" />
-            <span>Loading more...</span>
-          </div>
-        </div>
-      )}
 
       {/* Pagination Controls */}
       {!loading && !error && filteredProducts.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
           <div className="text-sm text-gray-500 flex items-center">
-            {loadingCount ? (
-              <div className="flex items-center">
-                <Loader2 size={14} className="animate-spin mr-2" />
-                <span>Calculating pages...</span>
-              </div>
-            ) : (
-              <span>
-                Page {currentPage} of {totalPages} ({totalItems} items)
-              </span>
-            )}
+            <span>
+              Page {currentPage} of {totalPages} ({totalItems} items)
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -523,11 +464,13 @@ export default function AllSitesTab({
 // Unified Site Card that matches the exact reference design
 function UnifiedSiteCard({
   site,
+  product,
   onCreateReport,
   onJOCountClick,
   router,
 }: {
   site: any
+  product: Product
   onCreateReport: (siteId: string) => void
   onJOCountClick: (siteId: string, siteName: string) => void
   router: any
@@ -551,141 +494,202 @@ function UnifiedSiteCard({
   }
 
   return (
-    <div className="p-2 bg-gray-100 rounded-xl">
-      <Card
-        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-xl w-full"
-        onClick={handleCardClick}
-      >
-        <div className="relative h-32 bg-gray-200">
-          <Image
-            src={site.image || "/placeholder.svg"}
-            alt={site.name}
-            fill
-            className="object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-              target.className = "opacity-50 object-contain"
-            }}
-          />
-
-          {/* Status Badge - Bottom Left */}
-          <div className="absolute bottom-2 left-2">
-            <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
-              {site.operationalStatus === "Operational"
-                ? "OPEN"
-                : site.operationalStatus === "Under Maintenance"
-                  ? "MAINTENANCE"
-                  : site.operationalStatus === "Pending Setup"
-                    ? "PENDING"
-                    : "CLOSED"}
-            </div>
-          </div>
-        </div>
-
-        <CardContent className="p-3">
-          <div className="flex flex-col gap-2">
-            {/* Site Code */}
-            <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
-
-            {/* Site Name */}
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            </div>
-
-            {/* Site Information */}
-            <div className="space-y-1 text-xs">
-              <div className="flex flex-col">
-                <span className="text-black">
-                  <span className="font-bold">Operation:</span>
-                  <span
-                    className={`ml-1 ${
-                      site.operationalStatus === "Operational"
-                        ? "text-black"
-                        : site.operationalStatus === "Under Maintenance"
-                          ? "text-black"
-                          : site.operationalStatus === "Pending Setup"
-                            ? "text-black"
-                            : "text-black"
-                    }`}
-                  >
-                    {site.operationalStatus === "Operational"
-                      ? "Active"
-                      : site.operationalStatus === "Under Maintenance"
-                        ? "Maintenance"
-                        : site.operationalStatus === "Pending Setup"
-                          ? "Pending"
-                          : "Inactive"}
-                  </span>
-                </span>
+    <div className="relative">
+      {product.content_type === "Dynamic" ? (
+        <div
+          className="p-[2px] rounded-[12px] gradient-border"
+        >
+          <Card
+            className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[10px] w-full"
+            onClick={handleCardClick}
+          >
+            <CardContent className="p-3">
+              <div className="relative w-full aspect-square bg-gray-200">
+                <Image
+                  src={site.image || "/placeholder.svg"}
+                  alt={site.name}
+                  width={192}
+                  height={192}
+                  className="object-cover w-full h-full"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                    target.className = "opacity-50 object-contain w-full h-full"
+                  }}
+                />
               </div>
+              <div className="flex flex-col pt-2">
+                {/* Site Code */}
+                <div className="text-sm font-bold text-gray-400 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
 
-              <div className="flex flex-col">
-                <span className="text-black">
-                  <span className="font-bold">Display Health:</span>
-                  <span className="ml-1" style={{ color: "#00bf63" }}>
-                    {site.healthPercentage > 90
-                      ? "100%"
-                      : site.healthPercentage > 80
-                        ? "90%"
-                        : site.healthPercentage > 60
-                          ? "75%"
-                          : "50%"}
-                  </span>
-                </span>
-              </div>
+                {/* Site Name */}
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-700 truncate">{site.name}</h3>
+                </div>
 
-              <div className="flex flex-col">
-                <span className="text-black">
-                  <span className="font-bold">Content:</span>
-                  <span className="ml-1 text-black">{site.content}</span>
-                </span>
-              </div>
+                {/* Location Information */}
+                {site.location && (
+                  <div className="text-sm font-bold text-gray-700 truncate" title={site.location}>
+                    <span className="font-bold">Location:</span> {site.location}
+                  </div>
+                )}
 
-              {site.contentType === "static" && (
-                <div className="flex flex-col">
-                  <span className="text-black">
-                    <span className="font-bold">Illumination:</span>
-                    <span
-                      className={`ml-1 ${
-                        site.illumination === "on" ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {site.illumination}
+                {/* Specs Rental Information */}
+                {site.specs_rental && (
+                  <div className="text-sm font-bold text-gray-700">
+                    <span className="font-bold">Specs:</span> {site.specs_rental}
+                  </div>
+                )}
+
+                {/* Site Information */}
+                <div className="">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">
+                      <span className="font-bold">Status:</span>
+                      <span className="ml-1">
+                        {site.operationalStatus === "Operational"
+                          ? "Active"
+                          : site.operationalStatus === "Under Maintenance"
+                            ? "Maintenance"
+                            : site.operationalStatus === "Pending Setup"
+                              ? "Pending"
+                              : "Inactive"}
+                      </span>
                     </span>
-                  </span>
+                  </div>
+
+                  {site.contentType === "static" ? (
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-gray-700">
+                        <span className="font-bold">Illumination:</span>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-gray-700">
+                        <span className="font-bold">Display Health:</span>
+                        <span className="ml-1 text-green-600">
+                          {site.healthPercentage > 90
+                            ? "100%"
+                            : site.healthPercentage > 80
+                              ? "90%"
+                              : site.healthPercentage > 60
+                                ? "75%"
+                                : "50%"}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Create Report Button */}
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
+                  onClick={handleCreateReport}
+                >
+                  Create Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <Card
+          className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[12px] border-2 border-gray-300 w-full"
+          onClick={handleCardClick}
+        >
+          <CardContent className="p-3">
+            <div className="relative w-full aspect-square bg-gray-200">
+              <Image
+                src={site.image || "/placeholder.svg"}
+                alt={site.name}
+                width={192}
+                height={192}
+                className="object-cover w-full h-full"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                  target.className = "opacity-50 object-contain w-full h-full"
+                }}
+              />
+            </div>
+            <div className="flex flex-col pt-2">
+              {/* Site Code */}
+              <div className="text-sm font-bold text-gray-400 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
+
+              {/* Site Name */}
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-gray-700 truncate">{site.name}</h3>
+              </div>
+
+              {/* Location Information */}
+              {site.location && (
+                <div className="text-sm font-bold text-gray-700 truncate" title={site.location}>
+                  <span className="font-bold">Location:</span> {site.location}
                 </div>
               )}
 
-              {/* JO Notification */}
-              <div className="flex items-center gap-1 text-xs">
-                <Bell className="h-3 w-3 text-gray-400" />
-                {site.joCount > 0 ? (
-                  <button
-                    onClick={handleJOClick}
-                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
-                  >
-                    JO ({site.joCount})
-                  </button>
-                ) : (
-                  <span className="text-gray-600">None</span>
-                )}
-                {/* Debug info - remove in production */}
-              </div>
-            </div>
+              {/* Specs Rental Information */}
+              {site.specs_rental && (
+                <div className="text-sm font-bold text-gray-700">
+                  <span className="font-bold">Specs:</span> {site.specs_rental}
+                </div>
+              )}
 
-            {/* Create Report Button */}
-            <Button
-              variant="secondary"
-              className="mt-3 w-full h-8 text-xs border-0 text-white hover:text-white rounded-md font-medium"
-              style={{ backgroundColor: "#0f76ff" }}
-              onClick={handleCreateReport}
-            >
-              Create Report
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {/* Site Information */}
+              <div className="">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-gray-700">
+                    <span className="font-bold">Status:</span>
+                    <span className="ml-1">
+                      {site.operationalStatus === "Operational"
+                        ? "Active"
+                        : site.operationalStatus === "Under Maintenance"
+                          ? "Maintenance"
+                          : site.operationalStatus === "Pending Setup"
+                            ? "Pending"
+                            : "Inactive"}
+                    </span>
+                  </span>
+                </div>
+
+                {site.contentType === "static" ? (
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">
+                      <span className="font-bold">Illumination:</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">
+                      <span className="font-bold">Display Health:</span>
+                      <span className="ml-1 text-green-600">
+                        {site.healthPercentage > 90
+                          ? "100%"
+                          : site.healthPercentage > 80
+                            ? "90%"
+                            : site.healthPercentage > 60
+                              ? "75%"
+                              : "50%"}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Create Report Button */}
+              <Button
+                variant="outline"
+                className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
+                onClick={handleCreateReport}
+              >
+                Create Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
@@ -719,12 +723,11 @@ function UnifiedSiteListItem({
   }
 
   return (
-    <div className="p-3 bg-gray-200 rounded-xl">
-      <Card
-        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
-        onClick={handleCardClick}
-      >
-        <CardContent className="p-4">
+    <Card
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg rounded-bl-lg w-full"
+      onClick={handleCardClick}
+    >
+      <CardContent className="p-4">
           <div className="flex items-center gap-4">
             {/* Site Image */}
             <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
@@ -739,38 +742,37 @@ function UnifiedSiteListItem({
                   target.className = "opacity-50 object-contain rounded-lg"
                 }}
               />
-              {/* Status Badge */}
-              <div className="absolute bottom-1 left-1">
-                <div
-                  className="px-1.5 py-0.5 rounded text-xs font-bold text-white"
-                  style={{ backgroundColor: "#38b6ff" }}
-                >
-                  {site.operationalStatus === "Operational"
-                    ? "OPEN"
-                    : site.operationalStatus === "Under Maintenance"
-                      ? "MAINT"
-                      : site.operationalStatus === "Pending Setup"
-                        ? "PEND"
-                        : "CLOSED"}
-                </div>
-              </div>
             </div>
 
             {/* Site Information */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
-                <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="text-sm font-bold text-gray-800 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
+                <div className="bg-purple-500 text-white text-sm font-bold px-1.5 py-0.5 rounded">
                   {site.contentType === "dynamic" ? "M" : "S"}
                 </div>
               </div>
 
-              <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
+              <h3 className="text-sm font-bold text-gray-700 mb-0.5 truncate">{site.name}</h3>
 
-              <div className="grid grid-cols-2 gap-4 text-sm mb-2">
+              {/* Location Information */}
+              {site.location && (
+                <div className="text-sm font-bold text-gray-700 mb-0.5 truncate" title={site.location}>
+                  <span className="font-bold">Location:</span> {site.location}
+                </div>
+              )}
+
+              {/* Specs Rental Information */}
+              {site.specs_rental && (
+                <div className="text-sm font-bold text-gray-700 mb-0.5">
+                  <span className="font-bold">Specs:</span> {site.specs_rental}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 mb-0.5">
                 <div>
-                  <span className="font-bold text-gray-700">Operation:</span>
-                  <div className="text-gray-600">
+                  <span className="text-sm font-bold text-gray-700">Status:</span>
+                  <div className="text-sm font-bold text-gray-700">
                     {site.operationalStatus === "Operational"
                       ? "Active"
                       : site.operationalStatus === "Under Maintenance"
@@ -781,32 +783,34 @@ function UnifiedSiteListItem({
                   </div>
                 </div>
 
-                <div>
-                  <span className="font-bold text-gray-700">Display Health:</span>
-                  <div style={{ color: "#00bf63" }}>
-                    {site.healthPercentage > 90
-                      ? "100%"
-                      : site.healthPercentage > 80
-                        ? "90%"
-                        : site.healthPercentage > 60
-                          ? "75%"
-                          : "50%"}
+                {site.contentType !== "static" && (
+                  <div>
+                    <span className="text-sm font-bold text-gray-700">Display Health:</span>
+                    <div className="text-sm font-bold text-green-600">
+                      {site.healthPercentage > 90
+                        ? "100%"
+                        : site.healthPercentage > 80
+                          ? "90%"
+                          : site.healthPercentage > 60
+                            ? "75%"
+                            : "50%"}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* JO Notification */}
-              <div className="flex items-center gap-1 text-sm">
+              <div className="flex items-center gap-1">
                 <Bell className="h-4 w-4 text-gray-400" />
                 {site.joCount > 0 ? (
                   <button
                     onClick={handleJOClick}
-                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                    className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                   >
                     JO ({site.joCount})
                   </button>
                 ) : (
-                  <span className="text-gray-600">None</span>
+                  <span className="text-sm font-bold text-gray-700">None</span>
                 )}
                 {/* Debug info - remove in production */}
               </div>
@@ -815,9 +819,8 @@ function UnifiedSiteListItem({
             {/* Create Report Button */}
             <div className="flex-shrink-0">
               <Button
-                variant="secondary"
-                className="h-10 px-6 text-sm border-0 text-white hover:text-white rounded-md font-medium"
-                style={{ backgroundColor: "#0f76ff" }}
+                variant="outline"
+                className="h-10 px-6 text-sm text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
                 onClick={handleCreateReport}
               >
                 Create Report
@@ -825,7 +828,6 @@ function UnifiedSiteListItem({
             </div>
           </div>
         </CardContent>
-      </Card>
-    </div>
+    </Card>
   )
 }

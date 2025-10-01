@@ -66,6 +66,7 @@ async function indexServiceAssignment(serviceAssignment: ServiceAssignment) {
       jobDescription: serviceAssignment.jobDescription,
       requestedBy: serviceAssignment.requestedBy,
       message: serviceAssignment.message,
+      campaignName: serviceAssignment.campaignName || '',
       status: serviceAssignment.status,
       coveredDateStart: serviceAssignment.coveredDateStart?.toISOString() || '',
       coveredDateEnd: serviceAssignment.coveredDateEnd?.toISOString() || '',
@@ -226,6 +227,7 @@ export interface ServiceAssignment {
     department: string
   }
   message: string
+  campaignName?: string
   coveredDateStart: Date | null
   coveredDateEnd: Date | null
   alarmDate: Date | null
@@ -417,6 +419,38 @@ export async function getUserProducts(userId: string): Promise<Product[]> {
     console.error("Error fetching user products:", error)
     return []
   }
+}
+
+// Get all products for a user with real-time updates
+export function getUserProductsRealtime(
+  userId: string,
+  callback: (products: Product[]) => void,
+): () => void {
+  const productsRef = collection(db, "products")
+  const q = query(
+    productsRef,
+    where("company_id", "==", userId),
+    where("active", "==", true),
+    orderBy("created", "desc")
+  )
+
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const products: Product[] = []
+      querySnapshot.forEach((doc) => {
+        products.push({ id: doc.id, ...doc.data() } as Product)
+      })
+      callback(products)
+    } catch (error) {
+      console.error("Error processing real-time product updates:", error)
+      callback([])
+    }
+  }, (error) => {
+    console.error("Error in real-time products listener:", error)
+    callback([])
+  })
+
+  return unsubscribe
 }
 
 // Get paginated products for a user
@@ -1199,6 +1233,7 @@ export async function updateServiceAssignment(
           jobDescription: updatedData.jobDescription,
           requestedBy: updatedData.requestedBy,
           message: updatedData.message,
+          campaignName: updatedData.campaignName || '',
           status: updatedData.status,
           coveredDateStart: updatedData.coveredDateStart?.toDate() || null,
           coveredDateEnd: updatedData.coveredDateEnd?.toDate() || null,

@@ -46,6 +46,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { collection, query, where, orderBy, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
@@ -213,6 +214,7 @@ interface ServiceAssignment {
     department: string
   }
   message: string
+  campaignName?: string
   coveredDateStart: any
   coveredDateEnd: any
   alarmDate: any
@@ -233,6 +235,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
   const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
   const [blueprintDialogOpen, setBlueprintDialogOpen] = useState(false)
+   const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
   const [selectedBlueprintFile, setSelectedBlueprintFile] = useState<File | null>(null)
   const [blueprintPreviewUrl, setBlueprintPreviewUrl] = useState<string | null>(null)
   const [isUploadingBlueprint, setIsUploadingBlueprint] = useState(false)
@@ -856,6 +859,10 @@ export default function SiteDetailsPage({ params }: Props) {
               </Button>
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  console.log('Create Report button clicked');
+                  setCreateReportDialogOpen(true);
+                }}
                 style={{
                   fontFamily: 'Inter',
                   fontWeight: 600,
@@ -1557,6 +1564,12 @@ export default function SiteDetailsPage({ params }: Props) {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
+      />
+      <CreateReportDialog
+        open={createReportDialogOpen}
+        onOpenChange={setCreateReportDialogOpen}
+        siteId={params.id}
+        module="logistics"
       />
 
       {/* Blueprint Dialog */}

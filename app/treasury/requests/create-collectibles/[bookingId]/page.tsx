@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/auth-context"
 import { bookingService, type Booking } from "@/lib/booking-service"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore"
 import { format, differenceInMonths, parse } from "date-fns"
 import { Arrow } from "@radix-ui/react-dropdown-menu"
 import { ArrowLeft } from "lucide-react"
@@ -219,6 +219,7 @@ export default function CreateCollectiblesPage() {
           due_date: dueDate,
           period,
           status: "pending",
+          contract_pdf_url: booking.projectCompliance?.signedContract?.fileUrl || undefined,
           created: serverTimestamp(),
           updated: serverTimestamp(),
         }
@@ -237,13 +238,24 @@ export default function CreateCollectiblesPage() {
         return {
           collectible_id: ref.id,
           ...collectibleData,
-          contract_pdf_url: booking.projectCompliance?.signedContract?.fileUrl,
+          contract_pdf_url: booking.projectCompliance?.signedContract?.fileUrl || undefined,
         }
       })
 
-      await Promise.all(
+      const invoiceRefs = await Promise.all(
         invoicesToCreate.map(data => addDoc(collection(db, "invoices"), data))
       )
+
+      // Update collectibles with invoice_id
+      await Promise.all(
+        collectibleRefs.map((collectibleRef, index) =>
+          updateDoc(collectibleRef, { invoice_id: invoiceRefs[index].id })
+        )
+      )
+
+      // Update booking document with isCollectibles: true
+      const bookingRef = doc(db, "booking", bookingId)
+      await updateDoc(bookingRef, { isCollectibles: true })
 
       // Show success and redirect
       router.push("/treasury/requests")

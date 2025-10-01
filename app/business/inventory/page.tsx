@@ -1,17 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { gsap } from "gsap"
+import { motion, useInView } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight, Search, List, Grid3X3, Upload } from "lucide-react"
-import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, createProduct, uploadFileToFirebaseStorage, type Product } from "@/lib/firebase-service"
+import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight, Search, List, Grid3X3, Upload, Edit, Trash2, X } from "lucide-react"
+import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, createProduct, uploadFileToFirebaseStorage, getUserProductsRealtime, type Product } from "@/lib/firebase-service"
+import { searchProducts, type SearchResult } from "@/lib/algolia-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { toast } from "@/components/ui/use-toast"
 import { useResponsive } from "@/hooks/use-responsive"
@@ -59,35 +62,38 @@ const DIGITAL_CATEGORIES = [
 ]
 
 export default function BusinessInventoryPage() {
-  const router = useRouter()
-  const { user, userData, subscriptionData, refreshUserData } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-  const { isMobile, isTablet } = useResponsive()
+   const router = useRouter()
+   const { user, userData, subscriptionData, refreshUserData } = useAuth()
+   const [allProducts, setAllProducts] = useState<Product[]>([])
+   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([])
+   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+   const [isSearching, setIsSearching] = useState(false)
+   const [loading, setLoading] = useState(true)
+   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+   const { isMobile, isTablet } = useResponsive()
 
-  // Company registration dialog state
-  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
+   // Company registration dialog state
+   const [showCompanyDialog, setShowCompanyDialog] = useState(false)
 
-  // Company update dialog state
-  const [showCompanyUpdateDialog, setShowCompanyUpdateDialog] = useState(false)
+   // Company update dialog state
+   const [showCompanyUpdateDialog, setShowCompanyUpdateDialog] = useState(false)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageCache, setPageCache] = useState<
-    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
-  >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
+   // Pagination state
+   const [currentPage, setCurrentPage] = useState(1)
+   const [totalItems, setTotalItems] = useState(0)
+   const [totalPages, setTotalPages] = useState(1)
+   const [loadingCount, setLoadingCount] = useState(false)
 
-  // Search and view mode state
-  const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+   // Search and view mode state
+   const [searchQuery, setSearchQuery] = useState("")
+   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+
+   // Animation refs
+   const cardsRef = useRef<HTMLDivElement>(null)
+   const cardElementsRef = useRef<(HTMLDivElement | null)[]>([])
+   const tlRef = useRef<gsap.core.Timeline | null>(null)
 
   // Subscription limit dialog state
   const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
@@ -143,79 +149,202 @@ export default function BusinessInventoryPage() {
     }
   }, [userData, toast])
 
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number) => {
-      if (!userData?.company_id) {
-        setProducts([])
-        setLastDoc(null)
-        setHasMore(false)
-        setLoading(false)
-        setLoadingMore(false)
-        return
-      }
-
-      // Check if we have this page in cache
-      if (pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        setLoading(false)
-        setLoadingMore(false)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load products. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [userData?.company_id, lastDoc, pageCache, toast],
-  )
-
-  // Load initial data and count
+  // Set up real-time listener for products
   useEffect(() => {
-    fetchProducts(1)
-    fetchTotalCount()
-  }, [userData?.company_id, fetchProducts, fetchTotalCount])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (currentPage > 0) {
-      fetchProducts(currentPage)
+    if (!userData?.company_id) {
+      setAllProducts([])
+      setLoading(false)
+      return
     }
-  }, [currentPage, fetchProducts])
+
+    setLoading(true)
+    const unsubscribe = getUserProductsRealtime(userData.company_id, (products) => {
+      setAllProducts(products)
+      setLoading(false)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id])
+
+  // Load total count
+  useEffect(() => {
+    fetchTotalCount()
+  }, [userData?.company_id, fetchTotalCount])
+
+  // Handle search query - use Algolia for search, fallback to client-side filtering
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim()
+
+    if (!trimmedQuery) {
+      setFilteredProducts(allProducts)
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+
+    const performSearch = async () => {
+      setIsSearching(true)
+      try {
+        // Use Algolia search
+        const searchResponse = await searchProducts(
+          trimmedQuery,
+          userData?.company_id || undefined,
+          0, // page
+          1000 // large number to get all results for client-side pagination
+        )
+
+        if (searchResponse.hits && searchResponse.hits.length > 0) {
+          // Convert Algolia results back to Product format for consistency
+          const productsFromSearch: Product[] = searchResponse.hits.map(hit => ({
+            id: hit.objectID,
+            name: hit.name,
+            type: hit.type,
+            price: hit.price,
+            specs_rental: hit.specs_rental || {
+              location: hit.location
+            },
+            media: hit.media || [],
+            categories: hit.category ? [hit.category] : [],
+            seller_id: hit.seller_id,
+            company_id: userData?.company_id,
+            description: hit.description,
+            active: true,
+            deleted: false,
+            created: new Date(),
+            updated: new Date()
+          } as Product))
+
+          setFilteredProducts(productsFromSearch)
+          setSearchResults(searchResponse.hits)
+        } else {
+          // Fallback to client-side filtering if Algolia fails
+          console.log("Algolia search failed, falling back to client-side filtering")
+          const searchLower = trimmedQuery.toLowerCase()
+          const filtered = allProducts.filter((product) =>
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          )
+          setFilteredProducts(filtered)
+          setSearchResults([])
+        }
+      } catch (error) {
+        console.error("Search error:", error)
+        // Fallback to client-side filtering
+        const searchLower = trimmedQuery.toLowerCase()
+        const filtered = allProducts.filter((product) =>
+          product.name?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower)
+        )
+        setFilteredProducts(filtered)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
+    }
+
+    performSearch()
+  }, [allProducts, searchQuery, userData?.company_id])
+
+  // Update pagination when filtered products change
+  useEffect(() => {
+    const totalFilteredItems = filteredProducts.length
+    const newTotalPages = Math.max(1, Math.ceil(totalFilteredItems / ITEMS_PER_PAGE))
+    setTotalPages(newTotalPages)
+    setTotalItems(totalFilteredItems)
+
+    // Reset to page 1 if current page is out of bounds
+    if (currentPage > newTotalPages) {
+      setCurrentPage(1)
+    }
+  }, [filteredProducts.length, currentPage])
+
+  // Update displayed products for current page
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    setDisplayedProducts(filteredProducts.slice(startIndex, endIndex))
+  }, [filteredProducts, currentPage])
+
+  // Reset card refs when displayed products change
+  useEffect(() => {
+    cardElementsRef.current = cardElementsRef.current.slice(0, displayedProducts.length)
+  }, [displayedProducts.length])
+
+  // Animation logic for grid view only
+   const createAnimation = () => {
+     const validElements = cardElementsRef.current.filter(el => el !== null)
+     if (!validElements.length) return null
+
+     // Set initial state
+     gsap.set(validElements, { y: 20, opacity: 0 })
+
+     const tl = gsap.timeline({ paused: true })
+
+     // Animate items in with stagger
+     tl.to(validElements, {
+       y: 0,
+       opacity: 1,
+       duration: 0.3,
+       ease: "power3.out",
+       stagger: 0.05
+     })
+
+     return tl
+   }
+
+   useLayoutEffect(() => {
+     // Only run animation for grid view
+     if (viewMode !== "grid") {
+       tlRef.current?.kill()
+       tlRef.current = null
+       return
+     }
+
+     // Kill existing animation
+     tlRef.current?.kill()
+
+     const tl = createAnimation()
+     tlRef.current = tl
+
+     // Play animation if we have items and it's not the initial load
+     if (tl && displayedProducts.length > 0 && !loading) {
+       // Small delay for smoother experience
+       setTimeout(() => {
+         tl.play()
+       }, 50)
+     }
+
+     return () => {
+       tl?.kill()
+       tlRef.current = null
+     }
+   }, [displayedProducts, loading, viewMode])
+
+  // Function to set card refs
+  const setCardRef = (index: number) => (el: HTMLDivElement | null) => {
+    cardElementsRef.current[index] = el
+  }
+  
+  // Animated list item component using Framer Motion
+  const AnimatedListItem = ({ children, delay = 0, index }: { children: React.ReactNode, delay?: number, index: number }) => {
+    const ref = useRef(null)
+    const inView = useInView(ref, { amount: 0.5, once: false })
+  
+    return (
+      <motion.div
+        ref={ref}
+        data-index={index}
+        initial={{ scale: 0.7, opacity: 0 }}
+        animate={inView ? { scale: 1, opacity: 1 } : { scale: 0.7, opacity: 0 }}
+        transition={{ duration: 0.2, delay }}
+        style={{ marginBottom: '1rem' }}
+      >
+        {children}
+      </motion.div>
+    )
+  }
 
   // Update price unit based on site type
   useEffect(() => {
@@ -310,17 +439,8 @@ export default function BusinessInventoryPage() {
     try {
       await softDeleteProduct(productToDelete.id)
 
-      // Update the UI by removing the deleted product
-      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
-
-      // Update total count
-      setTotalItems((prev) => prev - 1)
-
-      // Recalculate total pages
-      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
-
-      // Clear cache to force refresh
-      setPageCache(new Map())
+      // The real-time listener will automatically update the UI
+      // No need for manual state updates
 
       toast({
         title: "Product deleted",
@@ -721,10 +841,8 @@ export default function BusinessInventoryPage() {
 
       setShowAddSiteDialog(false)
 
-      // Clear cache and refresh the product list and navigate to page 1
-      setPageCache(new Map())
+      // Navigate to page 1 (the real-time listener will update the UI automatically)
       setCurrentPage(1)
-      fetchProducts(1)
       fetchTotalCount()
 
       toast({
@@ -744,7 +862,7 @@ export default function BusinessInventoryPage() {
   }
 
   // Show loading only on initial load
-  if (loading && products.length === 0 && userData === null) {
+  if (loading && allProducts.length === 0 && userData === null) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -761,7 +879,23 @@ export default function BusinessInventoryPage() {
           <div className="flex items-center justify-between mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4" />
-              <Input placeholder="Search" className="pl-10 w-80 bg-white border-[#d9d9d9]" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Input
+                placeholder="Search products..."
+                className="pl-10 pr-10 w-80 bg-white border-[#d9d9d9]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && !isSearching && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] hover:text-gray-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {isSearching && (
+                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4 animate-spin" />
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -774,66 +908,170 @@ export default function BusinessInventoryPage() {
             </div>
           </div>
 
-          {/* Inventory Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {loading && products.length === 0
-              ? Array.from({ length: 8 }).map((_, index) => (
-                  <Card key={`shimmer-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
-                    <div className="h-48 bg-gray-200 animate-pulse" />
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                        <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse" />
-                        <div className="flex items-center space-x-2">
-                          <div className="h-3 w-3 bg-gray-200 rounded animate-pulse" />
-                          <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse" />
+          {/* Inventory Display - Grid or List View */}
+          {viewMode === "grid" ? (
+            /* Grid View */
+            <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {loading && allProducts.length === 0
+                ? Array.from({ length: 8 }).map((_, index) => (
+                    <Card key={`shimmer-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+                      <div className="h-48 bg-gray-200 animate-pulse" />
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                          <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse" />
+                          <div className="flex items-center space-x-2">
+                            <div className="h-3 w-3 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse" />
+                          </div>
                         </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                : displayedProducts.map((product, index) => (
+                    <Card
+                      key={product.id}
+                      ref={setCardRef(index)}
+                      className="bg-white border-[#d9d9d9] hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => product.id && handleViewDetails(product.id)}
+                    >
+                      <div className="h-48 bg-gray-200 relative">
+                        <Image
+                          src={
+                            product.media && product.media.length > 0
+                              ? product.media[0].url
+                              : "/abstract-geometric-sculpture.png"
+                          }
+                          alt={product.name || "Product image"}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/abstract-geometric-sculpture.png"
+                            target.className = "opacity-50"
+                          }}
+                        />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              : products.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="bg-white border-[#d9d9d9] hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => product.id && handleViewDetails(product.id)}
-                  >
-                    <div className="h-48 bg-gray-200 relative">
-                      <Image
-                        src={
-                          product.media && product.media.length > 0
-                            ? product.media[0].url
-                            : "/abstract-geometric-sculpture.png"
-                        }
-                        alt={product.name || "Product image"}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/abstract-geometric-sculpture.png"
-                          target.className = "opacity-50"
-                        }}
-                      />
-                    </div>
 
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                        <div className="mt-2 text-sm font-medium text-green-700">
-                          ₱{Number(product.price).toLocaleString()}
+                      <CardContent className="p-4">
+                        <div className="flex flex-col">
+                          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                          <div className="mt-2 text-sm font-medium text-green-700">
+                            ₱{Number(product.price).toLocaleString()}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500 flex items-center">
+                            <MapPin size={12} className="mr-1 flex-shrink-0" />
+                            <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                          </div>
                         </div>
-                        <div className="mt-1 text-xs text-gray-500 flex items-center">
-                          <MapPin size={12} className="mr-1 flex-shrink-0" />
-                          <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                      </CardContent>
+                    </Card>
+                  ))}
+            </div>
+          ) : (
+            /* List View */
+            <div className="bg-white border border-[#d9d9d9] rounded-lg overflow-hidden">
+              {/* List Header */}
+              <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+                <div className="grid grid-cols-10 gap-4 text-sm font-medium text-gray-700">
+                  <div className="col-span-4">Site Details</div>
+                  <div className="col-span-2">Type</div>
+                  <div className="col-span-2">Location</div>
+                  <div className="col-span-2">Price</div>
+                </div>
+              </div>
+
+              {/* List Items */}
+              <div className="divide-y divide-gray-200">
+                {loading && allProducts.length === 0
+                  ? Array.from({ length: 8 }).map((_, index) => (
+                      <div key={`shimmer-list-${index}`} className="px-6 py-4">
+                        <div className="grid grid-cols-10 gap-4 items-center">
+                          <div className="col-span-4 flex items-center space-x-3">
+                            <div className="w-12 h-12 bg-gray-200 rounded animate-pulse" />
+                            <div className="space-y-2">
+                              <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
+                              <div className="h-3 bg-gray-200 rounded w-24 animate-pulse" />
+                            </div>
+                          </div>
+                          <div className="col-span-2">
+                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
+                          </div>
+                          <div className="col-span-2">
+                            <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+                          </div>
+                          <div className="col-span-2">
+                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
+                          </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-          </div>
+                    ))
+                  : displayedProducts.map((product, index) => (
+                      <AnimatedListItem key={product.id} delay={0.1} index={index}>
+                        <div
+                          className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => product.id && handleViewDetails(product.id)}
+                        >
+                        <div className="grid grid-cols-10 gap-4 items-center">
+                          {/* Site Details */}
+                          <div className="col-span-4 flex items-center space-x-3">
+                            <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                              <Image
+                                src={
+                                  product.media && product.media.length > 0
+                                    ? product.media[0].url
+                                    : "/abstract-geometric-sculpture.png"
+                                }
+                                alt={product.name || "Product image"}
+                                width={48}
+                                height={48}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/abstract-geometric-sculpture.png"
+                                  target.className = "opacity-50"
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900 line-clamp-1">{product.name}</h3>
+                              <p className="text-sm text-gray-500 line-clamp-1">
+                                {product.description || "No description"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Type */}
+                          <div className="col-span-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {product.type === "static" ? "Static" : "Digital"}
+                            </span>
+                          </div>
+
+                          {/* Location */}
+                          <div className="col-span-2">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin size={14} className="mr-1 flex-shrink-0" />
+                              <span className="truncate">{product.specs_rental?.location || "Unknown"}</span>
+                            </div>
+                          </div>
+
+                          {/* Price */}
+                          <div className="col-span-2">
+                            <span className="text-sm font-medium text-green-700">
+                              ₱{Number(product.price).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </AnimatedListItem>
+                    ))}
+              </div>
+            </div>
+          )}
 
           {/* Show empty state message when no products and not loading */}
-          {!loading && products.length === 0 && userData?.company_id && (
+          {!loading && allProducts.length === 0 && userData?.company_id && (
             <div className="text-center py-12">
               <div className="text-gray-500 text-lg mb-2">No sites found</div>
               <div className="text-gray-400 text-sm">Click the "Add Site" button below to create your first site.</div>
@@ -851,7 +1089,7 @@ export default function BusinessInventoryPage() {
           )}
 
           {/* Pagination Controls - Only show if there are products or multiple pages */}
-          {(products.length > 0 || totalPages > 1) && (
+          {(displayedProducts.length > 0 || totalPages > 1) && (
             <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
               <div className="text-sm text-gray-500 flex items-center">
                 {loadingCount ? (
@@ -861,7 +1099,7 @@ export default function BusinessInventoryPage() {
                   </div>
                 ) : (
                   <span>
-                    Page {currentPage} of {totalPages} ({products.length} items)
+                    Page {currentPage} of {totalPages} ({filteredProducts.length} items)
                   </span>
                 )}
               </div>

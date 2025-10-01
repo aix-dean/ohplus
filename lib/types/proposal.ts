@@ -2,6 +2,7 @@ export type ProposalClient = {
   id: string // Added missing id field
   company: string
   contactPerson: string
+  name: string
   email: string
   phone: string
   address?: string
@@ -72,32 +73,34 @@ export type ProposalProduct = {
 }
 
 export type Proposal = {
-  id: string
-  title: string
-  description?: string
-  proposalNumber?: string // Add proposal number field
-  client: ProposalClient
-  products: ProposalProduct[]
-  totalAmount: number
-  validUntil: Date
-  notes?: string
-  customMessage?: string
-  createdBy: string
-  companyId?: string | null // Add company_id field
-  campaignId?: string | null
-  templateSize?: string
-  templateOrientation?: string
-  templateLayout?: string
-  templateBackground?: string
-  status:
-    | "draft"
-    | "sent"
-    | "viewed"
-    | "accepted"
-    | "declined"
-    | "cost_estimate_pending"
-    | "cost_estimate_approved"
-    | "cost_estimate_rejected"
-  createdAt: Date
-  updatedAt: Date
-}
+   id: string
+   title: string
+   description?: string
+   proposalNumber?: string // Add proposal number field
+   client: ProposalClient
+   products: ProposalProduct[]
+   totalAmount: number
+   validUntil: Date
+   notes?: string
+   customMessage?: string
+   createdBy: string
+   companyId?: string | null // Add company_id field
+   companyName?: string // Add company name field
+   companyLogo?: string // Add company logo field
+   campaignId?: string | null
+   templateSize?: string
+   templateOrientation?: string
+   templateLayout?: string
+   templateBackground?: string
+   status:
+     | "draft"
+     | "sent"
+     | "viewed"
+     | "accepted"
+     | "declined"
+     | "cost_estimate_pending"
+     | "cost_estimate_approved"
+     | "cost_estimate_rejected"
+   createdAt: Date
+   updatedAt: Date
+ }

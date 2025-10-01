@@ -304,7 +304,7 @@ export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("business")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("business-dev")
   const [isGridView, setIsGridView] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -329,7 +329,7 @@ export default function TodoApp() {
     end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
     allDay: false,
     repeat: "Once",
-    department: "business",
+    department: "business-dev",
   })
 
   const sensors = useSensors(
@@ -451,7 +451,7 @@ export default function TodoApp() {
         end_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour later
         allDay: false,
         repeat: "Once",
-        department: "business",
+        department: "business-dev",
       })
       setSelectedFiles([])
       setIsDialogOpen(false)

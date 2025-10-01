@@ -1,4 +1,4 @@
-import { ServiceAssignmentCard } from './ServiceAssignmentCard';
+timport { ServiceAssignmentCard } from './ServiceAssignmentCard';
 import { ServiceExpenseCard } from './ServiceExpenseCard';
 import { ActionButtons } from './ActionButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,7 +105,6 @@ interface FormData {
   equipmentRequired: string;
   materialSpecs: string;
   crew: string;
-  illuminationNits: string;
   gondola: string;
   technology: string;
   sales: string;

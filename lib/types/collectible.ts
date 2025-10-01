@@ -34,6 +34,9 @@ export interface Collectible {
   due_date?: any // Firestore timestamp, optional for one-time
   period?: string // e.g., "January 2024", optional for one-time
   status: string
+  invoice_number?: string
+  invoice_id?: string
+  contract_pdf_url?: string
   created: any // Firestore timestamp
   updated: any // Firestore timestamp
 }

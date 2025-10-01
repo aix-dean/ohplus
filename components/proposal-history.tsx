@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { Product } from "@/lib/firebase-service"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 import { FileText } from "lucide-react"
 import { ProposalSitesModal } from "./proposal-sites-modal"
 
@@ -111,7 +111,7 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-gray-900 line-clamp-1">{proposal.title}</div>
-                      <div className="text-sm text-gray-500">{format(proposal.createdAt, "MMM d, yyyy")}</div>
+                      <div className="text-sm text-gray-500">{isValid(proposal.createdAt) ? format(proposal.createdAt, "MMM d, yyyy") : "N/A"}</div>
                     </div>
                   </button>
                 ))}

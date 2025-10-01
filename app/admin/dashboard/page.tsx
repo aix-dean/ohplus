@@ -24,6 +24,10 @@ import { SalesQuotaBreakdownDialog } from "@/components/sales-quota-breakdown-di
 import type { SalesQuotaSummary } from "@/lib/types/sales-quota"
 import { SalesEvent, getSalesEvents } from "@/lib/planner-service"
 import { EventDetailsDialog } from "@/components/event-details-dialog"
+import { getTodosByUser } from "@/lib/todo-service"
+import type { Todo } from "@/lib/types/todo"
+import { bookingService } from "@/lib/booking-service"
+import type { Booking } from "@/lib/booking-service"
 
 // Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +69,12 @@ export default function AdminDashboardPage() {
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [events, setEvents] = useState<SalesEvent[]>([])
   const [loadingEvents, setLoadingEvents] = useState(true)
+  const [calendarAssignments, setCalendarAssignments] = useState<ServiceAssignment[]>([])
+  const [loadingCalendarAssignments, setLoadingCalendarAssignments] = useState(true)
+  const [calendarTodos, setCalendarTodos] = useState<Todo[]>([])
+  const [loadingCalendarTodos, setLoadingCalendarTodos] = useState(true)
+  const [calendarBookings, setCalendarBookings] = useState<Booking[]>([])
+  const [loadingCalendarBookings, setLoadingCalendarBookings] = useState(true)
   const [pettyCashConfig, setPettyCashConfig] = useState<PettyCashConfig | null>(null);
   const [pettyCashCycle, setPettyCashCycle] = useState<PettyCashCycle | null>(null);
   const [pettyCashBalance, setPettyCashBalance] = useState(0);
@@ -238,7 +248,7 @@ export default function AdminDashboardPage() {
 
       setLoadingEvents(true);
       try {
-        const fetchedEvents = await getSalesEvents(true, "admin");
+        const fetchedEvents = await getSalesEvents(true, "admin", userData.company_id);
         setEvents(fetchedEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
@@ -305,6 +315,65 @@ export default function AdminDashboardPage() {
     };
 
     fetchSalesQuotaData();
+  }, [userData?.company_id]);
+
+  // Fetch todos for calendar
+  useEffect(() => {
+    const fetchTodos = async () => {
+      if (!userData?.company_id) {
+        setCalendarTodos([]);
+        return;
+      }
+
+      setLoadingCalendarTodos(true);
+      try {
+        const fetchedTodos = await getTodosByUser("", userData.company_id, "admin");
+        // Filter to ensure only non-deleted todos that are not completed are displayed
+        const activeTodos = fetchedTodos.filter(todo => !todo.isDeleted && (todo.status === "todo" || todo.status === "in-progress"));
+        setCalendarTodos(activeTodos);
+      } catch (error) {
+        console.error("Error fetching todos:", error);
+        setCalendarTodos([]);
+      } finally {
+        setLoadingCalendarTodos(false);
+      }
+    };
+
+    fetchTodos();
+  }, [userData?.company_id]);
+
+  // Fetch bookings for calendar
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!userData?.company_id) {
+        setCalendarBookings([]);
+        return;
+      }
+
+      setLoadingCalendarBookings(true);
+      try {
+        // Get both completed and collectible (reserved) bookings for the company
+        const [completedBookings, reservedBookings] = await Promise.all([
+          bookingService.getCompletedBookings(userData.company_id),
+          bookingService.getCollectiblesBookings(userData.company_id)
+        ]);
+
+        // Combine and deduplicate bookings
+        const allBookings = [...completedBookings, ...reservedBookings];
+        const uniqueBookings = allBookings.filter((booking, index, self) =>
+          index === self.findIndex(b => b.id === booking.id)
+        );
+
+        setCalendarBookings(uniqueBookings);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+        setCalendarBookings([]);
+      } finally {
+        setLoadingCalendarBookings(false);
+      }
+    };
+
+    fetchBookings();
   }, [userData?.company_id]);
 
   // Search service assignments when search term or page changes
@@ -375,6 +444,22 @@ export default function AdminDashboardPage() {
   const handleEventClick = (event: SalesEvent) => {
     setSelectedEventForDetails(event)
     setEventDetailsDialogOpen(true)
+  }
+
+  const getItemTitle = (type: string, item: any) => {
+    switch (type) {
+      case 'calendar':
+      case 'event':
+        return item.title;
+      case 'assignment':
+        return item.saNumber;
+      case 'todo':
+        return item.title;
+      case 'booking':
+        return item.reservation_id || item.id.slice(-8);
+      default:
+        return '';
+    }
   }
 
   // Calculate paginated service assignments for non-search mode
@@ -839,26 +924,49 @@ export default function AdminDashboardPage() {
                             event.start instanceof Date &&
                             event.start.toDateString() === todayKey
                           );
+                          const todayAssignments = serviceAssignments.filter(assignment => {
+                            if (!assignment.coveredDateStart) return false;
+                            const date = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart :
+                              (assignment.coveredDateStart as any).toDate ? (assignment.coveredDateStart as any).toDate() :
+                              new Date(assignment.coveredDateStart);
+                            return date.toDateString() === todayKey;
+                          });
+                          const todayTodos = calendarTodos.filter(todo =>
+                            todo.start_date &&
+                            (todo.start_date instanceof Date ? todo.start_date.toDateString() :
+                             (todo.start_date as any).toDate ? (todo.start_date as any).toDate().toDateString() :
+                             new Date(todo.start_date as string).toDateString()) === todayKey
+                          );
+                          const todayBookings = calendarBookings.filter(booking =>
+                            booking.start_date &&
+                            (booking.start_date instanceof Date ? booking.start_date.toDateString() : new Date(booking.start_date.seconds * 1000).toDateString()) === todayKey
+                          );
 
-                          const allTodayEvents = [...todayCalendarEvents, ...todaySalesEvents];
+                          const allTodayItems = [
+                            ...todayCalendarEvents.map(event => ({ type: 'calendar', item: event, color: event.color || '#10b981' })),
+                            ...todaySalesEvents.map(event => ({ type: 'event', item: event, color: '#ff9696' })),
+                            ...todayAssignments.map(assignment => ({ type: 'assignment', item: assignment, color: '#73bbff' })),
+                            ...todayTodos.map(todo => ({ type: 'todo', item: todo, color: '#ffe522' })),
+                            ...todayBookings.map(booking => ({ type: 'booking', item: booking, color: '#7fdb97' }))
+                          ];
 
-                          return allTodayEvents.length > 0 ? (
-                            allTodayEvents.map((event, index) => (
+                          return allTodayItems.length > 0 ? (
+                            allTodayItems.slice(0, 5).map((item, index) => (
                               <div
                                 key={`today-${index}`}
-                                className="p-2 rounded text-sm mb-1"
+                                className="p-2 rounded text-sm mb-1 text-black"
                                 style={{
-                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                  backgroundColor: item.color
                                 }}
                               >
                                 <span className="font-medium">
-                                  {event.title}
+                                  {getItemTitle(item.type, item.item)}
                                 </span>
                               </div>
                             ))
                           ) : (
                             <div className="text-center py-2 text-[#a1a1a1] text-xs">
-                              No events for today.
+                              No items for today.
                             </div>
                           );
                         })()}
@@ -891,26 +999,49 @@ export default function AdminDashboardPage() {
                             event.start instanceof Date &&
                             event.start.toDateString() === tomorrowKey
                           );
+                          const tomorrowAssignments = serviceAssignments.filter(assignment => {
+                            if (!assignment.coveredDateStart) return false;
+                            const date = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart :
+                              (assignment.coveredDateStart as any).toDate ? (assignment.coveredDateStart as any).toDate() :
+                              new Date(assignment.coveredDateStart);
+                            return date.toDateString() === tomorrowKey;
+                          });
+                          const tomorrowTodos = calendarTodos.filter(todo =>
+                            todo.start_date &&
+                            (todo.start_date instanceof Date ? todo.start_date.toDateString() :
+                             (todo.start_date as any).toDate ? (todo.start_date as any).toDate().toDateString() :
+                             new Date(todo.start_date as string).toDateString()) === tomorrowKey
+                          );
+                          const tomorrowBookings = calendarBookings.filter(booking =>
+                            booking.start_date &&
+                            (booking.start_date instanceof Date ? booking.start_date.toDateString() : new Date(booking.start_date.seconds * 1000).toDateString()) === tomorrowKey
+                          );
 
-                          const allTomorrowEvents = [...tomorrowCalendarEvents, ...tomorrowSalesEvents];
+                          const allTomorrowItems = [
+                            ...tomorrowCalendarEvents.map(event => ({ type: 'calendar', item: event, color: event.color || '#10b981' })),
+                            ...tomorrowSalesEvents.map(event => ({ type: 'event', item: event, color: '#ff9696' })),
+                            ...tomorrowAssignments.map(assignment => ({ type: 'assignment', item: assignment, color: '#73bbff' })),
+                            ...tomorrowTodos.map(todo => ({ type: 'todo', item: todo, color: '#ffe522' })),
+                            ...tomorrowBookings.map(booking => ({ type: 'booking', item: booking, color: '#7fdb97' }))
+                          ];
 
-                          return allTomorrowEvents.length > 0 ? (
-                            allTomorrowEvents.map((event, index) => (
+                          return allTomorrowItems.length > 0 ? (
+                            allTomorrowItems.slice(0, 5).map((item, index) => (
                               <div
                                 key={`tomorrow-${index}`}
-                                className="p-2 rounded text-sm mb-1"
+                                className="p-2 rounded text-sm mb-1 text-black"
                                 style={{
-                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                  backgroundColor: item.color
                                 }}
                               >
                                 <span className="font-medium">
-                                  {event.title}
+                                  {getItemTitle(item.type, item.item)}
                                 </span>
                               </div>
                             ))
                           ) : (
                             <p className="text-xs text-[#a1a1a1] text-center py-2">
-                              No events for this day.
+                              No items for this day.
                             </p>
                           );
                         })()}
@@ -943,26 +1074,49 @@ export default function AdminDashboardPage() {
                             event.start instanceof Date &&
                             event.start.toDateString() === dayAfterKey
                           );
+                          const dayAfterAssignments = serviceAssignments.filter(assignment => {
+                            if (!assignment.coveredDateStart) return false;
+                            const date = assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart :
+                              (assignment.coveredDateStart as any).toDate ? (assignment.coveredDateStart as any).toDate() :
+                              new Date(assignment.coveredDateStart);
+                            return date.toDateString() === dayAfterKey;
+                          });
+                          const dayAfterTodos = calendarTodos.filter(todo =>
+                            todo.start_date &&
+                            (todo.start_date instanceof Date ? todo.start_date.toDateString() :
+                             (todo.start_date as any).toDate ? (todo.start_date as any).toDate().toDateString() :
+                             new Date(todo.start_date as string).toDateString()) === dayAfterKey
+                          );
+                          const dayAfterBookings = calendarBookings.filter(booking =>
+                            booking.start_date &&
+                            (booking.start_date instanceof Date ? booking.start_date.toDateString() : new Date(booking.start_date.seconds * 1000).toDateString()) === dayAfterKey
+                          );
 
-                          const allDayAfterEvents = [...dayAfterCalendarEvents, ...dayAfterSalesEvents];
+                          const allDayAfterItems = [
+                            ...dayAfterCalendarEvents.map(event => ({ type: 'calendar', item: event, color: event.color || '#10b981' })),
+                            ...dayAfterSalesEvents.map(event => ({ type: 'event', item: event, color: '#ff9696' })),
+                            ...dayAfterAssignments.map(assignment => ({ type: 'assignment', item: assignment, color: '#73bbff' })),
+                            ...dayAfterTodos.map(todo => ({ type: 'todo', item: todo, color: '#ffe522' })),
+                            ...dayAfterBookings.map(booking => ({ type: 'booking', item: booking, color: '#7fdb97' }))
+                          ];
 
-                          return allDayAfterEvents.length > 0 ? (
-                            allDayAfterEvents.map((event, index) => (
+                          return allDayAfterItems.length > 0 ? (
+                            allDayAfterItems.slice(0, 5).map((item, index) => (
                               <div
                                 key={`dayAfter-${index}`}
-                                className="p-2 rounded text-sm mb-1"
+                                className="p-2 rounded text-sm mb-1 text-black"
                                 style={{
-                                  backgroundColor: 'color' in event ? event.color : '#10b981'
+                                  backgroundColor: item.color
                                 }}
                               >
                                 <span className="font-medium">
-                                  {event.title}
+                                  {getItemTitle(item.type, item.item)}
                                 </span>
                               </div>
                             ))
                           ) : (
                             <p className="text-xs text-[#a1a1a1] text-center py-2">
-                              No events for this day.
+                              No items for this day.
                             </p>
                           );
                         })()}
