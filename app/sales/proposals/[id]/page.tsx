@@ -143,16 +143,26 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   )
 }
 
-const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
+const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> = ({ className, proposal }) => {
   const { userData } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("")
+  const [companyName, setCompanyName] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
-    const fetchCompanyLogo = async () => {
+    // If proposal data is available, use it directly
+    if (proposal?.companyLogo || proposal?.companyName) {
+      setCompanyLogo(proposal.companyLogo || "")
+      setCompanyName(proposal.companyName || "")
+      setLoading(false)
+      return
+    }
+
+    // Fallback to fetching from company data if no proposal data
+    const fetchCompanyData = async () => {
       if (!userData?.company_id) {
         setLoading(false)
         return
@@ -167,16 +177,19 @@ const CompanyLogo: React.FC<{ className?: string }> = ({ className }) => {
           if (companyData.photo_url && companyData.photo_url.trim() !== "") {
             setCompanyLogo(companyData.photo_url)
           }
+          if (companyData.name && companyData.name.trim() !== "") {
+            setCompanyName(companyData.name)
+          }
         }
       } catch (error) {
-        console.error("Error fetching company logo:", error)
+        console.error("Error fetching company data:", error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchCompanyLogo()
-  }, [userData?.company_id])
+    fetchCompanyData()
+  }, [userData?.company_id, proposal?.companyLogo, proposal?.companyName])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1474,10 +1487,10 @@ export default function ProposalDetailsPage() {
                   {/* Content */}
                   <div className="relative z-10 p-4 md:p-6 bg-transparent">
                     <div className="flex justify-between items-start mb-4 md:mb-6">
-                      <CompanyLogo className="w-16 h-16 md:w-20 md:h-20" />
+                      <CompanyLogo className="w-16 h-16 md:w-20 md:h-20" proposal={proposal} />
                       <div className="text-right">
                         <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2">
-                          {getPageTitle(pageContent)}
+                          {proposal?.companyName || getPageTitle(pageContent)}
                         </h1>
 
                         {getSitesPerPage(selectedLayout) === 1 ? (
