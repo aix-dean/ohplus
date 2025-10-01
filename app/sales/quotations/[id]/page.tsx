@@ -30,6 +30,7 @@ import {
   Save,
   X,
   Building,
+  ImageIcon,
 } from "lucide-react"
 import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
@@ -68,12 +69,9 @@ const formatCompanyAddress = (companyData: CompanyData | null): string => {
   if (!companyData) return "N/A"
 
   const addressParts = [
-    companyData.address?.street1,
-    companyData.address?.street2,
+    companyData.address?.street,
     companyData.address?.city,
-    companyData.address?.state,
-    companyData.address?.zip,
-    companyData.company_location?.country,
+    companyData.address?.province,
   ]
 
   const filteredAddressParts = addressParts.filter(Boolean)
@@ -148,6 +146,42 @@ const formatCurrency = (amount: number | string | undefined | null) => {
   return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
+  let total = 0;
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Get days in this month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Daily price for this month
+    const dailyRate = price / daysInMonth;
+
+    // Determine start and end days for this month
+    let startDay = (currentDate.getMonth() === startDate.getMonth() && currentDate.getFullYear() === startDate.getFullYear())
+      ? startDate.getDate()
+      : 1;
+
+    let endDay = (currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear())
+      ? endDate.getDate()
+      : daysInMonth;
+
+    // Days counted in this month
+    const daysCounted = (endDay - startDay + 1);
+
+    // Add to total
+    total += dailyRate * daysCounted;
+
+    // Move to next month
+    currentDate = new Date(year, month + 1, 1);
+  }
+
+  return total;
+}
+
 export default function QuotationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: quotationId } = use(params)
   const router = useRouter()
@@ -170,6 +204,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
+  const [downloadingImage, setDownloadingImage] = useState(false)
   const [showPageSelection, setShowPageSelection] = useState(false)
   const [selectedPages, setSelectedPages] = useState<string[]>([])
   const [currentProductIndex, setCurrentProductIndex] = useState(0)
@@ -185,7 +220,15 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     setEditingField(fieldName)
-    setTempValues({ ...tempValues, [fieldName]: currentValue })
+    if (fieldName === "contractPeriod") {
+      setTempValues({
+        ...tempValues,
+        start_date: getDateObject(currentValue.start_date),
+        end_date: getDateObject(currentValue.end_date)
+      })
+    } else {
+      setTempValues({ ...tempValues, [fieldName]: currentValue })
+    }
     setHasUnsavedChanges(true)
   }
 
@@ -202,10 +245,9 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         const endDate = new Date(startDate)
         endDate.setDate(startDate.getDate() + durationDays - 1)
 
-        // Update pricing based on new duration
+        // Update pricing based on prorated calculation
         const price = editableQuotation.items?.price || 0
-        const dailyRate = price / 30
-        const newTotalAmount = dailyRate * durationDays
+        const newTotalAmount = calculateProratedPrice(price, startDate, endDate)
 
         setEditableQuotation({
           ...editableQuotation,
@@ -230,10 +272,9 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         const timeDiff = endDate.getTime() - startDate.getTime()
         const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
 
-        // Update pricing based on new duration
+        // Update pricing based on prorated calculation
         const price = editableQuotation.items?.price || 0
-        const dailyRate = price / 30
-        const newTotalAmount = dailyRate * durationDays
+        const newTotalAmount = calculateProratedPrice(price, startDate, endDate)
 
         setEditableQuotation({
           ...editableQuotation,
@@ -249,13 +290,45 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           duration_days: durationDays,
         }))
       } else if (fieldName === "price" && editableQuotation.items) {
-        const durationDays = editableQuotation.items.duration_days || 32
-        const dailyRate = newValue / 30 // Convert monthly price to daily rate
-        const newTotalAmount = dailyRate * durationDays
+        const startDate = getDateObject(editableQuotation.start_date) || new Date()
+        const endDate = getDateObject(editableQuotation.end_date) || new Date()
+        const newTotalAmount = calculateProratedPrice(newValue, startDate, endDate)
 
         setEditableQuotation({
           ...editableQuotation,
           items: { ...editableQuotation.items, price: newValue, item_total_amount: newTotalAmount },
+        })
+      } else if (fieldName === "salutation" || fieldName === "greeting") {
+        setEditableQuotation({
+          ...editableQuotation,
+          template: {
+            ...editableQuotation.template,
+            [fieldName]: newValue,
+          },
+        })
+      } else if (fieldName === "site_notes" || fieldName === "price_notes") {
+        setEditableQuotation({
+          ...editableQuotation,
+          items: {
+            ...editableQuotation.items,
+            [fieldName]: newValue,
+          },
+        })
+      } else if (fieldName === "terms_and_conditions") {
+        setEditableQuotation({
+          ...editableQuotation,
+          template: {
+            ...editableQuotation.template,
+            terms_and_conditions: newValue,
+          },
+        })
+      } else if (fieldName === "closing_message") {
+        setEditableQuotation({
+          ...editableQuotation,
+          template: {
+            ...editableQuotation.template,
+            closing_message: newValue,
+          },
         })
       } else {
         setEditableQuotation({
@@ -432,7 +505,14 @@ The OH Plus Team`,
     if (currentQuotation) {
       console.log("[v0] Entering edit mode with data:", currentQuotation)
       setEditableQuotation({ ...currentQuotation }) // Create proper copy
-      setTempValues({}) // Clear temp values
+      setTempValues({
+        terms_and_conditions: currentQuotation?.template?.terms_and_conditions || [
+          "Quotation validity: 5 working days.",
+          "Site availability: First-come-first-served basis. Official documents required.",
+          "Payment terms: One month advance and two months security deposit.",
+          "Payment deadline: 7 days before rental start.",
+        ]
+      }) // Set default terms
       setIsEditing(true)
     }
   }
@@ -556,6 +636,71 @@ The OH Plus Team`,
     }
   }
 
+  const handleDownloadImage = async () => {
+    if (!quotation) return
+
+    setDownloadingImage(true)
+    try {
+      // Load company logo if available
+      let logoDataUrl: string | null = null
+      if (companyData?.photo_url) {
+        try {
+          const response = await fetch(companyData.photo_url)
+          const blob = await response.blob()
+          logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+        } catch (error) {
+          console.error('Error loading company logo:', error)
+        }
+      }
+
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation,
+          companyData,
+          logoDataUrl,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error:', response.status, errorText)
+        throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully",
+      })
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingImage(false)
+    }
+  }
+
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
 
@@ -615,6 +760,62 @@ The OH Plus Team`,
     }
   }
 
+  const handleAddTerm = () => {
+    const currentTerms = tempValues.terms_and_conditions || editableQuotation?.template?.terms_and_conditions || [
+      "Quotation validity: 5 working days.",
+      "Site availability: First-come-first-served basis. Official documents required.",
+      "Payment terms: One month advance and two months security deposit.",
+      "Payment deadline: 7 days before rental start.",
+    ]
+    const newTerms = [...currentTerms, ""]
+    setEditableQuotation({
+      ...editableQuotation!,
+      template: {
+        ...editableQuotation?.template,
+        terms_and_conditions: newTerms,
+      },
+    })
+    setTempValues({
+      ...tempValues,
+      terms_and_conditions: newTerms,
+    })
+    setHasUnsavedChanges(true)
+  }
+
+  const handleUpdateTerm = (index: number, value: string) => {
+    const currentTerms = tempValues.terms_and_conditions || editableQuotation?.template?.terms_and_conditions || []
+    const newTerms = [...currentTerms]
+    newTerms[index] = value
+    setTempValues({
+      ...tempValues,
+      terms_and_conditions: newTerms,
+    })
+    setEditableQuotation({
+      ...editableQuotation!,
+      template: {
+        ...editableQuotation?.template,
+        terms_and_conditions: newTerms,
+      },
+    })
+  }
+
+  const handleRemoveTerm = (index: number) => {
+    const currentTerms = tempValues.terms_and_conditions || editableQuotation?.template?.terms_and_conditions || []
+    const newTerms = currentTerms.filter((_: string, i: number) => i !== index)
+    setTempValues({
+      ...tempValues,
+      terms_and_conditions: newTerms,
+    })
+    setEditableQuotation({
+      ...editableQuotation!,
+      template: {
+        ...editableQuotation?.template,
+        terms_and_conditions: newTerms,
+      },
+    })
+    setHasUnsavedChanges(true)
+  }
+
   const renderQuotationBlock = (siteName: string, items: QuotationProduct, pageNumber: number) => {
     const currentQuotation = editableQuotation || quotation
     if (!currentQuotation) return null
@@ -627,21 +828,25 @@ The OH Plus Team`,
     const totalWithVat = totalLease + vatAmount
 
     return (
-      <div key={siteName} className="p-8 bg-white">
+      <div key={siteName} className="px-8 bg-white">
         {/* Header Section */}
         <div className="text-center mb-8"></div>
+
+        <div id="quotation-body">
+          {/* Date */}
+          <div className="text-left mb-4">
+            <p className="text-base">{format(new Date(), "MMMM dd, yyyy")}</p>
+          </div>
 
         {/* Client and RFQ Info */}
         <div className="flex justify-between items-start mb-8">
           <div className="text-left">
-            <p className="text-base font-medium mb-2">{format(new Date(), "MMMM dd, yyyy")}</p>
-
-            <p className="text-base font-medium mb-1">{currentQuotation.client_name || "Client Name"}</p>
-
-            <p className="text-base font-medium">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
+            <p className="text-base ">{currentQuotation.client_name || "Client Name"}</p>
+            <p className="text-base ">{currentQuotation.client_designation || "Position"}</p>
+            <p className="text-base font-bold">{currentQuotation.client_company_name || "COMPANY NAME"}</p>
           </div>
           <div className="text-right">
-            <p className="text-base font-medium">RFQ. No. {currentQuotation.quotation_number}</p>
+            <p className="text-base">RFQ. No. {currentQuotation.quotation_number}</p>
           </div>
         </div>
 
@@ -649,36 +854,89 @@ The OH Plus Team`,
           <h1 className="text-xl font-bold text-gray-900 mb-4">{item?.name || "Site Name"} - Quotation</h1>
         </div>
 
-        {/* Greeting */}
-        <div className="text-center mb-8">
-          <p className="text-base mb-2">
-            Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
+        {/* Salutation */}
+        <div className="text-left mb-4">
+          <p className="text-base">
+            Dear {isEditing && editingField === "salutation" ? (
+              <select
+                value={tempValues.salutation || currentQuotation?.template?.salutation || "Mr."}
+                onChange={(e) => updateTempValues("salutation", e.target.value)}
+                className="border border-gray-300 rounded px-1 py-0 text-sm"
+              >
+                <option value="Mr.">Mr.</option>
+                <option value="Ms.">Ms.</option>
+                <option value="Mrs.">Mrs.</option>
+                <option value="Miss">Miss</option>
+              </select>
+            ) : (
+              <span
+                className={isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+                onClick={() => isEditing && handleFieldEdit("salutation", currentQuotation?.template?.salutation || "Mr.")}
+                title={isEditing ? "Click to edit salutation" : ""}
+              >
+                {currentQuotation?.template?.salutation || "Mr."}
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </span>
+            )} {currentQuotation?.client_name?.split(' ').pop() || 'Client'},
           </p>
-          <p className="text-base mb-6">We are pleased to submit our quotation for your requirements:</p>
-          <p className="text-base font-semibold">Details as follows:</p>
+        </div>
+
+        {/* Greeting */}
+        <div className="text-left mb-8">
+          {isEditing && editingField === "greeting" ? (
+            <textarea
+              value={tempValues.greeting || currentQuotation?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+              onChange={(e) => updateTempValues("greeting", e.target.value)}
+              className="w-full text-left text-base border border-gray-300 rounded p-2"
+              rows={2}
+              placeholder="Enter greeting text"
+            />
+          ) : (
+            <div
+              className={isEditing ? "cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+              onClick={() => isEditing && handleFieldEdit("greeting", currentQuotation?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`)}
+              title={isEditing ? "Click to edit greeting" : ""}
+            >
+              <p className="text-base">
+                {currentQuotation?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+              </p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Details Header */}
+        <div className="text-left mb-1">
+          <p className="text-base font-semibold">Site details:</p>
         </div>
 
         {/* Details Section with editable fields */}
-        <div className="space-y-3 mb-8">
+        <div className="space-y-2 mb-4">
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Type</span>
-            <span className="text-gray-700">: {item?.type || "Rental"}</span>
+            <span className="font-medium text-gray-700 w-1/4">Type:</span>
+            <span className="text-gray-700">{item?.type || "Rental"}</span>
           </div>
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Size</span>
-            <span className="text-gray-700">: </span>
+            <span className="font-medium text-gray-700 w-1/4">Size:</span>
             <span className="text-gray-700">
               {item?.specs?.height ? `${item.specs.height}ft (H)` : "N/A"} x {item?.specs?.width ? `${item.specs.width}ft (W)` : "N/A"}
             </span>
           </div>
 
+          {item?.illumination && (
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Illumination:</span>
+              <span className="text-gray-700">{item.illumination}</span>
+            </div>
+          )}
+
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Contract Duration</span>
-            <span className="text-gray-700">: </span>
+            <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
             {isEditing && editingField === "duration_days" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
@@ -708,8 +966,7 @@ The OH Plus Team`,
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Contract Period</span>
-            <span className="text-gray-700">: </span>
+            <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
             {isEditing && editingField === "contractPeriod" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
@@ -752,15 +1009,15 @@ The OH Plus Team`,
 
           <div className="flex">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Proposal to</span>
-            <span className="text-gray-700">: {currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
+            <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
+            <span className="text-gray-700">{currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
           </div>
 
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Lease Rate/Month</span>
-            <span className="text-gray-700">: PHP </span>
+            <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
+
             {isEditing && editingField === "price" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
@@ -782,7 +1039,7 @@ The OH Plus Team`,
                 onClick={() => isEditing && handleFieldEdit("price", monthlyRate)}
                 title={isEditing ? "Click to edit lease rate" : ""}
               >
-                : PHP {safeFormatNumber(item?.price || 0)} (Exclusive of VAT)
+                PHP {safeFormatNumber(item?.price || 0)} (Exclusive of VAT)
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
@@ -790,9 +1047,9 @@ The OH Plus Team`,
 
           <div className="flex">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-32">Total Lease</span>
+            <span className="font-medium text-gray-700 w-1/4">Total Lease:</span>
             <span className="text-gray-700">
-              : PHP{" "}
+              PHP{" "}
               {safeFormatNumber(
                 isEditing && editableQuotation?.items?.item_total_amount
                   ? editableQuotation.items.item_total_amount
@@ -803,56 +1060,185 @@ The OH Plus Team`,
           </div>
         </div>
 
+        {/* Site Notes */}
+        {isEditing && editingField === "site_notes" ? (
+          <div className="mt-4">
+            <textarea
+              value={tempValues.site_notes || currentQuotation?.items?.site_notes || ""}
+              onChange={(e) => updateTempValues("site_notes", e.target.value)}
+              className="w-full text-base border border-gray-300 rounded p-2"
+              rows={3}
+              placeholder="Enter site notes"
+            />
+          </div>
+        ) : currentQuotation?.items?.site_notes ? (
+          <div
+            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+            onClick={() => isEditing && handleFieldEdit("site_notes", currentQuotation.items.site_notes || "")}
+            title={isEditing ? "Click to edit site notes" : ""}
+          >
+            <p className="text-sm italic"><strong>Note:</strong> {currentQuotation.items.site_notes}</p>
+            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+          </div>
+        ) : isEditing ? (
+          <div
+            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+            onClick={() => handleFieldEdit("site_notes", "")}
+            title="Click to add site notes"
+          >
+            <p className="text-base">+ Add site notes</p>
+          </div>
+        ) : null}
+
+        <p className="font-bold mt-2">Price breakdown:</p>
         {/* Pricing Table - Updated for quotation pricing */}
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
-          <div className="space-y-2">
+        <div className="p-4 mb-6">
+          <div className="space-y-1">
             <div className="flex justify-between">
               <span className="text-gray-700">Lease rate per month</span>
               <span className="text-gray-900">PHP {safeFormatNumber(item?.price || 0)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-700">x {formatDuration(currentQuotation.duration_days || 180)}</span>
-              <span className="text-gray-900">PHP {safeFormatNumber(item?.item_total_amount || 0)}</span>
+              <span className="text-gray-700">Contract duration</span>
+              <span className="text-gray-900">x{Math.ceil((currentQuotation.duration_days || 0) / 30)} months</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-700">12% VAT</span>
-              <span className="text-gray-900">PHP {safeFormatNumber((item?.item_total_amount || 0) * 0.12)}</span>
+              <span className="text-gray-700">Total lease</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(calculateProratedPrice(item?.price || 0, getDateObject(currentQuotation?.start_date) || new Date(), getDateObject(currentQuotation?.end_date) || new Date()))}</span>
             </div>
-            <div className="border-t pt-2 mt-2">
+            <div className="flex justify-between">
+              <span className="text-gray-700">Add: VAT</span>
+              <span className="text-gray-900">PHP {safeFormatNumber(calculateProratedPrice(item?.price || 0, getDateObject(currentQuotation?.start_date) || new Date(), getDateObject(currentQuotation?.end_date) || new Date()) * 0.12)}</span>
+            </div>
+            <div className="border-t pt-1 mt-1">
               <div className="flex justify-between font-bold text-lg">
-                <span className="text-gray-900">TOTAL</span>
-                <span className="text-gray-900">PHP {safeFormatNumber((item?.item_total_amount || 0) * 1.12)}</span>
+                <span className="text-gray-900">Total</span>
+                <span className="text-gray-900">PHP {safeFormatNumber((calculateProratedPrice(item?.price || 0, getDateObject(currentQuotation?.start_date) || new Date(), getDateObject(currentQuotation?.end_date) || new Date())) * 1.12)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Note */}
-        <div className="mb-8">
-          <p className="text-base">
-            <strong>Note:</strong> free two (2) change material for {durationMonths} month rental
-          </p>
-        </div>
+        {/* Price Notes */}
+        {isEditing && editingField === "price_notes" ? (
+          <div className="mt-4">
+            <textarea
+              value={tempValues.price_notes || currentQuotation?.items?.price_notes || ""}
+              onChange={(e) => updateTempValues("price_notes", e.target.value)}
+              className="w-full text-base border border-gray-300 rounded p-2"
+              rows={3}
+              placeholder="Enter price notes"
+            />
+          </div>
+        ) : currentQuotation?.items?.price_notes ? (
+          <div
+            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+            onClick={() => isEditing && handleFieldEdit("price_notes", currentQuotation.items.price_notes || "")}
+            title={isEditing ? "Click to edit price notes" : ""}
+          >
+            <p className="text-sm italic mb-[15px]"><strong>Note:</strong> {currentQuotation.items.price_notes}</p>
+            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+          </div>
+        ) : isEditing ? (
+          <div
+            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+            onClick={() => handleFieldEdit("price_notes", "")}
+            title="Click to add price notes"
+          >
+            <p className="text-base">+ Add price notes</p>
+          </div>
+        ) : null}
 
         {/* Terms and Conditions */}
         <div className="mb-8">
           <p className="font-semibold mb-4">Terms and Conditions:</p>
           <div className="space-y-2 text-sm">
-            <p>1. Quotation validity: 5 working days.</p>
-            <p>
-              2. Availability of the site is on first-come-first-served-basis only. Only official documents such as
-              P.O's, Media Orders, signed quotation, & contracts are accepted in order to booked the site.
-            </p>
-            <p>
-              3. To book the site, one (1) month advance and one (2) months security deposit payment dated 7 days before
-              the start of rental is required.
-            </p>
-            <p>4. Final artwork should be approved ten (10) days before the contract period</p>
-            <p>5. Print is exclusively for {companyData?.name || "Company Name"} Only.</p>
+            {(isEditing
+              ? tempValues.terms_and_conditions || currentQuotation?.template?.terms_and_conditions || [
+                  "Quotation validity: 5 working days.",
+                  "Site availability: First-come-first-served basis. Official documents required.",
+                  "Payment terms: One month advance and two months security deposit.",
+                  "Payment deadline: 7 days before rental start.",
+                ]
+              : currentQuotation?.template?.terms_and_conditions || [
+                  "Quotation validity: 5 working days.",
+                  "Site availability: First-come-first-served basis. Official documents required.",
+                  "Payment terms: One month advance and two months security deposit.",
+                  "Payment deadline: 7 days before rental start.",
+                ]
+            ).map((term: string, index: number) => (
+              <div key={index} className="flex items-start gap-2">
+                <span className="flex-shrink-0">{index + 1}.</span>
+                {isEditing ? (
+                  <div className="flex-1 flex items-center gap-2">
+                    <textarea
+                      value={term}
+                      onChange={(e) => handleUpdateTerm(index, e.target.value)}
+                      className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
+                      placeholder="Enter term and condition"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRemoveTerm(index)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="flex-1">{term}</span>
+                )}
+              </div>
+            ))}
+            {isEditing && (
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTerm}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  + Add Term
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        {/* Closing Message */}
+        {isEditing && editingField === "closing_message" ? (
+          <div className="mb-8">
+            <textarea
+              value={tempValues.closing_message || currentQuotation?.template?.closing_message || ""}
+              onChange={(e) => updateTempValues("closing_message", e.target.value)}
+              className="w-full text-base border border-gray-300 rounded p-2"
+              rows={3}
+              placeholder="Enter closing message (optional)"
+            />
+          </div>
+        ) : currentQuotation?.template?.closing_message ? (
+          <div
+            className={isEditing ? "mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mb-8"}
+            onClick={() => isEditing && handleFieldEdit("closing_message", currentQuotation?.template?.closing_message || "")}
+            title={isEditing ? "Click to edit closing message" : ""}
+          >
+            <p className="text-base">{currentQuotation.template.closing_message}</p>
+            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+          </div>
+        ) : isEditing ? (
+          <div
+            className="mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+            onClick={() => handleFieldEdit("closing_message", "")}
+            title="Click to add closing message"
+          >
+            <p className="text-base">+ Add closing message</p>
+          </div>
+        ) : null}
+
+        <div className="space-y-8 mb-8">
           <div className="text-left">
             <p className="mb-16">Very truly yours,</p>
             <div>
@@ -898,11 +1284,13 @@ The OH Plus Team`,
             </p>
           </div>
         </div>
+        </div>
 
         <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
+          <p className="font-semibold">{companyData?.name || "Company Name"}</p>
           <p>{formatCompanyAddress(companyData)}</p>
-          {companyData?.phone && <p>Telephone: {companyData.phone}</p>}
-          {companyData?.email && <p>Email: {companyData.email}</p>}
+          <span className="text-center gap-1 flex-1">{companyData?.phone && `Tel no: ${companyData.phone}`}|
+          {companyData?.email && `Email: ${companyData.email}`}</span>
         </div>
       </div>
     )
@@ -1022,10 +1410,28 @@ The OH Plus Team`,
               </>
             )}
           </Button>
+          <Button
+            variant="ghost"
+            onClick={handleDownloadImage}
+            disabled={downloadingImage}
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+          >
+            {downloadingImage ? (
+              <>
+                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                <span className="text-[10px] text-gray-700">Generating...</span>
+              </>
+            ) : (
+              <>
+                <ImageIcon className="h-8 w-8 text-gray-500 mb-1" />
+                <span className="text-[10px] text-gray-700">Download Image</span>
+              </>
+            )}
+          </Button>
         </div>
 
         <div className="flex gap-6 items-start">
-          <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
+          <div id="quotation-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
            <div className="text-center mb-8">
              <div className="flex items-center justify-center mb-4 mt-6">
                 {companyData?.photo_url ? (
@@ -1040,7 +1446,6 @@ The OH Plus Team`,
                   </div>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name || "Company Name"}</h1>
             </div>
             {currentQuotation?.items && renderQuotationBlock("Single Site", currentQuotation.items, 1)}
 
@@ -1214,7 +1619,7 @@ The OH Plus Team`,
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
             onClick={handleSendClick}
-            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium invisible" 
           >
             Send
           </Button>
