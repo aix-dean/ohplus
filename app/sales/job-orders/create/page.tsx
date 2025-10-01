@@ -218,6 +218,7 @@ export default function CreateJobOrderPage() {
         vat,
         total,
         monthlyRate: monthlyRate,
+        siteCode: products[0]?.site_code || "N/A", // Get from product
         productName: products[0]?.name || "N/A", // Get from product
       },
     ]
@@ -1286,7 +1287,7 @@ export default function CreateJobOrderPage() {
               >
                 {quotation.quotation_number}
               </a>
-              <p className="text-xs text-gray-600">Project Name: {quotation.items.name}</p>
+              <p className="text-xs text-gray-600">Project ID: {quotation.id}</p>
             </div>
             <div className="space-y-0.5 mt-3">
               <div>
@@ -1321,6 +1322,7 @@ export default function CreateJobOrderPage() {
                         className="rounded-md object-cover"
                       />
                       <div className="flex-1">
+                        <p className="font-semibold text-sm">{productTotal.siteCode}</p>
                         <p className="text-xs text-gray-600">{productTotal.productName}</p>
                       </div>
                     </div>
@@ -2224,7 +2226,7 @@ export default function CreateJobOrderPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-2 pt-4 justify-end">
-              {/* <Button
+              <Button
                 variant="outline"
                 onClick={handlePrint}
                 disabled={isSubmitting}
@@ -2232,7 +2234,7 @@ export default function CreateJobOrderPage() {
               >
                 <Printer className="mr-2 h-4 w-4" />
                 Print
-              </Button> */}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => handleCreateJobOrders("draft")}

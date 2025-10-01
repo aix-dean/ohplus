@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { createNotifications } from "@/lib/client-service"
 import { getJobOrderById } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 
 interface JobOrderCreatedSuccessDialogProps {
@@ -29,7 +29,48 @@ export function JobOrderCreatedSuccessDialog({
   const [isLoadingPrint, setIsLoadingPrint] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
 
-  const handleNotifyTeams = useCallback(async () => {
+  // Fetch job order data when dialog opens
+  useEffect(() => {
+    if (isOpen && joIds.length > 0) {
+      const fetchJobOrders = async () => {
+        setIsLoadingData(true)
+        try {
+          const fetchedJobOrders: JobOrder[] = []
+          for (const joId of joIds) {
+            const jobOrder = await getJobOrderById(joId)
+            if (jobOrder) {
+              fetchedJobOrders.push(jobOrder)
+            }
+          }
+          setJobOrders(fetchedJobOrders)
+        } catch (error) {
+          console.error("Error fetching job orders:", error)
+        } finally {
+          setIsLoadingData(false)
+        }
+      }
+      fetchJobOrders()
+    }
+  }, [isOpen, joIds])
+
+  const generateAndPrintPDF = async () => {
+    if (jobOrders.length === 0) return
+
+    setIsLoadingPrint(true)
+    try {
+      // Generate PDF for each job order
+      for (const jobOrder of jobOrders) {
+        await generateJobOrderPDF(jobOrder, "print",false)
+      }
+      onClose()
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+    } finally {
+      setIsLoadingPrint(false)
+    }
+  }
+
+  const handleNotifyTeams = async () => {
     if (!userData?.company_id || !userData?.role) return
 
     // Map role to department
@@ -63,55 +104,7 @@ export function JobOrderCreatedSuccessDialog({
       // Still close dialog on error
       onClose()
     }
-  }, [userData?.company_id, userData?.role, joIds, onClose])
-
-  // Fetch job order data when dialog opens
-  useEffect(() => {
-    if (isOpen && joIds.length > 0) {
-      const fetchJobOrders = async () => {
-        setIsLoadingData(true)
-        try {
-          const fetchedJobOrders: JobOrder[] = []
-          for (const joId of joIds) {
-            const jobOrder = await getJobOrderById(joId)
-            if (jobOrder) {
-              fetchedJobOrders.push(jobOrder)
-            }
-          }
-          setJobOrders(fetchedJobOrders)
-
-          // Automatically create notifications for all departments
-          if (userData?.company_id && fetchedJobOrders.length > 0) {
-            await handleNotifyTeams()
-          }
-        } catch (error) {
-          console.error("Error fetching job orders:", error)
-        } finally {
-          setIsLoadingData(false)
-        }
-      }
-      fetchJobOrders()
-    }
-  }, [isOpen, joIds, userData?.company_id, handleNotifyTeams])
-
-  const generateAndPrintPDF = async () => {
-    if (jobOrders.length === 0) return
-
-    setIsLoadingPrint(true)
-    try {
-      // Generate PDF for each job order
-      for (const jobOrder of jobOrders) {
-        await generateJobOrderPDF(jobOrder, "print",false)
-      }
-      onClose()
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-    } finally {
-      setIsLoadingPrint(false)
-    }
   }
-
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

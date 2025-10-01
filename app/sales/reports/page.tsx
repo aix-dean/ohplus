@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Search, MoreVertical, Plus } from "lucide-react"
+import { Search, MoreVertical, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
-import { searchReports, type SearchResponse } from "@/lib/algolia-service"
-import { type ReportData } from "@/lib/report-service"
+import { getReportsByCompany, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
@@ -18,6 +17,9 @@ export default function SalesReportsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalReports, setTotalReports] = useState(0)
+  const itemsPerPage = 15
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
@@ -31,7 +33,7 @@ export default function SalesReportsPage() {
       await filterReports()
     }
     loadReports()
-  }, [searchQuery, filterType, userData])
+  }, [searchQuery, filterType, userData, currentPage])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -44,41 +46,55 @@ export default function SalesReportsPage() {
     }
   }, [])
 
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterType, searchQuery])
+
 
   const filterReports = async () => {
     try {
       setLoading(true)
-      // Build filters
-      const filters: string[] = []
 
-      // Company filter
-      if (userData?.company_id) {
-        filters.push(`companyId:${userData.company_id}`)
+      if (!userData?.company_id) {
+        setFilteredReports([])
+        setTotalReports(0)
+        return
       }
 
+      // Get all reports for the company (ordered by created desc)
+      const allReports = await getReportsByCompany(userData.company_id)
+      console.log("All reports data:", allReports)
 
-      // Status filter
-      filters.push(`NOT status:draft`)
+      // Apply client-side filters
+      let filtered = allReports
+
+      // Status filter - exclude draft reports
+      filtered = filtered.filter(report => report.status !== 'draft')
 
       // Report type filter
       if (filterType !== "All") {
-        filters.push(`reportType:${filterType}`)
+        filtered = filtered.filter(report => report.reportType === filterType)
       }
 
-      const filtersString = filters.join(" AND ")
-
-      const searchResponse = await searchReports(searchQuery, filtersString ? undefined : userData?.company_id || undefined, 0, 50, filtersString || undefined)
-      console.log("Filtered reports data:", searchResponse)
-      if (searchResponse.error) {
-        throw new Error(searchResponse.error)
+      // Search query filter (search in siteName, reportType, createdByName)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        filtered = filtered.filter(report =>
+          report.siteName?.toLowerCase().includes(query) ||
+          report.reportType?.toLowerCase().includes(query) ||
+          report.createdByName?.toLowerCase().includes(query) ||
+          report.report_id?.toLowerCase().includes(query)
+        )
       }
-      // Map hits to ReportData format
-      const reportsData: ReportData[] = searchResponse.hits.map((hit: any) => ({
-        id: hit.objectID,
-        ...hit,
-        attachments: hit.attachments || [],
-      }))
-      setFilteredReports(reportsData)
+
+      // Apply pagination client-side
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const endIndex = startIndex + itemsPerPage
+      const paginatedReports = filtered.slice(startIndex, endIndex)
+
+      setFilteredReports(paginatedReports)
+      setTotalReports(filtered.length)
     } catch (error) {
       console.error("Error filtering reports:", error)
       toast({
@@ -90,6 +106,7 @@ export default function SalesReportsPage() {
       setLoading(false)
     }
   }
+
 
   const formatDate = (date: any) => {
     if (!date) return "N/A"
@@ -125,9 +142,6 @@ export default function SalesReportsPage() {
     }
   }
 
-  const generateReportNumber = (id: string) => {
-    return id ? `000${id.slice(-3)}` : "000000"
-  }
 
   const handleViewReport = (reportId: string) => {
     router.push(`/sales/reports/${reportId}`)
@@ -150,9 +164,6 @@ export default function SalesReportsPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
           <h1 className="text-xl font-semibold text-gray-900">Sales Reports</h1>
         </div>
       </div>
@@ -180,7 +191,6 @@ export default function SalesReportsPage() {
                 <SelectItem value="completion-report">Completion</SelectItem>
                 <SelectItem value="monitoring-report">Monitoring</SelectItem>
                 <SelectItem value="installation-report">Installation</SelectItem>
-                <SelectItem value="roll-down">Roll Down</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -197,7 +207,7 @@ export default function SalesReportsPage() {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report #
+                  Report ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -237,7 +247,7 @@ export default function SalesReportsPage() {
                       {formatDate(report.created)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {generateReportNumber(report.id || "")}
+                      {report.report_id || "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.siteName || "Unknown Site"}
@@ -275,16 +285,36 @@ export default function SalesReportsPage() {
         </div>
       </div>
 
-      {/* Create New Report Button */}
-      <div className="fixed bottom-6 right-6">
-        <Button
-          onClick={() => router.push("/sales/dashboard")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Create New Report
-        </Button>
-      </div>
+      {/* Pagination */}
+      {totalReports > itemsPerPage && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+          <div className="text-sm text-gray-700">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalReports)} of {totalReports} reports
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {Math.ceil(totalReports / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalReports / itemsPerPage), prev + 1))}
+              disabled={currentPage === Math.ceil(totalReports / itemsPerPage)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />

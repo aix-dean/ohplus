@@ -293,7 +293,7 @@ interface ServiceAssignmentPDFData {
   equipmentRequired: string
   materialSpecs: string
   crew: string
-  illuminationNits: string
+  illuminationNits?: string
   gondola: string
   technology: string
   sales: string
