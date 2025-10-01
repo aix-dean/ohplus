@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { PartyPopper, FileText, Package, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { createNotifications } from "@/lib/client-service"
 import { getJobOrderById } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useState, useEffect, useRef } from "react"
@@ -71,38 +70,6 @@ export function JobOrderCreatedSuccessDialog({
     }
   }
 
-  const handleNotifyTeams = async () => {
-    if (!userData?.company_id || !userData?.role) return
-
-    // Map role to department
-    const roleToDepartment: { [key: string]: string } = {
-      sales: "SALES",
-      logistics: "LOGISTICS",
-      admin: "ADMIN",
-      cms: "CMS",
-    }
-     const departmentFrom = "Sales"
-
-    const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
-    const navigateTo = `/logistics/job-orders/${joIds[0]}`
-
-    const notifications = departments.map((dept) => ({
-      company_id: userData.company_id!,
-      department_from: departmentFrom,
-      department_to: dept,
-      description: "A new job order has been created and requires your attention.",
-      navigate_to: navigateTo,
-      title: "New Job Order Created",
-      type: "job_order_created",
-      uid_to: null,
-    }))
-
-    try {
-      await createNotifications(notifications)
-    } catch (error) {
-      console.error("Error creating notifications:", error)
-    }
-  }
 
   // Fetch job order data when dialog opens
   useEffect(() => {
@@ -119,14 +86,6 @@ export function JobOrderCreatedSuccessDialog({
           }
           setJobOrders(fetchedJobOrders)
 
-          // Automatically create notifications for all departments (only once per job order)
-          if (userData?.company_id && fetchedJobOrders.length > 0) {
-            const notificationKey = joIds.sort().join(',')
-            if (!notificationsSentRef.current.has(notificationKey)) {
-              await handleNotifyTeams()
-              notificationsSentRef.current.add(notificationKey)
-            }
-          }
         } catch (error) {
           console.error("Error fetching job orders:", error)
         } finally {

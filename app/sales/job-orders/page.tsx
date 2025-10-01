@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { Search, Plus, MoreHorizontal, X, Loader2 } from "lucide-react" // Added X for clear search
+import { Search, Plus, MoreHorizontal, X, Loader2, Printer } from "lucide-react" // Added X for clear search
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -325,6 +325,10 @@ export default function JobOrdersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(event) => handlePrint(jo, event)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => router.push(`/sales/job-orders/${jo.id}`)}>
                               View
                             </DropdownMenuItem>

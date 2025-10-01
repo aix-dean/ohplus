@@ -890,27 +890,17 @@ export function CreateReportDialog({
       console.log("After images array:", afterImages)
       console.log("General attachments array:", attachments)
 
-      let finalReportData = reportData
+      let reportId: string | undefined
 
       // For sales and logistics modules, save the report to database immediately with posted status
       if (module === "sales" || module === "logistics") {
         console.log(`Saving report to database for ${module} module`)
-        const reportId = await postReport(reportData)
+        reportId = await postReport(reportData)
+        console.log("Report saved with ID:", reportId)
 
-        // Fetch the actual saved report data from database
-        const { getReportById } = await import("@/lib/report-service")
-        const savedReport = await getReportById(reportId)
-
-        if (savedReport) {
-          finalReportData = savedReport
-          console.log("Retrieved saved report data:", savedReport)
-
-          // Set sessionStorage to trigger success dialog on service-reports page (for logistics module)
-          if (module === "logistics") {
-            sessionStorage.setItem("lastPostedReportId", reportId)
-          }
-        } else {
-          throw new Error("Failed to retrieve saved report")
+        // Set sessionStorage to trigger success dialog on service-reports page (for logistics module)
+        if (module === "logistics") {
+          sessionStorage.setItem("lastPostedReportId", reportId)
         }
       }
 
@@ -918,18 +908,14 @@ export function CreateReportDialog({
       if (module === "admin") {
         console.log("Saving report to database for admin module with draft status")
         const { createReport } = await import("@/lib/report-service")
-        const reportId = await createReport(reportData)
+        reportId = await createReport(reportData)
+        console.log("Saved admin report with draft status, ID:", reportId)
 
-        // Set the ID on the report data for the preview page
-        finalReportData = {
+        // Store the report data in sessionStorage for the preview page
+        const finalReportData = {
           ...reportData,
           id: reportId
         }
-        console.log("Saved admin report with draft status, ID:", reportId)
-      }
-
-      // Store the report data in sessionStorage for the preview page (only for admin module since logistics and sales auto-post)
-      if (module === "admin") {
         sessionStorage.setItem("previewReportData", JSON.stringify(finalReportData))
         sessionStorage.setItem("previewProductData", JSON.stringify(product))
       }
@@ -958,7 +944,15 @@ export function CreateReportDialog({
       setDescriptionOfWork("")
 
 
-      const redirectPath = module === "sales" ? "/sales/reports/preview" : module === "admin" ? "/admin/reports/preview" : "/logistics/service-reports"
+      const redirectPath = module === "sales"
+        ? "/sales/reports/preview"
+        : module === "admin"
+          ? "/admin/reports/preview"
+          : module === "logistics" && reportId
+            ? `/logistics/reports/${reportId}`
+            : "/logistics/service-reports"
+
+      console.log("Redirecting to:", redirectPath, "Module:", module, "Report ID:", reportId, "Report ID type:", typeof reportId, "Report ID truthy:", !!reportId)
       router.push(redirectPath)
     } catch (error) {
       console.error("Error generating report:", error)
