@@ -48,10 +48,28 @@ export async function createProposal(
       return sum + (isNaN(price) ? 0 : price)
     }, 0)
 
+    // Fetch company data if companyId is provided
+    let companyName = ""
+    let companyLogo = ""
+    if (options.companyId) {
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", options.companyId))
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+          companyName = companyData.name || ""
+          companyLogo = companyData.photo_url || ""
+        }
+      } catch (error) {
+        console.error("Error fetching company data:", error)
+        // Continue with empty company data if fetch fails
+      }
+    }
+
     // Clean the client data to ensure no undefined values
     const cleanClient: ProposalClient = {
       id: client.id || "", // Include id field
       company: client.company || "",
+      name: client.contactPerson || client.name || "", // Use contactPerson as name
       contactPerson: client.contactPerson || "",
       email: client.email || "",
       phone: client.phone || "",
@@ -108,6 +126,8 @@ export async function createProposal(
       customMessage: options.customMessage || "",
       createdBy: userId,
       companyId: options.companyId || null, // Add company_id to proposal data
+      companyName: companyName, // Store company name in proposal
+      companyLogo: companyLogo, // Store company logo in proposal
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: "draft" as const, // Always set to draft now
