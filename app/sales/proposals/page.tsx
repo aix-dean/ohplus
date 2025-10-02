@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
@@ -23,8 +23,6 @@ import {
   XCircle,
   Send,
   Printer,
-  Share,
-  History,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
@@ -32,7 +30,6 @@ import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { SentHistoryDialog } from "@/components/sent-history-dialog"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -51,8 +48,6 @@ function ProposalsPageContent() {
   const { isMobile } = useResponsive()
   const { toast } = useToast()
   const [isSearching, setIsSearching] = useState(false)
-  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
-  const [selectedProposalForHistory, setSelectedProposalForHistory] = useState<Proposal | null>(null)
 
   let content;
   if (loading) {
@@ -180,29 +175,12 @@ function ProposalsPageContent() {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
                         <Eye className="mr-2 h-4 w-4" />
-                        View
+                        View Details
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
                         <Download className="mr-2 h-4 w-4" />
-                        Download
+                        Download PDF
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleShareProposal(proposal)}>
-                        <Share className="mr-2 h-4 w-4" />
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleCreateQuotation(proposal)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Quotation
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleViewSentHistory(proposal)}>
-                        <History className="mr-2 h-4 w-4" />
-                        View Sent History
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print
@@ -346,21 +324,6 @@ function ProposalsPageContent() {
     router.push(`/sales/proposals/${proposal.id}?action=print`)
   }
 
-  const handleShareProposal = (proposal: Proposal) => {
-    // TODO: Implement share functionality
-    console.log('Share proposal', proposal.id)
-  }
-
-  const handleCreateQuotation = (proposal: Proposal) => {
-    // Navigate to create quotation page
-    router.push(`/sales/quotations/create?proposal=${proposal.id}`)
-  }
-
-  const handleViewSentHistory = (proposal: Proposal) => {
-    setSelectedProposalForHistory(proposal)
-    setShowSentHistoryDialog(true)
-  }
-
   return (
     <>
       <div className="min-h-screen bg-gray-50">
@@ -433,12 +396,6 @@ function ProposalsPageContent() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <SentHistoryDialog
-        open={showSentHistoryDialog}
-        onOpenChange={setShowSentHistoryDialog}
-        proposalId={selectedProposalForHistory?.id || ""}
-      />
     </>
   )
 }

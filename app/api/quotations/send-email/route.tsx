@@ -1,34 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { emailService, type EmailAttachment } from "@/lib/email-service"
-import { Timestamp } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-
-async function uploadFileToStorage(fileBuffer: Buffer, fileName: string, fileType: string, companyId: string): Promise<string> {
-  try {
-    const timestamp = Date.now()
-    const fileExtension = fileName.split('.').pop() || 'file'
-    const storageFileName = `emails/${companyId}/${timestamp}_${fileName}`
-
-    const storageRef = ref(storage, storageFileName)
-
-    // Upload the file
-    await uploadBytes(storageRef, fileBuffer, {
-      contentType: fileType,
-    })
-
-    // Get the download URL
-    const downloadURL = await getDownloadURL(storageRef)
-
-    return downloadURL
-  } catch (error) {
-    console.error("Error uploading file to storage:", error)
-    throw new Error(`Failed to upload file: ${fileName}`)
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -72,7 +45,6 @@ export async function POST(request: NextRequest) {
       companyName,
       preGeneratedPDFs,
       uploadedFiles,
-      userData,
     } = body
 
     if (!quotation || !clientEmail) {
@@ -333,7 +305,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Attempting to send email to:", clientEmail)
 
-    const attachments: Array<{ filename: string; content: Buffer; type?: string }> = []
+    const attachments = []
 
     if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
       preGeneratedPDFs.forEach((pdf, index) => {
@@ -365,15 +337,7 @@ export async function POST(request: NextRequest) {
     console.log(`Total attachments prepared: ${attachments.length}`)
 
     // Prepare email data with all attachments
-    const emailData: {
-      from: string;
-      to: string[];
-      subject: string;
-      html: string;
-      reply_to?: string[];
-      cc?: string[];
-      attachments?: Array<{ filename: string; content: Buffer; type?: string }>;
-    } = {
+    const emailData: any = {
       from: `${companyName || "Company"} <noreply@${process.env.RESEND_VERIFIED_DOMAIN || 'company.com'}>`,
       to: [clientEmail],
       subject: finalSubject,
@@ -402,84 +366,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Email sent successfully:", data)
-
-    // Create email document in emails collection
-    try {
-      const companyId = userData?.company_id || quotation?.company_id || "unknown"
-      let attachmentDetails: EmailAttachment[] = []
-
-      // Upload pre-generated PDFs to storage and create attachment details
-      if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
-        for (const pdf of preGeneratedPDFs) {
-          try {
-            const fileUrl = await uploadFileToStorage(
-              Buffer.from(pdf.content, 'base64'),
-              pdf.filename,
-              'application/pdf',
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: pdf.filename,
-              fileSize: Buffer.from(pdf.content, 'base64').length,
-              fileType: 'application/pdf',
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload PDF ${pdf.filename}:`, error)
-          }
-        }
-      }
-
-      // Upload uploaded files to storage and create attachment details
-      if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-        for (const file of uploadedFiles) {
-          try {
-            const fileBuffer = Buffer.from(file.content, 'base64')
-            const fileUrl = await uploadFileToStorage(
-              fileBuffer,
-              file.filename,
-              file.type,
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: file.filename,
-              fileSize: fileBuffer.length,
-              fileType: file.type,
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload file ${file.filename}:`, error)
-          }
-        }
-      }
-
-      const emailDocument = {
-        from: emailData.from,
-        to: emailData.to,
-        cc: emailData.cc || undefined,
-        replyTo: emailData.reply_to,
-        subject: finalSubject,
-        body: customBody || "",
-        attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
-        email_type: "quotation",
-        quotationId: quotation.id,
-        templateId: undefined,
-        reportId: undefined,
-        status: "sent" as const,
-        userId: userData?.email || currentUserEmail || "unknown",
-        company_id: companyId,
-        created: Timestamp.fromDate(new Date()),
-        sentAt: Timestamp.fromDate(new Date()),
-        updated: Timestamp.fromDate(new Date()),
-      }
-
-      const emailId = await emailService.createEmail(emailDocument)
-      console.log("[v0] Email document created successfully:", emailId)
-    } catch (emailDocError) {
-      console.error("[v0] Failed to create email document:", emailDocError)
-      // Don't fail the entire request if email document creation fails
-    }
-
     return NextResponse.json({
       success: true,
       data,
