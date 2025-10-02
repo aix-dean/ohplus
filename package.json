@@ -67,9 +67,10 @@
     "lucide-react": "^0.454.0",
     "next": "^15.5.4",
     "next-themes": "latest",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.149",
     "pdfkit": "^0.17.2",
-    "puppeteer": "^24.22.3",
+    "puppeteer": "^22.0.0",
     "qrcode": "latest",
     "react": "^19",
     "react-day-picker": "latest",
@@ -86,8 +87,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",
     "xlsx": "^0.18.5",
-    "zod": "latest",
-    "puppeteer": "^22.0.0"
+    "zod": "latest"
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.1",

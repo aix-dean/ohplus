@@ -1628,7 +1628,7 @@ The OH Plus Team`,
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
             onClick={handleSendClick}
-            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium invisible" 
+            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium" 
           >
             Send
           </Button>

@@ -149,18 +149,11 @@ export async function POST(request: NextRequest) {
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: `
-        <div class="header" style="text-align: center; width: 100%; padding: 5px;">
+        <div style="text-align: center; width: 100%; padding: 5px;">
           ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
         </div>
       `,
-      footerTemplate: `
-        <div style="font-size: 8px; text-align: center; width: 100%; padding: 5px;">
-          <div>${companyData?.name || 'Company Name'}</div>
-          <div>${formatCompanyAddress(companyData)}</div>
-          <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
-          <div>Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>
-        </div>
-      `,
+       footerTemplate: `<div></div>`,
       margin: {
         top: '25mm',
         right: '10mm',
@@ -176,7 +169,8 @@ export async function POST(request: NextRequest) {
     return new NextResponse(Buffer.from(buffer), {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `inline; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {
@@ -199,17 +193,34 @@ function generateQuotationHTML(
   <html>
   <head>
     <meta charset="UTF-8">
+    <title>${quotation.quotation_number}</title>
     <style>
+    @page {
+  margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
+}
     *{
       border-size: border-box;
       margin: 0;
       padding:0;
+    }
+      .page-footer {
+        position: fixed;
+          bottom: 0mm;
+          left: 5mm;             /* match @page left margin */
+          right: 15mm;            /* match @page right margin */
+          text-align: center;
+          font-size: 10px;
+          color: #555;
+          box-sizing: border-box;
     }
       body {
         font-family: Arial, sans-serif;
         background: #fff;
         color: #333;
         line-height: 1.5;
+        page-break-after: always;
+    position: relative;
+    height: 297mm; /* A4 height */
       }
       .date-ref {
         display: flex;
@@ -511,6 +522,12 @@ function generateQuotationHTML(
         </div>
       </div>
     </div>
+
+      <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
+          <div>${companyData?.name || 'Company Name'}</div>
+          <div>${formatCompanyAddress(companyData)}</div>
+          <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
+        </div>
   </body>
   </html>
   `

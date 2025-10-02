@@ -34,6 +34,7 @@ import {
   Mail,
   MessageSquare,
   MessageCircle,
+  Loader2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
@@ -58,6 +59,7 @@ function CostEstimatesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedCostEstimateForShare, setSelectedCostEstimateForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
 
   // Algolia search states
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -254,24 +256,126 @@ function CostEstimatesPageContent() {
   }
 
   const handlePrintPDF = async (costEstimate: CostEstimate) => {
+    const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+    setGeneratingPDFs((prev) => new Set(prev).add(costEstimateId))
+
     try {
-      // Fetch the full cost estimate data first
-      const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+      // Get the full cost estimate data
       const fullCostEstimate = await getCostEstimate(costEstimateId)
       if (!fullCostEstimate) {
         throw new Error("Cost estimate not found")
       }
 
-      // Generate and print PDF
-      await printCostEstimatePDF(fullCostEstimate, undefined, {
-        first_name: user?.displayName?.split(' ')[0] || "",
-        last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
-        email: user?.email || "",
-        company_id: userData?.company_id || "",
+      // Fetch company data
+      let companyData = null
+      if (userData?.company_id) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+          if (companyDoc.exists()) {
+            const data = companyDoc.data()
+            companyData = {
+              id: companyDoc.id,
+              name: data.name || data.company_name || "",
+              company_location: data.company_location || data.address || "",
+              address: data.address || "",
+              company_website: data.company_website || data.website || "",
+              photo_url: data.photo_url || data.logo_url || null,
+              contact_person: data.contact_person || "",
+              email: data.email || "",
+              phone: data.phone || data.telephone || "",
+              social_media: data.social_media || {},
+              created_by: data.created_by,
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching company data:", error)
+        }
+      }
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare cost estimate data for API (convert Timestamps to serializable format)
+      const serializableCostEstimate = {
+        ...fullCostEstimate,
+        createdAt: (fullCostEstimate as any).createdAt?.toDate ? (fullCostEstimate as any).createdAt.toDate().toISOString() : fullCostEstimate.createdAt?.toISOString(),
+        updatedAt: (fullCostEstimate as any).updatedAt?.toDate ? (fullCostEstimate as any).updatedAt.toDate().toISOString() : fullCostEstimate.updatedAt?.toISOString(),
+        startDate: (fullCostEstimate as any).startDate?.toDate ? (fullCostEstimate as any).startDate.toDate().toISOString() : fullCostEstimate.startDate?.toISOString(),
+        endDate: (fullCostEstimate as any).endDate?.toDate ? (fullCostEstimate as any).endDate.toDate().toISOString() : fullCostEstimate.endDate?.toISOString(),
+        validUntil: (fullCostEstimate as any).validUntil?.toDate ? (fullCostEstimate as any).validUntil.toDate().toISOString() : fullCostEstimate.validUntil?.toISOString(),
+      }
+
+      // Call the generate-cost-estimate-pdf API
+      const response = await fetch('/api/generate-cost-estimate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          costEstimate: serializableCostEstimate,
+          companyData,
+          logoDataUrl,
+        }),
       })
-    } catch (error) {
-      console.error("Error printing PDF:", error)
-      alert("Failed to print PDF. Please try again.")
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
+      }
+
+      toast({
+        title: "Success",
+        description: "Cost estimate PDF opened for printing",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Print Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(costEstimateId)
+        return newSet
+      })
     }
   }
 
@@ -570,9 +674,21 @@ function CostEstimatesPageContent() {
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePrintPDF(costEstimate as CostEstimate)}>
-                              <Printer className="mr-2 h-4 w-4" />
-                              Print
+                            <DropdownMenuItem
+                              onClick={() => handlePrintPDF(costEstimate as CostEstimate)}
+                              disabled={generatingPDFs.has(costEstimate.id || costEstimate.objectID)}
+                            >
+                              {generatingPDFs.has(costEstimate.id || costEstimate.objectID) ? (
+                                <>
+                                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                  Generating PDF...
+                                </>
+                              ) : (
+                                <>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print
+                                </>
+                              )}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate.id || costEstimate.objectID)}>
                               <Share2 className="mr-2 h-4 w-4" />
