@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore"
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import type { Proposal } from "@/lib/types/proposal"
+import { calculateProratedPrice } from "@/lib/quotation-service"
 
 // Algolia client for indexing
 let algoliasearch: any = null
@@ -149,8 +150,8 @@ function generateCostEstimatePassword(): string {
 // Calculate duration in days
 function calculateDurationDays(startDate: Date | null | undefined, endDate: Date | null | undefined): number | null {
   if (startDate && endDate) {
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const diffTime = endDate.getTime() - startDate.getTime()
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
   }
   return null
 }
@@ -169,8 +170,15 @@ export async function createCostEstimateFromProposal(
     // If customLineItems are not provided, generate them from proposal products
     if (!options?.customLineItems || options.customLineItems.length === 0) {
       proposal.products.forEach((product) => {
-        const pricePerDay = (typeof product.price === "number" ? product.price : 0) / 30
-        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : product.price // Use original price if no duration
+        let calculatedTotalPrice = typeof product.price === "number" ? product.price : 0
+        if (options?.startDate && options?.endDate) {
+          // Use prorated calculation when dates are provided
+          calculatedTotalPrice = calculateProratedPrice(typeof product.price === "number" ? product.price : 0, options.startDate, options.endDate)
+        } else if (durationDays) {
+          // Fallback to simple calculation if duration is provided but no dates
+          const pricePerDay = (typeof product.price === "number" ? product.price : 0) / 30
+          calculatedTotalPrice = pricePerDay * durationDays
+        }
         lineItems.push({
           id: product.id,
           description: product.name,
@@ -286,8 +294,15 @@ export async function createDirectCostEstimate(
     // If customLineItems are not provided, generate them from sitesData
     if (!options?.customLineItems || options.customLineItems.length === 0) {
       sitesData.forEach((site) => {
-        const pricePerDay = site.price / 30
-        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price
+        let calculatedTotalPrice = site.price || 0
+        if (options?.startDate && options?.endDate) {
+          // Use prorated calculation when dates are provided
+          calculatedTotalPrice = calculateProratedPrice(site.price || 0, options.startDate, options.endDate)
+        } else if (durationDays) {
+          // Fallback to simple calculation if duration is provided but no dates
+          const pricePerDay = (site.price || 0) / 30
+          calculatedTotalPrice = pricePerDay * durationDays
+        }
         lineItems.push({
           id: site.id,
           description: site.name,
@@ -430,6 +445,9 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        signature_position: data.signature_position || undefined,
+        items: data.items || undefined,
+        template: data.template || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -470,6 +488,9 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       endDate: safeToDate(data.endDate),
       durationDays: data.durationDays || null,
       validUntil: safeToDate(data.validUntil),
+      signature_position: data.signature_position || undefined,
+      items: data.items || undefined,
+      template: data.template || undefined,
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -579,6 +600,9 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        signature_position: data.signature_position || undefined,
+        items: data.items || undefined,
+        template: data.template || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -641,6 +665,9 @@ export async function getPaginatedCostEstimates(
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        signature_position: data.signature_position || undefined,
+        items: data.items || undefined,
+        template: data.template || undefined,
       } as CostEstimate
     })
 
@@ -699,6 +726,9 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        signature_position: data.signature_position || undefined,
+        items: data.items || undefined,
+        template: data.template || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -748,10 +778,10 @@ export async function getPaginatedCostEstimatesByCreatedBy(
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
 
@@ -787,8 +817,15 @@ export async function createMultipleCostEstimates(
       const lineItems: CostEstimateLineItem[] = []
 
       // Create line item for this specific site
-      const pricePerDay = site.price / 30
-      const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price
+      let calculatedTotalPrice = site.price || 0
+      if (options?.startDate && options?.endDate) {
+        // Use prorated calculation when dates are provided
+        calculatedTotalPrice = calculateProratedPrice(site.price || 0, options.startDate, options.endDate)
+      } else if (durationDays) {
+        // Fallback to simple calculation if duration is provided but no dates
+        const pricePerDay = (site.price || 0) / 30
+        calculatedTotalPrice = pricePerDay * durationDays
+      }
       lineItems.push({
         id: site.id,
         description: site.name,
@@ -881,6 +918,9 @@ export async function getCostEstimatesByPageId(pageId: string): Promise<CostEsti
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        signature_position: data.signature_position || undefined,
+        items: data.items || undefined,
+        template: data.template || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -917,10 +957,10 @@ export async function getCostEstimatesByClientId(clientId: string): Promise<Cost
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {

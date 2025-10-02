@@ -37,6 +37,7 @@ async function fetchCompanyData(companyId: string) {
     company_name: "Golden Touch Imaging Specialist",
     company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
     phone: "Telephone: (02) 5310 1750 to 53",
+    photo_url: null,
   }
 
   try {
@@ -50,6 +51,7 @@ async function fetchCompanyData(companyId: string) {
         company_name: data.company_name || data.name || fallbackData.company_name,
         company_location: data.company_location || data.address || fallbackData.company_location,
         phone: data.phone || data.telephone || data.contact_number || fallbackData.phone,
+        photo_url: data.photo_url || data.logo_url || null,
       }
     }
 
@@ -180,6 +182,14 @@ export async function generateSeparateCostEstimatePDFs(
       throw new Error("No sites selected for PDF generation")
     }
 
+    let companyData = null
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      if (companyId) {
+        companyData = await fetchCompanyData(companyId)
+      }
+    }
+
     // Generate separate PDF for each site
     for (let i = 0; i < sitesToProcess.length; i++) {
       const siteName = sitesToProcess[i]
@@ -199,8 +209,38 @@ export async function generateSeparateCostEstimatePDFs(
         costEstimateNumber: uniqueCENumber,
       }
 
-      // Generate PDF for this single site
-      await generateCostEstimatePDF(singleSiteCostEstimate, undefined, false, false, userData) // Pass userData to PDF generation
+      // Generate PDF for this single site using the API
+      const response = await fetch(`/api/generate-cost-estimate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          costEstimate: singleSiteCostEstimate,
+          companyData,
+          logoDataUrl: null,
+          format: 'pdf',
+          userData
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF for ${siteName}: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+
+      // Create blob URL and trigger download
+      const blob = new Blob([buffer], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const filename = `${uniqueCENumber}.pdf`
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
       // Add a small delay between downloads to ensure proper file naming
       if (i < sitesToProcess.length - 1) {
@@ -214,7 +254,7 @@ export async function generateSeparateCostEstimatePDFs(
 }
 
 /**
- * Generate a cost estimate PDF matching the exact format from the reference document
+ * Generate a cost estimate PDF using Puppeteer (similar to quotation PDF generation)
  */
 export async function generateCostEstimatePDF(
   costEstimate: CostEstimate,
@@ -224,354 +264,107 @@ export async function generateCostEstimatePDF(
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<string | jsPDF | void> {
   try {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 second timeout
+    // For now, we'll handle multiple sites by generating separate PDFs
+    if (selectedPages && selectedPages.length > 0) {
+      // Generate separate PDFs for selected pages
+      await generateSeparateCostEstimatePDFs(costEstimate, selectedPages, userData)
+      return
+    }
+
+    // Check if multiple sites - if so, generate separate PDFs
+    const groupLineItemsBySite = (lineItems: any[]) => {
+      const siteGroups: { [key: string]: any[] } = {}
+      lineItems.forEach((item) => {
+        if (item.category.includes("Billboard Rental")) {
+          const siteName = item.description
+          if (!siteGroups[siteName]) siteGroups[siteName] = []
+          siteGroups[siteName].push(item)
+          const siteId = item.id
+          const relatedItems = lineItems.filter(
+            (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+          )
+          siteGroups[siteName].push(...relatedItems)
+        }
+      })
+      if (Object.keys(siteGroups).length === 0) siteGroups["Single Site"] = lineItems
+      return siteGroups
+    }
+
+    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+    const sites = Object.keys(siteGroups)
+
+    if (sites.length > 1) {
+      await generateSeparateCostEstimatePDFs(costEstimate, undefined, userData)
+      return
+    }
+
+    // Single site - use Puppeteer API
+    let companyData = null
+    let logoDataUrl = null
+
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      if (companyId) {
+        companyData = await fetchCompanyData(companyId)
+
+        // Fetch company logo if available
+        if (companyData?.photo_url) {
+          try {
+            const logoResponse = await fetch(companyData.photo_url)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+            // Continue without logo if fetch fails
+          }
+        }
+      }
+    }
+
+    const response = await fetch(`/api/generate-cost-estimate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        costEstimate,
+        companyData,
+        logoDataUrl,
+        format: 'pdf',
+        userData
+      }),
     })
 
-    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, returnBase64, returnPDF, userData)
+    if (!response.ok) {
+      throw new Error(`Failed to generate PDF: ${response.statusText}`)
+    }
 
-    return await Promise.race([pdfGenerationPromise, timeoutPromise]) as string | jsPDF | void
+    
+
+
+      // Create blob URL and trigger download
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
   } catch (error) {
     console.error("Error generating PDF:", error)
     throw error
   }
 }
 
-async function generatePDFInternal(
-  costEstimate: CostEstimate,
-  selectedPages?: string[],
-  returnBase64 = false,
-  returnPDF = false,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
-): Promise<string | jsPDF | void> {
-  const pdf = new jsPDF("p", "mm", "a4")
-  const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
-  const margin = 15
-  const contentWidth = pageWidth - margin * 2
-  let yPosition = margin
-
-  // Convert dates safely
-  const createdAt = safeToDate(costEstimate.createdAt)
-  const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
-  const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
-
-  // Get site information from line items
-  const siteRentalItems = costEstimate.lineItems.filter(
-    (item) =>
-      item.category.includes("Billboard Rental") || item.category.includes("LED") || item.category.includes("Static"),
-  )
-
-  // Get the first site rental item for main details
-  const primarySite = siteRentalItems[0]
-  const siteName = primarySite?.description || costEstimate.title
-  const siteLocation = primarySite?.notes?.replace("Location: ", "") || siteName
-
-  // Calculate totals from actual line items
-  const subtotal = costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
-  const vatRate = 0.12
-  const vatAmount = subtotal * vatRate
-  const totalWithVat = subtotal + vatAmount
-
-  // Calculate monthly rate and duration from actual data
-  const exactDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
-  const primaryRentalItem = siteRentalItems[0]
-  // Use the actual unit price from the rental item, not calculated rate
-  const monthlyRate = primaryRentalItem ? primaryRentalItem.unitPrice : 0
-
-  const calculateDurationDisplay = (durationDays: number | null | undefined): string => {
-    if (!durationDays) return "1 month"
-    const months = Math.floor(durationDays / 30)
-    const days = durationDays % 30
-    if (months === 0) {
-      return days === 1 ? "1 day" : `${days} days`
-    } else if (days === 0) {
-      return months === 1 ? "1 month" : `${months} months`
-    } else {
-      const monthText = months === 1 ? "month" : "months"
-      const dayText = days === 1 ? "day" : "days"
-      return `${months} ${monthText} and ${days} ${dayText}`
-    }
-  }
-
-  const groupLineItemsBySite = (lineItems: any[]) => {
-    const siteGroups: { [key: string]: any[] } = {}
-
-    // Process each line item only once
-    const processedIds = new Set<string>()
-
-    lineItems.forEach((item) => {
-      if (processedIds.has(item.id)) return // Skip already processed items
-      processedIds.add(item.id)
-
-      if (item.category.includes("Billboard Rental")) {
-        const siteName = item.description
-        if (!siteGroups[siteName]) {
-          siteGroups[siteName] = []
-        }
-        siteGroups[siteName].push(item)
-
-        const siteId = item.id
-        const relatedItems = lineItems.filter(
-          (relatedItem) =>
-            relatedItem.id.includes(siteId) && relatedItem.id !== siteId && !processedIds.has(relatedItem.id),
-        )
-        relatedItems.forEach((relatedItem) => processedIds.add(relatedItem.id))
-        siteGroups[siteName].push(...relatedItems)
-      }
-    })
-
-    if (Object.keys(siteGroups).length === 0) {
-      siteGroups["Single Site"] = lineItems
-    }
-
-    return siteGroups
-  }
-
-  const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-  const sites = Object.keys(siteGroups)
-  const isMultipleSites = sites.length > 1
-
-  const sitesToProcess =
-    selectedPages && selectedPages.length > 0 ? sites.filter((site) => selectedPages.includes(site)) : sites
-
-  if (sitesToProcess.length === 0) {
-    throw new Error("No sites selected for PDF generation")
-  }
-
-  let companyData = null
-  if (userData?.company_id || costEstimate.company_id) {
-    const companyId = userData?.company_id || costEstimate.company_id
-    if (companyId) {
-      companyData = await fetchCompanyData(companyId)
-    }
-  }
-
-  for (let siteIndex = 0; siteIndex < sitesToProcess.length; siteIndex++) {
-    const siteName = sitesToProcess[siteIndex]
-
-    if (siteIndex > 0) {
-      pdf.addPage()
-      yPosition = margin
-    }
-
-    const siteLineItems = siteGroups[siteName] || []
-    const siteTotal = siteLineItems.reduce((sum, item) => sum + item.total, 0)
-
-    const originalSiteIndex = sites.indexOf(siteName)
-    const ceNumber = isMultipleSites
-      ? `${costEstimate.costEstimateNumber || costEstimate.id}-${String.fromCharCode(65 + originalSiteIndex)}`
-      : costEstimate.costEstimateNumber || costEstimate.id
-
-    pdf.setFontSize(16)
-    pdf.setFont("helvetica", "bold")
-    pdf.setTextColor(0, 0, 0)
-    const companyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
-    const companyNameWidth = pdf.getTextWidth(companyName)
-    const companyNameX = pageWidth / 2 - companyNameWidth / 2
-    pdf.text(companyName, companyNameX, yPosition)
-    yPosition += 15
-
-    // Client name and company (top left)
-    pdf.setFontSize(11)
-    pdf.setFont("helvetica", "bold")
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(costEstimate.client?.name || "Client Name", margin, yPosition)
-    yPosition += 5
-    pdf.setFont("helvetica", "normal")
-    pdf.text(costEstimate.client?.company || "Client Company", margin, yPosition)
-    yPosition += 10
-
-    // RFQ Number (top right)
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    const rfqText = `RFQ. No. ${ceNumber}`
-    const rfqTextWidth = pdf.getTextWidth(rfqText)
-    const rfqX = pageWidth - margin - rfqTextWidth
-    pdf.text(rfqText, rfqX, yPosition - 15)
-
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
-    const dateText = createdAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-    const dateTextWidth = pdf.getTextWidth(dateText)
-    const dateX = pageWidth - margin - dateTextWidth
-    pdf.text(dateText, dateX, yPosition - 10)
-
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.setTextColor(0, 0, 0)
-    const titleText = isMultipleSites
-      ? `Cost Estimate for ${siteName}`
-      : costEstimate.title ||
-        `Cost Estimate for ${costEstimate.client?.company || costEstimate.client?.name || "Client"}`
-    const titleWidth = pdf.getTextWidth(titleText)
-    const titleX = pageWidth / 2 - titleWidth / 2
-    pdf.text(titleText, titleX, yPosition)
-
-    // Add underline to title
-    pdf.setLineWidth(0.5)
-    pdf.line(titleX, yPosition + 2, titleX + titleWidth, yPosition + 2)
-    yPosition += 15
-
-    // Greeting message - positioned prominently at top
-    pdf.setFontSize(11)
-    pdf.setFont("helvetica", "normal")
-    const greetingLine1 = `Good Day! Thank you for considering ${companyName} for your business needs.`
-    const greetingLine2 = "We are pleased to submit our cost estimate for your requirements:"
-
-    // Calculate center position for each line
-    const centerX = pageWidth / 2
-    const line1Width = pdf.getTextWidth(greetingLine1)
-    const line2Width = pdf.getTextWidth(greetingLine2)
-
-    pdf.text(greetingLine1, centerX - line1Width / 2, yPosition)
-    yPosition += 5
-    pdf.text(greetingLine2, centerX - line2Width / 2, yPosition)
-    yPosition += 15
-
-    // "Details as follows:" section
-    pdf.setFontSize(11)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Details as follows:", margin, yPosition)
-    yPosition += 8
-
-    // Bullet points section with exact formatting
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-
-    // Extract size information from line items specs or use default
-    const height = siteLineItems[0]?.specs?.height
-    const width = siteLineItems[0]?.specs?.width
-    const sizeInfo = height && width ? `${height}ft (h) x ${width}ft (w)` : "100ft (H) x 60ft (W)"
-
-    const bulletPoints = [
-      { label: "Site Location", value: siteLocation },
-      { label: "Type", value: "Billboard" },
-      { label: "Size", value: sizeInfo },
-      { label: "Contract Duration", value: calculateDurationDisplay(costEstimate.durationDays) },
-      {
-        label: "Contract Period",
-        value: `${startDate ? startDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "June 15, 2025"} - ${endDate ? endDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "December 14, 2025"}`,
-      },
-      { label: "Proposal to", value: costEstimate?.client?.company || "Client Company" },
-      { label: "Illumination", value: `${siteLineItems[0]?.quantity || 10} units of 1000 watts metal Halide` },
-      { label: "Lease Rate/Month", value: "(Exclusive of VAT)" },
-      { label: "Total Lease", value: "(Exclusive of VAT)" },
-    ]
-
-    bulletPoints.forEach((point) => {
-      pdf.text("•", margin, yPosition)
-      pdf.setFont("helvetica", "bold")
-      pdf.text(`${point.label}:`, margin + 5, yPosition)
-      pdf.setFont("helvetica", "normal")
-
-      // Special handling for lease rate values
-      if (point.label === "Lease Rate/Month") {
-        pdf.text(
-          `PHP ${monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
-          margin + 65,
-          yPosition,
-        )
-      } else if (point.label === "Total Lease") {
-        pdf.text(
-          `PHP ${siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}     ${point.value}`,
-          margin + 65,
-          yPosition,
-        )
-      } else {
-        pdf.text(point.value, margin + 65, yPosition)
-      }
-      yPosition += 6
-    })
-
-    yPosition += 5
-
-    // Calculation breakdown section with exact formatting
-    pdf.setFontSize(10)
-    const siteRentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
-
-    const actualMonthlyRate = siteRentalItem ? siteRentalItem.unitPrice : 0
-    const actualDurationInMonths = costEstimate.durationDays ? costEstimate.durationDays / 30 : 1
-    const calculatedTotal = actualMonthlyRate * actualDurationInMonths
-    const formattedDuration = calculateDurationDisplay(costEstimate.durationDays)
-    const siteVatAmount = calculatedTotal * 0.12
-    const siteTotalWithVat = calculatedTotal + siteVatAmount
-
-    // Lease rate calculation - using actual monthly rate
-    pdf.text("Lease rate per month", margin + 5, yPosition)
-    pdf.text(
-      `PHP ${actualMonthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 6
-
-    pdf.text(`x ${formattedDuration}`, margin + 5, yPosition)
-    pdf.text(
-      `PHP ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 6
-
-    pdf.text("12 % VAT", margin + 5, yPosition)
-    pdf.text(
-      `PHP ${siteVatAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 8
-
-    // Total line
-    pdf.setFont("helvetica", "bold")
-    pdf.text("TOTAL", margin + 5, yPosition)
-    pdf.text(
-      `PHP ${siteTotalWithVat.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      pageWidth - margin - 40,
-      yPosition,
-    )
-    yPosition += 10
-
-    pdf.setFontSize(8)
-    pdf.setTextColor(100, 100, 100)
-
-    // Format company address and phone
-    const companyAddress = formatCompanyAddress(companyData)
-    const companyPhone = formatCompanyPhone(companyData)
-
-    // Create footer text with fallback to default values
-    const addressText = companyAddress || "No. 727 General Solano St., San Miguel, Manila 1005"
-    const footerText = addressText
-
-    // Calculate text width and center the footer
-    const footerTextWidth = pdf.getTextWidth(footerText)
-    const footerX = pageWidth / 2 - footerTextWidth / 2
-
-    pdf.text(footerText, footerX, pageHeight - 15)
-  }
-
-  // Return base64, PDF object, or download PDF
-  if (returnBase64) {
-    return pdf.output("datauristring").split(",")[1]
-  } else if (returnPDF) {
-    return pdf
-  } else {
-    const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
-    const sitesSuffix =
-      selectedPages && selectedPages.length > 0 && selectedPages.length < sites.length
-        ? `_selected-${selectedPages.length}-sites`
-        : sites.length > 1 && sitesToProcess.length === 1
-          ? `_${sitesToProcess[0].replace(/[^a-z0-9]/gi, "_").toLowerCase()}`
-          : sites.length > 1
-            ? `_all-${sites.length}-sites`
-            : ""
-    const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
-
-    console.log("[v0] Attempting to download PDF:", fileName)
-    pdf.save(fileName)
-    console.log("[v0] PDF download triggered successfully")
-  }
-}
 
 /**
  * Generate a detailed cost estimate PDF with line item breakdown
@@ -596,10 +389,29 @@ export async function generateDetailedCostEstimatePDF(
     const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
 
     let companyData = null
+    let logoDataUrl = null
+
     if (userData?.company_id || costEstimate.company_id) {
       const companyId = userData?.company_id || costEstimate.company_id
       if (companyId) {
         companyData = await fetchCompanyData(companyId)
+
+        // Fetch company logo if available
+        if (companyData?.photo_url) {
+          try {
+            const logoResponse = await fetch(companyData.photo_url)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+            // Continue without logo if fetch fails
+          }
+        }
       }
     }
 
@@ -608,7 +420,7 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    const companyName = companyData?.company_name || companyData?.name || "Golden Touch Imaging Specialist"
+    const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
     const companyNameWidth = pdf.getTextWidth(companyName)
     const companyNameX = pageWidth / 2 - companyNameWidth / 2
     pdf.text(companyName, companyNameX, yPosition)
@@ -829,16 +641,53 @@ export async function printCostEstimatePDF(
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
 ): Promise<void> {
   try {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("PDF generation timeout")), 15000) // 15 second timeout
+    let companyData = null
+    let logoDataUrl = null
+
+    if (userData?.company_id || costEstimate.company_id) {
+      const companyId = userData?.company_id || costEstimate.company_id
+      if (companyId) {
+        companyData = await fetchCompanyData(companyId)
+
+        // Fetch company logo if available
+        if (companyData?.photo_url) {
+          try {
+            const logoResponse = await fetch(companyData.photo_url)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+            // Continue without logo if fetch fails
+          }
+        }
+      }
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate-cost-estimate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        costEstimate,
+        companyData,
+        logoDataUrl,
+        format: 'pdf',
+        userData
+      }),
     })
 
-    const pdfGenerationPromise = generatePDFInternal(costEstimate, selectedPages, false, true, userData)
+    if (!response.ok) {
+      throw new Error(`Failed to generate PDF: ${response.statusText}`)
+    }
 
-    const pdf = await Promise.race([pdfGenerationPromise, timeoutPromise]) as jsPDF
-
-    // Generate blob and create URL for printing
-    const pdfBlob = pdf.output('blob')
+    const buffer = await response.arrayBuffer()
+    const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
     const pdfUrl = URL.createObjectURL(pdfBlob)
 
     // Open PDF in new window and trigger print

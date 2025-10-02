@@ -46,6 +46,8 @@ import {
   Linkedin,
   Check,
   Plus,
+  EyeIcon,
+  FilePen,
   Eye,
   Download,
   History,
@@ -58,6 +60,7 @@ import { SentHistoryDialog } from "@/components/sent-history-dialog"
 import { ComplianceDialog } from "@/components/compliance-dialog"
 import { bookingService } from "@/lib/booking-service"
 import { searchQuotations } from "@/lib/algolia-service"
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 export default function QuotationsListPage() {
   const router = useRouter()
@@ -225,6 +228,12 @@ export default function QuotationsListPage() {
       fetchQuotations(1, true)
     }
   }, [user?.uid])
+
+  useEffect(() => {
+    if (user && userData) {
+      fetchCompanyData()
+    }
+  }, [user, userData])
 
   useEffect(() => {
     const resetPagination = async () => {
@@ -645,6 +654,7 @@ export default function QuotationsListPage() {
       })
     }
   }
+  
 
   const handlePrintQuotation = async (quotationId: string) => {
     setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
@@ -656,12 +666,76 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
-      // Generate and download the PDF
-      await generateQuotationPDF(quotation)
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+
+
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
+      }
 
       toast({
         title: "Success",
-        description: "Quotation PDF generated and downloaded successfully",
+        description: "Quotation PDF opened for printing",
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
@@ -928,6 +1002,82 @@ export default function QuotationsListPage() {
   const handleQuotationRoute = (id: string) => {
     router.push(`/sales/quotations/${id}`)
   }
+  const fetchCompanyData = async () => {
+    if (!user?.uid || !userData) return
+
+    try {
+      let companyDoc = null
+      let companyDataResult = null
+
+      // First, try to find company by company_id if it exists in userData
+      if (userData?.company_id) {
+        try {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          const companyDocSnap = await getDoc(companyDocRef)
+
+          if (companyDocSnap.exists()) {
+            companyDoc = companyDocSnap
+            companyDataResult = companyDocSnap.data()
+          }
+        } catch (error) {
+          console.error("Error fetching company by company_id:", error)
+        }
+      }
+
+      // If no company found by company_id, try other methods
+      if (!companyDoc) {
+        // Try to find company by created_by field
+        let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+        let companiesSnapshot = await getDocs(companiesQuery)
+
+        // If no company found by created_by, try to find by email or other identifiers
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        // If still no company found, try to find by contact_person email
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        if (!companiesSnapshot.empty) {
+          companyDoc = companiesSnapshot.docs[0]
+          companyDataResult = companyDoc.data()
+        }
+      }
+
+      if (companyDoc && companyDataResult) {
+        const company: any = {
+          id: companyDoc.id,
+          name: companyDataResult.name,
+          company_location: companyDataResult.company_location || companyDataResult.address,
+          address: companyDataResult.address,
+          company_website: companyDataResult.company_website || companyDataResult.website,
+          photo_url: companyDataResult.photo_url,
+          contact_person: companyDataResult.contact_person,
+          email: companyDataResult.email,
+          phone: companyDataResult.phone,
+          social_media: companyDataResult.social_media || {},
+          created_by: companyDataResult.created_by,
+          created: companyDataResult.created?.toDate
+            ? companyDataResult.created.toDate()
+            : companyDataResult.created_at?.toDate(),
+          updated: companyDataResult.updated?.toDate
+            ? companyDataResult.updated.toDate()
+            : companyDataResult.updated_at?.toDate(),
+        }
+
+        setCompanyData(company)
+      } else {
+        setCompanyData(null)
+      }
+    } catch (error) {
+      console.error("Error fetching company data:", error)
+    }
+  }
+
   const handleProjectNameSubmit = async () => {
     if (!selectedQuotationForProject || !user?.uid || !userData?.company_id || !projectName.trim()) {
       toast({
@@ -1207,7 +1357,7 @@ export default function QuotationsListPage() {
                   const compliance = getProjectCompliance(quotation)
 
                   return (
-                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" onClick={(e) => router.push(`/sales/quotations/${quotation.id}`)}>
+                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">
                           {(() => {
@@ -1268,7 +1418,10 @@ export default function QuotationsListPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handlePrintQuotation(quotation.id)}
+                              onClick={(e) => {
+                                 e.stopPropagation()
+                                handlePrintQuotation(quotation.id)
+                              }}
                               disabled={generatingPDFs.has(quotation.id)}
                             >
                               {generatingPDFs.has(quotation.id) ? (
