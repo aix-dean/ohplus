@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Search, MoreVertical, Plus } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, Plus, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -18,11 +18,11 @@ export default function ServiceReportsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
-  const [activeTab, setActiveTab] = useState("From Logistics")
   const [showDrafts, setShowDrafts] = useState(false)
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleString())
 
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -33,8 +33,15 @@ export default function ServiceReportsPage() {
   }, [])
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date().toLocaleString())
+    }, 60000) // update every minute
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
     filterReports()
-  }, [reports, searchQuery, filterType, activeTab, showDrafts])
+  }, [reports, searchQuery, filterType, showDrafts])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -73,14 +80,6 @@ export default function ServiceReportsPage() {
       filtered = filtered.filter((report) => report.companyId === userData.company_id)
     }
 
-    // Filter by tab (department)
-    if (activeTab === "From Sales") {
-      filtered = filtered.filter((report) => report.category === "sales")
-    } else if (activeTab === "From Management") {
-      filtered = filtered.filter((report) => report.category === "management")
-    } else if (activeTab === "From Logistics") {
-      filtered = filtered.filter((report) => report.category === "logistics")
-    }
 
     // Filter by drafts
     if (showDrafts) {
@@ -102,7 +101,9 @@ export default function ServiceReportsPage() {
           report.siteName?.toLowerCase().includes(query) ||
           report.reportType?.toLowerCase().includes(query) ||
           report.createdByName?.toLowerCase().includes(query) ||
-          report.id?.toLowerCase().includes(query),
+          report.id?.toLowerCase().includes(query) ||
+          report.report_id?.toLowerCase().includes(query) ||
+          report.client?.toLowerCase().includes(query),
       )
     }
 
@@ -165,47 +166,28 @@ export default function ServiceReportsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Service Reports</h1>
-        </div>
-      </div>
 
-      {/* Filter Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex items-center gap-6">
-          {["From Sales", "From Management", "From Logistics"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+
+
+      {/* Reports Title */}
+      <div className="px-6 py-6">
+        <h2 className="text-2xl font-semibold text-gray-900">Reports</h2>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white px-6 py-4 border-b border-gray-200">
+      <div className="px-6 pb-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 flex-1">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search reports..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+              <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 py-2 flex items-center">
+                <Search className="h-4 w-4 text-gray-400 mr-2" />
+                <Input
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border-0 p-0 focus:ring-0 text-gray-400"
+                />
+              </div>
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger className="w-32">
@@ -231,33 +213,39 @@ export default function ServiceReportsPage() {
       </div>
 
       {/* Reports Table */}
-      <div className="bg-white mx-6 mt-6 rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white mx-6 rounded-t-lg border border-gray-200 overflow-hidden">
         <div>
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report #
+                  Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Report ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date of Report
+                  Campaign Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report Type
+                  Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reported By
+                  Sender
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
+                  Attachments
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2">Loading reports...</span>
@@ -266,45 +254,75 @@ export default function ServiceReportsPage() {
                 </tr>
               ) : filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>
               ) : (
-                filteredReports.map((report) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {generateReportNumber(report.id || "")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.siteName || "Unknown Site"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                      {formatDate(report.date || report.created)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getReportTypeDisplay(report.reportType)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.createdByName || "Unknown User"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-1">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>View Report</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>Edit Report</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
-                            Delete Report
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
+                filteredReports.map((report, index) => (
+                  <>
+                    <tr key={report.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(report.date || report.created)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {generateReportNumber(report.id || "")}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {report.siteName || "Unknown Site"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {report.client || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {getReportTypeDisplay(report.reportType)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        LOG- {report.createdByName || "Unknown User"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {report.attachments.length > 0 ? (
+                          <a
+                            href={report.attachments[0].fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            {report.attachments[0].fileName}
+                          </a>
+                        ) : (
+                          "N/A"
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-1">
+                              <div className="w-6 h-6 flex items-center justify-center">
+                                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
+                                <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
+                              </div>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>View Report</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>Edit Report</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
+                              Delete Report
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                    {index < filteredReports.length - 1 && (
+                      <tr>
+                        <td colSpan={8} className="p-0">
+                          <hr className="border-gray-200" />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))
               )}
             </tbody>
