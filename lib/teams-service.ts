@@ -18,10 +18,21 @@ const TEAMS_COLLECTION = "logistics_teams"
 const TEAM_MEMBERS_COLLECTION = "team_members"
 
 // Get all teams
-export async function getTeams(): Promise<Team[]> {
+export async function getTeams(companyId?: string): Promise<Team[]> {
   try {
     const teamsCollection = collection(db, TEAMS_COLLECTION)
-    const teamsQuery = query(teamsCollection, orderBy("createdAt", "desc"))
+    let teamsQuery
+
+    if (companyId) {
+      teamsQuery = query(
+        teamsCollection,
+        where("company_id", "==", companyId),
+        orderBy("createdAt", "desc")
+      )
+    } else {
+      teamsQuery = query(teamsCollection, orderBy("createdAt", "desc"))
+    }
+
     const snapshot = await getDocs(teamsQuery)
 
     const teams: Team[] = []
@@ -43,6 +54,7 @@ export async function getTeams(): Promise<Team[]> {
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
         createdBy: data.createdBy,
+        company_id: data.company_id,
       }
       teams.push(team)
     }
@@ -55,7 +67,7 @@ export async function getTeams(): Promise<Team[]> {
 }
 
 // Get team by ID
-export async function getTeamById(teamId: string): Promise<Team | null> {
+export async function getTeamById(teamId: string, companyId?: string): Promise<Team | null> {
   try {
     const teamDoc = doc(db, TEAMS_COLLECTION, teamId)
     const snapshot = await getDoc(teamDoc)
@@ -65,6 +77,12 @@ export async function getTeamById(teamId: string): Promise<Team | null> {
     }
 
     const data = snapshot.data()
+
+    // Verify company_id if provided
+    if (companyId && data.company_id !== companyId) {
+      return null
+    }
+
     const team: Team = {
       id: snapshot.id,
       name: data.name,
@@ -81,6 +99,7 @@ export async function getTeamById(teamId: string): Promise<Team | null> {
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
       createdBy: data.createdBy,
+      company_id: data.company_id,
     }
 
     return team
@@ -110,9 +129,18 @@ export async function createTeam(teamData: CreateTeamData, createdBy: string): P
 }
 
 // Update team
-export async function updateTeam(teamId: string, updates: Partial<CreateTeamData>): Promise<void> {
+export async function updateTeam(teamId: string, updates: Partial<CreateTeamData>, companyId?: string): Promise<void> {
   try {
     const teamDoc = doc(db, TEAMS_COLLECTION, teamId)
+
+    // First verify the team belongs to the company if companyId is provided
+    if (companyId) {
+      const teamSnapshot = await getDoc(teamDoc)
+      if (!teamSnapshot.exists() || teamSnapshot.data().company_id !== companyId) {
+        throw new Error("Team not found or access denied")
+      }
+    }
+
     await updateDoc(teamDoc, {
       ...updates,
       updatedAt: serverTimestamp(),
@@ -124,8 +152,18 @@ export async function updateTeam(teamId: string, updates: Partial<CreateTeamData
 }
 
 // Delete team
-export async function deleteTeam(teamId: string): Promise<void> {
+export async function deleteTeam(teamId: string, companyId?: string): Promise<void> {
   try {
+    const teamDoc = doc(db, TEAMS_COLLECTION, teamId)
+
+    // First verify the team belongs to the company if companyId is provided
+    if (companyId) {
+      const teamSnapshot = await getDoc(teamDoc)
+      if (!teamSnapshot.exists() || teamSnapshot.data().company_id !== companyId) {
+        throw new Error("Team not found or access denied")
+      }
+    }
+
     // Delete all team members first
     const membersQuery = query(collection(db, TEAM_MEMBERS_COLLECTION), where("teamId", "==", teamId))
     const membersSnapshot = await getDocs(membersQuery)
@@ -134,7 +172,6 @@ export async function deleteTeam(teamId: string): Promise<void> {
     await Promise.all(deletePromises)
 
     // Delete the team
-    const teamDoc = doc(db, TEAMS_COLLECTION, teamId)
     await deleteDoc(teamDoc)
   } catch (error) {
     console.error("Error deleting team:", error)
@@ -198,9 +235,18 @@ export async function removeTeamMember(memberId: string): Promise<void> {
 }
 
 // Update team status
-export async function updateTeamStatus(teamId: string, status: "active" | "inactive"): Promise<void> {
+export async function updateTeamStatus(teamId: string, status: "active" | "inactive", companyId?: string): Promise<void> {
   try {
     const teamDoc = doc(db, TEAMS_COLLECTION, teamId)
+
+    // First verify the team belongs to the company if companyId is provided
+    if (companyId) {
+      const teamSnapshot = await getDoc(teamDoc)
+      if (!teamSnapshot.exists() || teamSnapshot.data().company_id !== companyId) {
+        throw new Error("Team not found or access denied")
+      }
+    }
+
     await updateDoc(teamDoc, {
       status,
       updatedAt: serverTimestamp(),

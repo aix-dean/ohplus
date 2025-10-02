@@ -55,7 +55,7 @@ export default function TeamsPage() {
   const loadTeams = async () => {
     try {
       setLoading(true)
-      const teamsData = await getTeams()
+      const teamsData = await getTeams(userData?.company_id || undefined)
       setTeams(teamsData)
     } catch (error) {
       console.error("Error loading teams:", error)
@@ -117,7 +117,7 @@ export default function TeamsPage() {
 
     try {
       setFormLoading(true)
-      await updateTeam(editingTeam.id, data)
+      await updateTeam(editingTeam.id, data, userData?.company_id || undefined)
       toast.success("Team updated successfully")
       setIsFormDialogOpen(false)
       setEditingTeam(null)
@@ -135,7 +135,7 @@ export default function TeamsPage() {
 
     try {
       setDeleteLoading(true)
-      await deleteTeam(teamToDelete.id)
+      await deleteTeam(teamToDelete.id, userData?.company_id || undefined)
       toast.success("Team deleted successfully")
       setDeleteDialogOpen(false)
       setTeamToDelete(null)
@@ -151,7 +151,7 @@ export default function TeamsPage() {
   const handleStatusToggle = async (team: Team) => {
     try {
       const newStatus = team.status === "active" ? "inactive" : "active"
-      await updateTeamStatus(team.id, newStatus)
+      await updateTeamStatus(team.id, newStatus, userData?.company_id || undefined)
       toast.success(`Team ${newStatus === "active" ? "activated" : "deactivated"} successfully`)
       loadTeams()
     } catch (error) {
