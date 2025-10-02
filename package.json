@@ -74,9 +74,9 @@
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
-    "react-dropzone": "^14.3.8",
+    "react-dropzone": "latest",
     "react-hook-form": "latest",
-    "react-pdf": "^10.1.0",
+    "react-pdf": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "resend": "latest",
@@ -86,7 +86,8 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",
     "xlsx": "^0.18.5",
-    "zod": "latest"
+    "zod": "latest",
+    "puppeteer": "^22.0.0"
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.1",

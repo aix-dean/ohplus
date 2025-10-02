@@ -40,6 +40,7 @@ export interface ReportData {
     fileName: string
     fileType: string
     fileUrl: string
+    label?: string
   }>
   status: string
   createdBy: string
@@ -115,6 +116,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
           fileName: attachment.fileName || "Unknown file",
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
+          label: attachment.label,
         }
 
         console.log("Processed attachment:", processedAttachment)
@@ -204,6 +206,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
     // Clean the data to remove undefined values before saving
     const cleanedReportData = cleanReportData(finalReportData)
     console.log("Cleaned report data:", cleanedReportData)
+    console.log("Final attachments to be saved:", cleanedReportData.attachments)
 
     const docRef = await addDoc(collection(db, "reports"), cleanedReportData)
     console.log("Report created with ID:", docRef.id)
@@ -319,6 +322,7 @@ export async function updateReport(reportId: string, updateData: Partial<ReportD
           fileName: attachment.fileName || "Unknown file",
           fileType: attachment.fileType || "unknown",
           fileUrl: attachment.fileUrl,
+          label: attachment.label,
         }))
     }
 

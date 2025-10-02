@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Search, X, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -119,12 +119,12 @@ interface FormData {
   equipmentRequired: string;
   materialSpecs: string;
   crew: string;
-  illuminationNits: string;
   gondola: string;
   technology: string;
   sales: string;
   remarks: string;
   message: string;
+  campaignName?: string;
   startDate: Date | null;
   endDate: Date | null;
   alarmDate: Date | null;
@@ -277,13 +277,10 @@ export function ServiceAssignmentCard({
     // Auto-fill form fields with job order data
     handleInputChange("serviceType", jobOrder.joType || "");
     handleInputChange("remarks", jobOrder.remarks || "");
-    handleInputChange("message", jobOrder.message || "");
+    handleInputChange("campaignName", jobOrder.message || "");
 
     // Set materialSpecs from job order data
     handleInputChange("materialSpecs", jobOrder.materialSpec || "");
-
-    // Set illuminationNits from job order data
-    handleInputChange("illuminationNits", jobOrder.illumination || "");
 
     // Set dates if available and valid
     const requestedDate = parseDateSafely(jobOrder.dateRequested);
@@ -393,8 +390,8 @@ export function ServiceAssignmentCard({
                 <Input
                   id="campaignName"
                   placeholder="Enter campaign name"
-                  value={formData.message || ""}
-                  onChange={(e) => handleInputChange("message", e.target.value)}
+                  value={formData.campaignName || ""}
+                  onChange={(e) => handleInputChange("campaignName", e.target.value)}
                   className="flex-1"
                 />
               </div>
@@ -507,36 +504,43 @@ export function ServiceAssignmentCard({
               <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2">Attachment:</Label>
               <div className="flex-1">
                 {formData.serviceType === "Change Material" ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Old Material</Label>
-                      {selectedJobOrder?.siteImageUrl ? (
-                        <img
-                          src={selectedJobOrder.siteImageUrl}
-                          alt="Old Material"
-                          className="rounded-md h-32 w-full object-cover"
-                        />
-                      ) : (
-                        <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-full object-cover" />
-                      )}
+                      <div className="relative">
+                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                          <img
+                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                            alt="Old Material"
+                            className="rounded-md h-32 w-32 object-cover"
+                          />
+                        ) : (
+                          <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
+                        )}
+                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <ArrowRight className="h-8 w-8" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">New Material</Label>
-                      {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                        <img
-                          src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                          alt="New Material"
-                          className="rounded-md h-32 w-full object-cover"
-                        />
-                      ) : (
-                        <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-full object-cover" />
-                      )}
+                      <div className="relative">
+                        {(selectedJobOrder?.attachments as any)?.url ? (
+                          <img
+                            src={(selectedJobOrder?.attachments as any).url}
+                            alt="New Material"
+                            className="rounded-md h-32 w-32 object-cover"
+                          />
+                        ) : (
+                          <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
+                        )}
+                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  selectedJobOrder?.siteImageUrl ? (
+                  selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
                     <img
-                      src={selectedJobOrder.siteImageUrl}
+                      src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
                       alt="Site Image"
                       className="rounded-md h-32 w-32 object-cover"
                     />
@@ -583,17 +587,6 @@ export function ServiceAssignmentCard({
               </Select>
             </div>
 
-            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label className="w-32 flex-shrink-0">Illumination/Nits:</Label>
-                <Input
-                  placeholder="Enter illumination details"
-                  value={formData.illuminationNits}
-                  onChange={(e) => handleInputChange("illuminationNits", e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            )}
 
             {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">

@@ -16,8 +16,7 @@ import {
   Package,
   CircleCheck,
   Upload,
-  ArrowRight,
-  Printer
+  ArrowRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +44,7 @@ import { bookingService } from "@/lib/booking-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
 import type { Product } from "@/lib/firebase-service"
-import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
+import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById, createNotifications } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
@@ -145,10 +144,6 @@ export default function CreateJobOrderPage() {
   // Form data for each product
   const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
 
-  // Success dialog states
-  const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
-  const [createdJoIds, setCreatedJoIds] = useState<string[]>([])
-
 
   // Coming soon dialog state
   const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
@@ -218,6 +213,7 @@ export default function CreateJobOrderPage() {
         vat,
         total,
         monthlyRate: monthlyRate,
+        siteCode: products[0]?.site_code || "N/A", // Get from product
         productName: products[0]?.name || "N/A", // Get from product
       },
     ]
@@ -857,8 +853,32 @@ export default function CreateJobOrderPage() {
           user.uid,
           status,
         )
-        setCreatedJoIds(joIds)
-        setShowJobOrderSuccessDialog(true)
+
+        // Create notifications for all departments
+        if (userData?.company_id) {
+          const departments = ["Logistics", "Sales", "Admin", "Finance", "Treasury", "Accounting"]
+          const navigateTo = `/logistics/job-orders/${joIds[0]}`
+
+          const notifications = departments.map((dept) => ({
+            company_id: userData.company_id!,
+            department_from: "Sales",
+            department_to: dept,
+            description: "A new job order has been created and requires your attention.",
+            navigate_to: navigateTo,
+            title: "New Job Order Created",
+            type: "job_order_created",
+            uid_to: null,
+          }))
+
+          try {
+            await createNotifications(notifications)
+          } catch (notificationError: any) {
+            console.error("Error creating notifications:", notificationError)
+            // Don't throw here - we don't want notification failure to break job order creation
+          }
+        }
+
+        router.push(`/sales/job-orders?success=true&joIds=${joIds.join(',')}`)
       } catch (error: any) {
         console.error("Error creating job orders:", error)
         toast({
@@ -1040,10 +1060,6 @@ export default function CreateJobOrderPage() {
     toast,
   ])
 
-  const handleDismissAndNavigate = useCallback(() => {
-    setShowJobOrderSuccessDialog(false)
-    router.push("/sales/job-orders")
-  }, [router])
 
   const handleCreateJobOrders = useCallback(
     async (status: JobOrderStatus) => {
@@ -1286,7 +1302,7 @@ export default function CreateJobOrderPage() {
               >
                 {quotation.quotation_number}
               </a>
-              <p className="text-xs text-gray-600">Project Name: {quotation.items.name}</p>
+              <p className="text-xs text-gray-600">Project ID: {quotation.id}</p>
             </div>
             <div className="space-y-0.5 mt-3">
               <div>
@@ -1321,6 +1337,7 @@ export default function CreateJobOrderPage() {
                         className="rounded-md object-cover"
                       />
                       <div className="flex-1">
+                        <p className="font-semibold text-sm">{productTotal.siteCode}</p>
                         <p className="text-xs text-gray-600">{productTotal.productName}</p>
                       </div>
                     </div>
@@ -2224,15 +2241,6 @@ export default function CreateJobOrderPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-2 pt-4 justify-end">
-              {/* <Button
-                variant="outline"
-                onClick={handlePrint}
-                disabled={isSubmitting}
-                className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                Print
-              </Button> */}
               <Button
                 variant="outline"
                 onClick={() => handleCreateJobOrders("draft")}
@@ -2256,13 +2264,6 @@ export default function CreateJobOrderPage() {
       </div>
 
 
-      {/* Success Dialog */}
-      <JobOrderCreatedSuccessDialog
-        isOpen={showJobOrderSuccessDialog}
-        onClose={handleDismissAndNavigate}
-        joIds={createdJoIds}
-        isMultiple={false}
-      />
 
       {/* Coming Soon Dialog */}
       <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />

@@ -105,7 +105,6 @@ interface FormData {
   equipmentRequired: string;
   materialSpecs: string;
   crew: string;
-  illuminationNits: string;
   gondola: string;
   technology: string;
   sales: string;

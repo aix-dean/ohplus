@@ -26,6 +26,7 @@ import {
   getDoc,
   updateDoc,
 } from "firebase/firestore"
+import { generatePersonalizedJONumber } from "@/lib/job-order-service"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -81,12 +82,12 @@ export default function CreateServiceAssignmentPage() {
     equipmentRequired: "",
     materialSpecs: "",
     crew: "",
-    illuminationNits: "",
     gondola: "",
     technology: "",
     sales: "",
     remarks: "",
     message: "",
+    campaignName: "",
     startDate: null as Date | null,
     endDate: null as Date | null,
     alarmDate: null as Date | null,
@@ -183,7 +184,7 @@ export default function CreateServiceAssignmentPage() {
     const fetchTeams = async () => {
       try {
         setLoadingTeams(true)
-        const teamsData = await teamsService.getAllTeams()
+        const teamsData = await teamsService.getAllTeams(userData?.company_id ?? undefined)
         // Filter only active teams
         const activeTeams = teamsData.filter((team) => team.status === "active")
         setTeams(activeTeams)
@@ -195,7 +196,7 @@ export default function CreateServiceAssignmentPage() {
     }
 
     fetchTeams()
-  }, [])
+  }, [userData?.company_id])
 
   // Load draft data if editing
   useEffect(() => {
@@ -220,12 +221,12 @@ export default function CreateServiceAssignmentPage() {
               equipmentRequired: draftData.equipmentRequired || "",
               materialSpecs: draftData.materialSpecs || "",
               crew: draftData.crew || draftData.assignedTo || "",
-              illuminationNits: draftData.illuminationNits || "",
               gondola: draftData.gondola || "",
               technology: draftData.technology || "",
               sales: draftData.sales || "",
               remarks: draftData.remarks || "",
               message: draftData.message || "",
+              campaignName: draftData.campaignName || "",
               startDate: draftData.coveredDateStart?.toDate() || null,
               endDate: draftData.coveredDateEnd?.toDate() || null,
               alarmDate: draftData.alarmDate?.toDate() || null,
@@ -268,6 +269,12 @@ export default function CreateServiceAssignmentPage() {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
 
+            // Debug logging to understand the job order structure
+            console.log("Fetched job order data:", fetchedJobOrder)
+            console.log("Available fields:", Object.keys(fetchedJobOrder))
+            console.log("joType value:", fetchedJobOrder.joType)
+            console.log("jobDescription value:", fetchedJobOrder.jobDescription)
+
             // Set the project site from the job order's product_id
             const productId = fetchedJobOrder.product_id || ""
             if (productId) {
@@ -307,9 +314,9 @@ export default function CreateServiceAssignmentPage() {
               setFormData((prev) => ({
                 ...prev,
                 projectSite: productId,
-                serviceType: fetchedJobOrder.joType || "",
-                remarks: fetchedJobOrder.remarks || "",
-                message: fetchedJobOrder.message || "",
+                serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+                remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
+                campaignName: fetchedJobOrder.campaignName || "",
                 startDate: parseDateSafely(fetchedJobOrder.dateRequested),
                 endDate: parseDateSafely(fetchedJobOrder.deadline),
                 // You might want to pre-fill other fields like assignedTo, crew, etc.
@@ -406,7 +413,6 @@ export default function CreateServiceAssignmentPage() {
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
         crew: formData.crew,
-        illuminationNits: formData.illuminationNits,
         gondola: formData.gondola,
         technology: formData.technology,
         sales: formData.sales,
@@ -419,6 +425,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        campaignName: formData.campaignName,
         joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
@@ -486,9 +493,60 @@ export default function CreateServiceAssignmentPage() {
         // Don't throw here - we don't want notification failure to break assignment creation
       }
 
-      // Show success dialog
-      setCreatedSaNumber(saNumber)
-      setShowSuccessDialog(true)
+      // Create or update job order with campaign name
+      try {
+        if (formData.campaignName) {
+          if (jobOrderData?.id) {
+            // Update existing job order with campaign name
+            const jobOrderRef = doc(db, "job_orders", jobOrderData.id)
+            await updateDoc(jobOrderRef, {
+              campaignName: formData.campaignName,
+              updatedAt: serverTimestamp(),
+            })
+            console.log("Updated job order with campaign name:", jobOrderData.id)
+          } else {
+            // Create new job order with campaign name
+            const newJobOrderData = {
+              joNumber: await generatePersonalizedJONumber(userData),
+              siteName: selectedProduct?.name || "",
+              siteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+              joType: formData.serviceType,
+              requestedBy: userData?.first_name || "Auto-Generated",
+              assignTo: formData.assignedTo || formData.crew,
+              dateRequested: formData.startDate?.toISOString() || new Date().toISOString(),
+              deadline: formData.endDate?.toISOString() || new Date().toISOString(),
+              jobDescription: formData.remarks,
+              campaignName: formData.campaignName,
+              message: formData.campaignName, // Keep for backward compatibility
+              company_id: userData?.company_id || "",
+              created_by: user.uid,
+              status: "pending" as const,
+              quotation_id: "",
+            }
+
+            const newJobOrderRef = await addDoc(collection(db, "job_orders"), {
+              ...newJobOrderData,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            })
+
+            // Update the service assignment with the new job order ID
+            await updateDoc(assignmentDocRef, {
+              jobOrderId: newJobOrderRef.id,
+            })
+
+            console.log("Created new job order with campaign name:", newJobOrderRef.id)
+          }
+        }
+      } catch (jobOrderError) {
+        console.error("Error creating/updating job order:", jobOrderError)
+        // Don't throw here - we don't want job order operations to break assignment creation
+      }
+
+      // Set session storage and navigate to assignments
+      sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
+      sessionStorage.setItem('lastCreatedServiceAssignmentSaNumber', saNumber)
+      router.push('/logistics/assignments')
     } catch (error) {
       console.error("Error creating service assignment:", error)
     } finally {
@@ -518,7 +576,6 @@ export default function CreateServiceAssignmentPage() {
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
         crew: formData.crew,
-        illuminationNits: formData.illuminationNits,
         gondola: formData.gondola,
         technology: formData.technology,
         sales: formData.sales,
@@ -531,6 +588,7 @@ export default function CreateServiceAssignmentPage() {
           department: "LOGISTICS",
         },
         message: formData.message,
+        campaignName: formData.campaignName,
         joNumber: jobOrderData?.joNumber || null, // Add job order number if present
         coveredDateStart: formData.startDate,
         coveredDateEnd: formData.endDate,
@@ -635,12 +693,12 @@ export default function CreateServiceAssignmentPage() {
       equipmentRequired: "",
       materialSpecs: "",
       crew: "",
-      illuminationNits: "",
       gondola: "",
       technology: "",
       sales: "",
       remarks: "",
       message: "",
+      campaignName: "",
       startDate: null,
       endDate: null,
       alarmDate: null,
@@ -681,7 +739,6 @@ export default function CreateServiceAssignmentPage() {
          equipmentRequired: formData.equipmentRequired,
          materialSpecs: formData.materialSpecs,
          crew: formData.crew,
-         illuminationNits: formData.illuminationNits,
          gondola: formData.gondola,
          technology: formData.technology,
          sales: formData.sales,
@@ -768,6 +825,7 @@ export default function CreateServiceAssignmentPage() {
       serviceType: "",
       remarks: "",
       message: "",
+      campaignName: "",
       materialSpecs: "",
       illuminationNits: "",
       startDate: null,

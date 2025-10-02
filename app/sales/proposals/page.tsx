@@ -16,28 +16,20 @@ import {
   FileText,
   Eye,
   Download,
-  Calendar,
-  Building2,
   Plus,
   Search,
-  Filter,
   Clock,
   CheckCircle,
   XCircle,
   Send,
-  Calculator,
   Printer,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Pagination } from "@/components/ui/pagination"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -55,8 +47,154 @@ function ProposalsPageContent() {
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("proposals")
-  const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set())
+  const [isSearching, setIsSearching] = useState(false)
+
+  let content;
+  if (loading) {
+    content = (
+      <Card className="bg-white overflow-hidden rounded-t-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b border-gray-200">
+              <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Proposal ID</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i} className="border-b border-gray-200">
+                <TableCell className="py-3">
+                  <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell className="py-3">
+                  <Skeleton className="h-5 w-20" />
+                </TableCell>
+                <TableCell className="py-3">
+                  <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell className="py-3">
+                  <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell className="py-3">
+                  <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell className="text-right py-3">
+                  <Skeleton className="h-8 w-8 ml-auto" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    )
+  } else if (filteredProposals.length === 0) {
+    content = (
+      <Card className="bg-white rounded-xl">
+        <CardContent className="text-center py-12">
+          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <FileText className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {searchTerm ? "No proposals found" : "No proposals yet"}
+          </h3>
+          <p className="text-gray-600 mb-6">
+            {searchTerm
+              ? "Try adjusting your search criteria"
+              : "Create your first proposal to get started"}
+          </p>
+          {!searchTerm && (
+            <Button
+              onClick={() => router.push("/sales/proposals/create")}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Proposal
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    )
+  } else {
+    content = (
+      <Card className="bg-white overflow-hidden rounded-t-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b border-gray-200">
+              <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Proposal ID</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+              <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredProposals.map((proposal) => (
+              <TableRow
+                key={proposal.id}
+                className="cursor-pointer border-b border-gray-200"
+                onClick={() => handleViewProposal(proposal.id)}
+              >
+                <TableCell className="py-3">
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
+                        return "N/A"
+                      }
+                      return format(proposal.createdAt, "MMM d, yyyy")
+                    })()}
+                  </div>
+                </TableCell>
+                <TableCell className="py-3">
+                  <div className="font-medium text-gray-900">{proposal.id.slice(0, 8)}...</div>
+                </TableCell>
+                <TableCell className="py-3">
+                  <div className="font-medium text-gray-900">{proposal.client.company}</div>
+                </TableCell>
+                <TableCell className="py-3">
+                  <div className="text-sm text-gray-600">{proposal.client.contactPerson}</div>
+                </TableCell>
+                <TableCell className="py-3">
+                  <div className="text-sm text-gray-600">{proposal.products?.[0]?.name || "—"}</div>
+                </TableCell>
+                <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    )
+  }
 
   useEffect(() => {
     if (user?.uid) {
@@ -188,194 +326,61 @@ function ProposalsPageContent() {
 
   return (
     <>
-      <div className="bg-white rounded-tl-[10px] rounded-tr-[10px] p-8 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Proposals</h1>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+        <div className="mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Proposals</h1>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 opacity-30" />
+                <Input
+                  placeholder="Search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-96 border-gray-300 rounded-full"
+                />
+              </div>
+            </div>
             <Button
               onClick={() => router.push("/sales/dashboard?action=create-proposal")}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
             >
-              <Plus className="mr-2 h-4 w-4" />
               Create Proposal
             </Button>
           </div>
+        </div>
 
-          <div className="mb-6">
-            <div className="relative w-96">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search proposals or clients..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-              />
+        {content}
+
+        {/* Pagination Controls */}
+        {!loading && filteredProposals.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-xl">
+            <div className="text-sm text-gray-600">
+              Page {currentPage}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1 || loading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={!hasMore || loading}
+              >
+                Next
+              </Button>
             </div>
           </div>
-
-          {loading ? (
-            <div>
-              <div className="grid grid-cols-6 gap-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900 mb-4">
-                <div>Date</div>
-                <div>Proposal ID</div>
-                <div>Company</div>
-                <div>Contact Person</div>
-                <div>Sites</div>
-                <div className="text-right">Actions</div>
-              </div>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-6 gap-4 py-4 border-b border-gray-100">
-                  <Skeleton className="h-5" />
-                  <Skeleton className="h-5" />
-                  <Skeleton className="h-5" />
-                  <Skeleton className="h-5" />
-                  <Skeleton className="h-5" />
-                  <Skeleton className="h-8 w-8 ml-auto" />
-                </div>
-              ))}
-            </div>
-          ) : filteredProposals.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm ? "No proposals found" : "No proposals yet"}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm
-                  ? "Try adjusting your search criteria"
-                  : "Create your first proposal to get started"}
-              </p>
-              {!searchTerm && (
-                <Button
-                  onClick={() => router.push("/sales/proposals/create")}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Proposal
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div className="grid grid-cols-6 gap-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900 mb-4">
-                <div>Date</div>
-                <div>Proposal ID</div>
-                <div>Company</div>
-                <div>Contact Person</div>
-                <div>Sites</div>
-                <div className="text-right">Actions</div>
-              </div>
-              {filteredProposals.map((proposal) => {
-                return (
-                  <>
-                    <div
-                      key={proposal.id}
-                      className="grid grid-cols-6 gap-4 py-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                      onClick={() => handleViewProposal(proposal.id)}
-                    >
-                      <div className="text-sm text-gray-600">
-                        {(() => {
-                          if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
-                            return "N/A"
-                          }
-                          return format(proposal.createdAt, "MMM d, yyyy")
-                        })()}
-                      </div>
-                      <div className="text-sm text-gray-900">{proposal.id.slice(0, 8)}...</div>
-                      <div className="text-sm text-gray-900">{proposal.client.company}</div>
-                      <div className="text-sm text-gray-900">{proposal.client.contactPerson}</div>
-                      <div className="flex flex-col">
-                        <button
-                          className="flex items-center gap-1 text-sm text-gray-900 hover:text-blue-600"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setExpandedProposals(prev => {
-                              const newSet = new Set(prev)
-                              if (newSet.has(proposal.id)) {
-                                newSet.delete(proposal.id)
-                              } else {
-                                newSet.add(proposal.id)
-                              }
-                              return newSet
-                            })
-                          }}
-                        >
-                          {proposal.products.length}
-                          {expandedProposals.has(proposal.id) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </button>
-                        {expandedProposals.has(proposal.id) && (
-                          <div className="mt-2 space-y-1">
-                            {proposal.products.map((product, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center gap-2 text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                style={{
-                                  animationDelay: `${i * 50}ms`,
-                                  animationDuration: "200ms",
-                                }}
-                              >
-                                <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                  <CheckCircle className="w-2 h-2 text-white" />
-                                </div>
-                                <span className="text-gray-700">{product.name || "No Product Name" || `Site ${i + 1}`}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
-                              <Printer className="mr-2 h-4 w-4" />
-                              Print
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {!loading && filteredProposals.length > 0 && (
-            <div className="mt-6">
-              <Pagination
-                currentPage={currentPage}
-                itemsPerPage={itemsPerPage}
-                totalItems={filteredProposals.length}
-                onNextPage={handleNextPage}
-                onPreviousPage={handlePreviousPage}
-                hasMore={hasMore}
-              />
-            </div>
-          )}
+        )}
         </div>
+      </div>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="max-w-sm mx-auto text-center border-0 shadow-lg">
