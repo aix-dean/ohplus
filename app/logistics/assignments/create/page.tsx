@@ -184,7 +184,7 @@ export default function CreateServiceAssignmentPage() {
     const fetchTeams = async () => {
       try {
         setLoadingTeams(true)
-        const teamsData = await teamsService.getAllTeams()
+        const teamsData = await teamsService.getAllTeams(userData?.company_id ?? undefined)
         // Filter only active teams
         const activeTeams = teamsData.filter((team) => team.status === "active")
         setTeams(activeTeams)
@@ -196,7 +196,7 @@ export default function CreateServiceAssignmentPage() {
     }
 
     fetchTeams()
-  }, [])
+  }, [userData?.company_id])
 
   // Load draft data if editing
   useEffect(() => {
