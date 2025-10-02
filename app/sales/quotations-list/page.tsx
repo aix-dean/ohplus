@@ -440,30 +440,6 @@ export default function QuotationsListPage() {
         throw new Error("File size must be less than 10MB")
       }
 
-      // Special handling for signed contract - don't upload yet, show dialog first
-      if (complianceType === "signedContract") {
-        // For signed contract, store the file locally and show dialog
-        // Don't upload to Firebase Storage yet
-        const quotationRef = doc(db, "quotations", quotationId)
-        const currentQuotationDoc = await getDoc(quotationRef)
-        if (!currentQuotationDoc.exists()) {
-          throw new Error("Quotation not found")
-        }
-        const currentQuotationData = { id: quotationId, ...currentQuotationDoc.data() }
-
-        console.log("[DEBUG] Preparing signed contract upload for quotation:", quotationId)
-        console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
-
-        // Show project name dialog with the file stored temporarily
-        setSelectedQuotationForProject({
-          ...currentQuotationData,
-          tempFile: file, // Store the file locally
-          tempComplianceType: complianceType
-        })
-        setProjectName("")
-        setProjectNameDialogOpen(true)
-        return // Exit early, don't continue with normal upload flow
-      }
 
       // Normal upload flow for other compliance types
       // Create storage reference
@@ -515,6 +491,25 @@ export default function QuotationsListPage() {
 
       // Refresh quotations list
       await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        const updatedQuotation = quotations.find(q => q.id === quotationId) || selectedQuotationForCompliance
+        setSelectedQuotationForCompliance({
+          ...updatedQuotation,
+          projectCompliance: {
+            ...updatedQuotation.projectCompliance,
+            [complianceType]: {
+              ...updatedQuotation.projectCompliance?.[complianceType],
+              status: "completed",
+              fileUrl: downloadURL,
+              fileName: file.name,
+              uploadedAt: serverTimestamp(),
+              uploadedBy: user?.uid,
+            }
+          }
+        })
+      }
 
       toast({
         title: "Success",
@@ -1018,6 +1013,88 @@ export default function QuotationsListPage() {
     setShowSentHistoryDialog(true)
   }
 
+  const handleAcceptCompliance = async (quotationId: string, complianceType: string) => {
+    try {
+      const quotationRef = doc(db, "quotations", quotationId)
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.completed`]: true,
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} accepted successfully`,
+      })
+
+      // Refresh quotations list
+      await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        setSelectedQuotationForCompliance({
+          ...selectedQuotationForCompliance,
+          projectCompliance: {
+            ...selectedQuotationForCompliance.projectCompliance,
+            [complianceType]: {
+              ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              completed: true,
+            }
+          }
+        })
+      }
+    } catch (error: any) {
+      console.error("Error accepting compliance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to accept compliance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeclineCompliance = async (quotationId: string, complianceType: string) => {
+    try {
+      const quotationRef = doc(db, "quotations", quotationId)
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.completed`]: false,
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} declined successfully`,
+      })
+
+      // Refresh quotations list
+      await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        setSelectedQuotationForCompliance({
+          ...selectedQuotationForCompliance,
+          projectCompliance: {
+            ...selectedQuotationForCompliance.projectCompliance,
+            [complianceType]: {
+              ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              completed: false,
+            }
+          }
+        })
+      }
+    } catch (error: any) {
+      console.error("Error declining compliance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to decline compliance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleViewCompliance = (quotation: any) => {
     setSelectedQuotationForCompliance(quotation)
     setShowComplianceDialog(true)
@@ -1471,6 +1548,8 @@ export default function QuotationsListPage() {
         quotation={selectedQuotationForCompliance}
         onFileUpload={handleFileUpload}
         uploadingFiles={uploadingFiles}
+        onAccept={handleAcceptCompliance}
+        onDecline={handleDeclineCompliance}
       />
     </div>
   )

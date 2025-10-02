@@ -3,12 +3,13 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { X, Upload, CheckCircle } from "lucide-react"
 
 interface ComplianceItem {
   key: string
   name: string
-  status: "completed" | "upload" | "confirmation"
+  status: "accepted" | "declined" | "uploaded" | "confirmation"
   file?: string
   fileUrl?: string
   note?: string
@@ -20,6 +21,8 @@ interface ComplianceDialogProps {
   quotation: any
   onFileUpload: (quotationId: string, complianceType: string, file: File) => void
   uploadingFiles: Set<string>
+  onAccept?: (quotationId: string, complianceType: string) => void
+  onDecline?: (quotationId: string, complianceType: string) => void
 }
 
 export function ComplianceDialog({
@@ -27,36 +30,44 @@ export function ComplianceDialog({
   onOpenChange,
   quotation,
   onFileUpload,
-  uploadingFiles
+  uploadingFiles,
+  onAccept = () => {},
+  onDecline = () => {}
 }: ComplianceDialogProps) {
+  const [fileViewerOpen, setFileViewerOpen] = useState(false)
+  const [selectedFileUrl, setSelectedFileUrl] = useState<string>("")
+  const [selectedItemKey, setSelectedItemKey] = useState<string>("")
+  const [acceptedItems, setAcceptedItems] = useState<Set<string>>(new Set())
+  const [declinedItems, setDeclinedItems] = useState<Set<string>>(new Set())
+
   const compliance = quotation?.projectCompliance || {}
 
   const toReserveItems: ComplianceItem[] = [
     {
       key: "signedContract",
       name: "Signed Contract",
-      status: compliance.signedContract?.fileUrl ? "completed" : "upload",
+      status: acceptedItems.has("signedContract") ? "accepted" : declinedItems.has("signedContract") ? "declined" : compliance.signedContract?.status === "accepted" ? "accepted" : compliance.signedContract?.status === "declined" ? "declined" : compliance.signedContract?.fileUrl ? "uploaded" : "uploaded",
       file: compliance.signedContract?.fileName,
       fileUrl: compliance.signedContract?.fileUrl,
     },
     {
       key: "paymentAsDeposit",
       name: "Payment as Deposit",
-      status: compliance.paymentAsDeposit?.fileUrl ? "completed" : "confirmation",
+      status: acceptedItems.has("paymentAsDeposit") ? "accepted" : declinedItems.has("paymentAsDeposit") ? "declined" : compliance.paymentAsDeposit?.status === "accepted" ? "accepted" : compliance.paymentAsDeposit?.status === "declined" ? "declined" : compliance.paymentAsDeposit?.fileUrl ? "uploaded" : "confirmation",
       file: compliance.paymentAsDeposit?.fileName,
       fileUrl: compliance.paymentAsDeposit?.fileUrl,
     },
     {
       key: "irrevocablePo",
       name: "Irrevocable PO/MO",
-      status: compliance.irrevocablePo?.fileUrl ? "completed" : "upload",
+      status: acceptedItems.has("irrevocablePo") ? "accepted" : declinedItems.has("irrevocablePo") ? "declined" : compliance.irrevocablePo?.status === "accepted" ? "accepted" : compliance.irrevocablePo?.status === "declined" ? "declined" : compliance.irrevocablePo?.fileUrl ? "uploaded" : "uploaded",
       file: compliance.irrevocablePo?.fileName,
       fileUrl: compliance.irrevocablePo?.fileUrl,
     },
   ]
 
   const allItems = toReserveItems
-  const completed = allItems.filter((item) => item.status === "completed").length
+  const completed = allItems.filter((item) => item.status === "accepted").length
   const total = allItems.length
 
   const handleFileUpload = (complianceType: string) => {
@@ -77,6 +88,12 @@ export function ComplianceDialog({
       return <CheckCircle className="w-5 h-5 text-green-500" />
     }
     return <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+  }
+
+  const handleViewFile = (fileUrl: string, itemKey: string) => {
+    setSelectedFileUrl(fileUrl)
+    setSelectedItemKey(itemKey)
+    setFileViewerOpen(true)
   }
 
   return (
@@ -104,7 +121,7 @@ export function ComplianceDialog({
 
         <div className="px-4">
           {/* Header */}
-          <div className="grid grid-cols-[120px_140px_80px] gap-2 mb-2">
+          <div className="grid grid-cols-[120px_1fr_80px] gap-2 mb-2">
             <div className="text-[12px] font-bold text-[#333333]">Document</div>
             <div className="text-[12px] font-bold text-[#333333] text-center">File</div>
             <div className="text-[12px] font-bold text-[#333333] text-center">Action</div>
@@ -117,20 +134,19 @@ export function ComplianceDialog({
           <div className="mb-4">
             {toReserveItems.map((item, index) => (
               <div key={item.key} className="mb-2">
-                <div className="grid grid-cols-[120px_140px_80px] gap-2 items-center">
+                <div className="grid grid-cols-[120px_1fr_80px] gap-2 items-center">
                   <div className="flex items-center gap-2">
                     <span className="text-[12px] text-[#333333]">{item.name}</span>
                   </div>
                   <div className="text-center">
                     {item.file ? (
-                      <a
-                        href={item.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] text-[#2d3fff] underline cursor-pointer"
+                      <span
+                        className="text-[12px] text-[#2d3fff] cursor-pointer flex items-center justify-center gap-1"
+                        onClick={() => item.fileUrl && handleViewFile(item.fileUrl, item.key)}
                       >
                         {item.file}
-                      </a>
+                        <img src={item.status === "accepted" ? "/approve_sign.png" : "/exclamation_sign.png"} alt={item.status === "accepted" ? "approved" : "warning"} className="w-4 h-4" />
+                      </span>
                     ) : (
                       <span className="text-[12px] text-[#333333]">-</span>
                     )}
@@ -172,6 +188,81 @@ export function ComplianceDialog({
           </Button>
         </div>
       </DialogContent>
+
+      {/* File Viewer Dialog */}
+      <Dialog open={fileViewerOpen} onOpenChange={setFileViewerOpen}>
+        <DialogContent className="w-[95vw] max-w-6xl h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between p-4 pb-0 shrink-0">
+            <DialogTitle>File Viewer</DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFileViewerOpen(false)}
+              className="h-6 w-6 text-[#333333] hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+
+          {/* PDF Viewer */}
+          <div className="flex-1 min-h-0 overflow-hidden px-4 pb-4">
+            <PDFViewer
+              fileUrl={selectedFileUrl}
+              className="w-full h-full rounded-lg border"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row sm:justify-between items-center p-4 pt-0 shrink-0 gap-4 sm:gap-0">
+            <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+              <p className="mb-0">
+                <span className="font-bold">Sent from:</span> GTS Kiosk
+              </p>
+              <p className="mb-0">
+                <span className="font-bold">Sent by:</span> abccompany.ph@gmail.com
+              </p>
+              <p className="mb-0">
+                <span className="font-bold">Date:</span> Nov 15, 2025
+              </p>
+              <p className="mb-0">
+                <span className="font-bold">Time:</span> 10:00 GMT
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
+                  setAcceptedItems(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(selectedItemKey)
+                    return newSet
+                  })
+                  onDecline(quotation.id, selectedItemKey)
+                  setFileViewerOpen(false)
+                }}
+                className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
+              >
+                Decline
+              </Button>
+              <Button
+                onClick={() => {
+                  setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
+                  setDeclinedItems(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(selectedItemKey)
+                    return newSet
+                  })
+                  onAccept(quotation.id, selectedItemKey)
+                  setFileViewerOpen(false)
+                }}
+                className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
+              >
+                Accept
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
